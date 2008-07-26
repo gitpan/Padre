@@ -1,0 +1,59 @@
+---
+name: Padre
+version: 0.02
+author:
+  - Gabor Szabo
+abstract: Perl Application Development and Refactoring Environment
+license: perl
+resources:
+  license: http://dev.perl.org/licenses/
+requires:
+  Carp: 0
+  Class::Accessor: 0
+  Cwd: 0
+  DBD::SQLite: 0
+  DBI: 0
+  Data::Dumper: 0
+  File::HomeDir: 0
+  File::Slurp: 0
+  File::Spec::Functions: 0
+  Getopt::Long: 0
+  List::Util: 0
+  Pod::POM: 0
+  Wx: 0
+  Wx::Perl::ProcessStream: 0
+  YAML: 0
+  perl: 5.006
+build_requires:
+  Test::Exception: 0
+  Test::More: 0.47
+  Test::NoWarnings: 0
+provides:
+  My::POD:
+    file: lib/Padre/Pod/Viewer.pm
+  My::View:
+    file: lib/Padre/Pod/Viewer.pm
+  Padre:
+    file: lib/Padre.pm
+    version: 0.02
+  Padre::App:
+    file: lib/Padre/App.pm
+    version: 0.01
+  Padre::Frame:
+    file: lib/Padre/Frame.pm
+  Padre::Panel:
+    file: lib/Padre/Panel.pm
+    version: 0.01
+  Padre::Pod::Frame:
+    file: lib/Padre/Pod/Frame.pm
+    version: 0.01
+  Padre::Pod::Indexer:
+    file: lib/Padre/Pod/Indexer.pm
+    version: 0.01
+  Padre::Pod::Viewer:
+    file: lib/Padre/Pod/Viewer.pm
+    version: 0.01
+generated_by: Module::Build version 0.2808
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.2.html
+  version: 1.2
