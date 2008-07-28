@@ -1,4 +1,8 @@
 
+v0.03 2008.07.28
+    Fix many issues reported by Octavian Rasnita
+    Rename some internal modules to get full indexing
+
 v0.02 2008.07.26
     First public release under the name Padre
     Slow improvements

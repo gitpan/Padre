@@ -13,6 +13,8 @@ use Data::Dumper  qw(Dumper);
 use Padre;
 my $app = Padre->new;
 
+diag "Wx Version: $Wx::VERSION " . Wx::wxVERSION_STRING();
+
 {
     isa_ok($app, 'Padre');
     ok ! $app->get_index, 'no index';

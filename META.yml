@@ -1,6 +1,6 @@
 ---
 name: Padre
-version: 0.02
+version: 0.03
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
@@ -29,13 +29,9 @@ build_requires:
   Test::More: 0.47
   Test::NoWarnings: 0
 provides:
-  My::POD:
-    file: lib/Padre/Pod/Viewer.pm
-  My::View:
-    file: lib/Padre/Pod/Viewer.pm
   Padre:
     file: lib/Padre.pm
-    version: 0.02
+    version: 0.03
   Padre::App:
     file: lib/Padre/App.pm
     version: 0.01
@@ -53,6 +49,10 @@ provides:
   Padre::Pod::Viewer:
     file: lib/Padre/Pod/Viewer.pm
     version: 0.01
+  Padre::Pod::Viewer::POD:
+    file: lib/Padre/Pod/Viewer.pm
+  Padre::Pod::Viewer::View:
+    file: lib/Padre/Pod/Viewer.pm
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

@@ -2,7 +2,7 @@ package Padre;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 =head1 NAME
 
@@ -39,23 +39,52 @@ On Strawberry Perl you can associate .pl file extension with
 c:\strawberry\perl\bin\wxperl and then you can start double 
 clicking on the application. It should work.
 
-Run This (F5) - run the current buffer (usually you want this on scripts only)
+ Run This (F5) - run the current buffer with the current perl
+ this currently only works with files with .pl  extensions.
 
-Run (CtrlF5) - will first prompt you to a command line that you have to type in such as
+ Run Any (Ctr-F5) - run any external application
+ First time it will prompt you to a command line that you have to type in such as
 
  perl /full/path/to/my/script.pl
 
 then it will execute this every time you press Ctrl-F5 or the menu option.
+Currently Ctrl-F5 does not save any file. (This will be added later.)
 
 You can edit the command line using the Run/Setup menu item.
 
- Ctr-B  matching brace
- Alt-N  Select Nth tab
+ Ctr-B          matching brace
+ Alt-N          Nth Pane
+ Ctr-TAB        Next Pane
+ Ctr-Shift-TAB  Previous Pane
 
  Ctr-1 .. Ctrl-9 can set markers
  Ctr-Shift-1 .. Ctrl-Shift-9 jump to marker
 
  Ctr-M Ctr-Shift-M  comment/uncomment selected lines of code
+
+ Ctr-H opens a help window where you can see the documentation of 
+ any perl module. Just use open (in the help window) and type in the name
+ of a module.
+
+ Ctr-Shift-H Highlight the name of a module in the editor and then 
+ press Ctr-Shift-H. IT will open the help window for the module 
+ whose name was highlighted.
+
+ In the help window you can also start typing the name of a module. When the
+ list of the matching possible modules is small enough you'll be able
+ to open the drop-down list and select the name.
+ The "small enough" is controled by two configuration options in the 
+ Edit/Setup menu:
+
+ Max Number of modules
+ Min Number of modules
+
+ This feature only works after you have indexed all the modules 
+ on your computer. Indexing is currently done by running the following command:
+
+ padre --index
+
+
 
 =head1 Command line options
 
@@ -527,8 +556,6 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
 
   Debugger from within the editor
 
-  Menu option: Save All
-
   TAB jump N spaces, clever TAB (real tab in the beginning, spaces after???)
 
   Mark the buffer that is unsaved with a star.
@@ -556,7 +583,10 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
   Mark a section and comment out all of them at the same time - or remove the # from the beginning
   of all the lines at once. This works with #, make this work with other comment characters for
   other languages.
- 
+
+  Keep the size of the output window,
+  Move between the editor and the output window with some hot-key
+
 =head2 Podviewer
 
   Enabled indexing from widthin application or run the indexer when installing
@@ -647,7 +677,8 @@ that's your problem.
 =head1 CREDITS and THANKS
 
 To Mattia Barbon for providing WxPerl.
-Part of the code was copied from his Wx::Demo application.
+Part of the code was copied from his Wx::Demo application and I think 
+I tool some ideas from Kephra as well.
 
 =cut
 

@@ -9,6 +9,7 @@ my $stop_menu;
 my $proc;
 my $help;
 
+my $status_bar;
 
 my %marker;
 
@@ -90,6 +91,10 @@ sub _create_panel {
     my $config = $main::app->get_config;    
     $main_panel->SplitHorizontally( $nb, $output, $config->{main}{height} );
 
+    $self->CreateStatusBar;
+
+    EVT_NOTEBOOK_PAGE_CHANGED($self, $nb, \&on_panel_changed);
+
     return;
 }
 
@@ -144,15 +149,16 @@ sub _create_menu_bar {
 
     my $config = $main::app->get_config;
 
+    EVT_MENU(  $self, $file->Append( wxID_NEW,    ''  ), \&on_new     );
     EVT_MENU(  $self, $file->Append( wxID_OPEN,   ''  ), \&on_open    );
     my $recent = Wx::Menu->new;
     foreach my $f ($main::app->get_recent('files')) {
        EVT_MENU ($self, $recent->Append(-1, $f), sub { $_[0]->setup_editor($f) } );
     }
     $file->AppendSubMenu( $recent, "Recent Files" );
-    EVT_MENU(  $self, $file->Append( wxID_NEW,    ''  ), \&on_new     );
     EVT_MENU(  $self, $file->Append( wxID_SAVE,   ''  ), \&on_save    );
     EVT_MENU(  $self, $file->Append( wxID_SAVEAS, ''  ), \&on_save_as );
+    EVT_MENU(  $self, $file->Append( -1, 'Save All'  ), \&on_save_all );
     EVT_MENU(  $self, $file->Append( wxID_CLOSE,  ''  ), \&on_close   );
     EVT_MENU(  $self, $file->Append( wxID_EXIT,   ''  ), \&on_exit    );
 
@@ -178,7 +184,7 @@ sub _create_menu_bar {
 
 
     $run_this_menu  = $run->Append( -1 , "Run &This F5" );
-    $run_menu  = $run->Append( -1 , "&Run Ctr-F5" );
+    $run_menu  = $run->Append( -1 , "&Run Any Ctr-F5" );
     $stop_menu = $run->Append( -1 , "&Stop" );
     EVT_MENU( $self, $run_this_menu,  \&on_run_this);
     EVT_MENU( $self, $run_menu,  \&on_run);
@@ -200,6 +206,8 @@ sub _create_menu_bar {
 sub on_key {
     my ($self, $event) = @_;
 
+    $self->update_status;
+
     my $mod  = $event->GetModifiers || 0;
     my $code = $event->GetKeyCode;
     #print "$mod\n" if $mod;
@@ -213,10 +221,7 @@ sub on_key {
     } elsif ($mod == 1) {                        # Alt
         if (57 >= $code and $code >= 49) {       # Alt-1-9
             my $id = $code - 49;
-            my $page = $nb->GetPage($id);
-            if ($page) {
-                $nb->ChangeSelection($id);
-            }
+            $self->on_nth_pane($id);
         }
     } elsif ($mod == 2) {                        # Ctrl
         if (57 >= $code and $code >= 49) {       # Ctrl-1-9
@@ -229,6 +234,8 @@ sub on_key {
             #$page->MarkerAdd($line, $id);
         } elsif ($code == WXK_F5) {               # Ctrl-F5
             $self->on_run;
+        } elsif ($code == WXK_TAB) {              # Ctrl-TAB
+            $self->on_next_pane;
         } elsif ( $code == ord 'G') {             # Ctrl-G
             $self->on_goto;
         } elsif ($code == ord 'B') {              # Ctrl-5    Brace matching?
@@ -256,12 +263,14 @@ sub on_key {
                 $page->InsertText($pos, '#');
             }
         }
-    } elsif ($mod == 6) {                        # Ctrl-Shift
-        if ($code == ord 'H') {                  # Ctrl-Shift-H
+    } elsif ($mod == 6) {                         # Ctrl-Shift
+        if ($code == ord 'H') {                   # Ctrl-Shift-H
             $self->on_context_help;
-        } elsif ($code == ord 'Z') {             # Ctrl-Shift-Z
+        } elsif ($code == WXK_TAB) {              # Ctrl-Shift-TAB
+            $self->on_prev_pane;
+        } elsif ($code == ord 'Z') {              # Ctrl-Shift-Z
             $self->on_redo;
-        } elsif (57 >= $code and $code >= 49) {  # Ctrl-Shift-1-9      go to marker $id\n";
+        } elsif (57 >= $code and $code >= 49) {   # Ctrl-Shift-1-9      go to marker $id\n";
             my $id = $code - 49;
             my $pageid = $nb->GetSelection();
             my $page = $nb->GetPage($pageid);
@@ -373,6 +382,7 @@ sub setup_editor {
     _set_filename($id, $file);
     _set_content($id, $content);
 
+    $self->update_status;
     return;
 }
 
@@ -400,10 +410,11 @@ sub on_toggle_line_numbers {
 # and requireing a min of 2 width
 sub _toggle_numbers {
     my ($editor, $on) = @_;
+
     $editor->SetMarginWidth(1, 0);
     $editor->SetMarginWidth(2, 0);
     if ($on) {
-        my $n = max (2, length ($editor->GetLineCount * 2));
+        my $n = 1 + max (2, length ($editor->GetLineCount * 2));
         my $width = $n * $editor->TextWidth(wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
         $editor->SetMarginWidth(0, $width);
         $editor->SetMarginType(0, wxSTC_MARGIN_NUMBER);
@@ -416,6 +427,7 @@ sub _toggle_numbers {
 
 sub on_open {
     my ($self) = @_;
+
     my $dialog = Wx::FileDialog->new( $self, "Open file", $default_dir, "", "*.*", wxFD_OPEN);
     if ($dialog->ShowModal == wxID_CANCEL) {
         #print "Cancel\n";
@@ -524,6 +536,16 @@ sub on_save {
     return;
 }
 
+sub on_save_all {
+    my ($self) = @_;
+    foreach my $id (0 .. $nb->GetPageCount -1) {
+        if (_buffer_changed($id)) {
+            $self->_save_buffer($id);
+        }
+    }
+    return;
+}
+
 sub _save_buffer {
     my ($self, $id) = @_;
 
@@ -536,6 +558,8 @@ sub _save_buffer {
     $main::app->add_to_recent('files', $filename);
     _set_content($id, $content);
     $nb->SetPageText($id, basename($filename));
+    $page->SetSavePoint;
+    $self->update_status;
 
     return; 
 }
@@ -546,13 +570,13 @@ sub on_close {
     my $id   = $nb->GetSelection;
     #print "Closing $id\n";
     if (_buffer_changed($id)) {
-        my $ret = Wx::MessageBox( "Buffer changed. Do yo want to save it?", "Unsaved buffer", wxYES_NO|wxCENTRE, $self );
+        my $ret = Wx::MessageBox( "Buffer changed. Do yo want to save it?", "Unsaved buffer", wxYES_NO|wxCANCEL|wxCENTRE, $self );
         if ($ret == wxYES) {
             $self->on_save();
         } elsif ($ret == wxNO) {
             # just close it
         } else {
-            # wxCANCEL, when click on [x]
+            # wxCANCEL, or when clicking on [x]
             return;
         }
     }
@@ -693,9 +717,11 @@ sub on_find_again {
 sub on_about {
     my ( $self ) = @_;
 
-    Wx::MessageBox( "Padre $Padre::VERSION, (c) 2008 Gabor Szabo\n" .
-                    "Using Wx v$Wx::VERSION, binding " . wxVERSION_STRING,
-                    "About Padre", wxOK|wxCENTRE, $self );
+    Wx::MessageBox( 
+        "Perl Application Development and Refactoring Environment\n" .
+        "Padre $Padre::VERSION, (c) 2008 Gabor Szabo\n" .
+        "Using Wx v$Wx::VERSION, binding " . wxVERSION_STRING,
+        "About Padre", wxOK|wxCENTRE, $self );
 }
 
 sub on_help {
@@ -703,7 +729,7 @@ sub on_help {
 
     if (not $help) {
         $help = Padre::Pod::Frame->new;
-        my $module = $main::app->get_current('pod');
+        my $module = $main::app->get_current('pod') || 'Padre';
         if ($module) {
             $help->{html}->display($module);
         }
@@ -1022,6 +1048,71 @@ sub on_test_project {
     Wx::MessageBox("Not implemented yet", "Not Yes", wxOK, $self);
 }
 
+sub on_nth_pane {
+    my ($self, $id) = @_;
+    my $page = $nb->GetPage($id);
+    if ($page) {
+       $nb->ChangeSelection($id);
+       return 1;
+    }
+    return;
+}
+sub on_next_pane {
+    my ($self) = @_;
+
+    my $count = $nb->GetPageCount;
+    return if not $count;
+
+    my $id    = $nb->GetSelection;
+    if ($id + 1 < $count) {
+        $self->on_nth_pane($id + 1);
+    } else {
+        $self->on_nth_pane(0);
+    }
+    return;
+}
+sub on_prev_pane {
+    my ($self) = @_;
+
+    my $count = $nb->GetPageCount;
+    return if not $count;
+
+    my $id    = $nb->GetSelection;
+    if ($id) {
+        $self->on_nth_pane($id - 1);
+    } else {
+        $self->on_nth_pane($count-1);
+    }
+    return;
+}
+
+sub update_status {
+    my ($self) = @_;
+
+    my $pageid = $nb->GetSelection();
+    if (not defined $pageid) {
+        $self->SetStatusText("");
+        return;
+    }
+    my $page = $nb->GetPage($pageid);
+    my $line = $page->GetCurrentLine;
+    my $filename = _get_filename($pageid) || '';
+    my $modified = $page->GetModify ? '*' : ' ';
+
+    my $pos = $page->GetCurrentPos;
+
+    my $start = $page->PositionFromLine($line);
+    my $char = $pos-$start;
+
+    $self->SetStatusText("$modified $filename L: " . ($line +1) . " Ch: $char");
+
+    return;
+}
+
+sub on_panel_changed {
+    my ($self) = @_;
+    $self->update_status;
+}
 
 1;
 

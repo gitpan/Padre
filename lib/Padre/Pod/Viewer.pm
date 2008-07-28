@@ -60,10 +60,10 @@ sub display {
     #my $parser = Pod::POM->new();
     #my $pom = $parser->parse($path);
     #my $html = Pod::POM::View::HTML->print($pom);
-    #my $html = My::View->print($pom);
+    #my $html = Padre::Pod::Viewer::View->print($pom);
     #print $html;
 
-    my $parser = My::POD->new;
+    my $parser = Padre::Pod::Viewer::POD->new;
     $parser->start_html;
     $parser->parse_from_file($path);
     my $html = $parser->get_html;
@@ -91,7 +91,7 @@ sub OnLinkClicked {
 }
 
 
-package My::View;
+package Padre::Pod::Viewer::View;
 use base 'Pod::POM::View::HTML';
 
 sub _view_l {
@@ -102,7 +102,7 @@ sub _view_l {
            $item->content->present($self);
 }
 
-package My::POD;
+package Padre::Pod::Viewer::POD;
 use base 'Pod::Parser';
 
 my $html;
