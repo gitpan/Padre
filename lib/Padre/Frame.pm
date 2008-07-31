@@ -9,8 +9,6 @@ my $stop_menu;
 my $proc;
 my $help;
 
-my $status_bar;
-
 my %marker;
 
 use Wx        qw(:everything);
@@ -22,17 +20,19 @@ use base 'Wx::Frame';
 use Padre::Pod::Frame;
 use Padre::Panel;
 
-use File::Spec::Functions qw(catfile);
+use FindBin;
+use File::Spec::Functions qw(catfile catdir);
 use File::Slurp     qw(read_file write_file);
 use File::Basename  qw(basename fileparse);
 use Carp            qw();
 use Data::Dumper    qw(Dumper);
 use List::Util      qw(max);
-
+use File::ShareDir  ();
 my $default_dir = "";
 our $nb;
 my $cnt = 0;
 
+our $VERSION = '0.01';
 
 # see Wx-0.84/ext/stc/cpp/st_constants.cpp for extension
 my %syntax_of = (
@@ -92,11 +92,24 @@ sub _create_panel {
     $main_panel->SplitHorizontally( $nb, $output, $config->{main}{height} );
 
     $self->CreateStatusBar;
+    my $tool_bar = $self->CreateToolBar( wxTB_HORIZONTAL | wxNO_BORDER | wxTB_FLAT | wxTB_DOCKABLE, 5050);
+    $tool_bar->AddTool(wxID_NEW, '', _bitmap('new'), 'New File');
+    $tool_bar->AddTool(wxID_OPEN, '', _bitmap('open'), 'Open');
+    $tool_bar->AddTool(wxID_SAVE, '', _bitmap('save'), 'Save');
 
     EVT_NOTEBOOK_PAGE_CHANGED($self, $nb, \&on_panel_changed);
 
     return;
 }
+
+sub _bitmap($) {
+    my $file = shift;
+
+    my $dir = $ENV{PADRE_DEV} ? catdir($FindBin::Bin, '..', 'share') : File::ShareDir::dist_dir('Padre');
+    my $path = catfile($dir , 'docview', "$file.xpm" );
+    return Wx::Bitmap->new( $path, wxBITMAP_TYPE_XPM );
+}
+
 
 sub _load_files {
     my ($self) = @_;
@@ -181,6 +194,7 @@ sub _create_menu_bar {
     }
     EVT_MENU( $self, $chk, \&on_toggle_line_numbers);
     EVT_MENU( $self, $view->AppendCheckItem( -1 , "Show Output" ), \&on_toggle_show_output);
+    EVT_MENU( $self, $view->AppendCheckItem( -1 , "Hide StatusBar" ), \&on_toggle_status_bar);
 
 
     $run_this_menu  = $run->Append( -1 , "Run &This F5" );
@@ -850,6 +864,17 @@ sub on_toggle_show_output {
     } else {
         # TODO save the value and keep it for next use
         $main_panel->SetSashPosition($config->{main}{height});
+    }
+}
+
+sub on_toggle_status_bar {
+    my ($self, $event) = @_;
+
+    my $status_bar = $self->GetStatusBar;
+    if ($event->IsChecked) {
+        $status_bar->Hide;
+    } else {
+        $status_bar->Show;
     }
 }
 

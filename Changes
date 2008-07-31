@@ -1,3 +1,7 @@
+v0.03_01 2008.07.31
+    Experimental code in Build.PL to avoid test failures when wxWidgets is too old.
+    Added ToolBar
+    Experimental code to install non-perl files and then use find them using File::ShareDir
 
 v0.03 2008.07.28
     Fix many issues reported by Octavian Rasnita

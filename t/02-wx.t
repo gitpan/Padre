@@ -9,7 +9,7 @@ use File::Temp    qw(tempdir);
 
 
 my $dir = tempdir( CLEANUP => 1 );
-diag $dir;
+#diag $dir;
 $ENV{APP_EDITOR_HOME} = $dir;
 
 use Padre;

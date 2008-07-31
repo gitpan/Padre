@@ -1,6 +1,6 @@
 ---
 name: Padre
-version: 0.03
+version: 0.03_01
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
@@ -14,9 +14,12 @@ requires:
   DBD::SQLite: 0
   DBI: 0
   Data::Dumper: 0
+  File::Copy::Recursive: 0
   File::HomeDir: 0
+  File::ShareDir: 1.00
   File::Slurp: 0
   File::Spec::Functions: 0
+  FindBin: 0
   Getopt::Long: 0
   List::Util: 0
   Pod::POM: 0
@@ -31,12 +34,13 @@ build_requires:
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.03
+    version: 0.03_01
   Padre::App:
     file: lib/Padre/App.pm
     version: 0.01
   Padre::Frame:
     file: lib/Padre/Frame.pm
+    version: 0.01
   Padre::Panel:
     file: lib/Padre/Panel.pm
     version: 0.01

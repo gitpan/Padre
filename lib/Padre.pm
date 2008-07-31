@@ -2,7 +2,7 @@ package Padre;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.03_01';
 
 =head1 NAME
 
@@ -487,6 +487,8 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
 
 =head2 Editor
 
+  In "open file" show filenames without extension as well.
+
   Add unit tests that launch the GUI and generate events.
 
   Run an application from within the editor:
@@ -525,6 +527,9 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
     the important part is the STDERR and the debugger.
   - Run the unit tests assuming Makefile.PL or Build.PL
 
+  Deal with "resource installation". That is probably talk to
+  Module::Build, Debian and Fedora people to make it easy to install resource files
+  such as xpm or po files. See File::ShareDir.
 
   Project Management:
 
@@ -542,7 +547,7 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
   Then one should have all the standard steps ready in the menu
       Project Build.PL, Build, Build test, Build testcover, Build dist Build testdist
 
-  Create a new project will create the directory and the standar files
+  Create a new project will create the directory and the standard files
   Select a project == select a directory assuming the files are already there
     or
   Select a project that was already selected once

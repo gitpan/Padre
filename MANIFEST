@@ -2,6 +2,8 @@ Build.PL
 Changes
 MANIFEST
 README
+Makefile.PL
+META.yml
 
 lib/Padre.pm
 lib/Padre/App.pm
@@ -24,5 +26,13 @@ eg/sleep.pl
 eg/wx.pl
 eg/shell.pl
 
-Makefile.PL
-META.yml
+
+share/docview/print.xpm
+share/docview/save.xpm
+share/docview/open.xpm
+share/docview/preview.xpm
+share/docview/help.xpm
+share/docview/new.xpm
+share/docview/copy.xpm
+share/docview/cut.xpm
+
