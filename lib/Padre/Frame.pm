@@ -4,6 +4,7 @@ use warnings;
 
 my $output;
 my $run_this_menu;
+my $debug_this_menu;
 my $run_menu;
 my $stop_menu;
 my $proc;
@@ -143,6 +144,8 @@ sub _load_files {
 sub _create_menu_bar {
     my ($self) = @_;
 
+    my %plugins = %{ $main::app->{plugins} };
+
     my $bar     = Wx::MenuBar->new;
 
     my $file    = Wx::Menu->new;
@@ -150,12 +153,16 @@ sub _create_menu_bar {
     my $view    = Wx::Menu->new;
     my $run     = Wx::Menu->new;
     my $edit    = Wx::Menu->new;
+    my $plugin_menu = Wx::Menu->new;
     my $help    = Wx::Menu->new;
     $bar->Append( $file,    "&File" );
     $bar->Append( $project, "&Project" );
     $bar->Append( $edit,    "&Edit" );
     $bar->Append( $view,    "&View" );
     $bar->Append( $run,     "&Run" );
+    if (%plugins) {
+        $bar->Append( $plugin_menu,     "Pl&ugins" );
+    }
     $bar->Append( $help,    "&Help" );
 
     $self->SetMenuBar( $bar );
@@ -168,7 +175,11 @@ sub _create_menu_bar {
     foreach my $f ($main::app->get_recent('files')) {
        EVT_MENU ($self, $recent->Append(-1, $f), sub { $_[0]->setup_editor($f) } );
     }
-    $file->AppendSubMenu( $recent, "Recent Files" );
+
+    #$file->AppendSubMenu( $recent, "Recent Files" );
+    # to support older version of wxWidgets as well
+    $file->Append( -1, "Recent Files", $recent );
+
     EVT_MENU(  $self, $file->Append( wxID_SAVE,   ''  ), \&on_save    );
     EVT_MENU(  $self, $file->Append( wxID_SAVEAS, ''  ), \&on_save_as );
     EVT_MENU(  $self, $file->Append( -1, 'Save All'  ), \&on_save_all );
@@ -184,8 +195,8 @@ sub _create_menu_bar {
 #    EVT_MENU( $self, $edit->Append( wxID_COPY,    ''       ), \&on_copy    );
 #    EVT_MENU( $self, $edit->Append( wxID_PASTE,   ''       ), \&on_paste   );
     EVT_MENU( $self, $edit->Append( wxID_FIND,    ''       ), \&on_find    );
-    EVT_MENU( $self, $edit->Append( -1,           "&Find Again (F3)"  ), \&on_find_again    );
-    EVT_MENU( $self, $edit->Append( -1,           "&Goto Ctr-G"       ), \&on_goto    );
+    EVT_MENU( $self, $edit->Append( -1,           "&Find Again\tF3"  ), \&on_find_again    );
+    EVT_MENU( $self, $edit->Append( -1,           "&Goto\tCtrl-G"     ), \&on_goto    );
     EVT_MENU( $self, $edit->Append( -1,           "&Setup"      ), \&on_setup   );
 
     my $chk = $view->AppendCheckItem( -1 , "Line numbers" );
@@ -196,17 +207,34 @@ sub _create_menu_bar {
     EVT_MENU( $self, $view->AppendCheckItem( -1 , "Show Output" ), \&on_toggle_show_output);
     EVT_MENU( $self, $view->AppendCheckItem( -1 , "Hide StatusBar" ), \&on_toggle_status_bar);
 
-
-    $run_this_menu  = $run->Append( -1 , "Run &This F5" );
-    $run_menu  = $run->Append( -1 , "&Run Any Ctr-F5" );
+    ## Help
+    $run_this_menu  = $run->Append( -1 , "Run &This\tF5" );
+    #$debug_this_menu  = $run->Append( -1 , "Debug This\tF6" );
+    $run_menu  = $run->Append( -1 , "&Run Any\tCtrl-F5" );
     $stop_menu = $run->Append( -1 , "&Stop" );
     EVT_MENU( $self, $run_this_menu,  \&on_run_this);
+    #EVT_MENU( $self, $debug_this_menu,  \&on_debug_this);
     EVT_MENU( $self, $run_menu,  \&on_run);
     EVT_MENU( $self, $stop_menu,  \&on_stop);
     $stop_menu->Enable(0);
 
     EVT_MENU( $self, $run->Append( -1,           "&Setup"      ), \&on_setup_run   );
 
+    ## Plugins
+    foreach my $name (sort keys %plugins) {
+        next if not $plugins{$name};
+        my $submenu = Wx::Menu->new;
+        my @menu = eval {$plugins{$name}->menu;};
+        warn "Error when calling menu for plugin '$name' $@" if $@;
+        foreach my $m (@menu) {
+           EVT_MENU ($self, $submenu->Append(-1, $m->[0]), $m->[1] );
+        }
+        #$plugin_menu->AppendSubMenu( $submenu, $name );
+        $plugin_menu->Append(-1,$name, $submenu);
+    }
+
+
+    ## Help
     EVT_MENU( $self, $help->Append( wxID_ABOUT,   '' ), \&on_about   );
     EVT_MENU( $self, $help->Append( wxID_HELP,    '' ), \&on_help    );
     EVT_MENU( $self, $help->Append( -1,    'Context-help  Ctrl-Shift-H' ), \&on_context_help    );
@@ -227,11 +255,9 @@ sub on_key {
     #print "$mod\n" if $mod;
     #print $event->GetKeyCode, "\n";
     if (not $mod) {
-       if ($code == WXK_F3) {                    # F3
-          $self->on_find_again;
-       } elsif ($code == WXK_F5) {               # F5
-          $self->on_run_this;
-       }
+        if ($code == WXK_F7) {             # F7
+            print "experimental - sending s to debugger\n";
+        }
     } elsif ($mod == 1) {                        # Alt
         if (57 >= $code and $code >= 49) {       # Alt-1-9
             my $id = $code - 49;
@@ -246,13 +272,9 @@ sub on_key {
             $marker{$id} = $line;
 #print "set marker $id to line $line\n";
             #$page->MarkerAdd($line, $id);
-        } elsif ($code == WXK_F5) {               # Ctrl-F5
-            $self->on_run;
         } elsif ($code == WXK_TAB) {              # Ctrl-TAB
             $self->on_next_pane;
-        } elsif ( $code == ord 'G') {             # Ctrl-G
-            $self->on_goto;
-        } elsif ($code == ord 'B') {              # Ctrl-5    Brace matching?
+        } elsif ($code == ord 'B') {              # Ctrl-B    Brace matching?
             my $id   = $nb->GetSelection;
             my $page = $nb->GetPage($id);
             my $pos1  = $page->GetCurrentPos;
@@ -338,7 +360,7 @@ sub on_close_window {
             return;
         }
 
-        my @files = map { _get_filename($_) } (0 .. $nb->GetPageCount -1);
+        my @files = map { $self->_get_filename($_) } (0 .. $nb->GetPageCount -1);
         $config->{main}{files} = \@files;
     }
 
@@ -482,7 +504,7 @@ sub _set_filename {
     return;
 }
 sub _get_filename {
-    my ($id) = @_;
+    my ($self, $id) = @_;
 
     my $pack = __PACKAGE__;
     my $page = $nb->GetPage($id);
@@ -540,9 +562,9 @@ sub on_save {
     my ($self) = @_;
 
     my $id   = $nb->GetSelection;
-    return if not _buffer_changed($id) and _get_filename($id);
+    return if not _buffer_changed($id) and $self->_get_filename($id);
 
-    if (_get_filename($id)) {
+    if ($self->_get_filename($id)) {
         $self->_save_buffer($id);
     } else {
         $self->on_save_as();
@@ -565,7 +587,7 @@ sub _save_buffer {
 
     my $page = $nb->GetPage($id);
     my $content = $page->GetText;
-    my $filename = _get_filename($id);
+    my $filename = $self->_get_filename($id);
     eval {
         write_file($filename, $content);
     };
@@ -657,7 +679,22 @@ sub on_goto {
     my $id   = $nb->GetSelection;
     my $page = $nb->GetPage($id);
 
-    $page->GotoLine($line_number-1);
+    $line_number--;
+    $page->GotoLine($line_number);
+
+# highlight a line
+#    $page->SetSelection($page->PositionFromLine($line_number), $page->GetLineEndPosition($line_number));
+
+    #$page->SetMarginMask(0, wxSTC_STYLE_LINENUMBER);
+    #$page->SetMarginType(0, wxSTC_STYLE_LINENUMBER);
+
+# put circle next to row
+#    $page->SetMarginWidth(1, 16);
+#    my $fg = Wx::Colour->new( 0xff, 0xff, 0xff );
+#    my $bg = Wx::Colour->new( 0x00, 0x00, 0x00 );
+#    $page->MarkerDefine(0, wxSTC_MARK_CIRCLE, $fg, $bg);
+#    $page->MarkerAdd($line_number, 0);
+#
     return;
 }
 
@@ -788,7 +825,7 @@ sub on_run_this {
     }
 
     my $id   = $nb->GetSelection;
-    my $filename = _get_filename($id);
+    my $filename = $self->_get_filename($id);
     if (not $filename) {
         Wx::MessageBox( "No filename, cannot run", "Cannot run", wxOK|wxCENTRE, $self );
         return;
@@ -802,15 +839,58 @@ sub on_run_this {
     return;
 }
 
+sub on_debug_this {
+    my ($self) = @_;
+    $self->on_save;
+
+    my $id   = $nb->GetSelection;
+    my $filename = $self->_get_filename($id);
+
+
+    my $host = 'localhost';
+    my $port = 12345;
+
+    _setup_debugger($host, $port);
+
+    local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
+    $self->_run("$^X -d $filename");
+
+    return;
+}
+
+# based on remoteport from "Pro Perl Debugging by Richard Foley and Andy Lester"
+sub _setup_debugger {
+    my ($host, $port) = @_;
+
+#use IO::Socket;
+#use Term::ReadLine;
+#
+#    my $term = new Term::ReadLine 'local prompter';
+#
+#    # Open the socket the debugger will connect to.
+#    my $sock = IO::Socket::INET->new(
+#                   LocalHost => $host,
+#                   LocalPort => $port,
+#                   Proto     => 'tcp',
+#                   Listen    => SOMAXCONN,
+#                   Reuse     => 1);
+#    $sock or die "no socket :$!";
+#
+#    my $new_sock = $sock->accept();
+#    my $remote_host = gethostbyaddr($sock->sockaddr(), AF_INET) || 'remote';
+#    my $prompt = "($remote_host)> ";
+}
+
 sub _run {
     my ($self, $cmd) = @_;
+
     $run_this_menu->Enable(0);
     $run_menu->Enable(0);
     $stop_menu->Enable(1);
 
     my $config = $main::app->get_config;
     $main::app->get_widget('main_panel')
-        ->SetSashPosition($config->{main}{height} -100);
+        ->SetSashPosition($config->{main}{height} - 300);
     $output->Remove(0, $output->GetLastPosition);
 
     $proc = Wx::Perl::ProcessStream->OpenProcess($cmd, 'MyName1', $self);
@@ -1121,7 +1201,7 @@ sub update_status {
     }
     my $page = $nb->GetPage($pageid);
     my $line = $page->GetCurrentLine;
-    my $filename = _get_filename($pageid) || '';
+    my $filename = $self->_get_filename($pageid) || '';
     my $modified = $page->GetModify ? '*' : ' ';
 
     my $pos = $page->GetCurrentPos;
@@ -1137,6 +1217,11 @@ sub update_status {
 sub on_panel_changed {
     my ($self) = @_;
     $self->update_status;
+}
+
+sub get_nb {
+    my ($self) = @_;
+    return $nb;
 }
 
 1;

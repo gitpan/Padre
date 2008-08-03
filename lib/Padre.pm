@@ -2,13 +2,16 @@ package Padre;
 use strict;
 use warnings;
 
-our $VERSION = '0.03_01';
+our $VERSION = '0.03_02';
 
 =head1 NAME
 
 Padre - Perl Application Development and Refactoring Environment
 
 =head1 SYNOPSIS
+
+Padre is a text editor aimed to be an IDE for Perl.
+
 
 You should be able to just type in 
 
@@ -85,17 +88,37 @@ You can edit the command line using the Run/Setup menu item.
  padre --index
 
 
-
 =head1 Command line options
 
  --index   will go over the @INC and list all the available modules in the database
  
  a list of filenames can be given to be opened
 
+=head1 Plugins
+
+There is a highly experimental but quit simple plugin system.
+
+A plugin is a module in the Padre::Plugin::* namespace.
+
+At startup time Padre looks for all such modules in @INC 
+and loads them.
+Every plugin must have a C<menu> method that returns its menu items
+which is a list of lists:
+
+ ( 
+   [ Name_1, \&callback_1 ],
+   [ Name_2, \&callback_2 ],
+ )
+
+Padre will add a menu entry for every plugin under the B<Plugins>
+menu item. For each plugin menu item it will add all the Name_1,
+Name_2 subitems.
+
+
 =cut
 
 use File::HomeDir         qw();
-use File::Spec::Functions qw(catfile);
+use File::Spec::Functions qw(catfile catdir);
 use DBI                   qw();
 use Carp                  qw();
 use YAML                  qw(LoadFile DumpFile);
@@ -118,6 +141,7 @@ sub new {
     $self->{recent}{$_} = [] for @history;
 
     $self->_process_command_line;
+    $self->_locate_plugins;
 
     return $self;
 }
@@ -161,6 +185,31 @@ sub _process_command_line {
     return;
 }
 
+sub _locate_plugins {
+    my ($self) = @_;
+    my %plugins;
+    foreach my $path (@INC) {
+        my $dir = catdir($path, 'Padre', 'Plugin');
+        opendir my $dh, $dir or next;
+        while (my $file = readdir $dh) {
+            if ($file =~ /^\w+\.pm$/) {
+                $file =~ s/\.pm$//;
+                $plugins{$file} = 0;
+                my $module = "Padre::Plugin::$file";
+                #print "loading $module\n";
+                eval "use $module";
+                if ($@) {
+                    warn "ERROR while trying to load plugin '$file': $@";
+                    next;
+                }
+                
+                $plugins{$file} = $module;
+            }
+        }
+    }
+    $self->{plugins} = \%plugins;
+    return;
+}
 
 sub usage {
     die <<"END_USAGE";
@@ -182,7 +231,7 @@ sub run_editor {
 sub _config_dir {
     my $dir = catfile(
 
-              ($ENV{APP_EDITOR_HOME} ? $ENV{APP_EDITOR_HOME} : File::HomeDir->my_data),
+              ($ENV{PADRE_HOME} ? $ENV{PADRE_HOME} : File::HomeDir->my_data),
 
               '.padre');
     if (not -e $dir) {
@@ -532,6 +581,7 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
   such as xpm or po files. See File::ShareDir.
 
   Project Management:
+  use PerlySense http://use.perl.org/comments.pl?sid=40446  ?
 
   We need to assume that the current working directory of the editor can be anywhere.
   For Perl project management we will assume a directory layout similar to what we have
@@ -557,7 +607,6 @@ Send your wish list to Gabor Szabo <szabgab@gmail.com>
 
   How to keep the path of projects on a stick?
   Their path can be different in different machines.
-
 
   Debugger from within the editor
 
@@ -682,8 +731,11 @@ that's your problem.
 =head1 CREDITS and THANKS
 
 To Mattia Barbon for providing WxPerl.
-Part of the code was copied from his Wx::Demo application and I think 
-I tool some ideas from Kephra as well.
+Part of the code was copied from his Wx::Demo application.
+
+To Herbert Breunung for leting me work on Kephra.
+
+To Octavian Rasnita for early testing and bug reports.
 
 =cut
 

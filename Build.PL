@@ -49,6 +49,9 @@ my $builder = $class->new(
         'Getopt::Long'            => 0,
         'List::Util'              => 0,
 
+        'IO::Socket'              => 0,
+        'Term::ReadLine'          => 0,
+
         'Class::Accessor'         => 0,
         'DBD::SQLite'             => 0,
         'DBI'                     => 0,
@@ -60,6 +63,7 @@ my $builder = $class->new(
         'YAML'                    => 0,
         'Wx'                      => 0,
         'Wx::Perl::ProcessStream' => 0,
+
     },
     build_requires        => {
         'Test::More'                => '0.47',

@@ -1,6 +1,6 @@
 ---
 name: Padre
-version: 0.03_01
+version: 0.03_02
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
@@ -21,8 +21,10 @@ requires:
   File::Spec::Functions: 0
   FindBin: 0
   Getopt::Long: 0
+  IO::Socket: 0
   List::Util: 0
   Pod::POM: 0
+  Term::ReadLine: 0
   Wx: 0
   Wx::Perl::ProcessStream: 0
   YAML: 0
@@ -34,7 +36,7 @@ build_requires:
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.03_01
+    version: 0.03_02
   Padre::App:
     file: lib/Padre/App.pm
     version: 0.01

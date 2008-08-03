@@ -26,7 +26,7 @@ diag "Wx Version: $Wx::VERSION " . Wx::wxVERSION_STRING();
 
 my $dir = tempdir( CLEANUP => 1 );
 #diag $dir;
-$ENV{APP_EDITOR_HOME} = $dir;
+$ENV{PADRE_HOME} = $dir;
 
 {
     $app->load_config;

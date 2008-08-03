@@ -1,3 +1,9 @@
+v0.03_02 2008.08.03
+    add experimental code for plugins
+    add experimental version of Padre::Plugin::PAR
+    fix the shortcuts of some of the menues in windows, thanks to Octavian Rasnita
+    replace the AppendSubMenu calls by Append calls to support older version of wxWidgets
+
 v0.03_01 2008.07.31
     Experimental code in Build.PL to avoid test failures when wxWidgets is too old.
     Added ToolBar

@@ -10,7 +10,7 @@ use File::Temp    qw(tempdir);
 
 my $dir = tempdir( CLEANUP => 1 );
 #diag $dir;
-$ENV{APP_EDITOR_HOME} = $dir;
+$ENV{PADRE_HOME} = $dir;
 
 use Padre;
 our $app = Padre->new;
