@@ -4,7 +4,7 @@ use warnings;
 use Module::Build         ();
 
 
-check_wx_version();
+#check_wx_version();
 
 my $class = Module::Build->subclass(
     class => 'Padre::Install',
@@ -33,7 +33,7 @@ my $builder = $class->new(
     module_name           => 'Padre',
     license               => 'perl',
     dist_author           => 'Gabor Szabo',
-    create_makefile_pl    => 'traditional',
+    create_makefile_pl    => 'passthrough',
     create_readme         => 0,
     recursive_test_files  => 0,
 
@@ -55,6 +55,7 @@ my $builder = $class->new(
         'Class::Accessor'         => 0,
         'DBD::SQLite'             => 0,
         'DBI'                     => 0,
+        'Devel::PerlySense'       => 0, 
         'File::Copy::Recursive'   => 0,
         'File::HomeDir'           => 0,
         'File::ShareDir'          => '1.00',
@@ -69,6 +70,14 @@ my $builder = $class->new(
         'Test::More'                => '0.47',
         'Test::Exception'           => 0,
         'Test::NoWarnings'          => 0,
+    },
+    meta_merge => {
+        resources => {
+            homepage    => 'http://padre.perlide.org/',
+            bugtracker  => 'http://padre.perlide.org/',
+            Repository  => 'http://svn.perlide.org/padre',
+    #        MailingList => 'http://mail.perlide.org/listinfo/padre',
+        },
     },
 );
 

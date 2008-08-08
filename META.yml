@@ -1,11 +1,14 @@
 ---
 name: Padre
-version: 0.03_02
+version: 0.04
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
 license: perl
 resources:
+  Repository: http://svn.perlide.org/padre
+  bugtracker: http://padre.perlide.org/
+  homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
 requires:
   Carp: 0
@@ -14,6 +17,7 @@ requires:
   DBD::SQLite: 0
   DBI: 0
   Data::Dumper: 0
+  Devel::PerlySense: 0
   File::Copy::Recursive: 0
   File::HomeDir: 0
   File::ShareDir: 1.00
@@ -36,7 +40,7 @@ build_requires:
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.03_02
+    version: 0.04
   Padre::App:
     file: lib/Padre/App.pm
     version: 0.01

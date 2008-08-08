@@ -10,6 +10,8 @@ my $stop_menu;
 my $proc;
 my $help;
 
+sub say { print @_, "\n" }
+
 my %marker;
 
 use Wx        qw(:everything);
@@ -386,6 +388,8 @@ sub _lexer {
 sub setup_editor {
     my ($self, $file) = @_;
 
+    $self->{_in_setup_editor} = 1;
+
     my $config = $main::app->get_config;
 
 
@@ -400,7 +404,7 @@ sub setup_editor {
 #    print Wx::wxSTC_EOL_LF, "\n";2
 
     $cnt++;
-    my $title = "Unsaved Document $cnt";
+    my $title = " Unsaved Document $cnt";
     my $content = '';
     if ($file) {
         $content = read_file($file);
@@ -416,8 +420,8 @@ sub setup_editor {
     #my $page = $nb->GetCurrentPage;
     my $id  = $nb->GetSelection;
     _set_filename($id, $file);
-    _set_content($id, $content);
 
+    delete $self->{_in_setup_editor};
     $self->update_status;
     return;
 }
@@ -511,27 +515,14 @@ sub _get_filename {
 
     return $page->{$pack}{filename};
 }
-sub _set_content {
-    my ($id, $data) = @_;
-
-    my $pack = __PACKAGE__;
-    my $page = $nb->GetPage($id);
-    $page->{$pack}{content} = $data;
-
-    return;
-}
-sub _get_content {
-    my ($id) = @_;
-    my $pack = __PACKAGE__;
-    my $page = $nb->GetPage($id);
-    return $page->{$pack}{content};
-}
 
 
 sub on_save_as {
     my ($self) = @_;
 
     my $id   = $nb->GetSelection;
+    return if $id == -1;
+
     while (1) {
         my $dialog = Wx::FileDialog->new( $self, "Save file as...", $default_dir, "", "*.*", wxFD_SAVE);
         if ($dialog->ShowModal == wxID_CANCEL) {
@@ -562,6 +553,8 @@ sub on_save {
     my ($self) = @_;
 
     my $id   = $nb->GetSelection;
+    return if $id == -1;
+
     return if not _buffer_changed($id) and $self->_get_filename($id);
 
     if ($self->_get_filename($id)) {
@@ -592,7 +585,6 @@ sub _save_buffer {
         write_file($filename, $content);
     };
     $main::app->add_to_recent('files', $filename);
-    _set_content($id, $content);
     $nb->SetPageText($id, basename($filename));
     $page->SetSavePoint;
     $self->update_status;
@@ -623,10 +615,7 @@ sub _buffer_changed {
     my ($id) = @_;
 
     my $page = $nb->GetPage($id);
-    #print "$page\n";
-    #print $nb->GetPage($id), "\n";
-    my $content = $page->GetText;
-    return $content ne _get_content($id);
+    return $page->GetModify;
 }
 
 sub on_setup {
@@ -702,23 +691,59 @@ sub on_find {
     my ( $self ) = @_;
 
     my $config = $main::app->get_config;
-    my $selection = $self->_get_selection();
 
-    my $search_term = $config->{search_term};
-    if (defined $selection and $selection ne '') { 
-        $search_term = $selection;
-    }
-    my $dialog = Wx::TextEntryDialog->new( $self, "", "Type in search term", $search_term );
+    my $dialog = Wx::Dialog->new( $self, -1, "Search", [-1, -1], [-1, -1]);
+
+    my $box  = Wx::BoxSizer->new(  wxVERTICAL );
+    my $row1 = Wx::BoxSizer->new(  wxHORIZONTAL );
+    my $row2 = Wx::BoxSizer->new(  wxHORIZONTAL );
+    my $row3 = Wx::BoxSizer->new(  wxHORIZONTAL );
+    my $row4 = Wx::BoxSizer->new(  wxHORIZONTAL );
+
+    $box->Add($row1);
+    $box->Add($row2);
+    $box->Add($row3);
+    $box->Add($row4);
+
+    #my @projects = keys %{ $config->{projects} };
+    #push @$search_terms, $search_term if defined $search_term and $search_term ne '';
+
+    my $selection = $self->_get_selection();
+    $selection = '' if not defined $selection;
+    my $choice = Wx::ComboBox->new( $dialog, -1, $selection, [-1, -1], [-1, -1], $config->{search_terms});
+    $row1->Add( $choice, 1, wxALL, 3);
+
+#    $row2->Add($dir_selector, 1, wxALL, 3);
+
+#    my $path = Wx::StaticText->new( $dialog, -1, '');
+#    $row3->Add( $path, 1, wxALL, 3 );
+#    EVT_BUTTON( $dialog, $dir_selector, sub {on_pick_project_dir($path, @_) } );
+    #wxTE_PROCESS_ENTER
+    EVT_TEXT_ENTER($dialog, $choice, sub { $dialog->EndModal(wxID_OK) });
+
+    my $ok     = Wx::Button->new( $dialog, wxID_OK,     '');
+    my $cancel = Wx::Button->new( $dialog, wxID_CANCEL, '');
+    EVT_BUTTON( $dialog, $ok,     sub { $dialog->EndModal(wxID_OK)     } );
+    EVT_BUTTON( $dialog, $cancel, sub { $dialog->EndModal(wxID_CANCEL) } );
+    $row4->Add($cancel, 1, wxALL, 3);
+    $row4->Add($ok,     1, wxALL, 3);
+
+    $dialog->SetSizer($box);
+    #$box->SetSizeHints( $self );
+
+    $choice->SetFocus;
     if ($dialog->ShowModal == wxID_CANCEL) {
         return;
     }
-    $search_term = $dialog->GetValue;
+    my $search_term = $choice->GetValue;
     $dialog->Destroy;
 
-    $search_term = '' if not defined $search_term;
-    return if $search_term eq '';
+    return if not defined $search_term or $search_term eq '';
 
-    $config->{search_term} = $search_term;
+    unshift @{$config->{search_terms}}, $search_term;
+    my %seen;
+    @{$config->{search_terms}} = grep {!$seen{$_}++} @{$config->{search_terms}};
+
     $self->_search();
 
     return;
@@ -728,7 +753,7 @@ sub _search {
     my ($self) = @_;
 
     my $config = $main::app->get_config;
-    my $search_term = $config->{search_term};
+    my $search_term = $config->{search_terms}[0];
 
     my $id   = $nb->GetSelection;
     my $page = $nb->GetPage($id);
@@ -753,7 +778,7 @@ sub on_find_again {
     my ($self) = @_;
 
     my $config = $main::app->get_config;
-    my $search_term = $config->{search_term};
+    my $search_term = $config->{search_terms}[0];
 
     if ($search_term) {
         $self->_search;
@@ -1194,6 +1219,8 @@ sub on_prev_pane {
 sub update_status {
     my ($self) = @_;
 
+    return if $self->{_in_setup_editor};
+
     my $pageid = $nb->GetSelection();
     if (not defined $pageid) {
         $self->SetStatusText("");
@@ -1204,6 +1231,12 @@ sub update_status {
     my $filename = $self->_get_filename($pageid) || '';
     my $modified = $page->GetModify ? '*' : ' ';
 
+    if ($filename) {
+        $nb->SetPageText($pageid, $modified . basename $filename);
+    } else {
+        my $text = substr($nb->GetPageText($pageid), 1);
+        $nb->SetPageText($pageid, $modified . $text);
+    }
     my $pos = $page->GetCurrentPos;
 
     my $start = $page->PositionFromLine($line);

@@ -1,3 +1,18 @@
+v0.04 2008.08.08
+
+    add Devel::PerlySense as prereq
+    stop checking for wx version for now
+    change the create_makefile_pl to passthrough as the traditional did not do the extra work done by Build.PL
+    Mark the buffer that is unsaved with a star.
+    stop saving the content of the loaded file and use GetModify
+       to find out if the file has been modifyed since last save
+
+    * replace the search_term by search_terms in the config file
+    allow remembering of search terms
+    replace the text dialog by a full dialog box and a Wx::ComboBox
+    Setup http://padre.perlide.org/ using trac
+    Move the repository to http://svn.perlide.org/padre/
+
 v0.03_02 2008.08.03
     add experimental code for plugins
     add experimental version of Padre::Plugin::PAR
