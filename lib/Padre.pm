@@ -1,8 +1,6 @@
 package Padre;
-use strict;
-use warnings;
 
-our $VERSION = '0.04';
+=pod
 
 =head1 NAME
 
@@ -12,13 +10,11 @@ Padre - Perl Application Development and Refactoring Environment
 
 Padre is a text editor aimed to be an IDE for Perl.
 
-
 You should be able to just type in 
 
  padre
 
 and get the editor working.
-
 
 While I am using this editor myself there are still lots of
 missing features so I would consider this application to
@@ -56,6 +52,7 @@ Currently Ctrl-F5 does not save any file. (This will be added later.)
 You can edit the command line using the Run/Setup menu item.
 
  Ctr-B          matching brace
+ Ctr-P          Autocompletition
  Alt-N          Nth Pane
  Ctr-TAB        Next Pane
  Ctr-Shift-TAB  Previous Pane
@@ -87,6 +84,22 @@ You can edit the command line using the Run/Setup menu item.
 
  padre --index
 
+=head2 Rectangular Text Selection
+
+Simple text editors usually only allow you to select contiguous lines of text with your mouse. 
+Somtimes, however, it is handy to be able to select a rectangular area of text for more precise 
+cutting/copying/pasting or performing search/replace on. You can select a rectangular area in Padre
+by holding down Ctr-Alt whilst selecting text with your mouse. 
+
+For example, imagine you have the following nicely formatted hash assignment in a perl source file:
+
+ my %hash = (
+    key1 => 'value1',
+    key2 => 'value2',
+    key3 => 'value3',
+ );
+
+With a rectangular text selection you can select only the keys, only the values, etc.. 
 
 =head1 Command line options
 
@@ -114,42 +127,118 @@ Padre will add a menu entry for every plugin under the B<Plugins>
 menu item. For each plugin menu item it will add all the Name_1,
 Name_2 subitems.
 
-
 =cut
 
-use File::HomeDir         qw();
-use File::Spec::Functions qw(catfile catdir);
-use DBI                   qw();
-use Carp                  qw();
-use YAML                  qw(LoadFile DumpFile);
-use Getopt::Long          qw(GetOptions);
-use Data::Dumper          qw(Dumper);
+use 5.008;
+use strict;
+use warnings;
 
-use Padre::App;
+our $VERSION = '0.05';
+
+use Carp          ();
+use File::Spec    ();
+use File::HomeDir ();
+use Getopt::Long  ();
+use YAML::Tiny    ();
+use DBI           ();
+
+# Preload just what is needed to get something on screen
+use Padre::Config   ();
+use Padre::Wx::App  ();
+use Padre::Frame    ();
+use Padre::Wx::Text ();
+
+# Globally shared Perl detection object
+my $probe_perl = undef;
+sub probe_perl {
+	unless ( $probe_perl ) {
+		require Probe::Perl;
+		$probe_perl = Probe::Perl->new;
+	}
+	return $probe_perl;
+}
 
 use base 'Class::Accessor';
 
 __PACKAGE__->follow_best_practice;
 __PACKAGE__->mk_accessors(qw(config index));
 
-
 my @history = qw(files pod);
 
+my $SINGLETON = undef;
 sub new {
-    my ($class) = @_;
-    my $self = bless {}, $class;
-    $self->{recent}{$_} = [] for @history;
+    return $SINGLETON if $SINGLETON;
+    my $class = shift;
 
+    # Create the empty object
+    my $self  = bless {
+        # Wx-related Attributes
+        wx_app      => undef,
+        wx_notebook => undef,
+
+        # Internal Attributes
+        config_dir  => undef,
+        config_yaml => undef,
+        config_db   => undef,
+        recent      => {
+            files => [],
+            pod   => [],
+        },
+    }, $class;
+
+    # Locate the configuration directory
+    $self->{config_dir} = File::Spec->catfile(
+        ($ENV{PADRE_HOME} ? $ENV{PADRE_HOME} : File::HomeDir->my_data),
+        '.padre'
+    );
+    unless ( -e $self->{config_dir} ) {
+        mkdir $self->{config_dir} or die "Cannot create config dir '$self->{config_dir}' $!";
+    }
+    $self->{config_yaml} = File::Spec->catfile(
+        $self->config_dir,
+        'config.yml',
+    );
+    $self->{config_db} = File::Spec->catfile(
+        $self->config_dir,
+        'config.db',
+    );
+
+    $self->load_config;
     $self->_process_command_line;
     $self->_locate_plugins;
 
+    $SINGLETON = $self;
     return $self;
+}
+
+sub ide {
+    $SINGLETON or
+    $SINGLETON = Padre->new;
+}
+
+sub wx_app {
+    $_[0]->{wx_app};
+}
+
+sub wx_notebook {
+    $_[0]->{wx_notebook};
+}
+
+sub config_dir {
+    $_[0]->{config_dir};
+}
+
+sub config_yaml {
+    $_[0]->{config_yaml};
+}
+
+sub config_db {
+    $_[0]->{config_db};
 }
 
 sub run {
     my ($self) = @_;
-
-    if ($self->get_index) {
+    if ( $self->get_index ) {
         $self->run_indexer;
     } else {
         $self->run_editor;
@@ -161,13 +250,11 @@ sub run_indexer {
     my ($self) = @_;
 
     require Padre::Pod::Indexer;
-    my $x = Padre::Pod::Indexer->new;
-    my @files = $x->list_all_files(@INC);
+    my $indexer = Padre::Pod::Indexer->new;
+    my @files   = $indexer->list_all_files(@INC);
 
-    $self->remove_modules();
+    $self->remove_modules;
     $self->add_modules(@files);
-
-    #require Pod::Index;
 
     return;
 }
@@ -176,7 +263,7 @@ sub _process_command_line {
     my ($self) = @_;
 
     my %opt;
-    GetOptions(\%opt, "index", "help") or usage();
+    Getopt::Long::GetOptions(\%opt, "index", "help") or usage();
     usage() if $opt{help};
 
     $self->set_files(@ARGV);
@@ -189,15 +276,14 @@ sub _locate_plugins {
     my ($self) = @_;
     my %plugins;
     foreach my $path (@INC) {
-        my $dir = catdir($path, 'Padre', 'Plugin');
+        my $dir = File::Spec->catdir($path, 'Padre', 'Plugin');
         opendir my $dh, $dir or next;
         while (my $file = readdir $dh) {
             if ($file =~ /^\w+\.pm$/) {
                 $file =~ s/\.pm$//;
                 $plugins{$file} = 0;
                 my $module = "Padre::Plugin::$file";
-                #print "loading $module\n";
-                eval "use $module";
+		eval "use $module"; ## no critic
                 if ($@) {
                     warn "ERROR while trying to load plugin '$file': $@";
                     next;
@@ -220,56 +306,41 @@ END_USAGE
 }
 
 sub run_editor {
-    my ($self) = @_;
-
-    my $app = Padre::App->new();
-    $app->MainLoop;
-
+    my $self = shift;
+    $self->{wx_app} = Padre::Wx::App->new;
+    $self->{wx_app}->MainLoop;
+    $self->{wx_app} = undef;
     return;
-}
-
-sub _config_dir {
-    my $dir = catfile(
-
-              ($ENV{PADRE_HOME} ? $ENV{PADRE_HOME} : File::HomeDir->my_data),
-
-              '.padre');
-    if (not -e $dir) {
-        mkdir $dir or die "Cannot create config dir '$dir' $!";
-    }
-    return $dir;
 }
 
 sub config_dbh {
     my ($self) = @_;
 
-    my $dir = $self->_config_dir();
-    my $path = catfile($dir, "config.db");
-    my $new = not -e $path;
-    my $dbh = DBI->connect("dbi:SQLite:dbname=$path", "", "", {
+    my $path = $self->config_db;
+    my $new  = not -e $path;
+    my $dbh  = DBI->connect("dbi:SQLite:dbname=$path", "", "", {
         RaiseError       => 1,
         PrintError       => 1,
         AutoCommit       => 1,
         FetchHashKeyName => 'NAME_lc',
     });
-    if ($new) {
+    if ( $new ) {
        $self->create_config($dbh);
     }
     return $dbh;
 }
 
-sub config_yaml {
-    my ($self) = @_;
-    return catfile($self->_config_dir(), "config.yml");
-}
-
-
 sub load_config {
-    my ($self) = @_;
+    my $self = shift;
 
-    my $dbh = $self->config_dbh();
+    # Load the YAML configuration file
+    my $config = Padre::Config->read( $self->config_yaml )
+              || Padre::Config->new;
+    $self->set_config( $config );
 
-    my $sth = $dbh->prepare("SELECT name FROM history WHERE type=? ORDER BY id");
+    # Load the database parts of the configuration
+    my $dbh = $self->config_dbh;
+    my $sth = $dbh->prepare("SELECT name FROM history WHERE type = ? ORDER BY id");
 
     foreach my $type (@history) {
         $sth->execute($type);
@@ -279,58 +350,8 @@ sub load_config {
         }
     }
 
-    my $yaml = $self->config_yaml;
-    if (-e $yaml) {
-        $self->set_config(LoadFile($yaml));
-    }
-    $self->set_defaults;
-
     return;
 }
-
-sub set_defaults {
-    my ($self) = @_;
-
-    my $config = $self->get_config;
-
-    # number of moduls to display when searching for documentation
-    $config->{DISPLAY_MAX_LIMIT} ||= 200;
-    $config->{DISPLAY_MIN_LIMIT}   = 2 if not defined $config->{DISPLAY_MIN_LIMIT};
-
-    # size of the main window
-    $config->{main}{height}      ||= 600;
-    $config->{main}{width}       ||= 700;
-
-    # startup mode, if no files given on the command line this can be
-    #   new        - a new empty buffer
-    #   nothing    - nothing to open
-    #   last       - the files that were open last time    
-    $config->{startup}           ||= 'new';
-
-    #$config->{search_term}         = '' if not defined $config->{search_term};
-    $config->{search_terms}       = [] if not defined $config->{search_terms};
-    if ($config->{search_term}) {
-       $config->{search_terms} = [delete $config->{search_term}]
-    }
-
-    $config->{command_line}      ||= '';
-    # When running a script from the application some of the files might have not been saved yet.
-    # There are several option what to do before running the script
-    # none - don's save anything
-    # same - save the file in the current buffer
-    # all_files - all the files (but not buffers that have no filenames)
-    # all_buffers - all the buffers even if they don't have a name yet
-    $config->{save_on_run}       ||= 'same';
-
-    $config->{show_line_numbers} ||= 0;
-
-    $config->{projects}          ||= {};
-    $config->{current_project}   ||= '';
-
-    $self->set_config($config);
-    return;
-}
-
 
 sub add_to_recent {
     my ($self, $type, $item) = @_;
@@ -346,8 +367,6 @@ sub add_to_recent {
     }
     return;
 }
-
-
 
 sub get_recent {
     my ($self, $type) = @_;
@@ -417,16 +436,14 @@ sub set_item {
 }
 
 sub remove_modules {
-    my ($self) = @_;
-    my $dbh = $self->config_dbh();
-    $dbh->do("DELETE FROM modules");
+    $_[0]->config_dbh->do("DELETE FROM modules");
     return;
 }
 
 sub add_modules {
     my ($self, @modules) = @_;
 
-    my $dbh = $self->config_dbh();
+    my $dbh = $self->config_dbh;
     $dbh->begin_work;
     my $sth = $dbh->prepare("INSERT INTO modules (name) VALUES (?)");
     foreach my $m (@modules) {
@@ -438,7 +455,7 @@ sub add_modules {
 
 sub get_modules {
     my ($self, $part) = @_;
-    my $dbh = $self->config_dbh();
+    my $dbh = $self->config_dbh;
     #$dbh->prepare("SELECT name FROM modules ORDER BY name");
     #$dbh->execute;
     my $sql = "SELECT name FROM modules";
@@ -457,19 +474,18 @@ sub get_modules {
 sub save_config {
     my ($self) = @_;
 
-    my $dbh = $self->config_dbh();
+    # Save the database configuration information
+    my $dbh = $self->config_dbh;
     $dbh->do("DELETE FROM history");
-
     my $sth = $dbh->prepare("INSERT INTO history (type, name) VALUES (?, ?)");
-
     foreach my $type (@history) {
         foreach my $name ($self->get_recent($type)) {
             $sth->execute($type, $name);
         }
     }
 
-    my $yaml = $self->config_yaml;
-    DumpFile($yaml, $self->get_config);
+    # Save the YAML configuration file
+    $self->get_config->write( $self->config_yaml );
 
     return;
 }
@@ -529,6 +545,9 @@ sub get_widget {
     return $self->{widget}{$name};
 }
 
+1;
+
+=pod
 
 =head1 BUGS
 
@@ -558,41 +577,6 @@ L<http://padre.perlide.org/>
   Indexing the words of all the pod files? (Search engine?)
   Indexing the function names only?
 
-=head1 Learning WxWidgets
-
-L<http://wxperl.sourceforge.net/tutorial/tutorial.html> of Mattia Barbon
-
-L<http://www.perl.com/pub/a/2001/09/12/wxtutorial1.html> by Jouke Visser
-
-Documentation of Wx::StyledTextCtrl is here:
-L<http://www.yellowbrain.com/stc/index.html>
-
-stock items in wx:
-
-L<http://docs.wxwidgets.org/2.8.6/wx_stockitems.html#stockitems>
-
-L<http://www.perlmonks.org/?node_id=122227> by boo_radley
-
-http://www.perlmonks.org/?node_id=112297 
-
-http://www.perlmonks.org/?node_id=152323
-
-http://www.perlmonks.org/?node_id=153366
-
-http://www.perlmonks.org/?node_id=184685
-
-http://www.perlmonks.org/?node_id=194611
-
-http://www.perlmonks.org/?node_id=199840
-
-http://www.perlmonks.org/?node_id=164341
-
-http://www.perlmonks.org/?node_id=287396
-
-http://www.perlmonks.org/?node_id=290475
-
-http://www.perlmonks.org/?node_id=219778
-
 =head2 Code layout:
 
 Padre is the main module that reads/writes the configuration files
@@ -604,11 +588,12 @@ List of functions
 
 The yml file contains individual configuration options
 
-Padre::App is the Wx::App subclass
+Padre::Wx::App is the Wx::App subclass
 
 Padre::Frame is the main frame, most of the code is currently there.
 
-Padre::Panel holds an editor window instance (one for each buffer)
+Padre::Wx::Text holds an editor text control instance
+(one for each buffer/file)
 
 Padre::Pod::* are there to index and show documentation written in pod.
 
@@ -621,13 +606,12 @@ See also L<http://padre.perlide.org/>
 
 =head1 COPYRIGHT
 
-(c) 2008 Gabor Szabo http://www.szabgab.com/
+Copyright 2008 Gabor Szabo. L<http://www.szabgab.com/>
 
 =head1 LICENSE
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
-
 
 =head1 WARRANTY
 
@@ -640,11 +624,12 @@ that's your problem.
 To Mattia Barbon for providing WxPerl.
 Part of the code was copied from his Wx::Demo application.
 
+To Adam Kennedy for lots of refactoring.
+
+To Patrick Donelan.
+
 To Herbert Breunung for leting me work on Kephra.
 
 To Octavian Rasnita for early testing and bug reports.
 
 =cut
-
-1;
-

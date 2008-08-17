@@ -1,4 +1,5 @@
-package Padre::App;
+package Padre::Wx::App;
+
 use strict;
 use warnings;
 
