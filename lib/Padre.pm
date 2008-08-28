@@ -16,73 +16,84 @@ You should be able to just type in
 
 and get the editor working.
 
-While I am using this editor myself there are still lots of
-missing features so I would consider this application to
-be in pre-alpha state.
+While I have been using this editor since version 0.01 myself there 
+are still lots of missing features.
 
-I do so mainly becasue everything is in a constant flux.
-Menus, shortcuts and the way they work will change from
-version to version.
+Not only it is missing several important feature, everything is in
+a constant flux. Menus, shortcuts and the way they work will change
+from version to version.
+
+Having said that you can already use it for serious editing and you
+can even get involved and add the missing features.
 
 You should also know that I am mostly working on Linux and I
 have been using vi for many years now. This means that I am 
 not that familiar with the expectations of people using 
 Windows.
 
+=head1 FEATURES
+
+Instead of duplicating all the text here, let me point you to the
+web site of Padre L<http://padre.perlide.org/> where we keep a list
+of existing and planned features.
+
 =head1 DESCRIPTION
 
 The application maintains its configuration information in a 
-directory called .padre
+directory called F<.padre>.
 
 On Strawberry Perl you can associate .pl file extension with
-c:\strawberry\perl\bin\wxperl and then you can start double 
-clicking on the application. It should work.
+C:\strawberry\perl\bin\wxperl and then you can start double 
+clicking on the application. It should work...
 
- Run This (F5) - run the current buffer with the current perl
- this currently only works with files with .pl  extensions.
+  Run This (F5) - run the current buffer with the current perl
+  this currently only works with files with .pl  extensions.
+  
+  Run Any (Ctr-F5) - run any external application
+  First time it will prompt you to a command line that you have to
+  type in such as
+  
+  perl /full/path/to/my/script.pl
 
- Run Any (Ctr-F5) - run any external application
- First time it will prompt you to a command line that you have to type in such as
-
- perl /full/path/to/my/script.pl
-
-then it will execute this every time you press Ctrl-F5 or the menu option.
-Currently Ctrl-F5 does not save any file. (This will be added later.)
+...then it will execute this every time you press Ctrl-F5 or the menu
+option. Currently Ctrl-F5 does not save any file.
+(This will be added later.)
 
 You can edit the command line using the Run/Setup menu item.
 
- Ctr-B          matching brace
- Ctr-P          Autocompletition
- Alt-N          Nth Pane
- Ctr-TAB        Next Pane
- Ctr-Shift-TAB  Previous Pane
+  Ctr-B          matching brace
+  Ctr-P          Autocompletition
+  Alt-N          Nth Pane
+  Ctr-TAB        Next Pane
+  Ctr-Shift-TAB  Previous Pane
+  Alt-S          Jump to list of subs window
 
- Ctr-1 .. Ctrl-9 can set markers
- Ctr-Shift-1 .. Ctrl-Shift-9 jump to marker
-
- Ctr-M Ctr-Shift-M  comment/uncomment selected lines of code
-
- Ctr-H opens a help window where you can see the documentation of 
- any perl module. Just use open (in the help window) and type in the name
- of a module.
-
- Ctr-Shift-H Highlight the name of a module in the editor and then 
- press Ctr-Shift-H. IT will open the help window for the module 
- whose name was highlighted.
-
- In the help window you can also start typing the name of a module. When the
- list of the matching possible modules is small enough you'll be able
- to open the drop-down list and select the name.
- The "small enough" is controled by two configuration options in the 
- Edit/Setup menu:
-
- Max Number of modules
- Min Number of modules
-
- This feature only works after you have indexed all the modules 
- on your computer. Indexing is currently done by running the following command:
-
- padre --index
+  Ctr-1 .. Ctrl-9 can set markers
+  Ctr-Shift-1 .. Ctrl-Shift-9 jump to marker
+  
+  Ctr-M Ctr-Shift-M  comment/uncomment selected lines of code
+  
+  Ctr-H opens a help window where you can see the documentation of 
+  any perl module. Just use open (in the help window) and type in the name
+  of a module.
+  
+  Ctr-Shift-H Highlight the name of a module in the editor and then 
+  press Ctr-Shift-H. IT will open the help window for the module 
+  whose name was highlighted.
+  
+  In the help window you can also start typing the name of a module. When the
+  list of the matching possible modules is small enough you'll be able
+  to open the drop-down list and select the name.
+  The "small enough" is controled by two configuration options in the 
+  Edit/Setup menu: 
+  
+  Max Number of modules
+  Min Number of modules
+  
+  This feature only works after you have indexed all the modules 
+  on your computer. Indexing is currently done by running the following command:
+  
+  padre --index
 
 =head2 Rectangular Text Selection
 
@@ -133,20 +144,35 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
-use Carp          ();
-use File::Spec    ();
-use File::HomeDir ();
-use Getopt::Long  ();
-use YAML::Tiny    ();
-use DBI           ();
+use Carp           ();
+use File::Spec     ();
+use File::HomeDir  ();
+use Getopt::Long   ();
+use YAML::Tiny     ();
+use DBI            ();
+use Class::Autouse ();
 
-# Preload just what is needed to get something on screen
-use Padre::Config   ();
-use Padre::Wx::App  ();
-use Padre::Frame    ();
-use Padre::Wx::Text ();
+# Since everything is used OO-style,
+# autouse everything other than the bare essentials
+use Padre::Config         ();
+use Padre::Wx::App        ();
+use Padre::Wx::MainWindow ();
+
+# Nudges to make Class::Autouse behave
+BEGIN {
+	$Class::Autouse::LOADED{'Wx::Object'} = 1;
+}
+use Class::Autouse qw{
+   Padre::Project
+   Padre::Pod::Frame
+   Padre::Pod::Indexer
+   Padre::Pod::Viewer
+   Padre::Wx::FindDialog
+   Padre::Wx::Popup
+   Padre::Wx::Text
+};
 
 # Globally shared Perl detection object
 my $probe_perl = undef;
@@ -173,8 +199,7 @@ sub new {
     # Create the empty object
     my $self  = bless {
         # Wx-related Attributes
-        wx_app      => undef,
-        wx_notebook => undef,
+        wx      => undef,
 
         # Internal Attributes
         config_dir  => undef,
@@ -187,21 +212,9 @@ sub new {
     }, $class;
 
     # Locate the configuration directory
-    $self->{config_dir} = File::Spec->catfile(
-        ($ENV{PADRE_HOME} ? $ENV{PADRE_HOME} : File::HomeDir->my_data),
-        '.padre'
-    );
-    unless ( -e $self->{config_dir} ) {
-        mkdir $self->{config_dir} or die "Cannot create config dir '$self->{config_dir}' $!";
-    }
-    $self->{config_yaml} = File::Spec->catfile(
-        $self->config_dir,
-        'config.yml',
-    );
-    $self->{config_db} = File::Spec->catfile(
-        $self->config_dir,
-        'config.db',
-    );
+    $self->{config_dir}  = Padre::Config->default_dir;
+    $self->{config_yaml} = Padre::Config->default_yaml;
+    $self->{config_db}   = Padre::Config->default_db;
 
     $self->load_config;
     $self->_process_command_line;
@@ -216,12 +229,9 @@ sub ide {
     $SINGLETON = Padre->new;
 }
 
-sub wx_app {
-    $_[0]->{wx_app};
-}
-
-sub wx_notebook {
-    $_[0]->{wx_notebook};
+sub wx {
+    $_[0]->{wx} or
+    $_[0]->{wx} = Padre::Wx::App->new;
 }
 
 sub config_dir {
@@ -307,9 +317,8 @@ END_USAGE
 
 sub run_editor {
     my $self = shift;
-    $self->{wx_app} = Padre::Wx::App->new;
-    $self->{wx_app}->MainLoop;
-    $self->{wx_app} = undef;
+    $self->wx->MainLoop;
+    $self->{wx} = undef;
     return;
 }
 
@@ -362,9 +371,15 @@ sub add_to_recent {
     my @recent = $self->get_recent($type);
     if (not grep {$_ eq $item} @recent) {
         push @recent, $item;
-        @{ $self->{recent}{$type} } = @recent;
+        my $MAX = 20;
+        if (@recent > $MAX) {
+            @recent = @recent[$#recent-$MAX..$#recent];
+        }
+        @{ $self->{recent}->{$type} } = @recent;
         $self->set_current_index($type, $#recent);
     }
+    
+
     return;
 }
 
@@ -374,7 +389,7 @@ sub get_recent {
     Carp::confess("No type given") if not $type;
     Carp::confess("Invalid type '$type'") if not grep {$_ eq $type} @history;
 
-    return @{ $self->{recent}{$type} };
+    return @{ $self->{recent}->{$type} };
 }
 
 # gets a type, returns a name
@@ -386,7 +401,7 @@ sub get_current {
 
     my $index = $self->get_current_index($type);
     return if not defined $index or $index == -1;
-    return $self->{recent}{$type}[ $index ];
+    return $self->{recent}->{$type}->[ $index ];
 }
 
 # gets a type, returns and index
@@ -396,7 +411,7 @@ sub get_current_index {
     Carp::confess("No type given") if not $type;
     Carp::confess("Invalid type '$type'") if not grep {$_ eq $type} @history;
 
-    return $self->{current}{$type};
+    return $self->{current}->{$type};
 }
 # gets a type and a name
 sub set_current {
@@ -405,9 +420,9 @@ sub set_current {
     Carp::confess("No type given") if not $type;
     Carp::confess("Invalid type '$type'") if not grep {$_ eq $type} @history;
 
-    foreach my $i (0.. @{ $self->{recent}{$type} } -1) {
-        if ($self->{recent}{$type}[$i] eq $name) {
-            $self->{current}{$type} = $i;
+    foreach my $i (0.. @{ $self->{recent}->{$type} } -1) {
+        if ($self->{recent}->{$type}->[$i] eq $name) {
+            $self->{current}->{$type} = $i;
             last;
         }
     }
@@ -420,7 +435,7 @@ sub set_current_index {
 
     Carp::confess("No type given") if not $type;
     Carp::confess("Invalid type '$type'") if not grep {$_ eq $type} @history;
-    $self->{current}{$type} = $n;
+    $self->{current}->{$type} = $n;
     return; 
 }
 
@@ -535,14 +550,30 @@ sub get_files {
     return ($self->{_files} and ref ($self->{_files}) eq 'ARRAY' ? @{ $self->{_files} } : ());
 }
 
-sub set_widget {
-    my ($self, $name, $value) = @_;
-    $self->{widget}{$name} = $value;
-    return;
-}
-sub get_widget {
-    my ($self, $name) = @_;
-    return $self->{widget}{$name};
+=head2 get_newline_type
+
+Returns None if there was not CR or LF in the file.
+Returns UNIX, Mac or Windows if only the appropriate newlines were found.
+
+Returns Mixed if line endings are mixed.
+
+=cut
+sub get_newline_type {
+    my ($text) = @_;
+
+    my $CR   = "\015";
+    my $LF   = "\012";
+    my $CRLF = "\015\012";
+
+    return "None" if $text !~ /$LF/ and $text !~ /$CR/;
+    return "UNIX" if $text !~ /$CR/;
+    return "MAC"  if $text !~ /$LF/;
+
+    $text =~ s/$CRLF//g;
+    return "WIN" if $text !~ /$LF/ and $text !~ /$CR/;
+
+    return "Mixed"
+    # return "Unknown";
 }
 
 1;
@@ -553,31 +584,7 @@ sub get_widget {
 
 Please submit your bugs at L<http://padre.perlide.org/>
 
-=head1 TODO
-
-L<http://padre.perlide.org/>
-
-=head2 Editor
-
-  Fix the remaining short-cut key that don't work on Windows (F3)
-
-  Deal with "resource installation". That is probably talk to
-  Module::Build, Debian and Fedora people to make it easy to install resource files
-  such as xpm or po files. See File::ShareDir.
-
-=head2 Podviewer
-
-  Enabled indexing from widthin application or run the indexer when installing
-  the application?
-
-  If a file exists but no pod in there, don't show just a white page.
-
-  When displaying pod allow for clicking on names of other modules to be displayed.
-
-  Indexing the words of all the pod files? (Search engine?)
-  Indexing the function names only?
-
-=head2 Code layout:
+=head1 Code layout
 
 Padre is the main module that reads/writes the configuration files
 There is an SQLite database and a yml file to keep various pices of information
@@ -590,7 +597,7 @@ The yml file contains individual configuration options
 
 Padre::Wx::App is the Wx::App subclass
 
-Padre::Frame is the main frame, most of the code is currently there.
+Padre::Wx::MainWindow is the main frame, most of the code is currently there.
 
 Padre::Wx::Text holds an editor text control instance
 (one for each buffer/file)
@@ -628,7 +635,7 @@ To Adam Kennedy for lots of refactoring.
 
 To Patrick Donelan.
 
-To Herbert Breunung for leting me work on Kephra.
+To Herbert Breunung for letting me work on Kephra.
 
 To Octavian Rasnita for early testing and bug reports.
 

@@ -3,7 +3,52 @@ package Padre::Config;
 use 5.008;
 use strict;
 use warnings;
-use YAML::Tiny;
+use File::Spec    ();
+use File::HomeDir ();
+use YAML::Tiny    ();
+
+our $VERSION = '0.06';
+
+
+
+#####################################################################
+# Class-Level Functionality
+
+my $DEFAULT_DIR = File::Spec->catfile(
+    ($ENV{PADRE_HOME} ? $ENV{PADRE_HOME} : File::HomeDir->my_data),
+    '.padre'
+);
+
+sub default_dir {
+    my $dir = $DEFAULT_DIR;
+    unless ( -e $dir ) {
+        mkdir $dir or
+        die "Cannot create config dir '$dir' $!";
+    }
+
+    return $dir;
+}
+
+sub default_yaml {
+    File::Spec->catfile(
+        $_[0]->default_dir,
+        'config.yml',
+    );
+}
+
+sub default_db {
+   File::Spec->catfile(
+        $_[0]->default_dir,
+        'config.db',
+    );
+}
+
+
+
+
+
+#####################################################################
+# Constructor and Serialization
 
 sub new {
     my $class = shift;
@@ -17,8 +62,13 @@ sub new {
     }
 
     # size of the main window
-    $self->{main}{height} ||= 600;
-    $self->{main}{width}  ||= 700;
+    $self->{main}->{height} ||= Wx::wxDefaultSize()->height;
+    $self->{main}->{width}  ||= Wx::wxDefaultSize()->width;
+    $self->{main}->{left}   ||= Wx::wxDefaultPosition()->x;
+    $self->{main}->{top}    ||= Wx::wxDefaultPosition()->y;
+
+    # Is the window maximized
+    $self->{main}->{maximized} ||= 0;
 
     # startup mode, if no files given on the command line this can be
     #   new        - a new empty buffer
@@ -26,12 +76,8 @@ sub new {
     #   last       - the files that were open last time    
     $self->{startup} ||= 'new';
 
-    unless ( defined $self->{search_terms} ) {
-        $self->{search_terms} = [];
-    }
-    if ($self->{search_term}) {
-       $self->{search_terms} = [ delete $self->{search_term} ]
-    }
+    $self->{search_terms}      ||= [];
+    $self->{replace_terms}     ||= [];
 
     $self->{command_line}      ||= '';
     # When running a script from the application some of the files might have not been saved yet.
@@ -42,6 +88,7 @@ sub new {
     # all_buffers - all the buffers even if they don't have a name yet
     $self->{save_on_run}       ||= 'same';
     $self->{show_line_numbers} ||= 0;
+    $self->{show_eol}          ||= 0;
     $self->{projects}          ||= {};
     $self->{current_project}   ||= '';
 

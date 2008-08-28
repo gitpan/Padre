@@ -1,10 +1,6 @@
 use strict;
 use warnings;
-
-use Module::Build         ();
-
-
-#check_wx_version();
+use Module::Build ();
 
 my $class = Module::Build->subclass(
     class => 'Padre::Install',
@@ -53,23 +49,22 @@ my $builder = $class->new(
         'Term::ReadLine'          => 0,
 
         'Class::Accessor'         => 0,
+        'Class::Autouse'          => '1.26',
         'DBD::SQLite'             => 0,
         'DBI'                     => 0,
-        #'Devel::PerlySense'       => 0, 
         'File::Copy::Recursive'   => 0,
         'File::HomeDir'           => 0,
-        'File::LocalizeNewlines'  => '1.10',
+#        'File::LocalizeNewlines'  => '1.10',
         'File::ShareDir'          => '1.00',
         'File::Slurp'             => 0,
 	'Module::Inspector'       => '0.04',
+        'ORLite'                  => '0.10',
         'Pod::POM'                => 0,
         'Pod::Simple'             => 0,
 	'Probe::Perl'             => '0.01',
         'YAML::Tiny'              => '1.32',
         'Wx'                      => 0,
         'Wx::Perl::ProcessStream' => 0,
-
-
     },
     build_requires        => {
         'Test::More'                => '0.47',
@@ -82,6 +77,9 @@ my $builder = $class->new(
             bugtracker  => 'http://padre.perlide.org/',
             Repository  => 'http://svn.perlide.org/padre',
     #        MailingList => 'http://mail.perlide.org/listinfo/padre',
+        },
+        no_index => {
+            directory => [ qw{ t eg share } ],
         },
     },
 );
