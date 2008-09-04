@@ -2,21 +2,26 @@ Build.PL
 Changes
 MANIFEST
 README
-META.yml
 
 lib/Padre.pm
+lib/Padre/Wx/Ack.pm
 lib/Padre/Config.pm
 lib/Padre/DB.pm
+lib/Padre/Document.pm
+lib/Padre/PluginManager.pm
 lib/Padre/Project.pm
+lib/Padre/Util.pm
+
 
 lib/Padre/Wx/App.pm
+lib/Padre/Wx/Execute.pm
 lib/Padre/Wx/FindDialog.pm
+lib/Padre/Wx/Help.pm
 lib/Padre/Wx/MainWindow.pm
+lib/Padre/Wx/Menu.pm
 lib/Padre/Wx/Popup.pm
+lib/Padre/Wx/Preferences.pm
 lib/Padre/Wx/Text.pm
-
-lib/Padre/Demo.pm
-lib/Padre/Demo/Frame.pm
 
 lib/Padre/Pod/Frame.pm
 lib/Padre/Pod/Indexer.pm
@@ -28,7 +33,6 @@ t/01-load.t
 t/02-new.t
 t/03-wx.t
 t/80-newline.t
-t/99-demo.t
 t/lib/Padre.pm
 
 xt/99-critic.t
@@ -46,13 +50,6 @@ eg/wx/02_label.pl
 eg/wx/03_button.pl
 eg/wx/04_button_with_event.pl
 
-eg/wx_demo/wxer
-eg/wx_demo/01_prompt.pl
-eg/wx_demo/02_password.pl
-eg/wx_demo/03_filename.pl
-eg/wx_demo/04_choice.pl
-eg/wx_demo/05_dir_selector.pl
-
 share/docview/print.xpm
 share/docview/save.xpm
 share/docview/open.xpm
@@ -65,3 +62,4 @@ share/docview/cut.xpm
 share/templates/template.pl
 share/templates/template.pm
 share/templates/template.t
+META.yml

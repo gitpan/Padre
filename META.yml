@@ -1,16 +1,18 @@
 ---
 name: Padre
-version: 0.06
+version: 0.07
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
 license: perl
 resources:
+  MailingList: http://mail.perlide.org/mailman/listinfo/padre-dev
   Repository: http://svn.perlide.org/padre
   bugtracker: http://padre.perlide.org/
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
 requires:
+  App::Ack: 1.86
   Carp: 0
   Class::Accessor: 0
   Class::Autouse: 1.26
@@ -29,11 +31,13 @@ requires:
   List::Util: 0
   Module::Inspector: 0.04
   ORLite: 0.10
+  PAR: 0.970
   Pod::POM: 0
   Pod::Simple: 0
   Probe::Perl: 0.01
   Term::ReadLine: 0
   Wx: 0
+  Wx::Perl::Dialog: 0
   Wx::Perl::ProcessStream: 0
   YAML::Tiny: 1.32
   perl: 5.008
@@ -44,50 +48,68 @@ build_requires:
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.06
+    version: 0.07
   Padre::Config:
     file: lib/Padre/Config.pm
-    version: 0.06
+    version: 0.07
   Padre::DB:
     file: lib/Padre/DB.pm
-    version: 0.06
-  Padre::Demo:
-    file: lib/Padre/Demo.pm
-    version: 0.06
-  Padre::Demo::Frame:
-    file: lib/Padre/Demo/Frame.pm
-    version: 0.06
+    version: 0.07
+  Padre::Document:
+    file: lib/Padre/Document.pm
+    version: 0.07
+  Padre::PluginManager:
+    file: lib/Padre/PluginManager.pm
+    version: 0.07
   Padre::Pod::Frame:
     file: lib/Padre/Pod/Frame.pm
-    version: 0.06
+    version: 0.07
   Padre::Pod::Indexer:
     file: lib/Padre/Pod/Indexer.pm
-    version: 0.06
+    version: 0.07
   Padre::Pod::Viewer:
     file: lib/Padre/Pod/Viewer.pm
-    version: 0.06
+    version: 0.07
   Padre::Pod::Viewer::POD:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Pod::Viewer::View:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Project:
     file: lib/Padre/Project.pm
-    version: 0.06
+    version: 0.07
+  Padre::Util:
+    file: lib/Padre/Util.pm
+    version: 0.07
+  Padre::Wx::Ack:
+    file: lib/Padre/Wx/Ack.pm
+    version: 0.07
   Padre::Wx::App:
     file: lib/Padre/Wx/App.pm
-    version: 0.06
+    version: 0.07
+  Padre::Wx::Execute:
+    file: lib/Padre/Wx/Execute.pm
+    version: 0.07
   Padre::Wx::FindDialog:
     file: lib/Padre/Wx/FindDialog.pm
-    version: 0.06
+    version: 0.07
+  Padre::Wx::Help:
+    file: lib/Padre/Wx/Help.pm
+    version: 0.07
   Padre::Wx::MainWindow:
     file: lib/Padre/Wx/MainWindow.pm
-    version: 0.06
+    version: 0.07
+  Padre::Wx::Menu:
+    file: lib/Padre/Wx/Menu.pm
+    version: 0.07
   Padre::Wx::Popup:
     file: lib/Padre/Wx/Popup.pm
-    version: 0.06
+    version: 0.07
+  Padre::Wx::Preferences:
+    file: lib/Padre/Wx/Preferences.pm
+    version: 0.07
   Padre::Wx::Text:
     file: lib/Padre/Wx/Text.pm
-    version: 0.06
+    version: 0.07
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

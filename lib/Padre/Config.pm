@@ -3,11 +3,12 @@ package Padre::Config;
 use 5.008;
 use strict;
 use warnings;
+use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 use YAML::Tiny    ();
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 
 
@@ -41,6 +42,22 @@ sub default_db {
         $_[0]->default_dir,
         'config.db',
     );
+}
+
+sub default_plugin_dir {
+    my $pluginsdir = File::Spec->catdir(
+        $_[0]->default_dir,
+        'plugins',
+    );
+    my $plugins_full_path = File::Spec->catdir(
+        $pluginsdir, 'Padre', 'Plugin'
+    );
+    unless ( -e $plugins_full_path) {
+        File::Path::mkpath($plugins_full_path) or
+        die "Cannot create plugins dir '$plugins_full_path' $!";
+    }
+
+    return $pluginsdir;
 }
 
 
@@ -91,6 +108,11 @@ sub new {
     $self->{show_eol}          ||= 0;
     $self->{projects}          ||= {};
     $self->{current_project}   ||= '';
+
+    $self->{editor}->{tab_size}    ||= 8;
+
+    # by default, we have an empty plugins configuration
+    $self->{plugins}           ||= {};
 
     return $self;
 }

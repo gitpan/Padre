@@ -4,10 +4,12 @@ package Padre::Project;
 
 use strict;
 use warnings;
-use File::Spec ();
+use File::Spec        ();
+use Module::Inspector ();
+
 use base 'Module::Inspector';
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 sub from_file {
 	my $class = shift;

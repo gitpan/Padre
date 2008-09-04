@@ -11,17 +11,20 @@ use File::Basename ();
 use Data::Dumper   ();
 use List::Util     ();
 use File::ShareDir ();
-use Wx                      qw(:everything);
-use Wx::Event               qw(:everything);
-use Wx::Perl::ProcessStream qw(:everything);
+use Wx        qw(:everything);
+use Wx::Event qw(:everything);
 
-use base 'Wx::Frame';
+use base qw(
+	Wx::Frame
+	Padre::Wx::Execute
+);
 
+use Padre::Util ();
 use Padre::Wx::Text;
-use Padre::Wx::FindDialog;
-use Padre::Pod::Frame;
+# use Padre::Wx::FindDialog;
+# use Padre::Pod::Frame;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 my $default_dir = "";
 my $cnt         = 0;
@@ -108,7 +111,7 @@ sub new {
     $self->{marker} = {};
 
     # Create the menu bar
-    $self->{menu} = $self->_create_menu_bar;
+    $self->{menu} = Padre::Wx::Menu->new( $self );
     $self->SetMenuBar( $self->{menu}->{wx} );
 
     # Create the layout boxes for the main window
@@ -137,11 +140,11 @@ sub new {
     );
     $self->{rightbar}->InsertColumn(0, 'Methods');
     $self->{rightbar}->SetColumnWidth(0, wxLIST_AUTOSIZE);
-    EVT_LIST_ITEM_SELECTED(
-        $self,
-        $self->{rightbar},
-        \&method_selected,
-    );
+#    EVT_LIST_ITEM_SELECTED(
+#        $self,
+#        $self->{rightbar},
+#        \&method_selected,
+#    );
     EVT_LIST_ITEM_ACTIVATED(
         $self,
         $self->{rightbar},
@@ -192,230 +195,37 @@ sub new {
     # Attach main window events
     EVT_CLOSE( $self, \&on_close_window);
     EVT_KEY_UP( $self, \&on_key );
-    EVT_WXP_PROCESS_STREAM_STDOUT( $self, \&evt_process_stdout );
-    EVT_WXP_PROCESS_STREAM_STDERR( $self, \&evt_process_stderr );
-    EVT_WXP_PROCESS_STREAM_EXIT( $self, \&evt_process_exit );
+
+    #EVT_LEFT_UP( $self, \&on_left_mouse_up );
+    #EVT_LEFT_DOWN( $self, \&on_left_mouse_down );
+    #EVT_MOTION( $self, sub {print "mot\n"; } );
+    #EVT_MOUSE_EVENTS( $self, sub {print "xxx\n"; });
+    #EVT_MIDDLE_DOWN( $self, sub {print "xxx\n"; } );
+    #EVT_RIGHT_DOWN( $editor, \&on_right_click );
+    #EVT_RIGHT_UP( $self, \&on_right_click );
+    #EVT_STC_DWELLSTART( $editor, -1, sub {print 1});
+    #EVT_MOTION( $editor, sub {print '.'});
+    EVT_STC_UPDATEUI( $self, -1,  \&on_stc_update_ui );
+
+    Padre::Wx::Execute->setup( $self );
 
     # Load any default files
     $self->_load_files;
 
+    # we need an event immediately after the window opened
+    # (we had an issue that if the default of show_status_bar was false it did not show
+    # the status bar which is ok, but then when we selected the menu to show it, it showed
+    # at the top)
+    # TODO: there might be better ways to fix that issue...
+    my $timer = Wx::Timer->new( $self );
+    Wx::Event::EVT_TIMER(
+	    $self,
+	    -1,
+	    \&arrange_windows
+    );
+    $timer->Start( 500, 1 );
+
     return $self;
-}
-
-sub _add_alt_n_menu {
-    my ($self, $file, $n) = @_;
-    return if $n > 9;
-
-    $self->{menu}->{alt}->[$n] = $self->{menu}->{view}->Append(-1, "");
-    EVT_MENU( $self, $self->{menu}->{alt}->[$n], sub {$_[0]->on_nth_pane($n)} );
-    $self->_update_alt_n_menu($file, $n);
-
-    return;
-}
-
-sub _update_alt_n_menu {
-    my ($self, $file, $n) = @_;
-
-    my $v = $n +1;
-    $self->{menu}->{alt}->[$n]->SetText("$file\tAlt-$v");
-
-    return;
-}
-
-sub _remove_alt_n_menu {
-    my ($self) = @_;
-
-    $self->{menu}->{view}->Remove(pop @{ $self->{menu}->{alt} });
-
-    return;
-}
-
-sub _create_menu_bar {
-    my $self   = shift;
-    my $ide    = Padre->ide;
-    my $config = $ide->get_config;
-    my $menu   = {};
-
-    # Create the File menu
-    $menu->{file} = Wx::Menu->new;
-    EVT_MENU( $self, $menu->{file}->Append( wxID_NEW,  '' ), \&on_new  );
-    EVT_MENU( $self, $menu->{file}->Append( wxID_OPEN, '' ), \&on_open );
-    $menu->{file_recent} = Wx::Menu->new;
-    $menu->{file}->Append( -1, "Recent Files", $menu->{file_recent} );
-    foreach my $f ( $ide->get_recent('files') ) {
-       EVT_MENU(
-           $self,
-           $menu->{file_recent}->Append(-1, $f), 
-           sub { $_[0]->setup_editor($f) },
-       );
-    }
-    EVT_MENU( $self, $menu->{file}->Append( wxID_SAVE,   '' ), \&on_save     );
-    EVT_MENU( $self, $menu->{file}->Append( wxID_SAVEAS, '' ), \&on_save_as  );
-    EVT_MENU( $self, $menu->{file}->Append( -1, 'Save All'  ), \&on_save_all );
-    EVT_MENU( $self, $menu->{file}->Append( wxID_CLOSE,  '' ), \&on_close    );
-    EVT_MENU( $self, $menu->{file}->Append( wxID_EXIT,   '' ), \&on_exit     );
-
-
-
-    # Create the Project menu
-    $menu->{project} = Wx::Menu->new;
-    EVT_MENU( $self, $menu->{project}->Append( -1, "&New"), \&on_new_project );
-    EVT_MENU( $self, $menu->{project}->Append( -1, "&Select"    ), \&on_select_project );
-
-
-
-    # Create the Edit menu
-    $menu->{edit} = Wx::Menu->new;
-    EVT_MENU( $self, $menu->{edit}->Append( wxID_UNDO, '' ),           \&on_undo             );
-    EVT_MENU( $self, $menu->{edit}->Append( wxID_REDO, "\tCtrl-Shift-Z" ),  \&on_redo             );
-    EVT_MENU( $self, $menu->{edit}->Append( wxID_FIND, '' ),           \&on_find             );
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&Find Again\tF3" ),   \&on_find_again       );
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&Goto\tCtrl-G" ),     \&on_goto             );
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&AutoComp\tCtrl-P" ), \&on_autocompletition );
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "Subs\tAlt-S"     ),   sub { $_[0]->{rightbar}->SetFocus()} ); 
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&Comment out block\tCtrl-M" ),   \&on_comment_out_block       );
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&UnComment block\tCtrl-Shift-M" ),   \&on_uncomment_block       );
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&Brace matching\tCtrl-B" ),   \&on_brace_matching       );
-
-    EVT_MENU( $self, $menu->{edit}->Append( -1, "&Setup" ),            \&on_setup            );
-
-
-
-    # Create the View menu
-    $menu->{view}       = Wx::Menu->new;
-    $menu->{view_lines} = $menu->{view}->AppendCheckItem( -1, "Show Line numbers" );
-    $menu->{view_lines}->Check( $config->{show_line_numbers} ? 1 : 0 );
-    EVT_MENU(
-        $self,
-        $menu->{view_lines},
-        \&on_toggle_line_numbers,
-    );
-    $menu->{view_eol} = $menu->{view}->AppendCheckItem( -1, "Show Newlines" );
-    $menu->{view_eol}->Check( $config->{show_eol} ? 1 : 0 );
-    EVT_MENU(
-        $self,
-        $menu->{view_eol},
-        \&on_toggle_eol,
-    );
-    $menu->{view_output} = $menu->{view}->AppendCheckItem( -1, "Show Output" );
-    EVT_MENU(
-        $self,
-        $menu->{view_output},
-        \&on_toggle_show_output,
-    );
-    $menu->{view_statusbar} = $menu->{view}->AppendCheckItem( -1, "Show StatusBar" );
-    $menu->{view_statusbar}->Check( $config->{show_statusbar} ? 1 : 0 );
-    EVT_MENU(
-        $self,
-        $menu->{view_statusbar},
-        \&on_toggle_status_bar,
-    );
-
-    $menu->{view}->AppendSeparator;
-    #$menu->{view_files} = Wx::Menu->new;
-    #$menu->{view}->Append( -1, "Switch to...", $menu->{view_files} );
-    EVT_MENU(
-        $self,
-        $menu->{view}->Append(-1, "Next File\tCtrl-TAB"),
-        \&on_next_pane,
-    );
-    EVT_MENU(
-        $self,
-        $menu->{view}->Append(-1, "Prev File\tCtrl-Shift-TAB"),
-        \&on_prev_pane,
-    );
-
-    # Creat the Run menu
-    $menu->{run} = Wx::Menu->new;
-    $menu->{run_this} = $menu->{run}->Append( -1, "Run &This\tF5" );
-    EVT_MENU(
-        $self,
-        $menu->{run_this},
-        \&on_run_this,
-    );
-    $menu->{run_any} = $menu->{run}->Append( -1, "Run Any\tCtrl-F5" );
-    EVT_MENU(
-        $self,
-        $menu->{run_any},
-        \&on_run,
-    );
-    $menu->{run_stop} = $menu->{run}->Append( -1, "&Stop" );
-    EVT_MENU(
-        $self,
-        $menu->{run_stop},
-        \&on_stop,
-    );
-    EVT_MENU(
-        $self,
-        $menu->{run}->Append( -1, "&Setup" ),
-        \&on_setup_run,
-    );
-    $menu->{run_stop}->Enable(0);
-
-    
-    # Create the Plugins menu
-    $menu->{plugin} = Wx::Menu->new;
-    my %plugins = %{ $ide->{plugins} };
-    foreach my $name ( sort keys %plugins ) {
-        next if not $plugins{$name};
-        my @menu    = eval { $plugins{$name}->menu };
-        warn "Error when calling menu for plugin '$name' $@" if $@;
-        my $menu_items = $self->_add_plugin_menu_items(\@menu);
-        $menu->{plugin}->Append( -1, $name, $menu_items );
-    }
-
-
-
-    # Create the help menu
-    $menu->{help} = Wx::Menu->new;
-    EVT_MENU(
-        $self,
-        $menu->{help}->Append( wxID_ABOUT,   '' ),
-        \&on_about,
-    );
-    EVT_MENU(
-        $self,
-        $menu->{help}->Append( wxID_HELP, '' ),
-        \&on_help,
-    );
-    EVT_MENU(
-        $self,
-        $menu->{help}->Append( -1, "Context-help\tCtrl-Shift-H" ),
-        \&on_context_help,
-    );
-
-
-
-    # Create and return the main menu bar
-    $menu->{wx} = Wx::MenuBar->new;
-    $menu->{wx}->Append( $menu->{file},    "&File" );
-    $menu->{wx}->Append( $menu->{project}, "&Project" );
-    $menu->{wx}->Append( $menu->{edit},    "&Edit" );
-    $menu->{wx}->Append( $menu->{view},    "&View" );
-    $menu->{wx}->Append( $menu->{run},     "&Run" );
-    if ( %plugins ) {
-        $menu->{wx}->Append( $menu->{plugin}, "Pl&ugins" );
-    }
-    $menu->{wx}->Append( $menu->{help},    "&Help" );
-
-    return $menu;
-}
-
-
-# Recursively add plugin menu items from nested array refs
-sub _add_plugin_menu_items {
-    my ($self, $menu_items) = @_;
-
-    my $menu = Wx::Menu->new;
-    foreach my $m ( @{$menu_items} ) {
-        if (ref $m->[1] eq 'ARRAY') {
-            my $submenu = $self->_add_plugin_menu_items($m->[1]);
-            $menu->Append(-1, $m->[0], $submenu);
-        } else {
-            EVT_MENU( $self, $menu->Append(-1, $m->[0]), $m->[1] );
-        }
-    }
-    return $menu;
 }
 
 
@@ -470,6 +280,24 @@ sub method_selected {
     return;
 }
 
+=head2 get_current_editor
+
+ my $editor = $self->get_current_editor;
+ my $text   = $editor->GetText;
+
+ ... do your stuff with the $text
+
+ $editor->SetText($text);
+
+You can also use the following two methods to make
+your editing a atomic in the Undo stack.
+
+ $editor->BeginUndoAction;
+ $editor->EndUndoAction;
+
+
+=cut
+
 sub get_current_editor {
     my $nb = $_[0]->{notebook};
     return $nb->GetPage( $nb->GetSelection );
@@ -486,6 +314,11 @@ sub _bitmap {
         : File::ShareDir::dist_dir('Padre');
     my $path = File::Spec->catfile($dir , 'docview', "$file.xpm");
     return Wx::Bitmap->new( $path, wxBITMAP_TYPE_XPM );
+}
+
+sub on_stc_update_ui {
+    my ($self, $event) = @_;
+    $self->update_status;
 }
 
 sub on_key {
@@ -760,16 +593,39 @@ sub _get_local_filetype {
            $^O =~ /MacOS/                 ? 'MAC' : 'UNIX';
 }
 
+sub on_split_window {
+    my ($self) = @_;
+
+    my $editor  = $self->get_current_editor;
+    my $id      = $self->{notebook}->GetSelection;
+    my $title   = $self->{notebook}->GetPageText($id);
+    my $file    = $self->get_current_filename;
+    my $pointer = $editor->GetDocPointer();
+    $editor->AddRefDocument($pointer);
+
+    my $new_editor    = Padre::Wx::Text->new( $self->{notebook}, _lexer() );
+
+    #my $new_id = $self->setup_editor();
+    #my $new_editor = $self->{notebook}->GetPage( $new_id );
+    $new_editor->SetDocPointer($pointer);
+    $self->create_tab($new_editor, $file, " $title");
+
+    return;
+}
+
 sub setup_editor {
     my ($self, $file) = @_;
 
-    $self->{_in_setup_editor} = 1;
+    local $self->{_in_setup_editor} = 1;
 
     # Flush old stuff
     delete $self->{project};
 
     my $config    = Padre->ide->get_config;
     my $editor    = Padre::Wx::Text->new( $self->{notebook}, _lexer($file) );
+    #$editor->SetMouseDownCaptures(0);
+    #$editor->UsePopUp(0);
+    
     my $file_type = $self->_get_default_file_type();
 
     my %mode = (
@@ -786,10 +642,9 @@ sub setup_editor {
         $content = eval { File::Slurp::read_file($file) };
         if ($@) {
             warn $@;
-            delete $self->{_in_setup_editor};
             return;
         }
-        my $current_type = Padre::get_newline_type($content);
+        my $current_type = Padre::Util::newline_type($content);
         if ($current_type eq 'None') {
             # keep default
         } elsif ($current_type eq 'Mixed') {
@@ -826,84 +681,39 @@ sub setup_editor {
     }
     $self->_toggle_numbers($editor, $config->{show_line_numbers});
     $self->_toggle_eol($editor, $config->{show_eol});
+    $self->set_preferences($editor, $config);
+
+    my $id = $self->create_tab($editor, $file, $title);
+
+    $self->_set_filename($id, $file, $file_type);
+
+    $self->{_in_setup_editor} = 0;
+    $self->update_status;
+    return $id;
+}
+
+sub arrange_windows {
+    my ($self) = @_;
+    $self->on_toggle_status_bar;
+
+
+    #$self->
+}
+
+sub create_tab {
+    my ($self, $editor, $file, $title) = @_;
 
     $self->{notebook}->AddPage($editor, $title, 1); # TODO add closing x
     $editor->SetFocus;
+
     my $pack = __PACKAGE__;
-    #my $page = $self->{notebook}->GetCurrentPage;
     my $id  = $self->{notebook}->GetSelection;
-    my $file_title = $file || $self->{notebook}->GetPageText($id);
-    $self->_add_alt_n_menu($file_title, $id);
+    my $file_title = $file || $title;
+    $self->{menu}->add_alt_n_menu($file_title, $id);
 
-    $self->_set_filename($id, $file, $file_type);
-#print "x" . $editor->AutoCompActive .  "x\n";
-
-    #$editor->UsePopUp(0);
-    #EVT_RIGHT_DOWN( $editor, \&on_right_click );
-
-    #EVT_RIGHT_UP( $self, \&on_right_click );
-    #EVT_STC_DWELLSTART( $editor, -1, sub {print 1});
-    #EVT_MOTION( $editor, sub {print '.'});
-
-    delete $self->{_in_setup_editor};
     $self->update_status;
-    return;
-}
 
-sub on_toggle_line_numbers {
-    my ($self, $event) = @_;
-
-    # Update the configuration
-    my $config = Padre->ide->get_config;
-    $config->{show_line_numbers} = $event->IsChecked ? 1 : 0;
-
-    # Update the notebook pages
-    foreach my $id ( 0 .. $self->{notebook}->GetPageCount - 1 ) {
-        my $editor = $self->{notebook}->GetPage($id);
-        $self->_toggle_numbers( $editor, $config->{show_line_numbers} );
-    }
-
-    return;
-}
-
-
-sub on_toggle_eol {
-    my ($self, $event) = @_;
-
-    my $config = Padre->ide->get_config;
-    $config->{show_eol} = $event->IsChecked ? 1 : 0;
-
-    foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
-        my $editor = $self->{notebook}->GetPage($id);
-        $self->_toggle_eol($editor, $config->{show_eol})
-    }
-    return;
-}
-
-
-# currently if there are 9 lines we set the margin to 1 width and then
-# if another line is added it is not seen well.
-# actually I added some improvement allowing a 50% growth in the file
-# and requireing a min of 2 width
-sub _toggle_numbers {
-    my ($self, $editor, $on) = @_;
-
-    $editor->SetMarginWidth(1, 0);
-    $editor->SetMarginWidth(2, 0);
-    if ($on) {
-        my $n = 1 + List::Util::max (2, length ($editor->GetLineCount * 2));
-        my $width = $n * $editor->TextWidth(wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
-        $editor->SetMarginWidth(0, $width);
-        $editor->SetMarginType(0, wxSTC_MARGIN_NUMBER);
-    } else {
-        $editor->SetMarginWidth(0, 0);
-        $editor->SetMarginType(0, wxSTC_MARGIN_NUMBER);
-    }
-}
-sub _toggle_eol {
-    my ($self, $editor, $on) = @_;
-    $editor->SetViewEOL($on);
-    return;
+    return $id;
 }
 
 
@@ -1114,13 +924,13 @@ sub on_close {
     $self->{notebook}->DeletePage($id); 
 #print "PageText after delete: " . $self->{notebook}->GetPageText(0) . "\n";
 
-    $self->_remove_alt_n_menu();
+    $self->{menu}->remove_alt_n_menu();
     foreach my $i (0..@{ $self->{menu}->{alt} } -1) {
         my $file = $self->_get_filename($i);
 #print "file: $i $file\n";
         $file ||= $self->{notebook}->GetPageText($i);
 #print "pagetext: $file\n";
-        $self->_update_alt_n_menu($file, $i);
+        $self->{menu}->update_alt_n_menu($file, $i);
     }
 
     return;
@@ -1130,40 +940,6 @@ sub _buffer_changed {
     my ($self, $id) = @_;
     my $page = $self->{notebook}->GetPage($id);
     return $page->GetModify;
-}
-
-sub on_setup {
-    my ($self) = @_;
-    my $config = Padre->ide->get_config;
-
-    my $dialog = Wx::Dialog->new( $self, -1, "Configuration", [-1, -1], [550, 200]);
-
-    Wx::StaticText->new( $dialog, -1, 'Max number of modules', [10, 10], [-1, -1]);
-    my $max = Wx::TextCtrl->new( $dialog, -1, $config->{DISPLAY_MAX_LIMIT}, [300, 10] , [-1, -1]);
-
-    Wx::StaticText->new( $dialog, -1, 'Min number of modules', [10, 40], [-1, -1]);
-    my $min = Wx::TextCtrl->new( $dialog, -1, $config->{DISPLAY_MIN_LIMIT}, [300, 40] , [-1, -1]);
-
-    Wx::StaticText->new( $dialog, -1, 'Open files:', [10, 70], [-1, -1]);
-    my @values = ($config->{startup}, grep {$_ ne $config->{startup}} qw(new nothing last));
-
-    my $choice = Wx::Choice->new( $dialog, -1, [300, 70], [-1, -1], \@values);
-
-    EVT_BUTTON( $dialog, Wx::Button->new( $dialog, wxID_OK,     '', [10, 110] ),
-                sub { $dialog->EndModal(wxID_OK) } );
-    EVT_BUTTON( $dialog, Wx::Button->new( $dialog, wxID_CANCEL, '', [120, 110] ),
-                sub { $dialog->EndModal(wxID_CANCEL) } );
-
-    if ($dialog->ShowModal == wxID_CANCEL) {
-        return;
-    }
-    $config->{DISPLAY_MAX_LIMIT} = $max->GetValue;
-    $config->{DISPLAY_MIN_LIMIT} = $min->GetValue;
-
-    $config->{startup} =  $values[ $choice->GetSelection];
-    #Padre->ide->set_config($config);
-
-    return;
 }
 
 sub on_goto {
@@ -1207,6 +983,7 @@ sub on_find {
     my $selection = $self->_get_selection();
     $selection = '' if not defined $selection;
 
+    require Padre::Wx::FindDialog;
     my $search = Padre::Wx::FindDialog->new( $self, $config, {term => $selection} );
     return if not $search;
 
@@ -1226,6 +1003,51 @@ sub on_find {
     $self->_search(replace_term => $search->{replace_term});
 
     return;
+}
+
+my $DONE_EVENT : shared = Wx::NewEventType;
+sub on_ack {
+    my ($self) = @_;
+    @_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
+
+# TODO kill the thread before closing the application
+
+    require Padre::Wx::Ack;
+    require App::Ack;
+    my $search = Padre::Wx::Ack->new;
+use Data::Dumper;
+print Dumper $search;
+
+    return;
+
+    $self->show_output();
+
+    EVT_COMMAND( $self, -1, $DONE_EVENT, \&ack_done );
+
+
+    my $worker = threads->create( \&_on_ack_thread );
+    #my $data = Padre::Wx::Ack->new;
+}
+sub ack_done {
+    my( $self, $event ) = @_;
+
+   my $data = $event->GetData;
+   print "Data: $data\n";
+   $self->{output}->AppendText("$data\n");
+
+   return;
+}
+
+sub _on_ack_thread {
+
+    my $frame = Padre->ide->wx->main_window;
+
+    for my $i (1..10) {
+       print "TH $i\n";
+       my $threvent = Wx::PlThreadEvent->new( -1, $DONE_EVENT, $i );
+       Wx::PostEvent( $frame, $threvent );
+       sleep 1;
+    }
 }
 
 sub update_methods {
@@ -1295,44 +1117,6 @@ sub on_find_again {
     return;
 }
 
-sub on_about {
-    my ( $self ) = @_;
-
-    Wx::MessageBox( 
-        "Perl Application Development and Refactoring Environment\n" .
-        "Padre $Padre::VERSION, (c) 2008 Gabor Szabo\n" .
-        "Using Wx v$Wx::VERSION, binding " . wxVERSION_STRING,
-        "About Padre", wxOK|wxCENTRE, $self );
-}
-
-sub on_help {
-    my ( $self ) = @_;
-
-    if ( not $self->{help} ) {
-        $self->{help} = Padre::Pod::Frame->new;
-        my $module = Padre->ide->get_current('pod') || 'Padre';
-        if ($module) {
-            $self->{help}->{html}->display($module);
-        }
-    }
-    $self->{help}->SetFocus;
-    $self->{help}->Show (1);
-
-    return;
-}
-sub on_context_help {
-    my ($self) = @_;
-
-    my $selection = $self->_get_selection();
-
-    $self->on_help;
-
-    if ($selection) {
-        $self->{help}->show($selection);
-    }
-
-    return;
-}
 
 sub _get_selection {
     my ($self, $id) = @_;
@@ -1345,196 +1129,6 @@ sub _get_selection {
     return $page->GetSelectedText;
 }
 
-sub on_run_this {
-    my ($self) = @_;
-
-    my $config = Padre->ide->get_config;
-    if ($config->{save_on_run} eq 'same') {
-        $self->on_save;
-    } elsif ($config->{save_on_run} eq 'all_files') {
-    } elsif ($config->{save_on_run} eq 'all_buffer') {
-    }
-
-    my $id   = $self->{notebook}->GetSelection;
-    my $filename = $self->_get_filename($id);
-    if (not $filename) {
-        Wx::MessageBox( "No filename, cannot run", "Cannot run", wxOK|wxCENTRE, $self );
-        return;
-    }
-    if (substr($filename, -3) ne '.pl') {
-        Wx::MessageBox( "Currently we only support execution of .pl files", "Cannot run", wxOK|wxCENTRE, $self );
-        return;
-    }
-
-    # Run the program
-    my $perl = Padre->probe_perl->find_perl_interpreter;
-    $self->_run( qq["perl" "$filename"] );
-
-    return;
-}
-
-sub on_debug_this {
-    my ($self) = @_;
-    $self->on_save;
-
-    my $id   = $self->{notebook}->GetSelection;
-    my $filename = $self->_get_filename($id);
-
-
-    my $host = 'localhost';
-    my $port = 12345;
-
-    _setup_debugger($host, $port);
-
-    local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
-    my $perl = Padre->probe_perl->find_perl_interpreter;
-    $self->_run(qq["$perl" -d "$filename"]);
-
-    return;
-}
-
-# based on remoteport from "Pro Perl Debugging by Richard Foley and Andy Lester"
-sub _setup_debugger {
-    my ($host, $port) = @_;
-
-#use IO::Socket;
-#use Term::ReadLine;
-#
-#    my $term = new Term::ReadLine 'local prompter';
-#
-#    # Open the socket the debugger will connect to.
-#    my $sock = IO::Socket::INET->new(
-#                   LocalHost => $host,
-#                   LocalPort => $port,
-#                   Proto     => 'tcp',
-#                   Listen    => SOMAXCONN,
-#                   Reuse     => 1);
-#    $sock or die "no socket :$!";
-#
-#    my $new_sock = $sock->accept();
-#    my $remote_host = gethostbyaddr($sock->sockaddr(), AF_INET) || 'remote';
-#    my $prompt = "($remote_host)> ";
-}
-
-sub _run {
-    my ($self, $cmd) = @_;
-
-    $self->{menu}->{run_this}->Enable(0);
-    $self->{menu}->{run_any}->Enable(0);
-    $self->{menu}->{run_stop}->Enable(1);
-
-    my $config = Padre->ide->get_config;
-    $self->{main_panel}->SetSashPosition($config->{main}->{height} - 300);
-    $self->{output}->Remove( 0, $self->{output}->GetLastPosition );
-
-    $self->{proc} = Wx::Perl::ProcessStream->OpenProcess($cmd, 'MyName1', $self);
-    if ( not $self->{proc} ) {
-       $self->{menu}->{run_this}->Enable(1);
-       $self->{menu}->{run_any}->Enable(1);
-       $self->{menu}->{run_stop}->Enable(0);
-    }
-    return;
-}
-
-sub on_run {
-    my ($self) = @_;
-
-    my $config = Padre->ide->get_config;
-    if (not $config->{command_line}) {
-        $self->on_setup_run;
-    }
-    return if not $config->{command_line};
-    $self->_run($config->{command_line});
-
-    return;
-}
-
-
-sub on_setup_run {
-    my ($self) = @_;
-
-    my $config = Padre->ide->get_config;
-    my $dialog = Wx::TextEntryDialog->new( $self, "Command line", "Run setup", $config->{command_line} );
-    if ($dialog->ShowModal == wxID_CANCEL) {
-        return;
-    }
-#    my @values = ($config->{startup}, grep {$_ ne $config->{startup}} qw(new nothing last));
-
-#    my $choice = Wx::Choice->new( $dialog, -1, [300, 70], [-1, -1], \@values);
-
-    $config->{command_line} = $dialog->GetValue;
-    $dialog->Destroy;
-
-    return;
-}
-
-sub on_toggle_show_output {
-    my ($self, $event) = @_;
-
-    # Update the output panel
-    my $config = Padre->ide->get_config;
-    $self->{main_panel}->SetSashPosition(
-        $config->{main}->{height} - ($event->IsChecked ? 100 : 0)
-    );
-
-    return;
-}
-
-sub on_toggle_status_bar {
-    my ($self, $event) = @_;
-
-    # Update the configuration
-    my $config = Padre->ide->get_config;
-    $config->{show_status_bar} = $event->IsChecked ? 1 : 0;
-
-    # Update the status bar
-    my $status_bar = $self->GetStatusBar;
-    if ( $config->{show_status_bar} ) {
-        $status_bar->Hide;
-    } else {
-        $status_bar->Show;
-    }
-
-    return;
-}
-
-sub evt_process_stdout {
-    my ($self, $event) = @_;
-    $event->Skip(1);
-    $self->{output}->AppendText( $event->GetLine . "\n");
-    return;
-}
-
-sub evt_process_stderr {
-    my ($self, $event) = @_;
-    $event->Skip(1);
-    $self->{output}->AppendText( $event->GetLine . "\n");
-    return;
-}
-
-sub evt_process_exit {
-    my ($self, $event) = @_;
-
-    $event->Skip(1);
-    my $process = $event->GetProcess;
-    #my $line = $event->GetLine;
-    #my @buffers = @{ $process->GetStdOutBuffer };
-    #my @errors = @{ $process->GetStdOutBuffer };
-    #my $exitcode = $process->GetExitCode;
-    $process->Destroy;
-
-    $self->{menu}->{run_this}->Enable(1);
-    $self->{menu}->{run_any}->Enable(1);
-    $self->{menu}->{run_stop}->Enable(0);
-
-    return;
-}
-
-sub on_stop {
-    my ($self) = @_;
-    $self->{proc}->TerminateProcess if $self->{proc};
-    return;
-}
 
 sub on_undo { # Ctrl-Z
     my ($self) = @_;
@@ -1589,7 +1183,7 @@ sub on_select_project {
 
     my $dialog = Wx::Dialog->new( $self, -1, "Select Project", [-1, -1], [-1, -1]);
 
-    my $box  = Wx::BoxSizer->new(  wxVERTICAL );
+    my $box  = Wx::BoxSizer->new(  wxVERTICAL   );
     my $row1 = Wx::BoxSizer->new(  wxHORIZONTAL );
     my $row2 = Wx::BoxSizer->new(  wxHORIZONTAL );
     my $row3 = Wx::BoxSizer->new(  wxHORIZONTAL );
@@ -1699,6 +1293,7 @@ sub on_nth_pane {
     }
     return;
 }
+
 sub on_next_pane {
     my ($self) = @_;
 
@@ -1775,5 +1370,174 @@ sub on_panel_changed {
 
     return;
 }
+
+
+###### preferences and toggle functions
+
+sub on_zoom_in {
+    my ($self) = @_;
+    $self->zoom(+1);
+}
+sub on_zoom_out {
+    my ($self) = @_;
+    $self->zoom(-1);
+}
+sub on_zoom_reset {
+    my ($self) = @_;
+    my $editor  = $self->get_current_editor;
+    $self->zoom(-1 * $editor->GetZoom);
+}
+sub zoom {
+    my ($self, $val) = @_;
+
+    my $editor  = $self->get_current_editor;
+    my $zoom = $editor->GetZoom;
+
+    $zoom += $val;
+
+    foreach my $id ( 0 .. $self->{notebook}->GetPageCount - 1 ) {
+        $self->{notebook}->GetPage($id)->SetZoom($zoom);
+    }
+}
+
+
+sub on_setup {
+    my ($self) = @_;
+
+    my $config = Padre->ide->get_config;
+
+    require Padre::Wx::Preferences;
+    Padre::Wx::Preferences->new( $self, $config );
+
+    foreach my $id ( 0 .. $self->{notebook}->GetPageCount - 1 ) {
+        my $editor = $self->{notebook}->GetPage($id);
+        $self->set_preferences($editor, $config);
+    }
+
+    return;
+}
+
+sub set_preferences {
+    my ($self, $editor, $config) = @_;
+    $editor->SetTabWidth( $config->{editor}->{tab_size} );
+
+    return;
+}
+
+sub on_toggle_line_numbers {
+    my ($self, $event) = @_;
+
+    # Update the configuration
+    my $config = Padre->ide->get_config;
+    $config->{show_line_numbers} = $event->IsChecked ? 1 : 0;
+
+    # Update the notebook pages
+    foreach my $id ( 0 .. $self->{notebook}->GetPageCount - 1 ) {
+        my $editor = $self->{notebook}->GetPage($id);
+        $self->_toggle_numbers( $editor, $config->{show_line_numbers} );
+    }
+
+    return;
+}
+
+sub on_toggle_indentation_guide {
+    my ($self, $event) = @_;
+
+    my $config = Padre->ide->get_config;
+    $config->{editor}->{indentation_guide} = $self->{menu}->{view_indentation_guide}->IsChecked;
+
+    foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
+        my $editor = $self->{notebook}->GetPage($id);
+        $editor->SetIndentationGuides( $config->{editor}->{indentation_guide} );
+    }
+    return;
+}
+
+sub on_toggle_eol {
+    my ($self, $event) = @_;
+
+    my $config = Padre->ide->get_config;
+    $config->{show_eol} = $self->{menu}->{view_eol}->IsChecked ? 1 : 0;
+
+    foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
+        my $editor = $self->{notebook}->GetPage($id);
+        $self->_toggle_eol($editor, $config->{show_eol})
+    }
+    return;
+}
+
+sub show_output {
+    my ($self) = @_;
+
+    if (not $self->{menu}->{view_output}->IsChecked) {
+        $self->{menu}->{view_output}->Check(1);
+        $self->_toggle_output(1);
+    }
+
+    return;
+}
+
+sub on_toggle_show_output {
+    my ($self, $event) = @_;
+
+    # Update the output panel
+    $self->_toggle_output($self->{menu}->{view_output}->IsChecked);
+
+    return;
+}
+
+sub _toggle_output {
+    my ($self, $on) = @_;
+    my $config = Padre->ide->get_config;
+    $self->{main_panel}->SetSashPosition(
+        $config->{main}->{height} - ($on ? 300 : 0)
+    );
+}
+
+sub on_toggle_status_bar {
+    my ($self, $event) = @_;
+
+    # Update the configuration
+    my $config = Padre->ide->get_config;
+    $config->{show_status_bar} = $self->{menu}->{view_statusbar}->IsChecked;
+
+    # Update the status bar
+    my $status_bar = $self->GetStatusBar;
+    if ( $config->{show_status_bar} ) {
+        $status_bar->Show;
+    } else {
+        $status_bar->Hide;
+    }
+
+    return;
+}
+
+# currently if there are 9 lines we set the margin to 1 width and then
+# if another line is added it is not seen well.
+# actually I added some improvement allowing a 50% growth in the file
+# and requireing a min of 2 width
+sub _toggle_numbers {
+    my ($self, $editor, $on) = @_;
+
+    $editor->SetMarginWidth(1, 0);
+    $editor->SetMarginWidth(2, 0);
+    if ($on) {
+        my $n = 1 + List::Util::max (2, length ($editor->GetLineCount * 2));
+        my $width = $n * $editor->TextWidth(wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
+        $editor->SetMarginWidth(0, $width);
+        $editor->SetMarginType(0, wxSTC_MARGIN_NUMBER);
+    } else {
+        $editor->SetMarginWidth(0, 0);
+        $editor->SetMarginType(0, wxSTC_MARGIN_NUMBER);
+    }
+}
+
+sub _toggle_eol {
+    my ($self, $editor, $on) = @_;
+    $editor->SetViewEOL($on);
+    return;
+}
+
+
 
 1;
