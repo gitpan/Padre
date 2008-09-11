@@ -7,7 +7,7 @@ use warnings;
 use Wx        qw(:everything);
 use Wx::Event qw(:everything);
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 sub new {
     my ( $class, $win, $config, $args) = @_;
@@ -67,6 +67,14 @@ sub new {
     $row3->Add($case_insensitive);
     EVT_CHECKBOX( $dialog, $case_insensitive, sub { $find_choice->SetFocus; });
 
+    my $use_regex = Wx::CheckBox->new( $dialog, -1, "Use &Regex", [-1, -1], [-1, -1]);
+    if ($config->{search}->{use_regex}) {
+        $use_regex->SetValue(1);
+    }
+    $row3->Add($use_regex);
+    EVT_CHECKBOX( $dialog, $use_regex, sub { $find_choice->SetFocus; });
+
+
 #    $row2->Add($dir_selector, 1, wxALL, 3);
 
 #    my $path = Wx::StaticText->new( $dialog, -1, '');
@@ -96,6 +104,7 @@ sub new {
 
     $search{term}             = $find_choice->GetValue;
     $search{case_insensitive} = $case_insensitive->GetValue;
+    $search{use_regex}        = $use_regex->GetValue;
     $dialog->Destroy;
 
     return if not defined $search{term} or $search{term} eq '';

@@ -8,7 +8,7 @@ use File::Spec    ();
 use File::HomeDir ();
 use YAML::Tiny    ();
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 
 
@@ -97,6 +97,11 @@ sub new {
     $self->{replace_terms}     ||= [];
 
     $self->{command_line}      ||= '';
+    $self->{bookmarks}         ||= {};
+    #if (not $self->{bookmarks}) {
+    #   $self->{bookmarks}{$_} = undef for ('a'..'z');
+    #}
+
     # When running a script from the application some of the files might have not been saved yet.
     # There are several option what to do before running the script
     # none - don's save anything
@@ -110,6 +115,7 @@ sub new {
     $self->{current_project}   ||= '';
 
     $self->{editor}->{tab_size}    ||= 8;
+    $self->{editor}->{enable_calltip} = 1 if not exists $self->{editor}->{enable_calltip};
 
     # by default, we have an empty plugins configuration
     $self->{plugins}           ||= {};
@@ -134,8 +140,11 @@ sub read {
 
 sub write {
     my $self = shift;
+
     my %hash = %{ $self };
+    delete $self->{bookmarks}{$_}{pageid} for keys %{$self->{bookmarks}};
     YAML::Tiny::DumpFile( shift, \%hash );
+
     return 1;
 }
 

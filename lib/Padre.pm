@@ -61,7 +61,7 @@ option. Currently Ctrl-F5 does not save any file.
 
 You can edit the command line using the Run/Setup menu item.
 
-  Ctr-B          matching brace
+  Ctr-1          matching brace
   Ctr-P          Autocompletition
   Alt-N          Nth Pane
   Ctr-TAB        Next Pane
@@ -144,7 +144,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Carp           ();
 use File::Spec     ();
@@ -176,6 +176,8 @@ use Class::Autouse qw{
     Padre::Wx::Text
     Padre::Wx::Menu
     Padre::Wx::Help
+    Padre::Wx::Ack
+    Padre::Wx::Bookmarks
 };
 
 # Globally shared Perl detection object

@@ -52,8 +52,10 @@ SCOPE: {
             save_on_run       => 'same',
             current_project   => '',
             editor            => {
-                    tab_size      => 8,
+                    tab_size       => 8,
+                    enable_calltip => 1,
             },
+            bookmarks     => {},
             main              => {
                 top       => -1,
                 left      => -1,

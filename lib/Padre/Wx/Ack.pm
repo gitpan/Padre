@@ -4,11 +4,69 @@ use warnings;
 
 use Wx                      qw(:everything);
 use Wx::Event               qw(:everything);
+use Padre::Wx::Ack;
+use App::Ack;
+use Data::Dumper            qw(Dumper);
 
-our $VERSION = '0.07';
+my $iter;
+my %opts;
 
-sub new {
-    my ( $class, $win, $config ) = @_;
+our $VERSION = '0.08';
+
+{
+    no warnings 'redefine';
+    sub App::Ack::print_first_filename { print_results("$_[0]\n"); }
+    sub App::Ack::print_separator      { print_results("--\n"); }
+    sub App::Ack::print                { print_results($_[0]); }
+    sub App::Ack::print_filename       { print_results("$_[0]$_[1]"); }
+    sub App::Ack::print_line_no        { print_results("$_[0]$_[1]"); }
+}
+
+
+my $DONE_EVENT : shared = Wx::NewEventType;
+sub on_ack {
+    my ($self) = @_;
+    @_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
+
+    # TODO kill the thread before closing the application
+
+    my $search = dialog();
+print Dumper $search;
+
+    $search->{dir} ||= '.';
+    return if not $search->{term};
+
+    #my $config = get_config();
+    #%opts;# = %{ $config->{opts} };
+    #$opts{regex} = $regex;
+    $opts{regex} = $search->{term};
+    if (-f $search->{dir}) {
+        $opts{all} = 1;
+    }
+    #$opts{after_context}  = 0;
+    #$opts{before_context} = 0;
+print Dumper \%opts;
+    my $what = App::Ack::get_starting_points( [$search->{dir}], \%opts );
+    fill_type_wanted();
+#    $App::Ack::type_wanted{cc} = 1;
+#    $opts{show_filename} = 1;
+#    $opts{follow} = 0;
+    $iter = App::Ack::get_iterator( $what, \%opts );
+    App::Ack::filetype_setup();
+
+
+    $self->show_output();
+
+    EVT_COMMAND( $self, -1, $DONE_EVENT, \&ack_done );
+
+    my $worker = threads->create( \&on_ack_thread );
+
+    return;
+}
+
+
+sub dialog {
+    my ( $win, $config ) = @_;
 	my $id     = -1;
 	my $title  = "Ack";
 	my $pos    = wxDefaultPosition;
@@ -25,7 +83,7 @@ sub new {
 	my $button_cancel = Wx::Button->new($dialog, wxID_CANCEL, '');
 	my $nothing_1     = Wx::StaticText->new($dialog, -1, "", wxDefaultPosition, wxDefaultSize, );
 	my $nothing_2     = Wx::StaticText->new($dialog, -1, "", wxDefaultPosition, wxDefaultSize, );
-	my $button_dir    = Wx::Button->new($dialog, -1, "Pick directory");
+	my $button_dir    = Wx::Button->new($dialog, -1, "Pick &directory");
 
     EVT_BUTTON( $dialog, $button_search, sub { $dialog->EndModal(wxID_FIND) } );
     EVT_BUTTON( $dialog, $button_dir,    sub { on_pick_dir($dir, @_) } );
@@ -54,15 +112,19 @@ sub new {
 	$sizer_1->Fit($dialog);
 	$dialog->Layout();
 
+    $term->SetFocus;
+    my $ret = $dialog->ShowModal;
 
-
-    #$self->Show(1);
-    if ($dialog->ShowModal == wxID_CANCEL) {
+    if ($ret == wxID_CANCEL) {
+         $dialog->Destroy;
         return;
     }
+    
     my %search;
     $search{term}  = $term->GetValue;
-
+    $search{dir}   = $dir->GetValue;
+    $dialog->Destroy;
+ 
 	return \%search;
 }
 
@@ -77,6 +139,49 @@ sub on_pick_dir {
 
     return;
 }
+
+
+
+sub ack_done {
+    my( $self, $event ) = @_;
+
+   my $data = $event->GetData;
+   #print "Data: $data\n";
+   $self->{output}->AppendText("$data\n");
+
+   return;
+}
+
+sub on_ack_thread {
+    App::Ack::print_matches( $iter, \%opts );
+}
+
+sub print_results {
+    my ($text) = @_;
+#print $text;
+    #my $end = $result->get_end_iter;
+    #$result->insert($end, $text);
+
+    my $frame = Padre->ide->wx->main_window;
+    my $threvent = Wx::PlThreadEvent->new( -1, $DONE_EVENT, $text );
+    Wx::PostEvent( $frame, $threvent );
+
+
+    return;
+}
+
+
+
+# see t/module.t in ack distro
+sub fill_type_wanted {
+    for my $i ( App::Ack::filetypes_supported() ) {
+        $App::Ack::type_wanted{ $i } = undef;
+    }
+}
+
+1;
+
+
 
 1;
 

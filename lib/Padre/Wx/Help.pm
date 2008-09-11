@@ -2,7 +2,7 @@ package Padre::Wx::Help;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Wx                      qw(:everything);
 use Wx::Event               qw(:everything);
@@ -10,11 +10,19 @@ use Wx::Event               qw(:everything);
 sub on_about {
     my ( $self ) = @_;
 
-    Wx::MessageBox( 
-        "Perl Application Development and Refactoring Environment\n" .
-        "Padre $Padre::VERSION, (c) 2008 Gabor Szabo\n" .
-        "Using Wx v$Wx::VERSION, binding " . wxVERSION_STRING,
-        "About Padre", wxOK|wxCENTRE, $self );
+    my $about = Wx::AboutDialogInfo->new;
+    $about->SetName("Padre");
+    $about->SetDescription("Perl Application Development and Refactoring Environment");
+    $about->SetVersion($Padre::VERSION);
+    $about->SetCopyright("(c) 2008 Gabor Szabo");
+    $about->SetWebSite("http://padre.perlide.org/");
+    $about->AddDeveloper("Adam Kennedy");
+    $about->AddDeveloper("Using Wx v$Wx::VERSION, binding " . wxVERSION_STRING);
+    #$about->AddArtist("Name");
+    #$about->AddDocWriter();
+    #$about->AddTranslator();
+
+    Wx::AboutBox( $about );
 }
 
 sub on_help {

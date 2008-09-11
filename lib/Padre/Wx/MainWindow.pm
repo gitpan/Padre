@@ -5,6 +5,7 @@ use warnings;
 use English        qw(-no_match_vars);
 use FindBin;
 use Carp           ();
+use Cwd            ();
 use File::Spec     ();
 use File::Slurp    ();
 use File::Basename ();
@@ -21,13 +22,18 @@ use base qw(
 
 use Padre::Util ();
 use Padre::Wx::Text;
-# use Padre::Wx::FindDialog;
-# use Padre::Pod::Frame;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
-my $default_dir = "";
+my $default_dir = Cwd::cwd();
 my $cnt         = 0;
+
+
+my %mode = (
+    WIN  => Wx::wxSTC_EOL_CRLF,
+    MAC  => Wx::wxSTC_EOL_CR,
+    UNIX => Wx::wxSTC_EOL_LF,
+);
 
 use vars qw{%SYNTAX};
 BEGIN {
@@ -192,6 +198,13 @@ sub new {
     $self->{statusbar}->SetFieldsCount(3);
     $self->{statusbar}->SetStatusWidths(-1, 50, 100);
 
+    my $tool_bar = $self->CreateToolBar( wxTB_HORIZONTAL | wxNO_BORDER | wxTB_FLAT | wxTB_DOCKABLE, 5050); 
+    $tool_bar->AddTool( wxID_NEW,  '', _bitmap('new'),  'New File' ); 
+    $tool_bar->AddTool( wxID_OPEN, '', _bitmap('open'), 'Open'     ); 
+    $tool_bar->AddTool( wxID_SAVE, '', _bitmap('save'), 'Save'     ); 
+    $tool_bar->AddSeparator;
+    $tool_bar->Realize;
+
     # Attach main window events
     EVT_CLOSE( $self, \&on_close_window);
     EVT_KEY_UP( $self, \&on_key );
@@ -206,8 +219,11 @@ sub new {
     #EVT_STC_DWELLSTART( $editor, -1, sub {print 1});
     #EVT_MOTION( $editor, sub {print '.'});
     EVT_STC_UPDATEUI( $self, -1,  \&on_stc_update_ui );
+    EVT_STC_CHANGE( $self, -1, \&on_stc_change );
 
     Padre::Wx::Execute->setup( $self );
+    #$self->SetIcon( Wx::GetWxPerlIcon() );
+    $self->SetIcon( _icon('new') );
 
     # Load any default files
     $self->_load_files;
@@ -239,6 +255,9 @@ sub _load_files {
     my @files  = $ide->get_files;
     if ( @files ) {
         foreach my $f (@files) {
+            if (not File::Spec->file_name_is_absolute($f)) {
+                $f = File::Spec->catfile(Cwd::cwd(), $f);
+            }
             $self->setup_editor($f);
         }
     } elsif ($config->{startup} eq 'new') {
@@ -315,11 +334,20 @@ sub _bitmap {
     my $path = File::Spec->catfile($dir , 'docview', "$file.xpm");
     return Wx::Bitmap->new( $path, wxBITMAP_TYPE_XPM );
 }
+sub _icon {
+    my $file = shift;
+    my $dir  = $ENV{PADRE_DEV}
+        ? File::Spec->catdir($FindBin::Bin, '..', 'share')
+        : File::ShareDir::dist_dir('Padre');
+    my $path = File::Spec->catfile($dir , 'docview', "$file.xpm");
+    return Wx::Icon->new( $path, wxBITMAP_TYPE_XPM );
+}
 
 sub on_stc_update_ui {
     my ($self, $event) = @_;
     $self->update_status;
 }
+
 
 sub on_key {
     my ($self, $event) = @_;
@@ -330,50 +358,24 @@ sub on_key {
     my $code = $event->GetKeyCode;
 #print "$mod $code\n";
     if ($mod == 2) {            # Ctrl
-        if (57 >= $code and $code >= 49) {       # Ctrl-1-9
-            $self->on_set_mark($event, $code - 49);
-        } elsif ($code == WXK_TAB) {              # Ctrl-TAB  #TODO it is already in the menu
+        if ($code == WXK_TAB) {              # Ctrl-TAB  #TODO it is already in the menu
             $self->on_next_pane;
         }
     } elsif ($mod == 6) {                         # Ctrl-Shift
         if ($code == WXK_TAB) {                   # Ctrl-Shift-TAB #TODO it is already in the menu
             $self->on_prev_pane;
-        } elsif (57 >= $code and $code >= 49) {   # Ctrl-Shift-1-9      go to marker $id\n";
-            $self->on_jumpto_mark($event, $code - 49);
         }
     }
 
     return;
 }
 
-sub on_set_mark {
-    my ($self, $event, $id) = @_;
-
-    my $pageid = $self->{notebook}->GetSelection();
-    my $page = $self->{notebook}->GetPage($pageid);
-    my $line = $page->GetCurrentLine;
-    $self->{marker}->{$id} = $line;
-
-    return;
-}
-
-sub on_jumpto_mark {
-    my ($self, $event, $id) = @_;
-
-    my $pageid = $self->{notebook}->GetSelection();
-    my $page = $self->{notebook}->GetPage($pageid);
-    if (defined $self->{marker}->{$id}) {
-        $page->GotoLine($self->{marker}->{$id});
-    }
-
-    return;
-}
 
 sub on_brace_matching {
     my ($self, $event) = @_;
 
-    my $id   = $self->{notebook}->GetSelection;
-    my $page = $self->{notebook}->GetPage($id);
+    my $id    = $self->{notebook}->GetSelection;
+    my $page  = $self->{notebook}->GetPage($id);
     my $pos1  = $page->GetCurrentPos;
     my $pos2  = $page->BraceMatch($pos1);
     if ($pos2 != -1 ) {   #wxSTC_INVALID_POSITION
@@ -446,8 +448,15 @@ sub on_autocompletition {
       $prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
    my $last   = $page->GetLength();
    my $text   = $page->GetTextRange(0, $last);
+
+   my $regex;
+   eval { $regex = qr{\b($prefix\w*(?:::\w+)*)\b} };
+   if ($@) {
+       Wx::MessageBox("Cannot build regex for '$prefix'", "Autocompletions error", wxOK, $self);
+       return;
+   }
    my %seen;
-   my @words = grep { ! $seen{$_}++ } sort ($text =~ m{\b($prefix\w*(?:::\w+)*)\b}g);
+   my @words = grep { ! $seen{$_}++ } sort ($text =~ /$regex/g);
    if (@words > 20) {
       @words = @words[0..19];
    }
@@ -567,6 +576,7 @@ sub _get_default_file_type {
     # TODO: get it from config
     return $self->_get_local_filetype();
 }
+
 # Where to convert (UNIX, WIN, MAC)
 # or Ask (the user) or Keep (the garbage)
 # mixed files
@@ -600,6 +610,7 @@ sub on_split_window {
     my $id      = $self->{notebook}->GetSelection;
     my $title   = $self->{notebook}->GetPageText($id);
     my $file    = $self->get_current_filename;
+    return if not $file;
     my $pointer = $editor->GetDocPointer();
     $editor->AddRefDocument($pointer);
 
@@ -613,6 +624,8 @@ sub on_split_window {
     return;
 }
 
+# if the current buffer is empty then fill that with the content of the current file
+# otherwise open a new buffer and open the file there
 sub setup_editor {
     my ($self, $file) = @_;
 
@@ -628,11 +641,6 @@ sub setup_editor {
     
     my $file_type = $self->_get_default_file_type();
 
-    my %mode = (
-       'WIN'  => Wx::wxSTC_EOL_CRLF,
-       'MAC'  => Wx::wxSTC_EOL_CR,
-       'UNIX' => Wx::wxSTC_EOL_LF,
-    );
 
     $cnt++;
     my $title   = " Unsaved Document $cnt";
@@ -716,27 +724,83 @@ sub create_tab {
     return $id;
 }
 
+# try to open in various ways
+#    as full path
+#    as path relative to cwd
+#    as path to relative to where the current file is
+# if we are in a perl file or perl environment also try if the thing might be a name
+#    of a module and try to open it locally or from @INC.
+sub on_open_selection {
+    my ($self, $event) = @_;
+    my $selection = $self->_get_selection();
+    if (not $selection) {
+        Wx::MessageBox("Need to have something selected", "Open Selection", wxOK, $self);
+        return;
+    }
+    my $file;
+    if (-e $selection) {
+        $file = $selection;
+        if (not File::Spec->file_name_is_absolute($file)) {
+            $file = File::Spec->catfile(Cwd::cwd(), $file);
+            # check if this is still a file?
+        }
+    } else {
+        my $filename
+            = File::Spec->catfile(
+                    File::Basename::dirname($self->get_current_filename),
+                    $selection);
+        if (-e $filename) {
+            $file = $filename;
+        }
+    }
+    if (not $file) { # and we are in a Perl environment
+        $selection =~ s{::}{/}g;
+        $selection .= ".pm";
+        my $filename = File::Spec->catfile(Cwd::cwd(), $selection);
+        if (-e $filename) {
+            $file = $filename;
+        } else {
+            foreach my $path (@INC) {
+                 my $filename = File::Spec->catfile( $path, $selection );
+                 if (-e $filename) {
+                     $file = $filename;
+                     last;
+                 }
+            }
+        }
+    }
+
+	if (not $file) {
+        Wx::MessageBox("Could not find file '$selection'", "Open Selection", wxOK, $self);
+        return;
+    }
+
+    Padre->ide->add_to_recent('files', $file);
+    $self->setup_editor($file);
+
+    return;
+}
 
 sub on_open {
     my ($self) = @_;
 
+    my $current_filename = $self->get_current_filename;
+    if ($current_filename) {
+       $default_dir = File::Basename::dirname($current_filename);
+    }
     my $dialog = Wx::FileDialog->new( $self, "Open file", $default_dir, "", "*.*", wxFD_OPEN);
     if ($^O !~ /win32/i) {
        $dialog->SetWildcard("*");
     }
     if ($dialog->ShowModal == wxID_CANCEL) {
-#print "Cancel\n";
         return;
     }
     my $filename = $dialog->GetFilename;
-#print "OK $filename\n";
     $default_dir = $dialog->GetDirectory;
 
     my $file = File::Spec->catfile($default_dir, $filename);
     Padre->ide->add_to_recent('files', $file);
 
-    # if the current buffer is empty then fill that with the content of the current file
-    # otherwise open a new buffer and open the file there
     $self->setup_editor($file);
 
     return;
@@ -805,6 +869,7 @@ Returns the name filename of the current buffer.
 sub get_current_filename {
     my ($self) = @_;
     my $id = $self->{notebook}->GetSelection;
+    return if $id == -1;
     return $self->_get_filename($id);
 }
 
@@ -826,6 +891,10 @@ sub on_save_as {
     my $id   = $self->{notebook}->GetSelection;
     return if $id == -1;
 
+    my $current_filename = $self->get_current_filename;
+    if ($current_filename) {
+       $default_dir = File::Basename::dirname($current_filename);
+    }
     while (1) {
         my $dialog = Wx::FileDialog->new( $self, "Save file as...", $default_dir, "", "*.*", wxFD_SAVE);
         if ($dialog->ShowModal == wxID_CANCEL) {
@@ -936,6 +1005,18 @@ sub on_close {
     return;
 }
 
+sub on_close_all {
+    my ($self, $event) = @_;
+
+    foreach my $id (reverse 0 .. $self->{notebook}->GetPageCount -1) {
+        if (not $self->_buffer_changed($id) ) {
+            $self->_save_buffer($id);
+        }
+        $self->{notebook}->DeletePage($id);
+    }
+    return;
+}
+
 sub _buffer_changed {
     my ($self, $id) = @_;
     my $page = $self->{notebook}->GetPage($id);
@@ -988,6 +1069,7 @@ sub on_find {
     return if not $search;
 
     $config->{search}->{case_insensitive} = $search->{case_insensitive};
+    $config->{search}->{use_regex}        = $search->{use_regex};
 
     if ($search->{term}) {
         unshift @{$config->{search_terms}}, $search->{term};
@@ -1005,56 +1087,13 @@ sub on_find {
     return;
 }
 
-my $DONE_EVENT : shared = Wx::NewEventType;
-sub on_ack {
-    my ($self) = @_;
-    @_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
 
-# TODO kill the thread before closing the application
-
-    require Padre::Wx::Ack;
-    require App::Ack;
-    my $search = Padre::Wx::Ack->new;
-use Data::Dumper;
-print Dumper $search;
-
-    return;
-
-    $self->show_output();
-
-    EVT_COMMAND( $self, -1, $DONE_EVENT, \&ack_done );
-
-
-    my $worker = threads->create( \&_on_ack_thread );
-    #my $data = Padre::Wx::Ack->new;
-}
-sub ack_done {
-    my( $self, $event ) = @_;
-
-   my $data = $event->GetData;
-   print "Data: $data\n";
-   $self->{output}->AppendText("$data\n");
-
-   return;
-}
-
-sub _on_ack_thread {
-
-    my $frame = Padre->ide->wx->main_window;
-
-    for my $i (1..10) {
-       print "TH $i\n";
-       my $threvent = Wx::PlThreadEvent->new( -1, $DONE_EVENT, $i );
-       Wx::PostEvent( $frame, $threvent );
-       sleep 1;
-    }
-}
-
+# sub update_methods
 sub update_methods {
     my ($self) = @_;
 
     my $text = $self->get_current_content;
-    my @methods = reverse sort $text =~ m{sub\s+(\w+)}g;
+    my @methods = reverse sort $text =~ m{^sub\s+(\w+)}gm;
     $self->{rightbar}->DeleteAllItems;
     $self->{rightbar}->InsertStringItem(0, $_) for @methods;
     $self->{rightbar}->SetColumnWidth(0, wxLIST_AUTOSIZE);
@@ -1080,11 +1119,23 @@ sub _search {
     my $last = $page->GetLength();
     my $str  = $page->GetTextRange($from, $last);
 
+    if ($config->{search}->{use_regex}) {
+        $search_term =~ s/\$/\\\$/; # escape $ signs by default so they won't interpolate
+    } else {
+        $search_term = quotemeta $search_term;
+    }
+
     if ($config->{search}->{case_insensitive})  {
         $search_term = "(?i)$search_term";
     }
-#print $search_term, "\n";
-    my $regex = qr/$search_term/m;
+
+
+    my $regex;
+    eval { $regex = qr/$search_term/m };
+    if ($@) {
+        Wx::MessageBox("Cannot build regex for '$search_term'", "Search error", wxOK, $self);
+        return;
+    }
 
     my ($start, $end);
     if ($str =~ $regex) {
@@ -1289,6 +1340,7 @@ sub on_nth_pane {
     my $page = $self->{notebook}->GetPage($id);
     if ($page) {
        $self->{notebook}->ChangeSelection($id);
+       $self->update_methods;
        return 1;
     }
     return;
@@ -1512,6 +1564,7 @@ sub on_toggle_status_bar {
     return;
 }
 
+
 # currently if there are 9 lines we set the margin to 1 width and then
 # if another line is added it is not seen well.
 # actually I added some improvement allowing a 50% growth in the file
@@ -1538,6 +1591,77 @@ sub _toggle_eol {
     return;
 }
 
+sub convert_to {
+    my ($self, $file_type) = @_;
 
+    my $editor = $self->get_current_editor;
+    #$editor->SetEOLMode( $mode{$file_type} );
+    $editor->ConvertEOLs( $mode{$file_type} );
+
+    my $id   = $self->{notebook}->GetSelection;
+    # TODO: include the changing of file type in the undo/redo actions
+    # or better yet somehow fetch it from the document when it is needed.
+    my ($filename, $type) = $self->_get_filename($id);
+    $self->_set_filename($id, $filename, $file_type);
+
+    $self->update_status;
+
+    return;
+}
+
+sub find_editor_of_file {
+    my ($self, $file) = @_;
+
+    foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
+        my $filename = $self->_get_filename($id);
+        next if not $filename;
+        return $id if $filename eq $file;
+    }
+    return;
+}
+
+
+sub on_stc_change {
+    my ($self, $event) = @_;
+
+    return if $self->{_in_setup_editor};
+    my $config = Padre->ide->get_config;
+    return if not $config->{editor}->{enable_calltip};
+
+    my $editor = $self->get_current_editor;
+
+    my $pos    = $editor->GetCurrentPos;
+    my $line   = $editor->LineFromPosition($pos);
+    my $first  = $editor->PositionFromLine($line);
+    my $prefix = $editor->GetTextRange($first, $pos); # line from beginning to current position
+       #$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
+    if ($editor->CallTipActive) {
+        $editor->CallTipCancel;
+    }
+
+    my %keywords = (
+       chomp     => '(STRING)',
+       substr    => '(EXPR, OFFSET, LENGTH, REPLACEMENT)',
+       index     => '(STR, SUBSTR, INDEX)',
+       pop       => '(@ARRAY)',
+       psush     => '(@ARRAY, LIST)',
+       print     => '(LIST) or (FILEHANDLE LIST)',
+       join      => '(EXPR, LIST)',
+       split     => '(/PATTERN/,EXPR,LIMIT)',
+       wantarray => '()',
+    );
+
+    my $regex = join '|', sort {length $a <=> length $b} keys %keywords;
+
+    my $tip;
+    if ( $prefix =~ /($regex)[ (]?$/ ) {
+        $tip = $keywords{$1};
+    }
+    if ($tip) {
+        $editor->CallTipShow($editor->CallTipPosAtStart() + 1, $tip);
+    }
+
+    return;
+}
 
 1;

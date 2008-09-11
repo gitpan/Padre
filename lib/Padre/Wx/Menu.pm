@@ -6,7 +6,14 @@ use warnings;
 use Wx        qw(:everything);
 use Wx::Event qw(:everything);
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
+
+
+
+
+
+#####################################################################
+# Construction and Setup
 
 sub new {
     my ($class, $win) = @_;
@@ -21,6 +28,7 @@ sub new {
     $menu->{file} = Wx::Menu->new;
     EVT_MENU( $win, $menu->{file}->Append( wxID_NEW,  '' ), \&Padre::Wx::MainWindow::on_new  );
     EVT_MENU( $win, $menu->{file}->Append( wxID_OPEN, '' ), \&Padre::Wx::MainWindow::on_open );
+    EVT_MENU( $win, $menu->{file}->Append( -1, "Open Selection\tCtrl-Shift-O" ),  \&Padre::Wx::MainWindow::on_open_selection);
     $menu->{file_recent} = Wx::Menu->new;
     $menu->{file}->Append( -1, "Recent Files", $menu->{file_recent} );
     foreach my $f ( $ide->get_recent('files') ) {
@@ -34,12 +42,15 @@ sub new {
     EVT_MENU( $win, $menu->{file}->Append( wxID_SAVEAS, '' ), \&Padre::Wx::MainWindow::on_save_as  );
     EVT_MENU( $win, $menu->{file}->Append( -1, 'Save All'  ), \&Padre::Wx::MainWindow::on_save_all );
     EVT_MENU( $win, $menu->{file}->Append( wxID_CLOSE,  '' ), \&Padre::Wx::MainWindow::on_close    );
+    EVT_MENU( $win, $menu->{file}->Append( -1, 'Close All' ), \&Padre::Wx::MainWindow::on_close_all );
     EVT_MENU( $win, $menu->{file}->Append( wxID_EXIT,   '' ), \&Padre::Wx::MainWindow::on_exit     );
 
     # Create the Project menu
-    $menu->{project} = Wx::Menu->new;
-    EVT_MENU( $win, $menu->{project}->Append( -1, "&New"),        \&Padre::Wx::MainWindow::on_new_project );
-    EVT_MENU( $win, $menu->{project}->Append( -1, "&Select"    ), \&Padre::Wx::MainWindow::on_select_project );
+    #$menu->{project} = Wx::Menu->new;
+    #EVT_MENU( $win, $menu->{project}->Append( -1, "&New"),        \&Padre::Wx::MainWindow::on_new_project );
+    #EVT_MENU( $win, $menu->{project}->Append( -1, "&Select"    ), \&Padre::Wx::MainWindow::on_select_project );
+
+
 
 
 
@@ -49,16 +60,27 @@ sub new {
     EVT_MENU( $win, $menu->{edit}->Append( wxID_REDO, "\tCtrl-Shift-Z" ),  \&Padre::Wx::MainWindow::on_redo             );
     EVT_MENU( $win, $menu->{edit}->Append( wxID_FIND, '' ),           \&Padre::Wx::MainWindow::on_find             );
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&Find Again\tF3" ),   \&Padre::Wx::MainWindow::on_find_again       );
-    #EVT_MENU( $win, $menu->{edit}->Append( -1, "&Ack" ),   \&Padre::Wx::MainWindow::on_ack       );
+    EVT_MENU( $win, $menu->{edit}->Append( -1, "Ac&k" ),              \&Padre::Wx::Ack::on_ack  );
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&Goto\tCtrl-G" ),     \&Padre::Wx::MainWindow::on_goto             );
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&AutoComp\tCtrl-P" ), \&Padre::Wx::MainWindow::on_autocompletition );
     EVT_MENU( $win, $menu->{edit}->Append( -1, "Subs\tAlt-S"     ),   sub { $_[0]->{rightbar}->SetFocus()} ); 
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&Comment out block\tCtrl-M" ),   \&Padre::Wx::MainWindow::on_comment_out_block       );
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&UnComment block\tCtrl-Shift-M" ),   \&Padre::Wx::MainWindow::on_uncomment_block       );
-    EVT_MENU( $win, $menu->{edit}->Append( -1, "&Brace matching\tCtrl-B" ),   \&Padre::Wx::MainWindow::on_brace_matching       );
+    EVT_MENU( $win, $menu->{edit}->Append( -1, "&Brace matching\tCtrl-1" ),   \&Padre::Wx::MainWindow::on_brace_matching       );
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&Split window" ),   \&Padre::Wx::MainWindow::on_split_window     );
-
     EVT_MENU( $win, $menu->{edit}->Append( -1, "&Setup" ),            \&Padre::Wx::MainWindow::on_setup            );
+
+    $menu->{edit_convert} = Wx::Menu->new;
+    $menu->{edit}->Append( -1, "Convert File", $menu->{edit_convert} );
+    foreach my $os ( qw(UNIX MAC WIN) ) {
+       EVT_MENU(
+           $win,
+           $menu->{edit_convert}->Append(-1, "to $os"), 
+           sub { $_[0]->convert_to($os) },
+       );
+    }
+
+
 
 
     # Create the View menu
@@ -97,9 +119,18 @@ sub new {
         $menu->{view_indentation_guide},
         \&Padre::Wx::MainWindow::on_toggle_indentation_guide,
     );
-    EVT_MENU( $win, $menu->{view}->Append( -1, "&Zoom in\tCtrl--" ),   \&Padre::Wx::MainWindow::on_zoom_in   );
-    EVT_MENU( $win, $menu->{view}->Append( -1, "&Zoom out\tCtrl-+" ),  \&Padre::Wx::MainWindow::on_zoom_out  );
-    EVT_MENU( $win, $menu->{view}->Append( -1, "&Zoom reset\tCtrl-/" ),  \&Padre::Wx::MainWindow::on_zoom_reset  );
+    $menu->{view_enable_calltip} = $menu->{view}->AppendCheckItem( -1, "Enable Call Tip" );
+    $menu->{view_enable_calltip}->Check( $config->{editor}->{enable_calltip} ? 1 : 0 );
+    EVT_MENU(
+        $win,
+        $menu->{view_enable_calltip},
+        sub {$config->{editor}->{enable_calltip} = $menu->{view_enable_calltip}->IsChecked},
+    );
+    EVT_MENU( $win, $menu->{view}->Append( -1, "Zoom in\tCtrl--" ),   \&Padre::Wx::MainWindow::on_zoom_in   );
+    EVT_MENU( $win, $menu->{view}->Append( -1, "Zoom out\tCtrl-+" ),  \&Padre::Wx::MainWindow::on_zoom_out  );
+    EVT_MENU( $win, $menu->{view}->Append( -1, "Zoom reset\tCtrl-/" ),  \&Padre::Wx::MainWindow::on_zoom_reset  );
+    EVT_MENU( $win, $menu->{view}->Append( -1, "Set Bookmark\tCtrl-B" ),  \&Padre::Wx::Bookmarks::on_set_bookmark  );
+    EVT_MENU( $win, $menu->{view}->Append( -1, "Goto Bookmark\tCtrl-Shift-B" ),  \&Padre::Wx::Bookmarks::on_goto_bookmark  );
 
     $menu->{view}->AppendSeparator;
     #$menu->{view_files} = Wx::Menu->new;
@@ -114,6 +145,10 @@ sub new {
         $menu->{view}->Append(-1, "Prev File\tCtrl-Shift-TAB"),
         \&Padre::Wx::MainWindow::on_prev_pane,
     );
+
+
+
+
 
     # Creat the Run menu
     $menu->{run} = Wx::Menu->new;
@@ -155,6 +190,9 @@ sub new {
     }
 
 
+
+
+
     # Create the help menu
     $menu->{help} = Wx::Menu->new;
     EVT_MENU(
@@ -175,18 +213,39 @@ sub new {
 
 
 
+
+
+    # Create the Experimental menu
+    $menu->{experimental} = Wx::Menu->new;
+    EVT_MENU(
+        $win,
+        $menu->{experimental}->Append( -1, 'Reflow Menu' ),
+        sub {
+            $DB::single = 1;
+            $_[0]->{menu}->reflow;
+        },
+    );
+
+
+
+
+
     # Create and return the main menu bar
     $menu->{wx} = Wx::MenuBar->new;
-    $menu->{wx}->Append( $menu->{file},    "&File" );
-    $menu->{wx}->Append( $menu->{project}, "&Project" );
-    $menu->{wx}->Append( $menu->{edit},    "&Edit" );
-    $menu->{wx}->Append( $menu->{view},    "&View" );
-    $menu->{wx}->Append( $menu->{run},     "&Run" );
+    $menu->{wx}->Append( $menu->{file},     "&File" );
+    $menu->{wx}->Append( $menu->{project},  "&Project" );
+    $menu->{wx}->Append( $menu->{edit},     "&Edit" );
+    $menu->{wx}->Append( $menu->{view},     "&View" );
+    $menu->{wx}->Append( $menu->{run},      "&Run" );
+    $menu->{wx}->Append( $menu->{bookmark}, "&Bookmarks" );
     if ( %plugins ) {
         $menu->{wx}->Append( $menu->{plugin}, "Pl&ugins" );
     }
     $menu->{wx}->Append( $menu->{help},    "&Help" );
+    # $menu->{wx}->Append( $menu->{experimental}, "E&xperimental" );
 
+    # Do an initial reflow
+    # $menu->reflow;
 
     return $menu;
 }
@@ -240,10 +299,28 @@ sub remove_alt_n_menu {
 }
 
 sub win {
-    my ($self) = @_;
+	$_[0]->{win};
+}
 
-    return $self->{win};
+
+
+
+
+#####################################################################
+# Reflowing the Menu
+
+sub reflow {
+	my $self  = shift;
+	my $lexer = $self->win->get_current_editor->GetLexer;
+
+	# Enable or disable the run menu
+	if ( $lexer == wxSTC_LEX_PERL ) {
+		$self->{wx}->EnableTop( 4, 1 );
+	} else {
+		$self->{wx}->EnableTop( 4, 0 );
+	}
+
+	return 1;
 }
 
 1;
-
