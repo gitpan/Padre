@@ -40,6 +40,7 @@ SCOPE: {
 SCOPE: {
     my $config = $app->get_config;
     is_deeply {
+            experimental      => 0,
             DISPLAY_MIN_LIMIT => 2,
             DISPLAY_MAX_LIMIT => 200,
             show_line_numbers => 0,
@@ -52,8 +53,8 @@ SCOPE: {
             save_on_run       => 'same',
             current_project   => '',
             editor            => {
-                    tab_size       => 8,
-                    enable_calltip => 1,
+                    tab_size      => 8,
+                    show_calltips => 1,
             },
             bookmarks     => {},
             main              => {

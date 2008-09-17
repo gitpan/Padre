@@ -1,6 +1,6 @@
 ---
 name: Padre
-version: 0.08
+version: 0.09
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
@@ -32,6 +32,7 @@ requires:
   Module::Inspector: 0.04
   ORLite: 0.10
   PAR: 0.970
+  PPI: 1.203
   Pod::POM: 0
   Pod::Simple: 0
   Probe::Perl: 0.01
@@ -48,71 +49,80 @@ build_requires:
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.08
+    version: 0.09
   Padre::Config:
     file: lib/Padre/Config.pm
-    version: 0.08
+    version: 0.09
   Padre::DB:
     file: lib/Padre/DB.pm
-    version: 0.08
+    version: 0.09
   Padre::Document:
     file: lib/Padre/Document.pm
-    version: 0.08
+    version: 0.09
+  Padre::Document::Perl:
+    file: lib/Padre/Document/Perl.pm
+    version: 0.09
+  Padre::PPI:
+    file: lib/Padre/PPI.pm
+    version: 0.09
   Padre::PluginManager:
     file: lib/Padre/PluginManager.pm
-    version: 0.08
+    version: 0.09
   Padre::Pod::Frame:
     file: lib/Padre/Pod/Frame.pm
-    version: 0.08
+    version: 0.09
   Padre::Pod::Indexer:
     file: lib/Padre/Pod/Indexer.pm
-    version: 0.08
+    version: 0.09
   Padre::Pod::Viewer:
     file: lib/Padre/Pod/Viewer.pm
-    version: 0.08
+    version: 0.09
   Padre::Pod::Viewer::POD:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Pod::Viewer::View:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Project:
     file: lib/Padre/Project.pm
-    version: 0.08
+    version: 0.09
   Padre::Util:
     file: lib/Padre/Util.pm
-    version: 0.08
+    version: 0.09
+  Padre::Wx:
+    file: lib/Padre/Wx.pm
+    version: 0.09
   Padre::Wx::Ack:
     file: lib/Padre/Wx/Ack.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::App:
     file: lib/Padre/Wx/App.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Bookmarks:
     file: lib/Padre/Wx/Bookmarks.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Execute:
     file: lib/Padre/Wx/Execute.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::FindDialog:
     file: lib/Padre/Wx/FindDialog.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Help:
     file: lib/Padre/Wx/Help.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::MainWindow:
     file: lib/Padre/Wx/MainWindow.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Menu:
     file: lib/Padre/Wx/Menu.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Popup:
     file: lib/Padre/Wx/Popup.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Preferences:
     file: lib/Padre/Wx/Preferences.pm
-    version: 0.08
+    version: 0.09
   Padre::Wx::Text:
     file: lib/Padre/Wx/Text.pm
-    version: 0.08
+    version: 0.09
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

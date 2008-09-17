@@ -11,7 +11,7 @@ use Data::Dumper            qw(Dumper);
 my $iter;
 my %opts;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 {
     no warnings 'redefine';
@@ -31,7 +31,7 @@ sub on_ack {
     # TODO kill the thread before closing the application
 
     my $search = dialog();
-print Dumper $search;
+#print Dumper $search;
 
     $search->{dir} ||= '.';
     return if not $search->{term};
@@ -45,7 +45,7 @@ print Dumper $search;
     }
     #$opts{after_context}  = 0;
     #$opts{before_context} = 0;
-print Dumper \%opts;
+#print Dumper \%opts;
     my $what = App::Ack::get_starting_points( [$search->{dir}], \%opts );
     fill_type_wanted();
 #    $App::Ack::type_wanted{cc} = 1;
@@ -92,6 +92,7 @@ sub dialog {
 	#$dialog->SetTitle("frame_1");
 	$term->SetSelection(-1);
 	$dir->SetSelection(-1);
+    $button_search->SetDefault;
 
     # layout
 	my $sizer_1 = Wx::BoxSizer->new(wxVERTICAL);

@@ -138,13 +138,77 @@ Padre will add a menu entry for every plugin under the B<Plugins>
 menu item. For each plugin menu item it will add all the Name_1,
 Name_2 subitems.
 
+
+=head1 Search, Find and Replace
+
+(planning)
+
+
+=head2 Search
+
+Ctrl-F opens the search window, if something was selected then that is given as the search text.
+Otherwise the last search string should be displayed.
+
+Provide option to search backwards
+
+Limit action to current block, current subroutine, current
+file (should be the default) current project, current directory 
+with some file filters.
+
+When the user presses Find
+
+=over 4
+
+=item 1
+
+We find the first hit and the search window disappears. F3 jumps to next one.
+
+=item 2
+
+The first match is highlighted and focused but the window stays
+When the user clicks on the Find button again, we jump to the next hit
+In this case the user must be able to edit the document while the search window
+is on.
+
+=item 3
+
+All the matches are highlighted and we go to the first match, window disappears.
+F3 jumps to next one
+
+=item 4
+
+All the matches are highlighted and we go to the first one, window stays open
+user can edit text
+
+=back
+
+=head2 Find and Replace
+
+Find - find the next occurance
+
+Replace all - do just that
+
+Replace - if currently a match is selected then replace it find the next occurance and select it
+
+=head2 TODO describe what to do if we have to deal with files that are not in the editor
+
+if "Replace all" was pressed then do just that 
+   1) without opening editors for the files.
+   2) opening an editor for each file and keep it in unsaved state (sounds carzy having 1000 editors open...)
+if Search or Replace is clicked then we might show the next location in the lower pane. 
+If the user then presses Replace we open the file in an editor window and go on.
+If the user presses Search then we show the next occurance.
+Opened and edited files will be left in a not saved state.
+
+
+
 =cut
 
 use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Carp           ();
 use File::Spec     ();
@@ -167,6 +231,7 @@ BEGIN {
 }
 use Class::Autouse qw{
     Padre::Document
+    Padre::Document::Perl
     Padre::Project
     Padre::PluginManager
     Padre::Pod::Frame
@@ -178,6 +243,7 @@ use Class::Autouse qw{
     Padre::Wx::Help
     Padre::Wx::Ack
     Padre::Wx::Bookmarks
+    Padre::Wx::FindDialog
 };
 
 # Globally shared Perl detection object
@@ -201,7 +267,7 @@ sub new {
     # Create the empty object
     my $self  = bless {
         # Wx Attributes
-        wx      => undef,
+        wx          => undef,
 
         # Internal Attributes
         config_dir  => undef,
@@ -263,6 +329,11 @@ sub plugin_manager {
     $_[0]->{plugin_manager};
 }
 
+sub db {
+    require Padre::DB;
+    return 'Padre::DB';
+}
+
 sub run {
     my ($self) = @_;
     if ( $self->get_index ) {
@@ -303,14 +374,6 @@ sub _process_command_line {
     return;
 }
 
-sub usage {
-    die <<"END_USAGE";
-Usage: $0 [FILENAMEs]
-           --index to index the modules found on this computer
-           --help this help
-END_USAGE
-}
-
 sub run_editor {
     my $self = shift;
     $self->wx->MainLoop;
@@ -319,8 +382,7 @@ sub run_editor {
 }
 
 sub config_dbh {
-    my ($self) = @_;
-
+    my $self = shift;
     my $path = $self->config_db;
     my $new  = not -e $path;
     my $dbh  = DBI->connect("dbi:SQLite:dbname=$path", "", "", {
@@ -328,9 +390,9 @@ sub config_dbh {
         PrintError       => 1,
         AutoCommit       => 1,
         FetchHashKeyName => 'NAME_lc',
-    });
+    } );
     if ( $new ) {
-       $self->create_config($dbh);
+        $self->create_config($dbh);
     }
     return $dbh;
 }
@@ -359,10 +421,12 @@ sub load_config {
 }
 
 sub add_to_recent {
-    my ($self, $type, $item) = @_;
-
-    Carp::confess("No type given") if not $type;
-    Carp::confess("Invalid type '$type'") if not grep {$_ eq $type} @history;
+    my $self = shift;
+    my $type = shift or Carp::confess("No type given");
+    my $item = shift;
+    unless ( grep { $_ eq $type } @history ) {
+    	Carp::confess("Invalid type '$type'");
+    }
 
     my @recent = $self->get_recent($type);
     if (not grep {$_ eq $item} @recent) {
@@ -408,6 +472,7 @@ sub get_current_index {
 
     return $self->{current}->{$type};
 }
+
 # gets a type and a name
 sub set_current {
     my ($self, $type, $name) = @_;
@@ -505,7 +570,7 @@ sub create_config {
     $dbh->do("CREATE TABLE modules (id INTEGER PRIMARY KEY, name VARCHAR(100))");
     $dbh->do("CREATE TABLE history (id INTEGER PRIMARY KEY, type VARCHAR(100), name VARCHAR(100))");
     return;
-} 
+}
 
 # returns the name of the next module
 sub next_module {
@@ -537,13 +602,19 @@ sub prev_module {
 sub set_files {
     my ($self, @files) = @_;
     @{ $self->{_files} } = @files;
-
     return;
 }
+
 sub get_files {
     my ($self) = @_;
     return ($self->{_files} and ref ($self->{_files}) eq 'ARRAY' ? @{ $self->{_files} } : ());
 }
+
+sub usage { die <<"END_USAGE" }
+Usage: $0 [FILENAMEs]
+           --index to index the modules found on this computer
+           --help this help
+END_USAGE
 
 1;
 

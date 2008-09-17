@@ -2,7 +2,7 @@ package Padre::Wx::Execute;
 use strict;
 use warnings;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Wx                      qw(:everything);
 use Wx::Event               qw(:everything);
@@ -60,7 +60,7 @@ sub on_debug_this {
     my $host = 'localhost';
     my $port = 12345;
 
-    _setup_debugger($host, $port);
+    $self->_setup_debugger($host, $port);
 
     local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
     my $perl = Padre->perl_interpreter;
@@ -71,7 +71,7 @@ sub on_debug_this {
 
 # based on remoteport from "Pro Perl Debugging by Richard Foley and Andy Lester"
 sub _setup_debugger {
-    my ($host, $port) = @_;
+    my ($self, $host, $port) = @_;
 
 #use IO::Socket;
 #use Term::ReadLine;
@@ -95,9 +95,9 @@ sub _setup_debugger {
 sub _run {
     my ($self, $cmd) = @_;
 
-    $self->{menu}->{run_this}->Enable(0);
-    $self->{menu}->{run_any}->Enable(0);
-    $self->{menu}->{run_stop}->Enable(1);
+    $self->{menu}->{perl_run_this}->Enable(0);
+    $self->{menu}->{perl_run_any}->Enable(0);
+    $self->{menu}->{perl_stop}->Enable(1);
 
     my $config = Padre->ide->get_config;
 
@@ -106,9 +106,9 @@ sub _run {
 
     $self->{proc} = Wx::Perl::ProcessStream->OpenProcess($cmd, 'MyName1', $self);
     if ( not $self->{proc} ) {
-       $self->{menu}->{run_this}->Enable(1);
-       $self->{menu}->{run_any}->Enable(1);
-       $self->{menu}->{run_stop}->Enable(0);
+       $self->{menu}->{perl_run_this}->Enable(1);
+       $self->{menu}->{perl_run_any}->Enable(1);
+       $self->{menu}->{perl_stop}->Enable(0);
     }
     return;
 }
@@ -171,9 +171,9 @@ sub evt_process_exit {
     #my $exitcode = $process->GetExitCode;
     $process->Destroy;
 
-    $self->{menu}->{run_this}->Enable(1);
-    $self->{menu}->{run_any}->Enable(1);
-    $self->{menu}->{run_stop}->Enable(0);
+    $self->{menu}->{perl_run_this}->Enable(1);
+    $self->{menu}->{perl_run_any}->Enable(1);
+    $self->{menu}->{perl_stop}->Enable(0);
 
     return;
 }

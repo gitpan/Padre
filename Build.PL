@@ -37,6 +37,7 @@ my %prereqs = (
         'Pod::POM'                => 0,
         'Pod::Simple'             => 0,
         'Probe::Perl'             => '0.01',
+	'PPI'                     => '1.203',
         'YAML::Tiny'              => '1.32',
         'Wx'                      => 0,
         'Wx::Perl::Dialog'        => 0,
@@ -71,7 +72,7 @@ sub ACTION_exe {
 
 
     my @libs    = libs();
-    my @modules = modules(); #(grep {$_ ne 'perl'} keys %{ $self->requires });
+    my @modules = modules();
     my @cmd     = qw(pp -o padre -I lib  script/padre);
     push @cmd, @modules, @libs;
     print "@cmd\n";
@@ -122,7 +123,9 @@ sub libs {
 
 
 sub modules {
-    my @modules = @_;
+
+    my @modules;
+    my @files;
 
     open my $fh, '<', 'MANIFEST' or die $!;
     while (my $line = <$fh>) {
@@ -132,11 +135,15 @@ sub modules {
             $line =~ s{/}{::}g;
             push @modules, $line;
         }
+        if ($line =~ m{^share/}) {
+            push @files, $line;
+        }
     }
-    my @m_args;
-    push @m_args, "-M", $_ for @modules;
+    my @args;
+    push @args, "-M", $_ for @modules;
+    push @args, "-a", $_ for @files;
 
-    return @m_args;
+    return @args;
 }
 
 

@@ -5,9 +5,15 @@ use warnings;
 
 $| = 1;
 
-use threads;
-use threads::shared;
+unless ( $^O eq 'MSWin32' ) {
+	exit 0 if fork();
+}
 
-use Padre;
+require threads;
+require threads::shared;
+
+$ENV{PADRE_PAR_PATH} = $ENV{PAR_TEMP}||'';
+
+require Padre;
 my $app = Padre->new;
 $app->run;

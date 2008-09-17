@@ -1,5 +1,6 @@
 package Padre::Wx::MainWindow;
 
+use 5.008;
 use strict;
 use warnings;
 use English        qw(-no_match_vars);
@@ -11,19 +12,20 @@ use File::Slurp    ();
 use File::Basename ();
 use Data::Dumper   ();
 use List::Util     ();
-use File::ShareDir ();
+use Params::Util   ();
 use Wx        qw(:everything);
 use Wx::Event qw(:everything);
 
-use base qw(
+use base qw{
 	Wx::Frame
 	Padre::Wx::Execute
-);
+};
 
-use Padre::Util ();
-use Padre::Wx::Text;
+use Padre::Util     ();
+use Padre::Wx       ();
+use Padre::Wx::Text ();
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 my $default_dir = Cwd::cwd();
 my $cnt         = 0;
@@ -83,6 +85,9 @@ BEGIN {
 }
 
 
+
+
+
 #####################################################################
 # Constructor and Accessors
 
@@ -101,7 +106,7 @@ sub new {
     my $self = $class->SUPER::new(
         undef,
         -1,
-        'Padre ',
+        "Padre $Padre::VERSION ",
         [
             $config->{main}->{left},
             $config->{main}->{top},
@@ -199,9 +204,10 @@ sub new {
     $self->{statusbar}->SetStatusWidths(-1, 50, 100);
 
     my $tool_bar = $self->CreateToolBar( wxTB_HORIZONTAL | wxNO_BORDER | wxTB_FLAT | wxTB_DOCKABLE, 5050); 
-    $tool_bar->AddTool( wxID_NEW,  '', _bitmap('new'),  'New File' ); 
-    $tool_bar->AddTool( wxID_OPEN, '', _bitmap('open'), 'Open'     ); 
-    $tool_bar->AddTool( wxID_SAVE, '', _bitmap('save'), 'Save'     ); 
+    $tool_bar->AddTool( wxID_NEW,  '', Padre::Wx::bitmap('new'),  'New File'  ); 
+    $tool_bar->AddTool( wxID_OPEN, '', Padre::Wx::bitmap('open'), 'Open File' ); 
+    $tool_bar->AddTool( wxID_SAVE, '', Padre::Wx::bitmap('save'), 'Save File' );
+    # $tool_bar->AddTool( wxID_CLOSE, '', Padre::Wx::bitmap('close'), 'Close File' );
     $tool_bar->AddSeparator;
     $tool_bar->Realize;
 
@@ -223,7 +229,7 @@ sub new {
 
     Padre::Wx::Execute->setup( $self );
     #$self->SetIcon( Wx::GetWxPerlIcon() );
-    $self->SetIcon( _icon('new') );
+    $self->SetIcon( Padre::Wx::icon('new') );
 
     # Load any default files
     $self->_load_files;
@@ -237,7 +243,7 @@ sub new {
     Wx::Event::EVT_TIMER(
 	    $self,
 	    -1,
-	    \&arrange_windows
+            sub { $_[0]->on_toggle_status_bar },
     );
     $timer->Start( 500, 1 );
 
@@ -295,7 +301,7 @@ sub method_selected {
     my ($self, $event) = @_;
     my $sub = $event->GetItem->GetText;
     return if not defined $sub;
-    $self->_search(search_term => "sub $sub"); # TODO actually search for sub\s+$sub
+    Padre::Wx::FindDialog::_search($self, search_term => "sub $sub"); # TODO actually search for sub\s+$sub
     return;
 }
 
@@ -326,28 +332,10 @@ sub get_current_content {
     $_[0]->get_current_editor->GetText;
 }
 
-sub _bitmap {
-    my $file = shift;
-    my $dir  = $ENV{PADRE_DEV}
-        ? File::Spec->catdir($FindBin::Bin, '..', 'share')
-        : File::ShareDir::dist_dir('Padre');
-    my $path = File::Spec->catfile($dir , 'docview', "$file.xpm");
-    return Wx::Bitmap->new( $path, wxBITMAP_TYPE_XPM );
-}
-sub _icon {
-    my $file = shift;
-    my $dir  = $ENV{PADRE_DEV}
-        ? File::Spec->catdir($FindBin::Bin, '..', 'share')
-        : File::ShareDir::dist_dir('Padre');
-    my $path = File::Spec->catfile($dir , 'docview', "$file.xpm");
-    return Wx::Icon->new( $path, wxBITMAP_TYPE_XPM );
-}
-
 sub on_stc_update_ui {
     my ($self, $event) = @_;
     $self->update_status;
 }
-
 
 sub on_key {
     my ($self, $event) = @_;
@@ -356,7 +344,6 @@ sub on_key {
 
     my $mod  = $event->GetModifiers() || 0;
     my $code = $event->GetKeyCode;
-#print "$mod $code\n";
     if ($mod == 2) {            # Ctrl
         if ($code == WXK_TAB) {              # Ctrl-TAB  #TODO it is already in the menu
             $self->on_next_pane;
@@ -395,9 +382,9 @@ sub on_comment_out_block {
     my ($self, $event) = @_;
 
     my $pageid = $self->{notebook}->GetSelection();
-    my $page = $self->{notebook}->GetPage($pageid);
-    my $start = $page->LineFromPosition($page->GetSelectionStart);
-    my $end = $page->LineFromPosition($page->GetSelectionEnd);
+    my $page   = $self->{notebook}->GetPage($pageid);
+    my $start  = $page->LineFromPosition($page->GetSelectionStart);
+    my $end    = $page->LineFromPosition($page->GetSelectionEnd);
 
     $page->BeginUndoAction;
     for my $line ($start .. $end) {
@@ -415,9 +402,9 @@ sub on_uncomment_block {
     my ($self, $event) = @_;
 
     my $pageid = $self->{notebook}->GetSelection();
-    my $page = $self->{notebook}->GetPage($pageid);
-    my $start = $page->LineFromPosition($page->GetSelectionStart);
-    my $end = $page->LineFromPosition($page->GetSelectionEnd);
+    my $page   = $self->{notebook}->GetPage($pageid);
+    my $start  = $page->LineFromPosition($page->GetSelectionStart);
+    my $end    = $page->LineFromPosition($page->GetSelectionEnd);
 
     $page->BeginUndoAction;
     for my $line ($start .. $end) {
@@ -438,7 +425,6 @@ sub on_uncomment_block {
 
 sub on_autocompletition {
    my $self   = shift;
-
    my $id     = $self->{notebook}->GetSelection;
    my $page   = $self->{notebook}->GetPage($id);
    my $pos    = $page->GetCurrentPos;
@@ -502,35 +488,38 @@ sub on_right {
 }
 
 sub on_exit {
-    my ($self) = @_;
-
-    $self->Close;
-
+    $_[0]->Close;
     return;
 }
 
 sub on_close_window {
-    my ( $self, $event ) = @_;
-
+    my $self   = shift;
+    my $event  = shift;
     my $config = Padre->ide->get_config;
+
+    $config->{main}->{files} = [
+        map { scalar $self->_get_filename($_) }
+        ( 0 .. $self->{notebook}->GetPageCount - 1 )
+    ];
 
     # Check that all files have been saved
     if ( $event->CanVeto ) {
-        my @unsaved;
-        foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
-            if ( $self->_buffer_changed($id) ) {
-                push @unsaved, $self->{notebook}->GetPageText($id);
+        if ( $config->{startup} eq 'same' ) {
+            # Save the files, but don't close
+            my $saved = $self->on_save_all;
+            unless ( $saved ) {
+                 # They cancelled at some point
+                $event->Veto;
+                return;
+            }
+        } else {
+            my $closed = $self->on_close_all;
+            unless ( $closed ) {
+                # They cancelled at some point
+                $event->Veto;
+                return;
             }
         }
-        if (@unsaved) {
-            Wx::MessageBox( "The following buffers are still not saved:\n" . join("\n", @unsaved), 
-                            "Unsaved", wxOK|wxCENTRE, $self );
-            $event->Veto;
-            return;
-        }
-
-        my @files = map { scalar $self->_get_filename($_) } ( 0 .. $self->{notebook}->GetPageCount - 1 );
-        $config->{main}->{files} = \@files;
     }
 
     # Discover and save the state we want to memorize
@@ -559,7 +548,8 @@ sub on_close_window {
 }
 
 sub _lexer {
-    my ($file) = @_;
+    my $self = shift;
+    my $file = shift;
 
     return $SYNTAX{_default_} if not $file;
     (my $ext = $file) =~ s{.*\.}{};
@@ -614,7 +604,10 @@ sub on_split_window {
     my $pointer = $editor->GetDocPointer();
     $editor->AddRefDocument($pointer);
 
-    my $new_editor    = Padre::Wx::Text->new( $self->{notebook}, _lexer() );
+    my $new_editor = Padre::Wx::Text->new(
+        $self->{notebook},
+        $self->_lexer,
+    );
 
     #my $new_id = $self->setup_editor();
     #my $new_editor = $self->{notebook}->GetPage( $new_id );
@@ -634,8 +627,11 @@ sub setup_editor {
     # Flush old stuff
     delete $self->{project};
 
-    my $config    = Padre->ide->get_config;
-    my $editor    = Padre::Wx::Text->new( $self->{notebook}, _lexer($file) );
+    my $config = Padre->ide->get_config;
+    my $editor = Padre::Wx::Text->new(
+        $self->{notebook},
+        $self->_lexer($file),
+    );
     #$editor->SetMouseDownCaptures(0);
     #$editor->UsePopUp(0);
     
@@ -698,14 +694,6 @@ sub setup_editor {
     $self->{_in_setup_editor} = 0;
     $self->update_status;
     return $id;
-}
-
-sub arrange_windows {
-    my ($self) = @_;
-    $self->on_toggle_status_bar;
-
-
-    #$self->
 }
 
 sub create_tab {
@@ -782,17 +770,23 @@ sub on_open_selection {
 }
 
 sub on_open {
-    my ($self) = @_;
-
+    my $self = shift;
     my $current_filename = $self->get_current_filename;
     if ($current_filename) {
        $default_dir = File::Basename::dirname($current_filename);
     }
-    my $dialog = Wx::FileDialog->new( $self, "Open file", $default_dir, "", "*.*", wxFD_OPEN);
-    if ($^O !~ /win32/i) {
+    my $dialog = Wx::FileDialog->new(
+        $self,
+        "Open file",
+        $default_dir,
+        "",
+        "*.*",
+        wxFD_OPEN,
+    );
+    unless ( Padre::Util::WIN32 ) {
        $dialog->SetWildcard("*");
     }
-    if ($dialog->ShowModal == wxID_CANCEL) {
+    if ( $dialog->ShowModal == wxID_CANCEL ) {
         return;
     }
     my $filename = $dialog->GetFilename;
@@ -800,6 +794,14 @@ sub on_open {
 
     my $file = File::Spec->catfile($default_dir, $filename);
     Padre->ide->add_to_recent('files', $file);
+
+    # If and only if there is only one current file,
+    # and it is unused, close it.
+    if ( $self->{notebook}->GetPageCount == 1 ) {
+        if ( Padre::Document->from_selection->is_unused ) {
+            $self->on_close;
+        }
+    }
 
     $self->setup_editor($file);
 
@@ -821,7 +823,7 @@ sub _set_filename {
     $page->{$pack}->{type}     = $type;
 
     if ($data) {
-       $page->SetLexer( _lexer($data) ); # set the syntax highlighting
+       $page->SetLexer( $self->_lexer($data) );
        $page->Colourise(0, $page->GetTextLength);
     }
 
@@ -885,67 +887,83 @@ sub get_page_text {
     return $self->_get_page_text($id);
 }
 
+# Returns true if saved.
+# Returns false if cancelled.
 sub on_save_as {
-    my ($self) = @_;
-
-    my $id   = $self->{notebook}->GetSelection;
-    return if $id == -1;
-
-    my $current_filename = $self->get_current_filename;
-    if ($current_filename) {
-       $default_dir = File::Basename::dirname($current_filename);
+    my $self    = shift;
+    my $doc     = _DOCUMENT(@_) or return;
+    my $current = $doc->filename;
+    if ( defined $current ) {
+        $default_dir = File::Basename::dirname($current);
     }
     while (1) {
-        my $dialog = Wx::FileDialog->new( $self, "Save file as...", $default_dir, "", "*.*", wxFD_SAVE);
-        if ($dialog->ShowModal == wxID_CANCEL) {
-#print "Cancel\n";
-            return;
+        my $dialog = Wx::FileDialog->new(
+            $self,
+            "Save file as...",
+            $default_dir,
+            "",
+            "*.*",
+            wxFD_SAVE,
+        );
+        if ( $dialog->ShowModal == wxID_CANCEL ) {
+            return 0;
         }
         my $filename = $dialog->GetFilename;
-#print "OK $filename\n";
         $default_dir = $dialog->GetDirectory;
-
         my $path = File::Spec->catfile($default_dir, $filename);
-        if (-e $path) {
-            my $res = Wx::MessageBox("File already exists. Overwrite it?", "Exist", wxYES_NO, $self);
-            if ($res == wxYES) {
-                $self->_set_filename($id, $path, $self->_get_local_filetype());
+        if ( -e $path ) {
+            my $res = Wx::MessageBox(
+                "File already exists. Overwrite it?",
+                "Exist",
+                wxYES_NO,
+                $self,
+            );
+            if ( $res == wxYES ) {
+                $doc->_set_filename($path);
+                $self->_set_filename(
+                    $doc->page_id,
+                    $path,
+                    $self->_get_local_filetype,
+                );
                 last;
             }
         } else {
-            $self->_set_filename($id, $path, $self->_get_local_filetype());
+            $doc->_set_filename($path);
+            $self->_set_filename(
+                $doc->page_id,
+                $path,
+                $self->_get_local_filetype,
+            );
             last;
         }
     }
-    $self->_save_buffer($id);
-    return;
+    $self->_save_buffer($doc->page_id);
+    return 1;
 }
 
 sub on_save {
-    my ($self) = @_;
-    my $id = $self->{notebook}->GetSelection;
-    if ( $id == -1 ) {
-        return;
+    my $self = shift;
+    my $doc  = _DOCUMENT(@_) or return;
+
+    if ( $doc->is_new ) {
+        return $self->on_save_as($doc);
     }
-    if ( not $self->_buffer_changed($id) and $self->_get_filename($id) ) {
-        return;
+    if ( $doc->is_modified ) {
+        $self->_save_buffer($doc->page_id);
     }
-    if ($self->_get_filename($id)) {
-        $self->_save_buffer($id);
-    } else {
-        $self->on_save_as();
-    }
+
     return;
 }
 
+# Returns true if all saved.
+# Returns false if cancelled.
 sub on_save_all {
-    my ($self) = @_;
-    foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
-        if ( $self->_buffer_changed($id) ) {
-            $self->_save_buffer($id);
-        }
+    my $self = shift;
+    foreach my $id ( 0 .. $self->{notebook}->GetPageCount - 1 ) {
+	my $doc = Padre::Document->from_page_id($id);
+        $self->on_save( $doc ) or return 0;
     }
-    return;
+    return 1;
 }
 
 sub _save_buffer {
@@ -966,55 +984,50 @@ sub _save_buffer {
     return; 
 }
 
+# Returns true if closed.
+# Returns false on cancel.
 sub on_close {
-    my ($self) = @_;
-
+    my $self = shift;
+    my $doc  = _DOCUMENT(@_);
     local $self->{_in_delete_editor} = 1;
-#print "PageText: " . $self->{notebook}->GetPageText(0) . "\n";
 
-    my $id     = $self->{notebook}->GetSelection;
-    if ( $self->_buffer_changed($id) ) {
+    if ( $doc->is_modified and not $doc->is_unused ) {
         my $ret = Wx::MessageBox(
-            "File changed. Do yo want to save it?",
-            "Unsaved file",
+            "File changed. Do you want to save it?",
+            scalar($self->_get_filename($doc->page_id)) || "Unsaved File",
             wxYES_NO|wxCANCEL|wxCENTRE,
             $self,
         );
         if ( $ret == wxYES ) {
-            $self->on_save();
+            $self->on_save( $doc );
         } elsif ( $ret == wxNO ) {
             # just close it
         } else {
             # wxCANCEL, or when clicking on [x]
-
-            return;
+            return 0;
         }
     }
-    $self->{notebook}->DeletePage($id); 
-#print "PageText after delete: " . $self->{notebook}->GetPageText(0) . "\n";
+    $self->{notebook}->DeletePage($doc->page_id);
 
-    $self->{menu}->remove_alt_n_menu();
-    foreach my $i (0..@{ $self->{menu}->{alt} } -1) {
-        my $file = $self->_get_filename($i);
-#print "file: $i $file\n";
-        $file ||= $self->{notebook}->GetPageText($i);
-#print "pagetext: $file\n";
+    # Update the alt-n menus
+    $self->{menu}->remove_alt_n_menu;
+    foreach my $i ( 0 .. @{ $self->{menu}->{alt} } - 1 ) {
+        my $file = $self->_get_filename($i)
+        	|| $self->{notebook}->GetPageText($i);
         $self->{menu}->update_alt_n_menu($file, $i);
     }
 
-    return;
+    return 1;
 }
 
+# Returns true if all closed.
+# Returns false if cancelled.
 sub on_close_all {
-    my ($self, $event) = @_;
-
-    foreach my $id (reverse 0 .. $self->{notebook}->GetPageCount -1) {
-        if (not $self->_buffer_changed($id) ) {
-            $self->_save_buffer($id);
-        }
-        $self->{notebook}->DeletePage($id);
+    my $self = shift;
+    foreach my $id ( reverse 0 .. $self->{notebook}->GetPageCount - 1 ) {
+        $self->on_close( $id ) or return 0;
     }
-    return;
+    return 1;
 }
 
 sub _buffer_changed {
@@ -1057,122 +1070,20 @@ sub on_goto {
     return;
 }
 
-sub on_find {
-    my ( $self ) = @_;
-
-    my $config = Padre->ide->get_config;
-    my $selection = $self->_get_selection();
-    $selection = '' if not defined $selection;
-
-    require Padre::Wx::FindDialog;
-    my $search = Padre::Wx::FindDialog->new( $self, $config, {term => $selection} );
-    return if not $search;
-
-    $config->{search}->{case_insensitive} = $search->{case_insensitive};
-    $config->{search}->{use_regex}        = $search->{use_regex};
-
-    if ($search->{term}) {
-        unshift @{$config->{search_terms}}, $search->{term};
-        my %seen;
-        @{$config->{search_terms}} = grep {!$seen{$_}++} @{$config->{search_terms}};
-    }
-    if ($search->{replace_term} ) {
-        unshift @{$config->{replace_terms}}, $search->{replace_term};
-        my %seen;
-        @{$config->{replace_terms}} = grep {!$seen{$_}++} @{$config->{replace_terms}};
-     }
-
-    $self->_search(replace_term => $search->{replace_term});
-
-    return;
-}
-
-
 # sub update_methods
 sub update_methods {
-    my ($self) = @_;
-
-    my $text = $self->get_current_content;
+    my $self    = shift;
+    my $text    = $self->get_current_content;
     my @methods = reverse sort $text =~ m{^sub\s+(\w+)}gm;
     $self->{rightbar}->DeleteAllItems;
     $self->{rightbar}->InsertStringItem(0, $_) for @methods;
     $self->{rightbar}->SetColumnWidth(0, wxLIST_AUTOSIZE);
-
-
     return;
 }
-
-sub _search {
-    my ($self, %args) = @_;
-
-    my $config = Padre->ide->get_config;
-    my $search_term = $args{search_term} ||= $config->{search_terms}->[0];
-    #$args{replace_term}
-
-    my $id   = $self->{notebook}->GetSelection;
-    my $page = $self->{notebook}->GetPage($id);
-    my $content = $page->GetText;
-    my ($from, $to) = $page->GetSelection;
-    if ($from < $to) {
-        $from++;
-    }
-    my $last = $page->GetLength();
-    my $str  = $page->GetTextRange($from, $last);
-
-    if ($config->{search}->{use_regex}) {
-        $search_term =~ s/\$/\\\$/; # escape $ signs by default so they won't interpolate
-    } else {
-        $search_term = quotemeta $search_term;
-    }
-
-    if ($config->{search}->{case_insensitive})  {
-        $search_term = "(?i)$search_term";
-    }
-
-
-    my $regex;
-    eval { $regex = qr/$search_term/m };
-    if ($@) {
-        Wx::MessageBox("Cannot build regex for '$search_term'", "Search error", wxOK, $self);
-        return;
-    }
-
-    my ($start, $end);
-    if ($str =~ $regex) {
-        $start = $LAST_MATCH_START[0] + $from;
-        $end   = $LAST_MATCH_END[0] + $from;
-    } else {
-        my $str  = $page->GetTextRange(0, $last);
-        if ($str =~ $regex) {
-            $start = $LAST_MATCH_START[0];
-            $end   = $LAST_MATCH_END[0];
-        }
-    }
-    if (not defined $start) {
-        return; # not found
-    }
-
-    $page->SetSelection($start, $end);
-
-    return;
-}
-
-sub on_find_again {
-    my $self = shift;
-    my $term = Padre->ide->get_config->{search_terms}->[0];
-    if ( $term ) {
-        $self->_search;
-    } else {
-        $self->on_find;
-    }
-    return;
-}
-
 
 sub _get_selection {
     my ($self, $id) = @_;
-
-    if (not defined $id) {
+    if ( not defined $id ) {
         $id  = $self->{notebook}->GetSelection;
     }
     return if $id == -1;
@@ -1180,28 +1091,23 @@ sub _get_selection {
     return $page->GetSelectedText;
 }
 
-
 sub on_undo { # Ctrl-Z
-    my ($self) = @_;
-
-    my $id = $self->{notebook}->GetSelection;
+    my $self = shift;
+    my $id   = $self->{notebook}->GetSelection;
     my $page = $self->{notebook}->GetPage($id);
-    if ($page->CanUndo) {
+    if ( $page->CanUndo ) {
        $page->Undo;
     }
-
     return;
 }
 
 sub on_redo { # Shift-Ctr-Z
-    my ($self) = @_;
-
-    my $id = $self->{notebook}->GetSelection;
+    my $self = shift;
+    my $id   = $self->{notebook}->GetSelection;
     my $page = $self->{notebook}->GetPage($id);
-    if ($page->CanRedo) {
+    if ( $page->CanRedo ) {
        $page->Redo;
     }
-
     return;
 }
 
@@ -1548,6 +1454,10 @@ sub _toggle_output {
 
 sub on_toggle_status_bar {
     my ($self, $event) = @_;
+    if ( Padre::Util::WIN32 ) {
+        # Status bar always shown on Windows
+        return;
+    }
 
     # Update the configuration
     my $config = Padre->ide->get_config;
@@ -1626,7 +1536,7 @@ sub on_stc_change {
 
     return if $self->{_in_setup_editor};
     my $config = Padre->ide->get_config;
-    return if not $config->{editor}->{enable_calltip};
+    return if not $config->{editor}->{show_calltips};
 
     my $editor = $self->get_current_editor;
 
@@ -1644,7 +1554,7 @@ sub on_stc_change {
        substr    => '(EXPR, OFFSET, LENGTH, REPLACEMENT)',
        index     => '(STR, SUBSTR, INDEX)',
        pop       => '(@ARRAY)',
-       psush     => '(@ARRAY, LIST)',
+       push      => '(@ARRAY, LIST)',
        print     => '(LIST) or (FILEHANDLE LIST)',
        join      => '(EXPR, LIST)',
        split     => '(/PATTERN/,EXPR,LIMIT)',
@@ -1662,6 +1572,27 @@ sub on_stc_change {
     }
 
     return;
+}
+
+
+
+
+
+#####################################################################
+# Convenience Functions
+
+sub _DOCUMENT {
+	if ( Params::Util::_INSTANCE($_[0], 'Wx::CommandEvent') ) {
+		shift;
+	}
+	unless ( @_ ) {
+		return Padre::Document->from_selection;
+	}
+	if ( Params::Util::_INSTANCE($_[0], 'Padre::Document') ) {
+		return $_[0];
+	} else {
+		return Padre::Document->from_page_id($_[0]);
+	}
 }
 
 1;
