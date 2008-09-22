@@ -2,6 +2,7 @@ Build.PL
 Changes
 MANIFEST
 README
+inc/Padre/Install.pm
 
 lib/Padre.pm
 lib/Padre/Wx/Ack.pm
@@ -14,7 +15,10 @@ lib/Padre/Util.pm
 lib/Padre/PPI.pm
 lib/Padre/Wx.pm
 
+lib/Padre/Document/Pasm.pm
 lib/Padre/Document/Perl.pm
+lib/Padre/Document/Perl6.pm
+lib/Padre/Document/Pir.pm
 
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/Bookmarks.pm
@@ -25,7 +29,8 @@ lib/Padre/Wx/MainWindow.pm
 lib/Padre/Wx/Menu.pm
 lib/Padre/Wx/Popup.pm
 lib/Padre/Wx/Preferences.pm
-lib/Padre/Wx/Text.pm
+lib/Padre/Wx/Editor.pm
+lib/Padre/Wx/ToolBar.pm
 
 lib/Padre/Pod/Frame.pm
 lib/Padre/Pod/Indexer.pm
@@ -37,6 +42,7 @@ t/01-load.t
 t/02-new.t
 t/03-wx.t
 t/80-newline.t
+t/81-search.t
 t/lib/Padre.pm
 
 xt/99-critic.t

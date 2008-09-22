@@ -2,7 +2,7 @@ package Padre::Pod::Frame;
 use strict;
 use warnings;
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 use Data::Dumper qw(Dumper);
 
@@ -131,7 +131,7 @@ sub _create_menu_bar {
     EVT_MENU(  $self, $file->Append( wxID_OPEN, ''),  \&on_open);
     EVT_MENU(  $self, $file->Append( wxID_EXIT, ''),  sub { $self->Close } );
     EVT_MENU(  $self, $edit->Append( wxID_FIND, ''),  \&on_find);
-    
+   
     EVT_CLOSE( $self,             \&on_close);
 
     return;

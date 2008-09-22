@@ -1,13 +1,13 @@
 package Padre::Document::Perl;
 
-use 5.006;
+use 5.008;
 use strict;
 use warnings;
 use Carp            ();
 use Params::Util    '_INSTANCE';
 use Padre::Document ();
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 our @ISA     = 'Padre::Document';
 
 
@@ -74,6 +74,29 @@ sub ppi_select {
 	my $line     = $page->PositionFromLine( $location->[0] - 1 );
 	my $start    = $line + $location->[1] - 1;
 	$page->SetSelection( $start, $start + 1 );
+}
+
+my $keywords = {
+	chomp     => '(STRING)',
+	substr    => '(EXPR, OFFSET, LENGTH, REPLACEMENT)',
+	index     => '(STR, SUBSTR, INDEX)',
+	pop       => '(@ARRAY)',
+	push      => '(@ARRAY, LIST)',
+	print     => '(LIST) or (FILEHANDLE LIST)',
+	join      => '(EXPR, LIST)',
+	split     => '(/PATTERN/,EXPR,LIMIT)',
+	wantarray => '()',
+};
+
+sub keywords {
+	return $keywords;
+}
+
+sub get_functions {
+	my $self = shift;
+
+	my $text = $self->text_get;
+    return reverse sort $text =~ m{^sub\s+(\w+)}gm;
 }
 
 1;
