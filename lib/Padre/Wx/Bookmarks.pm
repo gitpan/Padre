@@ -2,22 +2,22 @@ package Padre::Wx::Bookmarks;
 
 use strict;
 use warnings;
-use Wx           qw(:everything);
-use Wx::Event    qw(:everything);
+use Wx           qw(wxID_OK wxID_CANCEL wxID_DELETE wxVERTICAL wxHORIZONTAL);
+use Wx::Event    qw(EVT_BUTTON);
 use List::Util   qw(max);
 use Data::Dumper qw(Dumper);
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 my $tb;
 
 sub dialog {
 	my ($self, $text) = @_;
 
-	my $box  = Wx::BoxSizer->new(  wxVERTICAL   );
+	my $box  = Wx::BoxSizer->new( wxVERTICAL );
 	my @rows;
 	for my $i (0..3) {
-		$rows[$i] = Wx::BoxSizer->new(  wxHORIZONTAL );
+		$rows[$i] = Wx::BoxSizer->new( wxHORIZONTAL );
 		$box->Add($rows[$i]);
 	}
 
@@ -77,7 +77,7 @@ sub dialog {
 sub list_bookmarks {
 	my ($dialog, $rows, $button_size) = @_;
 
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 	my @shortcuts = sort keys %{ $config->{bookmarks} };
 	my $height = 0;
 	my $width  = 25;
@@ -108,7 +108,7 @@ sub on_set_bookmark {
 	my $pageid = $self->{notebook}->GetSelection();
 	my $editor = $self->{notebook}->GetPage($pageid);
 	my $line   = $editor->GetCurrentLine;
-	my $path   = $self->get_current_filename;
+	my $path   = $self->selected_filename;
 	my $file   = File::Basename::basename($path || '');
 
 	my $data = dialog($self, "$file line $line");
@@ -117,7 +117,7 @@ sub on_set_bookmark {
 
 	#print Dumper $data;
 
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 	my $shortcut = delete $data->{shortcut};
 	#my $text     = delete $data->{text};
 	
@@ -136,7 +136,7 @@ sub on_goto_bookmark {
 
 	dialog($self);
 
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 	my $selection = $tb->GetSelection;
 	my @shortcuts = sort keys %{ $config->{bookmarks} };
 	my $bookmark = $config->{bookmarks}{ $shortcuts[$selection] };
@@ -171,7 +171,7 @@ sub on_delete_bookmark {
 	my ($self, $event) = @_;
 
 	my $selection = $tb->GetSelection;
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 	my @shortcuts = sort keys %{ $config->{bookmarks} };
 	delete $config->{bookmarks}{ $shortcuts[$selection] };
 	$tb->DeletePage($selection);

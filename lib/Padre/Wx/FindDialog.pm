@@ -6,117 +6,88 @@ use warnings;
 
 # Find and Replace widget of Padre
 
-use English        qw(-no_match_vars);
-use Wx             qw(:everything);
-use Wx::Event      qw(:everything);
+use Wx        ();
+use Wx::Event qw{ EVT_BUTTON EVT_CHECKBOX };
 
-our $VERSION = '0.10';
-
-my %cbs = (
-	case_insensitive => {
-		title => "Case &Insensitive",
-		row   => 4,
-	},
-	use_regex        => {
-		title => "&Use Regex",
-		row   => 5,
-	},
-	backwards        => {
-		title => "Search &Backwards",
-		row   => 6,
-	},
-	close_on_hit     => {
-		title => "Close Window on &hit",
-		row   => 7,
-	},
-);
-
+our $VERSION = '0.11';
 
 sub on_find {
-	my ( $main_window ) = @_;
+	my $main   = shift;
+	my $config = Padre->ide->config;
+	my $text   = $main->selected_text;
+	$text = '' if not defined $text;
 
-	my $config = Padre->ide->get_config;
-	my $selection = $main_window->_get_selection();
-	$selection = '' if not defined $selection;
+	# TODO: if selection is more than one lines then consider it as the limit
+	# of the search and replace and not as the string to be used
 
-    # TODO: if selection is more than one lines then consider it as the limit
-    # of the search and replace and not as the string to be used
-
-	Padre::Wx::FindDialog->dialog( $main_window, $config, {term => $selection} );
+	__PACKAGE__->dialog( $main, $config, { term => $text } );
 }
 
+my @cbs = qw(case_insensitive use_regex backwards close_on_hit);
 
 sub dialog {
 	my ( $class, $win, $config, $args) = @_;
 
 	my $search_term = $args->{term} || '';
 
-	my $dialog = Wx::Dialog->new( $win, -1, "Search", [-1, -1], [500, 300]);
+	my $dialog = Wx::Dialog->new( $win, -1, "Search", [-1, -1], [440, 220]);
 
-	my $box  = Wx::BoxSizer->new(  wxVERTICAL   );
-	my @rows;
-	foreach my $i ( 0..8 ) {
-		push @rows, Wx::BoxSizer->new(  wxHORIZONTAL );
-		$box->Add($rows[$i]);
+	my $layout = get_layout($search_term, $config);
+	Padre::Wx::ModuleStartDialog::build_layout($dialog, $layout, [150, 200]);
+
+	foreach my $cb (@cbs) {
+		EVT_CHECKBOX( $dialog, $dialog->{$cb}, sub { $_[0]->{_find_choice_}->SetFocus; });
 	}
+	$dialog->{_find_}->SetDefault;
+	EVT_BUTTON( $dialog, $dialog->{_find_},        \&find_clicked);
+	EVT_BUTTON( $dialog, $dialog->{_replace_},     \&replace_clicked     );
+	EVT_BUTTON( $dialog, $dialog->{_replace_all_}, \&replace_all_clicked );
+	EVT_BUTTON( $dialog, $dialog->{_cancel_},      \&cancel_clicked      );
 
-	my $find        = Wx::Button->new( $dialog, wxID_FIND,   '',            );
-	my $replace     = Wx::Button->new( $dialog, -1,          '&Replace',     );
-	my $replace_all = Wx::Button->new( $dialog, -1,          'Replace &All', );
-	my $cancel      = Wx::Button->new( $dialog, wxID_CANCEL, '',            );
-	$find->SetDefault;
-
-	EVT_BUTTON( $dialog, $find,        \&find_clicked        );
-	EVT_BUTTON( $dialog, $replace,     \&replace_clicked     );
-	EVT_BUTTON( $dialog, $replace_all, \&replace_all_clicked );
-	EVT_BUTTON( $dialog, $cancel,      \&cancel_clicked      );
-
-	my @WIDTH  = (100);
-	my @HEIGHT = (200);
-
-	$rows[0]->Add( Wx::StaticText->new( $dialog, -1, 'Find:',         wxDefaultPosition, [$WIDTH[0], -1] ) );
-	my $find_choice = Wx::ComboBox->new( $dialog, -1, $search_term, wxDefaultPosition, wxDefaultSize, $config->{search_terms});
-	$rows[0]->Add( $find_choice, 1, wxALL, 3 );
-	$rows[0]->Add( $find,        1, wxALL, 3 );
-
-	$rows[1]->Add( Wx::StaticText->new( $dialog, -1, 'Replace With:', wxDefaultPosition, [$WIDTH[0], -1]) );
-	my $replace_choice = Wx::ComboBox->new( $dialog, -1, '', [-1, -1], [-1, -1], $config->{replace_terms});
-	$rows[1]->Add( $replace_choice, 1, wxALL, 3 );
-	$rows[1]->Add( $replace,        1, wxALL, 3 );
-
-	$rows[2]->Add(300, 20, 1, wxEXPAND, 0);
-	$rows[2]->Add( $replace_all );
-
-	foreach my $field (sort keys %cbs) {
-		my $cb = Wx::CheckBox->new( $dialog, -1, $cbs{$field}{title}, [-1, -1], [-1, -1]);
-		if ($config->{search}->{$field}) {
-		    $cb->SetValue(1);
-		}
-		$rows[ $cbs{$field}{row} ]->Add($cb);
-		EVT_CHECKBOX( $dialog, $cb, sub { $find_choice->SetFocus; });
-		$cbs{$field}{cb} = $cb;
-	}
-
-#    $rows[1]->Add($dir_selector, 1, wxALL, 3);
-
-#    my $path = Wx::StaticText->new( $dialog, -1, '');
-#    $rows[2]->Add( $path, 1, wxALL, 3 );
-#    EVT_BUTTON( $dialog, $dir_selector, sub {on_pick_project_dir($path, @_) } );
-	#wxTE_PROCESS_ENTER
-	#EVT_TEXT_ENTER($dialog, $find_choice,    sub { $dialog->EndModal(wxID_FIND)    });
-	#EVT_TEXT_ENTER($dialog, $replace_choice, sub { $dialog->EndModal('replace') });
-	$rows[8]->Add(300, 20, 1, wxEXPAND, 0);
-	$rows[8]->Add($cancel);
-
-	$dialog->SetSizer($box);
-
-	$find_choice->SetFocus;
+	$dialog->{_find_choice_}->SetFocus;
 	$dialog->Show(1);
 
-	$dialog->{_find_choice_}    = $find_choice;
-	$dialog->{_replace_choice_} = $replace_choice;
-
 	return;
+}
+
+sub get_layout {
+	my ($search_term, $config) = @_;
+
+	my @layout = (
+		[
+			[ 'Wx::StaticText', undef,              'Find:'],
+			[ 'Wx::ComboBox',   '_find_choice_',    $search_term, $config->{search_terms}],
+			[ 'Wx::Button',     '_find_',           Wx::wxID_FIND ],
+		],
+		[
+			[ 'Wx::StaticText', undef,              'Replace With:'],
+			[ 'Wx::ComboBox',   '_replace_choice_',    '', $config->{replace_terms}],
+			[ 'Wx::Button',     '_replace_',        '&Replace'],
+		],
+		[
+			[],
+			[],
+			[ 'Wx::Button',     '_replace_all_',    'Replace &All'],
+		],
+		[
+			['Wx::CheckBox',    'case_insensitive', 'Case &Insensitive',    ($config->{search}->{case_insensitive} ? 1 : 0) ],
+		],
+		[
+			['Wx::CheckBox',    'use_regex',        '&Use Regex',           ($config->{search}->{use_regex} ? 1 : 0) ],
+		],
+		[
+			['Wx::CheckBox',    'backwards',        'Search &Backwards',    ($config->{search}->{backwards} ? 1 : 0) ],
+		],
+		[
+			['Wx::CheckBox',    'close_on_hit',     'Close Window on &hit', ($config->{search}->{close_on_hit} ? 1 : 0) ],
+		],
+		[
+			[],
+			[],
+			[ 'Wx::Button',     '_cancel_',    Wx::wxID_CANCEL],
+		],
+	);
+	return \@layout;
 }
 
 sub cancel_clicked {
@@ -134,7 +105,7 @@ sub replace_all_clicked {
 	my $regex = _get_regex();
 	return if not defined $regex;
 
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 	my $main_window = Padre->ide->wx->main_window;
 
 	my $id   = $main_window->{notebook}->GetSelection;
@@ -164,11 +135,11 @@ sub replace_clicked {
 	my $regex = _get_regex();
 	return if not defined $regex;
 
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 
 	# get current search condition and check if they match
 	my $main_window = Padre->ide->wx->main_window;
-	my $str = $main_window->_get_selection();
+	my $str         = $main_window->selected_text;
 	my ($start, $end, @matches) = Padre::Util::get_matches($str, $regex, 0, 0);
 
 	# if they do, replace it
@@ -202,13 +173,16 @@ sub find_clicked {
 sub _get_data_from {
 	my ( $dialog ) = @_;
 
-	my $config = Padre->ide->get_config;
-	foreach my $field (keys %cbs) {
-	   $config->{search}->{$field} = $cbs{$field}{cb}->GetValue;
-	}
+	my $data = Padre::Wx::ModuleStartDialog::get_data_from($dialog, get_layout());
 
-	my $search_term      = $dialog->{_find_choice_}->GetValue;
-	my $replace_term     = $dialog->{_replace_choice_}->GetValue;
+	#print Data::Dumper::Dumper $data;
+
+	my $config = Padre->ide->config;
+	foreach my $field (@cbs) {
+	   $config->{search}->{$field} = $data->{$field};
+	}
+	my $search_term      = $data->{_find_choice_};
+	my $replace_term     = $data->{_replace_choice_};
 
 	if ($config->{search}->{close_on_hit}) {
 		$dialog->Destroy;
@@ -231,7 +205,7 @@ sub _get_data_from {
 sub on_find_next {
 	my $main_window = shift;
 
-	my $term = Padre->ide->get_config->{search_terms}->[0];
+	my $term = Padre->ide->config->{search_terms}->[0];
 	if ( $term ) {
 		_search();
 	} else {
@@ -243,7 +217,7 @@ sub on_find_next {
 sub on_find_previous {
 	my $main_window = shift;
 
-	my $term = Padre->ide->get_config->{search_terms}->[0];
+	my $term = Padre->ide->config->{search_terms}->[0];
 	if ( $term ) {
 		_search(rev => 1);
 	} else {
@@ -255,9 +229,11 @@ sub on_find_previous {
 sub _get_regex {
 	my %args = @_;
 
-	my $config = Padre->ide->get_config;
+	my $config = Padre->ide->config;
 
 	my $search_term = $args{search_term} || $config->{search_terms}->[0];
+	return $search_term if defined $search_term and 'Regexp' eq ref $search_term;
+
 	if ($config->{search}->{use_regex}) {
 		$search_term =~ s/\$/\\\$/; # escape $ signs by default so they won't interpolate
 	} else {
@@ -272,7 +248,7 @@ sub _get_regex {
 	eval { $regex = qr/$search_term/m };
 	if ($@) {
 		my $main_window = Padre->ide->wx->main_window;
-		Wx::MessageBox("Cannot build regex for '$search_term'", "Search error", wxOK, $main_window);
+		Wx::MessageBox("Cannot build regex for '$search_term'", "Search error", Wx::wxOK, $main_window);
 		return;
 	}
 	return $regex;
@@ -291,7 +267,7 @@ sub _search {
 	my $last = $page->GetLength();
 	my $str  = $page->GetTextRange(0, $last);
 
-	my $config    = Padre->ide->get_config;
+	my $config    = Padre->ide->config;
 	my $backwards = $config->{search}->{backwards};
 	if ($args{rev}) {
 	   $backwards = not $backwards;

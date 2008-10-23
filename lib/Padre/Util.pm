@@ -27,7 +27,7 @@ use warnings;
 use Exporter     ();
 use List::Util   qw(first);
 
-our $VERSION   = '0.10';
+our $VERSION   = '0.11';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches);
 
@@ -38,9 +38,10 @@ our @EXPORT_OK = qw(newline_type get_matches);
 # The following defined reusable constants for these platforms,
 # suitable for use in platform-specific adaptation code.
 
-use constant WIN32 => !! ( $^O eq 'MSWin32' );
-use constant MAC   => !! ( $^O eq 'darwin'  );
-use constant UNIX  => !  ( WIN32 or MAC );
+use constant WIN32   => !! ( $^O eq 'MSWin32' );
+use constant MAC     => !! ( $^O eq 'darwin'  );
+use constant UNIX    => !  ( WIN32 or MAC );
+use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAX' : 'UNIX';
 
 =pod
 

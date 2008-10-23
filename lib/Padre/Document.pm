@@ -6,6 +6,9 @@ package Padre::Document;
 use 5.008;
 use strict;
 use warnings;
+use File::Spec ();
+use List::Util ();
+use Carp       ();
 use Wx qw{
 	wxSTC_LEX_ADA
 	wxSTC_LEX_ASM
@@ -29,17 +32,18 @@ use Wx qw{
 	wxSTC_LEX_VBSCRIPT
 	wxSTC_LEX_YAML
 	wxSTC_LEX_XML
-
 	wxSTC_LEX_AUTOMATIC
 	wxSTC_LEX_CONTAINER
+
+	wxSTC_EOL_CRLF
+	wxSTC_EOL_CR
+	wxSTC_EOL_LF
 };
-use File::Spec ();
-use List::Util ();
-use Carp       ();
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
-my $cnt         = 0;
+my $cnt   = 0;
+
 our %mode = (
 	WIN  => Wx::wxSTC_EOL_CRLF,
 	MAC  => Wx::wxSTC_EOL_CR,
@@ -115,7 +119,8 @@ our %MIME_LEXER = (
 	'text/css'        => wxSTC_LEX_CSS,
 	'text/diff'       => wxSTC_LEX_DIFF,
 	'text/html'       => wxSTC_LEX_HTML,
-    'text/ecmascript' => 41, # wxSTC_LEX_ESCRIPT (presumably "ESCRIPT" refers to ECMA-script?) 
+	# wxSTC_LEX_ESCRIPT (presumably "ESCRIPT" refers to ECMA-script?) 
+	'text/ecmascript' => 41,
 	'text/latex'      => wxSTC_LEX_LATEX,
 	'text/lisp'       => wxSTC_LEX_LISP,
 	'text/lua'        => wxSTC_LEX_LUA,
@@ -124,14 +129,13 @@ our %MIME_LEXER = (
 	'text/pascal'     => wxSTC_LEX_PASCAL,
 	'text/perl'       => wxSTC_LEX_PERL,
 	'text/python'     => wxSTC_LEX_PYTHON,
-    'text/php'        => wxSTC_LEX_PHPSCRIPT,
+	'text/php'        => wxSTC_LEX_PHPSCRIPT,
 	'text/ruby'       => wxSTC_LEX_RUBY,
 	'text/sql'        => wxSTC_LEX_SQL,
 	'text/tcl'        => wxSTC_LEX_TCL,
-    'text/vbscript'   => wxSTC_LEX_VBSCRIPT,
+	'text/vbscript'   => wxSTC_LEX_VBSCRIPT,
 	'text/xml'        => wxSTC_LEX_XML,
 	'text/yaml'       => wxSTC_LEX_YAML,
-
 	'text/pir'        => wxSTC_LEX_CONTAINER,
 	'text/pasm'       => wxSTC_LEX_CONTAINER,
 	'text/perl6'      => wxSTC_LEX_CONTAINER,
@@ -146,26 +150,26 @@ our $DEFAULT_LEXER = wxSTC_LEX_AUTOMATIC;
 # This method may be changed to work properly later, but for now
 # feel free to use it wherever needed.
 sub from_selection {
-	$_[0]->from_page_id( $_[0]->notebook->GetSelection );
+	$_[0]->from_pageid( $_[0]->notebook->GetSelection );
 }
 
-sub from_page_id {
-	my $class    = shift;
-	my $page_id  = shift;
+sub from_pageid {
+	my $class   = shift;
+	my $pageid  = shift;
 
 	# TODO maybe report some error?
-	return if not defined $page_id or $page_id =~ /\D/;
+	return if not defined $pageid or $pageid =~ /\D/;
 
-	if ( $page_id == -1 ) {
+	if ( $pageid == -1 ) {
 		# No page selected
 		return;
 	}
 
-	return if $page_id >= $class->notebook->GetPageCount;
+	return if $pageid >= $class->notebook->GetPageCount;
 
-	my $page     = $class->notebook->GetPage( $page_id );
+	my $page = $class->notebook->GetPage( $pageid );
 
-	return $page->{Padre};
+	return $page->{Document};
 }
 
 
@@ -194,6 +198,9 @@ sub new {
 	unless ( $self->editor ) {
 		die "Missing or invalid editor";
 	}
+
+	$self->setup;
+
 	unless ( $self->mimetype ) {
 		$self->set_mimetype( $self->guess_mimetype );
 	}
@@ -209,7 +216,6 @@ sub new {
 			bless $self, $subclass;
 		}
 	}
-	$self->setup;
 
 	return $self;
 }
@@ -221,6 +227,7 @@ sub guess_mimetype {
 	if (not $self->filename) {
 		return 'text/perl';
 	}
+
 	# Try derive the mime type from the name
 	if ( $self->filename and $self->filename =~ /\.([^.]+)$/ ) {
 		my $ext = lc $1;
@@ -230,9 +237,9 @@ sub guess_mimetype {
 	# Fall back on deriving the type from the content
 	# Hardcode this for now for the special cases we care about.
 	my $text = $self->text_get;
-	if ( $text =~ /\A\#\!/m ) {
+	if ( $text =~ /\A#!/m ) {
 		# Found a hash bang line
-		if ( $text =~ /\A[^\n]\bperl\b/m ) {
+		if ( $text =~ /\A#![^\n]*\bperl\b/m ) {
 			return 'text/perl';
 		}
 	}
@@ -243,56 +250,44 @@ sub guess_mimetype {
 
 sub setup {
 	my $self = shift;
-
-	if ($self->{filename}) {
-        $self->{newline_type} = $self->load_file($self->{filename}, $self->editor);
+	if ( $self->{filename} ) {
+		$self->{newline_type} = $self->load_file($self->{filename}, $self->editor);
 	} else {
 		$cnt++;
-        $self->{newline_type} = $self->_get_default_newline_type();
-    }
+		$self->{newline_type} = $self->_get_default_newline_type;
+	}
 }
 
 sub get_title {
 	my $self = shift;
-	if ($self->{filename}) {
-        return File::Basename::basename( $self->{filename} );
+	if ( $self->{filename} ) {
+		return File::Basename::basename( $self->{filename} );
 	} else {
 		return " Unsaved Document $cnt";
 	}
 }
 
-# for ts without a newline type
+# For ts without a newline type
+# TODO: get it from config
 sub _get_default_newline_type {
-	my ($self) = @_;
-
-	# TODO: get it from config
-	return $self->_get_local_newline_type();
+	Padre::Util::NEWLINE;
 }
 
 # Where to convert (UNIX, WIN, MAC)
 # or Ask (the user) or Keep (the garbage)
 # mixed files
+# TODO get from config
 sub _mixed_newlines {
-	my ($self) = @_;
-
-	# TODO get from config
-	return $self->_get_local_newline_type();
+	Padre::Util::NEWLINE;
 }
 
-# What to do with files that have consistent line endings:
+# What to do with files that have inconsistent line endings:
 # 0 if keep as they are
 # MAC|UNIX|WIN convert them to the appropriate type
 sub _auto_convert {
 	my ($self) = @_;
 	# TODO get from config
 	return 0;
-}
-
-sub _get_local_newline_type {
-	my ($self) = @_;
-
-	return $^O =~ /MSWin|cygwin|dos|os2/i ? 'WIN' : 
-		   $^O =~ /MacOS/                 ? 'MAC' : 'UNIX';
 }
 
 sub load_file {
@@ -463,8 +458,9 @@ sub find_project {
 }
 
 # abstract method, each subclass should implement it
-sub keywords      { return {} }
-sub get_functions { return () };
+sub keywords           { return {} }
+sub get_functions      { return () };
+sub get_function_regex { return '' };
 
 # should return ($length, @words)
 # where $length is the length of the prefix to be replaced by one of the words
@@ -478,7 +474,9 @@ sub autocomplete {
 	my $pos    = $editor->GetCurrentPos;
 	my $line   = $editor->LineFromPosition($pos);
 	my $first  = $editor->PositionFromLine($line);
-	my $prefix = $editor->GetTextRange($first, $pos); # line from beginning to current position
+
+	# line from beginning to current position
+	my $prefix = $editor->GetTextRange($first, $pos);
 	   $prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
 	my $last   = $editor->GetLength();
 	my $text   = $editor->GetTextRange(0, $last);
@@ -496,4 +494,5 @@ sub autocomplete {
 
 	return (length($prefix), @words);
 }
+
 1;

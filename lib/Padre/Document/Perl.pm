@@ -6,8 +6,9 @@ use warnings;
 use Carp            ();
 use Params::Util    '_INSTANCE';
 use Padre::Document ();
+use YAML::Tiny      ();
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 our @ISA     = 'Padre::Document';
 
 
@@ -70,33 +71,32 @@ sub ppi_select {
 	if ( _INSTANCE($location, 'PPI::Element') ) {
 		$location = $location->location;
 	}
-	my $page     = $self->page or return;
-	my $line     = $page->PositionFromLine( $location->[0] - 1 );
+	my $editor   = $self->editor or return;
+	my $line     = $editor->PositionFromLine( $location->[0] - 1 );
 	my $start    = $line + $location->[1] - 1;
-	$page->SetSelection( $start, $start + 1 );
+	$editor->SetSelection( $start, $start + 1 );
 }
 
-my $keywords = {
-	chomp     => '(STRING)',
-	substr    => '(EXPR, OFFSET, LENGTH, REPLACEMENT)',
-	index     => '(STR, SUBSTR, INDEX)',
-	pop       => '(@ARRAY)',
-	push      => '(@ARRAY, LIST)',
-	print     => '(LIST) or (FILEHANDLE LIST)',
-	join      => '(EXPR, LIST)',
-	split     => '(/PATTERN/,EXPR,LIMIT)',
-	wantarray => '()',
-};
+my $keywords;
 
 sub keywords {
+	if (not $keywords) {
+		my $dir  = Padre::Wx::_dir();
+		my $path = File::Spec->catfile($dir , 'languages', 'perl5', "perl5.yml");
+		$keywords = YAML::Tiny::LoadFile($path);
+	}
 	return $keywords;
 }
 
 sub get_functions {
 	my $self = shift;
-
 	my $text = $self->text_get;
-    return reverse sort $text =~ m{^sub\s+(\w+)}gm;
+	return reverse sort $text =~ m{^sub\s+(\w+)}gm;
+}
+
+sub get_function_regex {
+	my ( $self, $sub ) = @_;
+	return qr{sub\s+$sub\b};
 }
 
 1;

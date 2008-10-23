@@ -2,7 +2,7 @@ package Padre::Pod::Viewer;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 use Wx qw(wxOK wxCENTRE wxVERSION_STRING);
 use Wx::Html;
@@ -83,7 +83,7 @@ sub OnLinkClicked {
     }
     my $path = $self->module_to_path($href);
     if ($path) {
-        Padre->ide->add_to_recent('pod', $href);
+        Padre::DB->add_recent_pod( $href);
         $self->display($href);
     } 
 

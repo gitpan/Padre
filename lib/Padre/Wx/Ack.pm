@@ -1,7 +1,7 @@
 package Padre::Wx::Ack;
+
 use strict;
 use warnings;
-
 use Wx                      qw(:everything);
 use Wx::Event               qw(:everything);
 use Padre::Wx::Ack;
@@ -11,7 +11,7 @@ use Data::Dumper            qw(Dumper);
 my $iter;
 my %opts;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 {
 	no warnings 'redefine';
@@ -22,8 +22,8 @@ our $VERSION = '0.10';
 	sub App::Ack::print_line_no        { print_results("$_[0]$_[1]"); }
 }
 
-
 my $DONE_EVENT : shared = Wx::NewEventType;
+
 sub on_ack {
 	my ($self) = @_;
 	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
@@ -31,31 +31,20 @@ sub on_ack {
 	# TODO kill the thread before closing the application
 
 	my $search = dialog();
-#print Dumper $search;
 
 	$search->{dir} ||= '.';
 	return if not $search->{term};
 
-	#my $config = get_config();
-	#%opts;# = %{ $config->{opts} };
-	#$opts{regex} = $regex;
 	$opts{regex} = $search->{term};
 	if (-f $search->{dir}) {
 		$opts{all} = 1;
 	}
-	#$opts{after_context}  = 0;
-	#$opts{before_context} = 0;
-#print Dumper \%opts;
 	my $what = App::Ack::get_starting_points( [$search->{dir}], \%opts );
 	fill_type_wanted();
-#    $App::Ack::type_wanted{cc} = 1;
-#    $opts{show_filename} = 1;
-#    $opts{follow} = 0;
 	$iter = App::Ack::get_iterator( $what, \%opts );
 	App::Ack::filetype_setup();
 
-
-	$self->show_output();
+	$self->show_output(1);
 
 	EVT_COMMAND( $self, -1, $DONE_EVENT, \&ack_done );
 
@@ -181,8 +170,3 @@ sub fill_type_wanted {
 }
 
 1;
-
-
-
-1;
-
