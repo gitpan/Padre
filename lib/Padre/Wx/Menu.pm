@@ -8,7 +8,7 @@ use Params::Util qw{_INSTANCE};
 use Wx           qw( wxID_NEW wxID_CLOSE wxID_SAVEAS wxID_EXIT wxID_UNDO wxID_REDO wxID_FIND wxID_HELP wxID_ABOUT );
 use Wx::Event    qw(EVT_MENU);
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 
 
@@ -387,7 +387,6 @@ sub new {
 
 
 	# Create the help menu
-	require Padre::Wx::Menu::Help;
 	$menu->{help} = Wx::Menu->new;
 	my $help = Padre::Wx::Menu::Help->new;
 
@@ -410,7 +409,7 @@ sub new {
 	$menu->{help}->AppendSeparator;
 	EVT_MENU( $win,
 		$menu->{help}->Append( Wx::wxID_ABOUT, '' ),
-		sub { $menu->{help}->about },
+		sub { $help->about },
 	);
 
 

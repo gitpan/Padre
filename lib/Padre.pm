@@ -213,7 +213,7 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -239,7 +239,7 @@ use Class::Autouse qw{
 	Padre::Wx::Popup
 	Padre::Wx::Editor
 	Padre::Wx::Menu
-	Padre::Wx::Help
+	Padre::Wx::Menu::Help
 	Padre::Wx::Ack
 	Padre::Wx::Bookmarks
 	Padre::Wx::FindDialog
