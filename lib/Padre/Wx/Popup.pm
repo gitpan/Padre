@@ -5,18 +5,18 @@ use warnings;
 #use base 'Wx::ComboPopup';
 #use base 'Wx::PopupTransientWindow';
 #use base 'Wx::PopupWindow';
+use Padre::Wx   ();
+
 use base qw(Wx::PlPopupTransientWindow);
 
-use Wx        qw(:everything);
-use Wx::Event qw(:everything);
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub on_paint {
     my( $self, $event ) = @_;
 #    my $dc = Wx::PaintDC->new( $self );
-#    $dc->SetBrush( Wx::Brush->new( Wx::Colour->new( 0, 192, 0 ), wxSOLID ) );
-#    $dc->SetPen( Wx::Pen->new( Wx::Colour->new( 0, 0, 0 ), 1, wxSOLID ) );
+#    $dc->SetBrush( Wx::Brush->new( Wx::Colour->new( 0, 192, 0 ), Wx::wxSOLID ) );
+#    $dc->SetPen( Wx::Pen->new( Wx::Colour->new( 0, 0, 0 ), 1, Wx::wxSOLID ) );
 #    $dc->DrawRectangle( 0, 0, $self->GetSize->x, $self->GetSize->y );
 
     
@@ -24,7 +24,7 @@ sub on_paint {
 sub new {
     my $class = shift;
     my $self = $class->SUPER::new(@_);
-EVT_PAINT( $self, \&on_paint);
+Wx::Event::EVT_PAINT( $self, \&on_paint);
 
 print "xxx $self\n";
 #    my $panel =  Wx::Panel->new( $self, -1 );

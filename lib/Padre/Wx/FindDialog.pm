@@ -6,10 +6,10 @@ use warnings;
 
 # Find and Replace widget of Padre
 
-use Wx        ();
-use Wx::Event qw{ EVT_BUTTON EVT_CHECKBOX };
+use Padre::Wx;
+use Padre::Wx::Dialog;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub on_find {
 	my $main   = shift;
@@ -33,16 +33,16 @@ sub dialog {
 	my $dialog = Wx::Dialog->new( $win, -1, "Search", [-1, -1], [440, 220]);
 
 	my $layout = get_layout($search_term, $config);
-	Padre::Wx::ModuleStartDialog::build_layout($dialog, $layout, [150, 200]);
+	Padre::Wx::Dialog::build_layout($dialog, $layout, [150, 200]);
 
 	foreach my $cb (@cbs) {
-		EVT_CHECKBOX( $dialog, $dialog->{$cb}, sub { $_[0]->{_find_choice_}->SetFocus; });
+		Wx::Event::EVT_CHECKBOX( $dialog, $dialog->{$cb}, sub { $_[0]->{_find_choice_}->SetFocus; });
 	}
 	$dialog->{_find_}->SetDefault;
-	EVT_BUTTON( $dialog, $dialog->{_find_},        \&find_clicked);
-	EVT_BUTTON( $dialog, $dialog->{_replace_},     \&replace_clicked     );
-	EVT_BUTTON( $dialog, $dialog->{_replace_all_}, \&replace_all_clicked );
-	EVT_BUTTON( $dialog, $dialog->{_cancel_},      \&cancel_clicked      );
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_find_},        \&find_clicked);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_replace_},     \&replace_clicked     );
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_replace_all_}, \&replace_all_clicked );
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_cancel_},      \&cancel_clicked      );
 
 	$dialog->{_find_choice_}->SetFocus;
 	$dialog->Show(1);
@@ -173,7 +173,7 @@ sub find_clicked {
 sub _get_data_from {
 	my ( $dialog ) = @_;
 
-	my $data = Padre::Wx::ModuleStartDialog::get_data_from($dialog, get_layout());
+	my $data = Padre::Wx::Dialog::get_data_from($dialog, get_layout());
 
 	#print Data::Dumper::Dumper $data;
 

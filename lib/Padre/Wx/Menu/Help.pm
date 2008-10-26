@@ -3,9 +3,11 @@ package Padre::Wx::Menu::Help;
 use 5.008;
 use strict;
 use warnings;
-use Wx ();
 
-our $VERSION = '0.12';
+use Padre::Wx ();
+use Padre::Util;
+
+our $VERSION = '0.13';
 #our @ISA     = 'Wx::Menu';
 sub new { return bless {}, shift };
 

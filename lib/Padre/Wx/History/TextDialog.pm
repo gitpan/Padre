@@ -3,13 +3,15 @@ package Padre::Wx::History::TextDialog;
 use 5.008;
 use strict;
 use warnings;
+
 use Padre::DB ();
-use Wx        ();
+use Padre::Wx ();
+
 use Class::Adapter::Builder
 	ISA      => 'Wx::TextEntryDialog',
 	AUTOLOAD => 1;
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub new {
 	my $class  = shift;

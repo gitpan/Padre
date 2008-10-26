@@ -9,6 +9,8 @@ lib/Padre/Wx/Ack.pm
 lib/Padre/Config.pm
 lib/Padre/DB.pm
 lib/Padre/Document.pm
+lib/Padre/Documents.pm
+lib/Padre/PluginBuilder.pm
 lib/Padre/PluginManager.pm
 lib/Padre/Project.pm
 lib/Padre/Util.pm
@@ -22,12 +24,14 @@ lib/Padre/Document/Pir.pm
 
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/Bookmarks.pm
+lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Editor.pm
 lib/Padre/Wx/FindDialog.pm
 lib/Padre/Wx/GoToLine.pm
 lib/Padre/Wx/MainWindow.pm
 lib/Padre/Wx/Menu.pm
 lib/Padre/Wx/ModuleStartDialog.pm
+lib/Padre/Wx/Output.pm
 lib/Padre/Wx/Popup.pm
 lib/Padre/Wx/Preferences.pm
 lib/Padre/Wx/Project.pm
@@ -45,6 +49,7 @@ lib/Padre/Pod/Viewer.pm
 
 script/padre
 
+t/00-compile.t
 t/01-load.t
 t/02-new.t
 t/03-wx.t

@@ -4,12 +4,14 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.12';
-
+use Padre::Documents ();
 use Wx::STC;
+use Padre::Wx;
+
 use base 'Wx::StyledTextCtrl';
 
-use Wx   qw( wxTELETYPE wxNORMAL wxSTC_STYLE_DEFAULT wxSTC_H_TAG wxLayout_LeftToRight );
+our $VERSION = '0.13';
+
 sub new {
 	my( $class, $parent ) = @_;
 
@@ -45,11 +47,11 @@ sub padre_setup {
 sub padre_setup_plain {
 	my $self = shift;
 
-	my $font = Wx::Font->new( 10, wxTELETYPE, wxNORMAL, wxNORMAL );
+	my $font = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
 
 	$self->SetFont( $font );
 
-	$self->StyleSetFont( wxSTC_STYLE_DEFAULT, $font );
+	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
 
 	$self->StyleClearAll();
 
@@ -104,21 +106,21 @@ sub padre_setup_perl {
 		#define SCE_PL_FORMAT_IDENT 41
 		#define SCE_PL_FORMAT 42
 	);
-	Wx->import(keys %colors);
 
 	foreach my $k (keys %colors) {
 		my @c = map {hex($_)} $colors{$k} =~ /(..)(..)(..)/;
-		$self->StyleSetForeground( $k->(), Wx::Colour->new(@c));
+		my $f = 'Wx::' . $k;
+		$self->StyleSetForeground( $f->(), Wx::Colour->new(@c));
 	}
 
 	# Set a style 12 bold
 	$self->StyleSetBold(12,  1);
 
 	# Apply tag style for selected lexer (blue)
-	$self->StyleSetSpec( wxSTC_H_TAG, "fore:#0000ff" );
+	$self->StyleSetSpec( Wx::wxSTC_H_TAG, "fore:#0000ff" );
 
 	if ( $self->can('SetLayoutDirection') ) {
-		$self->SetLayoutDirection( wxLayout_LeftToRight );
+		$self->SetLayoutDirection( Wx::wxLayout_LeftToRight );
 	}
 
 	return;
@@ -133,7 +135,7 @@ sub on_stc_update_ui {
 sub on_stc_style_needed {
 	my ( $self, $event ) = @_;
 
-	my $doc = Padre::Wx::MainWindow::_DOCUMENT() or return;
+	my $doc = Padre::Documents->current or return;
 	if ($doc->can('colourise')) {
 		$doc->colourise;
 	}
@@ -143,7 +145,7 @@ sub on_stc_style_needed {
 sub on_stc_change {
 	my ($self, $event) = @_;
 
-	return if $self->{_in_setup_editor};
+	return if $self->no_refresh;
 	my $config = Padre->ide->config;
 	return if not $config->{editor_calltips};
 
@@ -158,7 +160,7 @@ sub on_stc_change {
 		$editor->CallTipCancel;
 	}
 
-    my $doc = Padre::Wx::MainWindow::_DOCUMENT() or return;
+    my $doc = Padre::Documents->current or return;
     my $keywords = $doc->keywords;
 
 	my $regex = join '|', sort {length $a <=> length $b} keys %$keywords;
@@ -175,5 +177,37 @@ sub on_stc_change {
 
 	return;
 }
+
+# currently if there are 9 lines we set the margin to 1 width and then
+# if another line is added it is not seen well.
+# actually I added some improvement allowing a 50% growth in the file
+# and requireing a min of 2 width
+sub show_line_numbers {
+	my ($self, $on) = @_;
+
+	$self->SetMarginWidth(1, 0);
+	$self->SetMarginWidth(2, 0);
+	if ($on) {
+		my $n = 1 + List::Util::max (2, length ($self->GetLineCount * 2));
+		my $width = $n * $self->TextWidth(Wx::wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
+		$self->SetMarginWidth(0, $width);
+		$self->SetMarginType(0, Wx::wxSTC_MARGIN_NUMBER);
+	} else {
+		$self->SetMarginWidth(0, 0);
+		$self->SetMarginType(0, Wx::wxSTC_MARGIN_NUMBER);
+	}
+
+	return;
+}
+
+sub set_preferences {
+	my ($self) = @_;
+	my $config = Padre->ide->config;
+
+	$self->SetTabWidth( $config->{editor_tabwidth} );
+
+	return;
+}
+
 
 1;

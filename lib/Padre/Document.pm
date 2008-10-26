@@ -6,9 +6,10 @@ package Padre::Document;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec ();
-use List::Util ();
-use Carp       ();
+use File::Spec  ();
+use File::Slurp ();
+use List::Util  ();
+use Carp        ();
 use Wx qw{
 	wxSTC_LEX_ADA
 	wxSTC_LEX_ASM
@@ -39,15 +40,18 @@ use Wx qw{
 	wxSTC_EOL_CR
 	wxSTC_EOL_LF
 };
+use Wx::STC;
 
-our $VERSION = '0.12';
+use Padre::Util;
+
+our $VERSION = '0.13';
 
 my $cnt   = 0;
 
 our %mode = (
-	WIN  => Wx::wxSTC_EOL_CRLF,
-	MAC  => Wx::wxSTC_EOL_CR,
-	UNIX => Wx::wxSTC_EOL_LF,
+	WIN  => wxSTC_EOL_CRLF,
+	MAC  => wxSTC_EOL_CR,
+	UNIX => wxSTC_EOL_LF,
 );
 
 # see Wx-0.84/ext/stc/cpp/st_constants.cpp for extension
@@ -142,48 +146,6 @@ our %MIME_LEXER = (
 );
 
 our $DEFAULT_LEXER = wxSTC_LEX_AUTOMATIC;
-
-### DODGY HACK
-# This is a temporary method that can generate an "anonymous"
-# document for whatever is in the current buffer. The document
-# is not saved or cached anywhere.
-# This method may be changed to work properly later, but for now
-# feel free to use it wherever needed.
-sub from_selection {
-	$_[0]->from_pageid( $_[0]->notebook->GetSelection );
-}
-
-sub from_pageid {
-	my $class   = shift;
-	my $pageid  = shift;
-
-	# TODO maybe report some error?
-	return if not defined $pageid or $pageid =~ /\D/;
-
-	if ( $pageid == -1 ) {
-		# No page selected
-		return;
-	}
-
-	return if $pageid >= $class->notebook->GetPageCount;
-
-	my $page = $class->notebook->GetPage( $pageid );
-
-	return $page->{Document};
-}
-
-
-
-
-
-#####################################################################
-# Class Methods
-
-sub notebook {
-	Padre->ide->wx->main_window->{notebook};
-}
-
-
 
 
 
@@ -295,7 +257,7 @@ sub load_file {
 
 	my $newline_type = $self->_get_default_newline_type;
 	my $convert_to;
-	my $content = eval { File::Slurp::read_file($file) };
+	my $content = eval { File::Slurp::read_file($file, binmode => ':raw') };
 	if ($@) {
 		warn $@;
 		return;
@@ -328,11 +290,26 @@ sub load_file {
 	$editor->SetText( $content );
 	$editor->EmptyUndoBuffer;
 	if ($convert_to) {
-		warn "Converting to $convert_to";
+		warn "Converting $file to $convert_to";
 		$editor->ConvertEOLs( $mode{$newline_type} );
 	}
 
 	return ($newline_type);
+}
+
+sub save_file {
+	my ($self) = @_;
+	my $content      = $self->text_get;
+	my $filename     = $self->filename;
+    #my $newline_type = $self->get_newline_type;
+
+	eval {
+		File::Slurp::write_file($filename, {binmode => ':raw'}, $content);
+	};
+	if ($@) {
+		return "Could not save: $!";
+	}
+	return;
 }
 
 sub set_newline_type {

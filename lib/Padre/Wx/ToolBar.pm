@@ -3,10 +3,10 @@ package Padre::Wx::ToolBar;
 use 5.008;
 use strict;
 use warnings;
-use Wx           qw( wxNO_BORDER wxTB_HORIZONTAL wxTB_FLAT wxTB_DOCKABLE wxID_NEW wxID_OPEN wxID_SAVE);
+
 use Padre::Wx    ();
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 our @ISA     = 'Wx::ToolBar';
 
 sub new {
@@ -34,7 +34,8 @@ sub new {
 sub refresh {
 	my $self    = shift;
 	my $doc     = shift;
-	my $enabled = !! ( $doc and ( $doc->is_new or $doc->is_modified ) );
+
+	my $enabled = !! ( $doc and $doc->is_modified );
 	$self->EnableTool( Wx::wxID_SAVE, $enabled );
 	return 1;
 }

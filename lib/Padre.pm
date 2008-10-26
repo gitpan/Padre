@@ -213,7 +213,7 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -245,6 +245,7 @@ use Class::Autouse qw{
 	Padre::Wx::FindDialog
 	Padre::Wx::GoToLine
 	Padre::Wx::ModuleStartDialog
+	Padre::Wx::Preferences
 };
 
 # Globally shared Perl detection object
@@ -465,7 +466,7 @@ Part of the code was copied from his Wx::Demo application.
 
 To Adam Kennedy for lots of refactoring.
 
-To Steffen Müller for PAR plugins.
+To Steffen Muller for PAR plugins.
 
 To Patrick Donelan.
 

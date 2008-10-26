@@ -10,7 +10,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 
 
@@ -108,6 +108,7 @@ sub new {
 
 	# Look and feel preferences
 	$self->{main_statusbar}           ||= 1;
+	$self->{main_output}              ||= 0;
 	$self->{editor_tabwidth}          ||= 4;
 	$self->{editor_linenumbers}       ||= 0;
 	$self->{editor_eol}               ||= 0;
@@ -195,7 +196,7 @@ sub write {
 	}
 
 	# Serialize some values
-	$copy->{host}->{main_files} = join( "\n", @{$copy->{host}->{main_files}} );
+	$copy->{host}->{main_files} = join( "\n", grep { defined } @{$copy->{host}->{main_files}} );
 
 	# Save the host configuration
 	Padre::DB->hostconf_write( delete $copy->{host} );
