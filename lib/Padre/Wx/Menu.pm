@@ -9,7 +9,7 @@ use Padre::Wx        ();
 use Padre::Util      ();
 use Padre::Documents ();
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 
 
@@ -467,7 +467,7 @@ sub new {
 	$menu->{wx}->Append( $menu->{project},  "&Project"   );
 	$menu->{wx}->Append( $menu->{edit},     "&Edit"      );
 	$menu->{wx}->Append( $menu->{view},     "&View"      );
-	$menu->{wx}->Append( $menu->{perl},     "Perl"       );
+	#$menu->{wx}->Append( $menu->{perl},     "Perl"       );
 	$menu->{wx}->Append( $menu->{bookmark}, "&Bookmarks" );
 	$menu->{wx}->Append( $menu->{plugin},   "Pl&ugins"   ) if $menu->{plugin};
 	$menu->{wx}->Append( $menu->{window},   "&Window"    );
@@ -556,8 +556,15 @@ sub refresh {
 	my $self     = shift;
 	my $document = Padre::Documents->current;
 
+	if ( _INSTANCE($document, 'Padre::Document::Perl') and $self->{wx}->GetMenuLabel(3) ne 'Perl') {
+		$self->{wx}->Insert( 3, $self->{perl}, "Perl" );
+	} elsif ( not _INSTANCE($document, 'Padre::Document::Perl') and $self->{wx}->GetMenuLabel(3) eq 'Perl') {
+		$self->{wx}->Remove( 3 );
+	}
+
+	return 1;
+
 	# Create the new menu bar
-return;
 	$self->{wx} = Wx::MenuBar->new;
 	$self->{wx}->Append( $self->{file},     "&File"      );
 	$self->{wx}->Append( $self->{project},  "&Project"   );
@@ -567,14 +574,13 @@ return;
 		$self->{wx}->Append( $self->{perl}, "Perl" );
 	}
 	$self->{wx}->Append( $self->{bookmark}, "&Bookmarks" );
-	if ( $self->{plugins} ) {
-		$self->{wx}->Append( $self->{plugin}, "Pl&ugins" );
-	}
+	$self->{wx}->Append( $self->{plugin},   "Pl&ugins"   ) if $self->{plugin};
 	$self->{wx}->Append( $self->{window},   "&Window"    );
 	$self->{wx}->Append( $self->{help},     "&Help"      );
 	if ( Padre->ide->config->{experimental} ) {
 		$self->{wx}->Append( $self->{experimental}, "E&xperimental" );
 	}
+	$self->win->SetMenuBar( $self->{wx} );
 
 	return 1;
 }

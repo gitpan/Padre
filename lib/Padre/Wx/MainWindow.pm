@@ -21,7 +21,7 @@ use Padre::Documents   ();
 
 use base qw{Wx::Frame};
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 my $default_dir = Cwd::cwd();
 
@@ -168,9 +168,9 @@ sub new {
 	# Deal with someone closing the window
 	Wx::Event::EVT_CLOSE( $self, \&on_close_window);
 
-	Wx::Event::EVT_STC_UPDATEUI(    $self, -1, \&Padre::Wx::Editor::on_stc_update_ui    );
-	Wx::Event::EVT_STC_CHANGE(      $self, -1, \&Padre::Wx::Editor::on_stc_change       );
-	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&Padre::Wx::Editor::on_stc_style_needed );
+	Wx::Event::EVT_STC_UPDATEUI(    $self, -1, \&on_stc_update_ui    );
+	Wx::Event::EVT_STC_CHANGE(      $self, -1, \&on_stc_change       );
+	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
 
 	# As ugly as the WxPerl icon is, the new file toolbar image is uglier
 	$self->SetIcon( Wx::GetWxPerlIcon() );
@@ -575,13 +575,20 @@ sub on_brace_matching {
 	my $page  = $self->{notebook}->GetPage($id);
 	my $pos1  = $page->GetCurrentPos;
 	my $pos2  = $page->BraceMatch($pos1);
+	if ($pos2 == -1 ) {   #Wx::wxSTC_INVALID_POSITION
+		if ($pos1 > 0) {
+			$pos1--;
+			$pos2 = $page->BraceMatch($pos1);
+		}
+	}
+
 	if ($pos2 != -1 ) {   #Wx::wxSTC_INVALID_POSITION
 		#print "$pos1 $pos2\n";
 		#$page->BraceHighlight($pos1, $pos2);
-		$page->SetCurrentPos($pos2);
+		#$page->SetCurrentPos($pos2);
+		$page->GotoPos($pos2);
+		#$page->MoveCaretInsideView;
 	}
-	# TODO: if not found matching brace,
-	# we might want to check it at the previous position
 	# TODO: or any nearby position.
 
 	return;
@@ -767,7 +774,7 @@ sub create_tab {
 	my $file_title = $file || $title;
 	$self->{menu}->add_alt_n_menu($file_title, $id);
 
-	$self->refresh_status;
+	$self->refresh_all;
 
 	return $id;
 }
@@ -918,8 +925,7 @@ sub on_save_as {
 	$doc->set_mimetype( $doc->guess_mimetype );
 	$doc->editor->padre_setup;
 
-	$self->refresh_status;
-	$self->refresh_methods;
+	$self->refresh_all;
 
 	return 1;
 }
@@ -965,8 +971,7 @@ sub _save_buffer {
 
 	Padre::DB->add_recent_files($doc->filename);
 	$page->SetSavePoint;
-	$self->refresh_status;
-	$self->refresh_methods;
+	$self->refresh_all;
 
 	return; 
 }
@@ -1226,6 +1231,68 @@ sub on_function_selected {
 	my $doc = $self->selected_document;
 	Padre::Wx::FindDialog::_search( search_term => $doc->get_function_regex($sub) );
 	$self->selected_editor->SetFocus;
+	return;
+}
+
+
+## STC related functions
+
+sub on_stc_style_needed {
+	my ( $self, $event ) = @_;
+
+	my $doc = Padre::Documents->current or return;
+	if ($doc->can('colourise')) {
+		$doc->colourise;
+	}
+
+}
+
+
+sub on_stc_update_ui {
+	my ($self, $event) = @_;
+	
+	# check for brace, on current position, higlight the matching brace
+	my $editor = $self->selected_editor;
+	$editor->highlight_braces;
+
+	$self->refresh_status;
+
+	return;
+}
+
+sub on_stc_change {
+	my ($self, $event) = @_;
+
+	return if $self->no_refresh;
+	my $config = Padre->ide->config;
+	return if not $config->{editor_calltips};
+
+	my $editor = $self->selected_editor;
+
+	my $pos    = $editor->GetCurrentPos;
+	my $line   = $editor->LineFromPosition($pos);
+	my $first  = $editor->PositionFromLine($line);
+	my $prefix = $editor->GetTextRange($first, $pos); # line from beginning to current position
+	   #$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
+	if ($editor->CallTipActive) {
+		$editor->CallTipCancel;
+	}
+
+    my $doc = Padre::Documents->current or return;
+    my $keywords = $doc->keywords;
+
+	my $regex = join '|', sort {length $a <=> length $b} keys %$keywords;
+
+	my $tip;
+	if ( $prefix =~ /($regex)[ (]?$/ ) {
+		my $z = $keywords->{$1};
+		return if not $z or not ref($z) or ref($z) ne 'HASH';
+		$tip = "$z->{cmd}\n$z->{exp}";
+	}
+	if ($tip) {
+		$editor->CallTipShow($editor->CallTipPosAtStart() + 1, $tip);
+	}
+
 	return;
 }
 

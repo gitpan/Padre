@@ -10,7 +10,7 @@ use Padre::Wx;
 
 use base 'Wx::StyledTextCtrl';
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 sub new {
 	my( $class, $parent ) = @_;
@@ -119,6 +119,8 @@ sub padre_setup_perl {
 	# Apply tag style for selected lexer (blue)
 	$self->StyleSetSpec( Wx::wxSTC_H_TAG, "fore:#0000ff" );
 
+	$self->StyleSetBackground(34, Wx::Colour->new(0x00, 0xFF, 0x00)); # brace highlight
+
 	if ( $self->can('SetLayoutDirection') ) {
 		$self->SetLayoutDirection( Wx::wxLayout_LeftToRight );
 	}
@@ -126,57 +128,32 @@ sub padre_setup_perl {
 	return;
 }
 
+sub highlight_braces {
+	my ($self) = @_;
 
-sub on_stc_update_ui {
-	my ($self, $event) = @_;
-	$self->refresh_status;
-}
+	$self->BraceHighlight(-1, -1); # Wx::wxSTC_INVALID_POSITION
+	my $pos1  = $self->GetCurrentPos;
+	my $chr = chr($self->GetCharAt($pos1));
 
-sub on_stc_style_needed {
-	my ( $self, $event ) = @_;
-
-	my $doc = Padre::Documents->current or return;
-	if ($doc->can('colourise')) {
-		$doc->colourise;
+	my @braces = ( '{', '}', '(', ')', '[', ']');
+	if (not grep {$chr eq $_} @braces) {
+		if ($pos1 > 0) {
+			$pos1--;
+			$chr = chr($self->GetCharAt($pos1));
+			return unless grep {$chr eq $_} @braces;
+		}
 	}
+	
+	my $pos2  = $self->BraceMatch($pos1);
+	return if abs($pos1-$pos2) < 2;
 
-}
-
-sub on_stc_change {
-	my ($self, $event) = @_;
-
-	return if $self->no_refresh;
-	my $config = Padre->ide->config;
-	return if not $config->{editor_calltips};
-
-	my $editor = $self->selected_editor;
-
-	my $pos    = $editor->GetCurrentPos;
-	my $line   = $editor->LineFromPosition($pos);
-	my $first  = $editor->PositionFromLine($line);
-	my $prefix = $editor->GetTextRange($first, $pos); # line from beginning to current position
-	   #$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
-	if ($editor->CallTipActive) {
-		$editor->CallTipCancel;
-	}
-
-    my $doc = Padre::Documents->current or return;
-    my $keywords = $doc->keywords;
-
-	my $regex = join '|', sort {length $a <=> length $b} keys %$keywords;
-
-	my $tip;
-	if ( $prefix =~ /($regex)[ (]?$/ ) {
-		my $z = $keywords->{$1};
-		return if not $z or not ref($z) or ref($z) ne 'HASH';
-		$tip = "$z->{cmd}\n$z->{exp}";
-	}
-	if ($tip) {
-		$editor->CallTipShow($editor->CallTipPosAtStart() + 1, $tip);
-	}
+	return if $pos2 == -1;   #Wx::wxSTC_INVALID_POSITION  #????
+	
+	$self->BraceHighlight($pos1, $pos2);
 
 	return;
 }
+
 
 # currently if there are 9 lines we set the margin to 1 width and then
 # if another line is added it is not seen well.
@@ -205,6 +182,7 @@ sub set_preferences {
 	my $config = Padre->ide->config;
 
 	$self->SetTabWidth( $config->{editor_tabwidth} );
+	$self->SetUseTabs(  $config->{editor_use_tabs} );
 
 	return;
 }
