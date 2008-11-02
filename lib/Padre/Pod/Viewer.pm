@@ -2,7 +2,7 @@ package Padre::Pod::Viewer;
 use strict;
 use warnings;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 use Wx qw(wxOK wxCENTRE wxVERSION_STRING);
 use Wx::Html;
@@ -17,6 +17,11 @@ use Config;
 
 our @pages;
 
+=head1 NAME
+
+Padre::Pod::Viewer - class for viewing pod
+
+=head1 METHODS
 
 =head2 module_to_path
 
@@ -174,3 +179,7 @@ sub get_html {
 1;
 
 
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

@@ -8,7 +8,7 @@ use Params::Util    '_INSTANCE';
 use Padre::Document ();
 use YAML::Tiny      ();
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 our @ISA     = 'Padre::Document';
 
 
@@ -99,4 +99,29 @@ sub get_function_regex {
 	return qr{sub\s+$sub\b};
 }
 
+
+sub get_command {
+	my $self     = shift;
+
+	# Check the file name
+	my $filename = $self->filename;
+	unless ( $filename =~ /\.pl$/i ) {
+		die "Only .pl files can be executed\n";
+	}
+
+	# Run with the same Perl that launched Padre
+	# TODO: get preferred Perl from configuration
+	my $perl = Padre->perl_interpreter;
+
+	my $dir = File::Basename::dirname($filename);
+	chdir $dir;
+	return qq{"$perl" "$filename"};
+}
+
+
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

@@ -7,7 +7,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::Util;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 #our @ISA     = 'Wx::Menu';
 sub new { return bless {}, shift };
 
@@ -45,8 +45,14 @@ sub about {
 	}
 	$about->AddDeveloper("Gabor Szabo");
 	$about->AddDeveloper("Adam Kennedy");
+	$about->AddDeveloper("Steffen Mueller");
 	Wx::AboutBox( $about );
 	return;
 }
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

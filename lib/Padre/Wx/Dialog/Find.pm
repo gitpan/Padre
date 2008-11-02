@@ -1,4 +1,4 @@
-package Padre::Wx::FindDialog;
+package Padre::Wx::Dialog::Find;
 
 use 5.008;
 use strict;
@@ -9,46 +9,9 @@ use warnings;
 use Padre::Wx;
 use Padre::Wx::Dialog;
 
-our $VERSION = '0.14';
-
-sub on_find {
-	my $main   = shift;
-	my $config = Padre->ide->config;
-	my $text   = $main->selected_text;
-	$text = '' if not defined $text;
-
-	# TODO: if selection is more than one lines then consider it as the limit
-	# of the search and replace and not as the string to be used
-
-	__PACKAGE__->dialog( $main, $config, { term => $text } );
-}
+our $VERSION = '0.15';
 
 my @cbs = qw(case_insensitive use_regex backwards close_on_hit);
-
-sub dialog {
-	my ( $class, $win, $config, $args) = @_;
-
-	my $search_term = $args->{term} || '';
-
-	my $dialog = Wx::Dialog->new( $win, -1, "Search", [-1, -1], [440, 220]);
-
-	my $layout = get_layout($search_term, $config);
-	Padre::Wx::Dialog::build_layout($dialog, $layout, [150, 200]);
-
-	foreach my $cb (@cbs) {
-		Wx::Event::EVT_CHECKBOX( $dialog, $dialog->{$cb}, sub { $_[0]->{_find_choice_}->SetFocus; });
-	}
-	$dialog->{_find_}->SetDefault;
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_find_},        \&find_clicked);
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_replace_},     \&replace_clicked     );
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_replace_all_}, \&replace_all_clicked );
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_cancel_},      \&cancel_clicked      );
-
-	$dialog->{_find_choice_}->SetFocus;
-	$dialog->Show(1);
-
-	return;
-}
 
 sub get_layout {
 	my ($search_term, $config) = @_;
@@ -89,6 +52,49 @@ sub get_layout {
 	);
 	return \@layout;
 }
+
+
+sub on_find {
+	my $main   = shift;
+	my $config = Padre->ide->config;
+	my $text   = $main->selected_text;
+	$text = '' if not defined $text;
+
+	# TODO: if selection is more than one lines then consider it as the limit
+	# of the search and replace and not as the string to be used
+
+	__PACKAGE__->dialog( $main, $config, { term => $text } );
+}
+
+
+sub dialog {
+	my ( $class, $win, $config, $args) = @_;
+
+	my $search_term = $args->{term} || '';
+
+	my $layout = get_layout($search_term, $config);
+	my $dialog = Padre::Wx::Dialog->new(
+		parent => $win,
+		title  => "Search",
+		layout => $layout,
+		width  => [150, 200],
+	);
+
+	foreach my $cb (@cbs) {
+		Wx::Event::EVT_CHECKBOX( $dialog, $dialog->{_widgets_}{$cb}, sub { $_[0]->{_widgets_}{_find_choice_}->SetFocus; });
+	}
+	$dialog->{_widgets_}{_find_}->SetDefault;
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_find_},        \&find_clicked);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_replace_},     \&replace_clicked     );
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_replace_all_}, \&replace_all_clicked );
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},      \&cancel_clicked      );
+
+	$dialog->{_widgets_}{_find_choice_}->SetFocus;
+	$dialog->Show(1);
+
+	return;
+}
+
 
 sub cancel_clicked {
 	my ($dialog, $event) = @_;
@@ -173,7 +179,7 @@ sub find_clicked {
 sub _get_data_from {
 	my ( $dialog ) = @_;
 
-	my $data = Padre::Wx::Dialog::get_data_from($dialog, get_layout());
+	my $data = $dialog->get_data;
 
 	#print Data::Dumper::Dumper $data;
 
@@ -281,3 +287,8 @@ sub _search {
 }
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

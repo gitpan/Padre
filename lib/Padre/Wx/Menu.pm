@@ -9,7 +9,7 @@ use Padre::Wx        ();
 use Padre::Util      ();
 use Padre::Documents ();
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 
 
@@ -32,14 +32,22 @@ sub new {
 	# Create the File menu
 	$menu->{file} = Wx::Menu->new;
 
-	# Opening and closing files
+	# Creating new things
 	Wx::Event::EVT_MENU( $win,
-		$menu->{file}->Append( Wx::wxID_NEW, '' ),
+		$menu->{file}->Append( -1, "New\tCtrl-T" ),
 		sub {
 			$_[0]->setup_editor;
 			return;
 		},
 	);
+	$menu->{file_new} = Wx::Menu->new;
+	$menu->{file}->Append( -1, "New...", $menu->{file_new} );
+	Wx::Event::EVT_MENU( $win,
+		$menu->{file_new}->Append( -1, 'Perl Distribution (Module::Starter)' ),
+		\&Padre::Wx::Dialog::ModuleStart::on_start,
+	);
+
+	# Opening and closing files
 	Wx::Event::EVT_MENU( $win,
 		$menu->{file}->Append( Wx::wxID_OPEN, '' ),
 		sub { $_[0]->on_open },
@@ -55,6 +63,14 @@ sub new {
 	Wx::Event::EVT_MENU( $win,
 		$menu->{file}->Append( -1, 'Close All' ),
 		sub { $_[0]->on_close_all },
+	);
+	Wx::Event::EVT_MENU( $win,
+		$menu->{file}->Append( -1, 'Close All but Current Document' ),
+		sub { $_[0]->on_close_all_but_current },
+	);
+	Wx::Event::EVT_MENU( $win,
+		$menu->{file}->Append( -1, 'Reload file' ),
+		sub { $_[0]->on_reload_file },
 	);
 	$menu->{file}->AppendSeparator;
 
@@ -114,14 +130,6 @@ sub new {
 	}
 	$menu->{file}->AppendSeparator;
 
-	# Module::Start
-	Wx::Event::EVT_MENU( $win,
-		$menu->{file}->Append( -1, 'Start Module' ),
-		\&Padre::Wx::ModuleStartDialog::on_start,
-	);
-
-	$menu->{file}->AppendSeparator;
-
 	# Exiting
 	Wx::Event::EVT_MENU( $win,
 		$menu->{file}->Append( Wx::wxID_EXIT, '' ),
@@ -161,15 +169,15 @@ sub new {
 	# Random shit that doesn't fit anywhere better yet
 	Wx::Event::EVT_MENU( $win,
 		$menu->{edit}->Append( Wx::wxID_FIND, '' ),
-		\&Padre::Wx::FindDialog::on_find,
+		\&Padre::Wx::Dialog::Find::on_find,
 	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->{edit}->Append( -1, "&Find Next\tF3" ),
-		\&Padre::Wx::FindDialog::on_find_next,
+		\&Padre::Wx::Dialog::Find::on_find_next,
 	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->{edit}->Append( -1, "Find Previous\tShift-F3" ),
-		\&Padre::Wx::FindDialog::on_find_previous,
+		\&Padre::Wx::Dialog::Find::on_find_previous,
 	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->{edit}->Append( -1, "Ac&k" ),
@@ -177,7 +185,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->{edit}->Append( -1, "&Goto\tCtrl-G" ),
-		\&Padre::Wx::GoToLine::on_goto,
+		\&Padre::Wx::MainWindow::on_goto,
 	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->{edit}->Append( -1, "&AutoComp\tCtrl-P" ),
@@ -192,6 +200,18 @@ sub new {
 		\&Padre::Wx::MainWindow::on_brace_matching,
 	);
 	$menu->{edit}->AppendSeparator;
+
+	# Commenting
+	Wx::Event::EVT_MENU( $win,
+		$menu->{edit}->Append( -1, "&Comment Selected Lines\tCtrl-M" ),
+		\&Padre::Wx::MainWindow::on_comment_out_block,
+	);
+	Wx::Event::EVT_MENU( $win,
+		$menu->{edit}->Append( -1, "&Uncomment Selected Lines\tCtrl-Shift-M" ),
+		\&Padre::Wx::MainWindow::on_uncomment_block,
+	);
+	$menu->{edit}->AppendSeparator;
+
 
 	# User Preferences
 	Wx::Event::EVT_MENU( $win,
@@ -260,13 +280,12 @@ sub new {
 	$menu->{view}->AppendSeparator;
 	Wx::Event::EVT_MENU( $win,
 		$menu->{view}->Append( -1, "Set Bookmark\tCtrl-B" ),
-		sub { Padre::Wx::Bookmarks::on_set_bookmark($_[0]) },
+		sub { Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]) },
 	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->{view}->Append( -1, "Goto Bookmark\tCtrl-Shift-B" ),
-		sub { Padre::Wx::Bookmarks::on_goto_bookmark($_[0]) },
+		sub { Padre::Wx::Dialog::Bookmarks->goto_bookmark($_[0]) },
 	);
-
 
 
 
@@ -299,42 +318,25 @@ sub new {
 			}
 		},
 	);
-	$menu->{perl}->AppendSeparator;
+
+
+	# Create the Run menu
+	$menu->{run} = Wx::Menu->new;
 
 	# Script Execution
-	$menu->{perl_run_script} = $menu->{perl}->Append( -1, "Run Script\tF5" );
+	$menu->{run_run_script} = $menu->{run}->Append( -1, "Run Script\tF5" );
 	Wx::Event::EVT_MENU( $win,
-		$menu->{perl_run_script},
-		sub { $_[0]->run_perl },
+		$menu->{run_run_script},
+		sub { $_[0]->run_script },
 	);
-	$menu->{perl_run_command} = $menu->{perl}->Append( -1, "Run Command\tCtrl-F5" );
+	$menu->{run_run_command} = $menu->{run}->Append( -1, "Run Command\tCtrl-F5" );
 	Wx::Event::EVT_MENU( $win,
-		$menu->{perl_run_command},
-		sub {
-			$DB::single = 1;
-			my $main_window = shift;
-			require Padre::Wx::History::TextDialog;
-			my $dialog = Padre::Wx::History::TextDialog->new(
-				$main_window,
-				"Command line",
-				"Run setup",
-				"run_command",
-			);
-			if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-				return;
-			}
-			my $command = $dialog->GetValue;
-			$dialog->Destroy;
-			unless ( defined $command and $command ne '' ) {
-				return;
-			}
-			$main_window->run_command( $command );
-			return;
-		}
+		$menu->{run_run_command},
+		sub { $_[0]->on_run_command },
 	);
-	$menu->{perl_stop} = $menu->{perl}->Append( -1, "&Stop" );
+	$menu->{run_stop} = $menu->{run}->Append( -1, "&Stop" );
 	Wx::Event::EVT_MENU( $win,
-		$menu->{perl_stop},
+		$menu->{run_stop},
 		sub {
 			if ( $_[0]->{command} ) {
 				$_[0]->{command}->TerminateProcess;
@@ -343,18 +345,7 @@ sub new {
 			return;
 		},
 	);
-	$menu->{perl_stop}->Enable(0);
-
-	# Commenting
-	Wx::Event::EVT_MENU( $win,
-		$menu->{perl}->Append( -1, "&Comment Selected Lines\tCtrl-M" ),
-		\&Padre::Wx::MainWindow::on_comment_out_block,
-	);
-	Wx::Event::EVT_MENU( $win,
-		$menu->{perl}->Append( -1, "&Uncomment Selected Lines\tCtrl-Shift-M" ),
-		\&Padre::Wx::MainWindow::on_uncomment_block,
-	);
-
+	$menu->{run_stop}->Enable(0);
 
 
 
@@ -468,6 +459,7 @@ sub new {
 	$menu->{wx}->Append( $menu->{edit},     "&Edit"      );
 	$menu->{wx}->Append( $menu->{view},     "&View"      );
 	#$menu->{wx}->Append( $menu->{perl},     "Perl"       );
+	$menu->{wx}->Append( $menu->{run},      "Run"        );
 	$menu->{wx}->Append( $menu->{bookmark}, "&Bookmarks" );
 	$menu->{wx}->Append( $menu->{plugin},   "Pl&ugins"   ) if $menu->{plugin};
 	$menu->{wx}->Append( $menu->{window},   "&Window"    );
@@ -586,3 +578,8 @@ sub refresh {
 }
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

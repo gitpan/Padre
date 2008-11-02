@@ -44,7 +44,7 @@ use Wx::STC;
 
 use Padre::Util;
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 my $cnt   = 0;
 
@@ -262,6 +262,7 @@ sub load_file {
 		warn $@;
 		return;
 	}
+	$self->{_timestamp} = $self->time_on_file;
 	my $current_type = Padre::Util::newline_type($content);
 	if ($current_type eq 'None') {
 		# keep default
@@ -309,6 +310,8 @@ sub save_file {
 	if ($@) {
 		return "Could not save: $!";
 	}
+	$self->{_timestamp} = $self->time_on_file;
+
 	return;
 }
 
@@ -356,6 +359,29 @@ sub is_modified {
 	return !! ( $_[0]->editor->GetModify );
 }
 
+# check if the file on the disk has changed
+# 1) when document gets the focus (gvim, notepad++)
+# 2) when we try to save the file (gvim)
+# 3) every time we type something ????
+
+# returns if file has changed on the disk 
+# since load time or the last time we saved
+sub has_changed_on_disk {
+	my ($self) = @_;
+	return 0 if not defined $self->filename;
+	return 0 if not defined $self->last_sync;
+	return $self->last_sync < $self->time_on_file ? 1 : 0;
+}
+
+sub time_on_file {
+	return if not defined $_[0]->filename;
+	return (stat($_[0]->filename))[9];
+}
+
+sub last_sync {
+	return $_[0]->{_timestamp};
+}
+
 # A new document that isn't worth saving
 sub is_unused {
 	my $self = shift;
@@ -369,7 +395,13 @@ sub is_saved {
 	return !! ( defined $_[0]->filename and not $_[0]->is_modified );
 }
 
+sub reload {
+	my ($self) = @_;
 
+	my $filename = $self->filename or return;
+	$self->load_file($filename, $self->editor);
+	return 1;
+}
 
 
 
@@ -473,3 +505,8 @@ sub autocomplete {
 }
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

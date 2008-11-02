@@ -1,4 +1,4 @@
-package Padre::Wx::ModuleStartDialog;
+package Padre::Wx::Dialog::ModuleStart;
 
 use 5.008;
 use strict;
@@ -11,33 +11,7 @@ use Cwd          ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.14';
-
-sub on_start {
-	my $main   = shift;
-	my $config = Padre->ide->config;
-	__PACKAGE__->dialog( $main, $config, { } );
-}
-
-sub dialog {
-	my ( $class, $win, $config, $args) = @_;
-
-	my $dialog = Wx::Dialog->new( $win, -1, "Module Start", [-1, -1], [310, 210]);
-
-	my $layout = get_layout($config);
-	Padre::Wx::Dialog::build_layout($dialog, $layout, [100, 200], [5, 5]);
-
-	$dialog->{_ok_}->SetDefault;
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_ok_},      \&ok_clicked      );
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_cancel_},  \&cancel_clicked  );
-
-        $dialog->{_license_choice_}->SetValue('perl');
-
-	$dialog->{_module_name_}->SetFocus;
-	$dialog->Show(1);
-
-	return;
-}
+our $VERSION = '0.15';
 
 sub get_layout {
 	my ($config) = @_;
@@ -56,11 +30,11 @@ sub get_layout {
 		],
 		[
 			[ 'Wx::StaticText', undef,              'Author:'],
-			[ 'Wx::TextCtrl',   '_author_name_',    '', ($config->{module_start}{author_name} || '') ],
+			[ 'Wx::TextCtrl',   '_author_name_',    ($config->{module_start}{author_name} || '') ],
 		],
 		[
 			[ 'Wx::StaticText', undef,              'Email:'],
-			[ 'Wx::TextCtrl',   '_email_',          '', ($config->{module_start}{email} || '') ],
+			[ 'Wx::TextCtrl',   '_email_',          ($config->{module_start}{email} || '') ],
 		],
 		[
 			[ 'Wx::StaticText', undef,              'Builder:'],
@@ -83,6 +57,37 @@ sub get_layout {
 }
 
 
+
+sub on_start {
+	my $main   = shift;
+	my $config = Padre->ide->config;
+	__PACKAGE__->dialog( $main, $config, { } );
+}
+
+sub dialog {
+	my ( $class, $win, $config, $args) = @_;
+
+	my $layout = get_layout($config);
+	my $dialog = Padre::Wx::Dialog->new(
+		parent          => $win,
+		title           => "Module Start",
+		layout          => $layout,
+		width           => [100, 200],
+	);
+
+	$dialog->{_widgets_}{_ok_}->SetDefault;
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_ok_},      \&ok_clicked      );
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},  \&cancel_clicked  );
+
+	$dialog->{_widgets_}{_license_choice_}->SetValue('perl');
+
+	$dialog->{_widgets_}{_module_name_}->SetFocus;
+	$dialog->Show(1);
+
+	return;
+}
+
+
 sub cancel_clicked {
 	my ($dialog, $event) = @_;
 
@@ -94,9 +99,9 @@ sub cancel_clicked {
 sub ok_clicked {
 	my ($dialog, $event) = @_;
 
-	my $data = Padre::Wx::Dialog::get_data_from( $dialog, get_layout() );
+	my $data = $dialog->get_data;
 	$dialog->Destroy;
-	print Dumper $data;
+	#print Dumper $data;
 
 	my $config = Padre->ide->config;
 	$config->{module_start}{author_name} = $data->{_author_name_};
@@ -132,3 +137,9 @@ sub ok_clicked {
 
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.
+

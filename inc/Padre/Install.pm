@@ -21,6 +21,7 @@ sub ACTION_exe {
     my $self = shift;
 
     # temporary tool to create executable using PAR
+    eval "use Module::ScanDeps 0.88; 1;" or die $@;
 
 
     my @libs    = libs();
@@ -29,12 +30,12 @@ sub ACTION_exe {
     if (-e $exe) {
         unlink $exe or die "Cannot remove '$exe' $!";
     }
-    my @cmd     = ('pp', '-o', $exe, qw(-I lib  script/padre));
+    my @cmd     = ('pp', '-o', $exe, qw(-I lib script/padre));
     push @cmd, @modules, @libs;
     if ($^O =~ /win32/i) {
-        push @cmd, '-M', 'File::HomeDir::Windows';
         push @cmd, '-M', 'Tie::Hash::NamedCapture';
     }
+
     print "@cmd\n";
     system(@cmd);
 
@@ -109,3 +110,8 @@ sub modules {
 
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

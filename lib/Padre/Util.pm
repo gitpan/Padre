@@ -27,7 +27,7 @@ use warnings;
 use Exporter     ();
 use List::Util   qw(first);
 
-our $VERSION   = '0.14';
+our $VERSION   = '0.15';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches);
 
@@ -104,6 +104,17 @@ sub get_matches {
 
 	return ($start, $end, @matches);
 }
+
+package Px;
+
+use constant {
+	PASM_KEYWORD  => 1,
+	PASM_REGISTER => 2,
+	PASM_LABEL    => 3,
+	PASM_STRING   => 4,
+	PASM_COMMENT  => 5,
+	PASM_POD      => 6,
+};
 
 1;
 

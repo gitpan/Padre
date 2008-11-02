@@ -22,18 +22,19 @@ lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl6.pm
 lib/Padre/Document/Pir.pm
 
+lib/Padre/Plugin/Parrot.pm
+
 lib/Padre/Wx/App.pm
-lib/Padre/Wx/Bookmarks.pm
 lib/Padre/Wx/Dialog.pm
+lib/Padre/Wx/Dialog/Bookmarks.pm
+lib/Padre/Wx/Dialog/Find.pm
+lib/Padre/Wx/Dialog/ModuleStart.pm
+lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Editor.pm
-lib/Padre/Wx/FindDialog.pm
-lib/Padre/Wx/GoToLine.pm
 lib/Padre/Wx/MainWindow.pm
 lib/Padre/Wx/Menu.pm
-lib/Padre/Wx/ModuleStartDialog.pm
 lib/Padre/Wx/Output.pm
 lib/Padre/Wx/Popup.pm
-lib/Padre/Wx/Preferences.pm
 lib/Padre/Wx/Project.pm
 lib/Padre/Wx/RightClick.pm
 lib/Padre/Wx/ToolBar.pm
@@ -66,26 +67,27 @@ eg/stderr.pl
 eg/sleep.pl
 eg/wx.pl
 eg/shell.pl
+eg/hello.pasm
+eg/hello.p6
 
 eg/wx/01_simple_frame.pl
 eg/wx/02_label.pl
 eg/wx/03_button.pl
 eg/wx/04_button_with_event.pl
 
-share/docview/print.xpm
-share/docview/save.xpm
-share/docview/open.xpm
-share/docview/preview.xpm
-share/docview/help.xpm
-share/docview/new.xpm
-share/docview/copy.xpm
-share/docview/cut.xpm
-
 share/templates/template.pl
 share/templates/template.pm
 share/templates/template.t
 
+share/styles/default.yml
+
 share/languages/perl5/perl5.yml
+
+share/tango/16x16/actions/document-open.png
+share/tango/16x16/actions/document-new.png
+share/tango/16x16/actions/document-save.png
+share/tango/16x16/emblems/emblem-unreadable.png
+
 
 META.yml
 

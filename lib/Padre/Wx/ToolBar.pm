@@ -5,8 +5,9 @@ use strict;
 use warnings;
 
 use Padre::Wx    ();
+use File::Spec::Functions qw(catfile);
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 our @ISA     = 'Wx::ToolBar';
 
 sub new {
@@ -22,11 +23,14 @@ sub new {
 	);
 
 	# Automatically populate
-	$self->AddTool( Wx::wxID_NEW,  '', Padre::Wx::bitmap('new'),  'New File'  ); 
-	$self->AddTool( Wx::wxID_OPEN, '', Padre::Wx::bitmap('open'), 'Open File' ); 
-	$self->AddTool( Wx::wxID_SAVE, '', Padre::Wx::bitmap('save'), 'Save File' );
-	# $self->AddTool( Wx::wxID_CLOSE, '', Padre::Wx::bitmap('close'), 'Close File' );
+	$self->AddTool( Wx::wxID_NEW,   '', Padre::Wx::tango(catfile('actions', 'document-new.png')),  'New File'  ); 
+	$self->AddTool( Wx::wxID_OPEN,  '', Padre::Wx::tango(catfile('actions', 'document-open.png')), 'Open File' ); 
+	$self->AddTool( Wx::wxID_SAVE,  '', Padre::Wx::tango(catfile('actions', 'document-save.png')), 'Save File' );
+	$self->AddTool( Wx::wxID_CLOSE, '', Padre::Wx::tango(catfile('emblems', 'emblem-unreadable.png')) , 'Close File' );
 	$self->AddSeparator;
+	# TODO, how can we make sure these numbers are unique?
+	#$self->AddTool( 1000, '', Padre::Wx::tango(catfile('actions', 'bookmark-new.png')), 'Bookmark' );
+	#Wx::Event::EVT_TOOL($parent, 1000, sub { Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]) } );
 
 	return $self;
 }
@@ -37,7 +41,14 @@ sub refresh {
 
 	my $enabled = !! ( $doc and $doc->is_modified );
 	$self->EnableTool( Wx::wxID_SAVE, $enabled );
+	
+	$self->EnableTool( Wx::wxID_CLOSE,  (defined Padre::Documents->current ? 1 :0));
 	return 1;
 }
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

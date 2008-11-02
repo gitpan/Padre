@@ -94,6 +94,42 @@ You can edit the command line using the Run/Setup menu item.
   on your computer. Indexing is currently done by running the following command:
   
   padre --index
+  
+=head2 Parrot integration
+
+This is an experimentatl feature.
+
+Download Parrot (or check it out from its version control)
+
+Configure PARROT_PATH to point to the root of parrot
+
+Configure LD_LIBRARY_PATH
+
+ export LD_LIBRARY_PATH=$PARROT_PATH/blib/lib/
+ 
+Build Parrot
+
+ cd $PARROT_PATH
+ svn up
+ make realclean
+ perl Configure.pl
+ make
+ make test
+
+Build Parrot::Embed
+
+ cd ext/Parrot-Embed/
+ ./Build realclean
+ perl Build.PL
+ ./Build
+ ./Build test
+
+Now if you run Padre it will come with an embedded Parrot interpreter.
+
+You can get the interpreter by calling 
+
+ Padre->ide->parrot
+
 
 =head2 Rectangular Text Selection
 
@@ -213,7 +249,7 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -241,17 +277,19 @@ use Class::Autouse qw{
 	Padre::Wx::Menu
 	Padre::Wx::Menu::Help
 	Padre::Wx::Ack
-	Padre::Wx::Bookmarks
-	Padre::Wx::FindDialog
-	Padre::Wx::GoToLine
-	Padre::Wx::ModuleStartDialog
-	Padre::Wx::Preferences
+	Padre::Wx::Dialog::Bookmarks
+	Padre::Wx::Dialog::Find
+	Padre::Wx::Dialog::ModuleStart
+	Padre::Wx::Dialog::Preferences
 };
 
 # Globally shared Perl detection object
 sub perl_interpreter {
 	require Probe::Perl;
-	return Probe::Perl->find_perl_interpreter;
+	my $perl = Probe::Perl->find_perl_interpreter;
+	return $perl if $perl;
+	require File::Which;
+	return scalar File::Which::which('perl');
 }
 
 my @history = qw(files pod);
@@ -291,6 +329,11 @@ sub new {
 	$self->{config}    ||= Padre::Config->create( $self->config_yaml );
 
 	$self->{plugin_manager} = Padre::PluginManager->new($self);
+	
+	eval {
+		require Parrot::Embed;
+		$self->{parrot} = Parrot::Interpreter->new;
+	};
 
 	# Load the database
 	Class::Autouse->load('Padre::DB');
@@ -307,6 +350,10 @@ sub wx {
 	my $self = shift;
 	$self->{wx} or
 	$self->{wx} = Padre::Wx::App->new;
+}
+
+sub parrot {
+	$_[0]->{parrot};
 }
 
 sub config {
@@ -363,6 +410,12 @@ sub run_indexer {
 
 sub run_editor {
 	my $self = shift;
+
+	# Move our current dir to the user's documents directory by default
+	my $documents = File::HomeDir->my_documents;
+	if ( defined $documents ) {
+		chdir $documents;
+	}
 
 	$self->wx->MainLoop;
 	$self->{wx} = undef;
@@ -453,6 +506,12 @@ Copyright 2008 Gabor Szabo. L<http://www.szabgab.com/>
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
+The icons were taken from 
+http://tango.freedesktop.org/Tango_Desktop_Project
+The Tango base icon theme is licensed under the 
+Creative Commons Attribution Share-Alike license.
+Using tango-icon-theme-0.8.1.tar.gz
+
 =head1 WARRANTY
 
 There is no warranty whatsoever.
@@ -468,7 +527,7 @@ To Adam Kennedy for lots of refactoring.
 
 To Steffen Muller for PAR plugins.
 
-To Patrick Donelan.
+To Patrick Donelan, Fayland Lam, Brian Cassidy
 
 To Herbert Breunung for letting me work on Kephra.
 

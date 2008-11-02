@@ -4,14 +4,13 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use Cwd            ();
-use Carp           ();
-use Data::Dumper   ();
-use File::Spec     ();
-use File::Basename ();
-use List::Util     ();
-use Params::Util   ();
-
+use Cwd                ();
+use Carp               ();
+use Data::Dumper       ();
+use File::Spec         ();
+use File::Basename     ();
+use List::Util         ();
+use Params::Util       ();
 use Padre::Util        ();
 use Padre::Wx          ();
 use Padre::Wx::Editor  ();
@@ -21,7 +20,7 @@ use Padre::Documents   ();
 
 use base qw{Wx::Frame};
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 my $default_dir = Cwd::cwd();
 
@@ -34,7 +33,6 @@ my $default_dir = Cwd::cwd();
 
 sub new {
 	my $class  = shift;
-	my $files  = Padre->inst->{ARGV};
 
 	my $config = Padre->ide->config;
 	Wx::InitAllImageHandlers();
@@ -162,6 +160,7 @@ sub new {
 			# Ctrl-Shift-TAB #TODO it is already in the menu
 			$self->on_prev_pane if $code == Wx::WXK_TAB;
 		}
+		$event->Skip();
 		return;
 	} );
 
@@ -171,14 +170,34 @@ sub new {
 	Wx::Event::EVT_STC_UPDATEUI(    $self, -1, \&on_stc_update_ui    );
 	Wx::Event::EVT_STC_CHANGE(      $self, -1, \&on_stc_change       );
 	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
+	Wx::Event::EVT_STC_CHARADDED(   $self, -1, \&on_stc_char_added   );
 
 	# As ugly as the WxPerl icon is, the new file toolbar image is uglier
 	$self->SetIcon( Wx::GetWxPerlIcon() );
 	# $self->SetIcon( Padre::Wx::icon('new') );
 
-	# Load any default files
-	# TODO make sure the full path to the file is saved and not
-	# the relative path
+	# we need an event immediately after the window opened
+	# (we had an issue that if the default of main_statusbar was false it did not show
+	# the status bar which is ok, but then when we selected the menu to show it, it showed
+	# at the top)
+	# TODO: there might be better ways to fix that issue...
+	my $timer = Wx::Timer->new( $self );
+	Wx::Event::EVT_TIMER(
+		$self,
+		-1,
+		\&post_init,
+	);
+	$timer->Start( 1, 1 );
+
+	return $self;
+}
+
+# Load any default files
+sub load_files {
+	my ($self) = @_;
+
+	my $config = Padre->ide->config;
+	my $files  = Padre->inst->{ARGV};
 	if ( $files and ref($files) eq 'ARRAY' and @$files ) {
 		foreach my $f ( @$files ) {
 		    if ( not File::Spec->file_name_is_absolute($f) ) {
@@ -199,36 +218,28 @@ sub new {
 	} else {
 		# should never happen
 	}
-
-	# we need an event immediately after the window opened
-	# (we had an issue that if the default of main_statusbar was false it did not show
-	# the status bar which is ok, but then when we selected the menu to show it, it showed
-	# at the top)
-	# TODO: there might be better ways to fix that issue...
-	my $timer = Wx::Timer->new( $self );
-	Wx::Event::EVT_TIMER(
-		$self,
-		-1,
-		sub { 
-			$_[0]->on_toggle_status_bar; 
-			$_[0]->refresh_all;
-
-			my $output = $_[0]->{menu}->{view_output}->IsChecked;
-			# First we show the output window and then hide it if necessary
-			# in order to avoide some weird visual artifacts (empty square at
-			# top left part of the whole application)
-			# TODO maybe some users want to make sure the output window is always
-			# off at startup.
-			$_[0]->show_output(1);
-			$_[0]->show_output($output) if not $output;
-			},
-	);
-	$timer->Start( 500, 1 );
-
-	return $self;
+	return;
 }
 
+sub post_init { 
+	my ($self) = @_;
 
+	$self->load_files;
+
+	$self->on_toggle_status_bar;
+	$self->refresh_all;
+
+	my $output = $self->{menu}->{view_output}->IsChecked;
+	# First we show the output window and then hide it if necessary
+	# in order to avoide some weird visual artifacts (empty square at
+	# top left part of the whole application)
+	# TODO maybe some users want to make sure the output window is always
+	# off at startup.
+	$self->show_output(1);
+	$self->show_output($output) if not $output;
+
+	return;
+}
 
 
 
@@ -269,6 +280,12 @@ sub refresh_all {
 	$self->refresh_toolbar;
 	$self->refresh_status;
 	$self->refresh_methods;
+	
+	my $id = $self->{notebook}->GetSelection();
+	if (defined $id and $id >= 0) {
+		$self->{notebook}->GetPage($id)->SetFocus;
+	}
+
 	return;
 }
 
@@ -408,15 +425,37 @@ sub pages {
 #####################################################################
 # Process Execution
 
+# probably need to be combined with run_command
+sub on_run_command {
+	my $main_window = shift;
+	require Padre::Wx::History::TextDialog;
+	my $dialog = Padre::Wx::History::TextDialog->new(
+		$main_window,
+		"Command line",
+		"Run setup",
+		"run_command",
+	);
+	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		return;
+	}
+	my $command = $dialog->GetValue;
+	$dialog->Destroy;
+	unless ( defined $command and $command ne '' ) {
+		return;
+	}
+	$main_window->run_command( $command );
+	return;
+}
+
 sub run_command {
 	my $self   = shift;
 	my $cmd    = shift;
 	my $config = Padre->ide->config;
 
-	# Temporarily hard-wire this to the Perl menu
-	$self->{menu}->{perl_run_script}->Enable(0);
-	$self->{menu}->{perl_run_command}->Enable(0);
-	$self->{menu}->{perl_stop}->Enable(1);
+	# Temporarily hard-wire this to the appropriate menu
+	$self->{menu}->{run_run_script}->Enable(0);
+	$self->{menu}->{run_run_command}->Enable(0);
+	$self->{menu}->{run_stop}->Enable(1);
 
 	# Prepare the output window for the output
 	$self->show_output(1);
@@ -449,9 +488,9 @@ sub run_command {
 				$_[1]->GetProcess->Destroy;
 
 				# Temporarily hard-wired to the Perl menu
-				$self->{menu}->{perl_run_script}->Enable(1);
-				$self->{menu}->{perl_run_command}->Enable(1);
-				$self->{menu}->{perl_stop}->Enable(0);
+				$self->{menu}->{run_run_script}->Enable(1);
+				$self->{menu}->{run_run_command}->Enable(1);
+				$self->{menu}->{run_stop}->Enable(0);
 			},
 		);
 	}
@@ -460,29 +499,20 @@ sub run_command {
 	$self->{command} = Wx::Perl::ProcessStream->OpenProcess( $cmd, 'MyName1', $self );
 	unless ( $self->{command} ) {
 		# Failed to start the command. Clean up.
-		$self->{menu}->{perl_run_script}->Enable(1);
-		$self->{menu}->{perl_run_command}->Enable(1);
-		$self->{menu}->{perl_stop}->Enable(0);
+		$self->{menu}->{run_run_script}->Enable(1);
+		$self->{menu}->{run_run_command}->Enable(1);
+		$self->{menu}->{run_stop}->Enable(0);
 	}
 
 	return;
 }
 
 # This should really be somewhere else, but can stay here for now
-sub run_perl {
+sub run_script {
 	my $self     = shift;
 	my $document = Padre::Documents->current;
 
 	return $self->error("No open document") if not $document;
-	unless ( $document->isa('Padre::Document::Perl') ) {
-		return $self->error("Not a Perl document");
-	}
-
-	# Check the file name
-	my $filename = $document->filename;
-	unless ( $filename =~ /\.pl$/i ) {
-		return $self->error("Only .pl files can be executed");
-	}
 
 	# Apply the user's save-on-run policy
 	# TODO: Make this code suck less
@@ -494,14 +524,21 @@ sub run_perl {
 	} elsif ( $config->{run_save} eq 'all_buffer' ) {
 		$self->on_save_all;
 	}
-
-	# Run with the same Perl that launched Padre
-	# TODO: get preferred Perl from configuration
-	my $perl = Padre->perl_interpreter;
-
-	my $dir = File::Basename::dirname($filename);
-	chdir $dir;
-	$self->run_command( qq{"$perl" "$filename"} );
+	
+	if ( not $document->can('get_command') ) {
+		return $self->error("No execution mode was defined for this document");
+	}
+	
+	my $cmd = eval { $document->get_command };
+	if ($@) {
+		chomp $@;
+		$self->error($@);
+		return;
+	}
+	if ($cmd) {
+		$self->run_command( $cmd );
+	}
+	return;
 }
 
 sub debug_perl {
@@ -566,7 +603,6 @@ sub error {
 
 #####################################################################
 # Event Handlers
-
 
 sub on_brace_matching {
 	my ($self, $event) = @_;
@@ -652,6 +688,27 @@ sub on_autocompletition {
 	return;
 }
 
+sub on_goto {
+	my $self = shift;
+
+	my $dialog = Wx::TextEntryDialog->new( $self, "Line number:", "", '' );
+	if ($dialog->ShowModal == Wx::wxID_CANCEL) {
+		return;
+	}   
+	my $line_number = $dialog->GetValue;
+	$dialog->Destroy;
+	return if not defined $line_number or $line_number !~ /^\d+$/;
+	#what if it is bigger than buffer?
+
+	my $id   = $self->{notebook}->GetSelection;
+	my $page = $self->{notebook}->GetPage($id);
+
+	$line_number--;
+	$page->GotoLine($line_number);
+
+	return;
+}
+
 sub on_close_window {
 	my $self   = shift;
 	my $event  = shift;
@@ -722,9 +779,9 @@ sub on_split_window {
 	$editor->AddRefDocument($pointer);
 
 	my $new_editor = Padre::Wx::Editor->new( $self->{notebook} );
+	$new_editor->{Document} = $editor->{Document};
+	$new_editor->padre_setup;
 
-	#my $new_id = $self->setup_editor();
-	#my $new_editor = $self->{notebook}->GetPage( $new_id );
 	$new_editor->SetDocPointer($pointer);
 	$self->create_tab($new_editor, $file, " $title");
 
@@ -736,10 +793,15 @@ sub on_split_window {
 sub setup_editor {
 	my ($self, $file) = @_;
 
-	local $self->{_no_refresh} = 1;
+	if ($file) {
+		my $id = $self->find_editor_of_file($file);
+		if (defined $id) {
+			$self->on_nth_pane($id);
+			return;
+		}
+	}
 
-	# Flush old stuff
-	delete $self->{project};
+	local $self->{_no_refresh} = 1;
 
 	my $config = Padre->ide->config;
 	my $editor = Padre::Wx::Editor->new( $self->{notebook} );
@@ -750,10 +812,6 @@ sub setup_editor {
 	);
 
 	my $title = $editor->{Document}->get_title;
-
-	$editor->show_line_numbers(    $config->{editor_linenumbers}       );
-	$editor->SetIndentationGuides( $config->{editor_indentationguides} );
-	$editor->SetViewEOL(           $config->{editor_eol}               );
 
 	$editor->set_preferences;
 
@@ -877,6 +935,15 @@ sub on_open {
 	return;
 }
 
+sub on_reload_file {
+	my ($self) = @_;
+
+	my $doc     = $self->selected_document or return;
+	$doc->reload;
+	
+	return;
+}
+
 # Returns true if saved.
 # Returns false if cancelled.
 sub on_save_as {
@@ -963,6 +1030,16 @@ sub _save_buffer {
 	my $page         = $self->{notebook}->GetPage($id);
     my $doc          = Padre::Documents->by_id($id) or return;
 
+	if ($doc->has_changed_on_disk) {
+		my $ret = Wx::MessageBox(
+			"File changed on disk since last saved. Do you want to overwrite it?",
+			$doc->filename || "File not in sync",
+			Wx::wxYES_NO|Wx::wxCENTRE,
+			$self,
+		);
+		return if $ret != Wx::wxYES;
+	}
+	
 	my $error = $doc->save_file;
 	if ($error) {
 		Wx::MessageBox($error, "Error", Wx::wxOK, $self);
@@ -980,14 +1057,19 @@ sub _save_buffer {
 # Returns false on cancel.
 sub on_close {
 	my $self = shift;
-	$self->close(@_);
+	$self->close;
 	$self->refresh_all;
 }
 
 sub close {
-	my $self = shift;
+	my ($self, $id) = @_;
 
-	my $doc     = $self->selected_document or return;
+	$id = defined $id ? $id : $self->{notebook}->GetSelection;
+	
+	return if $id == -1;
+	
+	my $doc = Padre::Documents->by_id($id) or return;
+
 	local $self->{_no_refresh} = 1;
 	
 
@@ -1007,8 +1089,7 @@ sub close {
 			return 0;
 		}
 	}
-	my $pageid = $self->{notebook}->GetSelection;
-	$self->{notebook}->DeletePage($pageid);
+	$self->{notebook}->DeletePage($id);
 
 	# Update the alt-n menus
 	$self->{menu}->remove_alt_n_menu;
@@ -1026,8 +1107,20 @@ sub close {
 # Returns false if cancelled.
 sub on_close_all {
 	my $self = shift;
+	return $self->_close_all;
+}
+
+sub on_close_all_but_current {
+	my $self = shift;
+	return $self->_close_all( $self->{notebook}->GetSelection );
+}
+
+sub _close_all {
+	my ($self, $skip) = @_;
+
 	$self->Freeze;
 	foreach my $id ( reverse $self->pageids ) {
+		next if defined $skip and $skip == $id;
 		$self->close( $id ) or return 0;
 	}
 	$self->Thaw;
@@ -1089,7 +1182,7 @@ sub on_preferences {
 	my $self   = shift;
 	my $config = Padre->ide->config;
 
-	Padre::Wx::Preferences->run( $self, $config );
+	Padre::Wx::Dialog::Preferences->run( $self, $config );
 
 	foreach my $editor ( $self->pages ) {
 		$editor->set_preferences;
@@ -1196,6 +1289,7 @@ sub convert_to {
 	$doc->set_newline_type($newline_type);
 
 	$self->refresh_status;
+	$self->refresh_toolbar;
 
 	return;
 }
@@ -1229,7 +1323,7 @@ sub on_function_selected {
 	return if not defined $sub;
 
 	my $doc = $self->selected_document;
-	Padre::Wx::FindDialog::_search( search_term => $doc->get_function_regex($sub) );
+	Padre::Wx::Dialog::Find::_search( search_term => $doc->get_function_regex($sub) );
 	$self->selected_editor->SetFocus;
 	return;
 }
@@ -1254,8 +1348,10 @@ sub on_stc_update_ui {
 	# check for brace, on current position, higlight the matching brace
 	my $editor = $self->selected_editor;
 	$editor->highlight_braces;
+	$editor->show_calltip;
 
 	$self->refresh_status;
+	$self->refresh_toolbar;
 
 	return;
 }
@@ -1264,36 +1360,25 @@ sub on_stc_change {
 	my ($self, $event) = @_;
 
 	return if $self->no_refresh;
-	my $config = Padre->ide->config;
-	return if not $config->{editor_calltips};
-
-	my $editor = $self->selected_editor;
-
-	my $pos    = $editor->GetCurrentPos;
-	my $line   = $editor->LineFromPosition($pos);
-	my $first  = $editor->PositionFromLine($line);
-	my $prefix = $editor->GetTextRange($first, $pos); # line from beginning to current position
-	   #$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
-	if ($editor->CallTipActive) {
-		$editor->CallTipCancel;
-	}
-
-    my $doc = Padre::Documents->current or return;
-    my $keywords = $doc->keywords;
-
-	my $regex = join '|', sort {length $a <=> length $b} keys %$keywords;
-
-	my $tip;
-	if ( $prefix =~ /($regex)[ (]?$/ ) {
-		my $z = $keywords->{$1};
-		return if not $z or not ref($z) or ref($z) ne 'HASH';
-		$tip = "$z->{cmd}\n$z->{exp}";
-	}
-	if ($tip) {
-		$editor->CallTipShow($editor->CallTipPosAtStart() + 1, $tip);
-	}
 
 	return;
 }
 
+# http://www.yellowbrain.com/stc/events.html#EVT_STC_CHARADDED
+# TODO: maybe we need to check this more carefully.
+sub on_stc_char_added {
+	my ($self, $event) = @_;
+
+	if ($event->GetKey == 10) { # ENTER
+		my $editor = $self->selected_editor;
+		$editor->autoindent;
+	}
+	return;
+}
+
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

@@ -1,6 +1,6 @@
 ---
 name: Padre
-version: 0.14
+version: 0.15
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
@@ -23,14 +23,16 @@ requires:
   File::Copy::Recursive: 0
   File::HomeDir: 0
   File::ShareDir: 1.00
+  File::ShareDir::PAR: 0.02
   File::Slurp: 0
   File::Spec::Functions: 0
+  File::Which: 0.05
   FindBin: 0
   Getopt::Long: 0
   IO::Socket: 0
   List::Util: 0
   Module::Inspector: 0.04
-  Module::Starter: 0
+  Module::Starter: 1.50
   ORLite: 0.15
   PAR: 0.970
   PPI: 1.203
@@ -46,123 +48,126 @@ requires:
 build_requires:
   Test::Exception: 0
   Test::More: 0.47
+  Test::NeedsDisplay: 1.05
   Test::NoWarnings: 0
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.14
+    version: 0.15
   Padre::Config:
     file: lib/Padre/Config.pm
-    version: 0.14
+    version: 0.15
   Padre::DB:
     file: lib/Padre/DB.pm
-    version: 0.14
+    version: 0.15
   Padre::Document:
     file: lib/Padre/Document.pm
-    version: 0.14
+    version: 0.15
   Padre::Document::Pasm:
     file: lib/Padre/Document/Pasm.pm
-    version: 0.14
+    version: 0.15
   Padre::Document::Perl:
     file: lib/Padre/Document/Perl.pm
-    version: 0.14
+    version: 0.15
   Padre::Document::Perl6:
     file: lib/Padre/Document/Perl6.pm
-    version: 0.14
+    version: 0.15
   Padre::Document::Pir:
     file: lib/Padre/Document/Pir.pm
-    version: 0.14
+    version: 0.15
   Padre::Documents:
     file: lib/Padre/Documents.pm
-    version: 0.14
+    version: 0.15
   Padre::PPI:
     file: lib/Padre/PPI.pm
-    version: 0.14
+    version: 0.15
+  Padre::Plugin::Parrot:
+    file: lib/Padre/Plugin/Parrot.pm
+    version: 0.15
   Padre::PluginBuilder:
     file: lib/Padre/PluginBuilder.pm
-    version: 0.14
+    version: 0.15
   Padre::PluginManager:
     file: lib/Padre/PluginManager.pm
-    version: 0.14
+    version: 0.15
   Padre::Pod::Frame:
     file: lib/Padre/Pod/Frame.pm
-    version: 0.14
+    version: 0.15
   Padre::Pod::Indexer:
     file: lib/Padre/Pod/Indexer.pm
-    version: 0.14
+    version: 0.15
   Padre::Pod::Viewer:
     file: lib/Padre/Pod/Viewer.pm
-    version: 0.14
+    version: 0.15
   Padre::Pod::Viewer::POD:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Pod::Viewer::View:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Project:
     file: lib/Padre/Project.pm
-    version: 0.14
+    version: 0.15
   Padre::Util:
     file: lib/Padre/Util.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx:
     file: lib/Padre/Wx.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Ack:
     file: lib/Padre/Wx/Ack.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::App:
     file: lib/Padre/Wx/App.pm
-    version: 0.14
-  Padre::Wx::Bookmarks:
-    file: lib/Padre/Wx/Bookmarks.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Dialog:
     file: lib/Padre/Wx/Dialog.pm
-    version: 0.14
+    version: 0.15
+  Padre::Wx::Dialog::Bookmarks:
+    file: lib/Padre/Wx/Dialog/Bookmarks.pm
+    version: 0.15
+  Padre::Wx::Dialog::Find:
+    file: lib/Padre/Wx/Dialog/Find.pm
+    version: 0.15
+  Padre::Wx::Dialog::ModuleStart:
+    file: lib/Padre/Wx/Dialog/ModuleStart.pm
+    version: 0.15
+  Padre::Wx::Dialog::Preferences:
+    file: lib/Padre/Wx/Dialog/Preferences.pm
+    version: 0.15
   Padre::Wx::Editor:
     file: lib/Padre/Wx/Editor.pm
-    version: 0.14
-  Padre::Wx::FindDialog:
-    file: lib/Padre/Wx/FindDialog.pm
-    version: 0.14
-  Padre::Wx::GoToLine:
-    file: lib/Padre/Wx/GoToLine.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::History::ComboBox:
     file: lib/Padre/Wx/History/ComboBox.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::History::TextDialog:
     file: lib/Padre/Wx/History/TextDialog.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::MainWindow:
     file: lib/Padre/Wx/MainWindow.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Menu:
     file: lib/Padre/Wx/Menu.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Menu::Help:
     file: lib/Padre/Wx/Menu/Help.pm
-    version: 0.14
-  Padre::Wx::ModuleStartDialog:
-    file: lib/Padre/Wx/ModuleStartDialog.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Output:
     file: lib/Padre/Wx/Output.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Popup:
     file: lib/Padre/Wx/Popup.pm
-    version: 0.14
-  Padre::Wx::Preferences:
-    file: lib/Padre/Wx/Preferences.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::Project:
     file: lib/Padre/Wx/Project.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::RightClick:
     file: lib/Padre/Wx/RightClick.pm
-    version: 0.14
+    version: 0.15
   Padre::Wx::ToolBar:
     file: lib/Padre/Wx/ToolBar.pm
-    version: 0.14
+    version: 0.15
+  Px:
+    file: lib/Padre/Util.pm
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

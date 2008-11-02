@@ -1,5 +1,31 @@
 Changes for Padre.
 
+0.15 2008.11.02
+
+    Don't let opening file that is already open. (SZABGAB)
+    Start UTF-8 support. (SZABGAB)
+	Switch to File::ShareDir::PAR (SMUELLER)
+	Start using File::Which to locate the perl interpreter
+       (if padre is running from a par archive). (SZABGAB)
+    Fix the Split Window menu option to really work. (SZABGAB)
+    Adding "Close All but Current Document" menu option. (SZABGAB)
+    Add autoindentation. (SZABGAB)
+    Set focus on windows. (SZABGAB)
+    Before saving, check if file has changed on disk. (SZABGAB)
+    New menu option: "Reload file". (SZABGAB)
+    Move style definition to external yaml file. (SZABGAB)
+    Separate highlighting definition for PASM files. (SZABGAB)
+    Reorganize Menus (make the Perl menu really only perl specific). (SZABGAB)
+    Allow the execution of PASM files using parrot if PARROT_PATH
+        is defined. (SZABGAB)
+    Load Parrot::Embed if it is available. (SZABGAB)
+    Add Padre::Plugin::Parrot to show how to use pir for plugin writing. (SZABGAB)
+    Allow execution of Perl 6 code using Rakudo. (SZABGAB)
+    Add copyright/license to all the .pm files as per Debian request. (SZABGAB)
+    Ctrl-T is the default new file hot-key just as in Firefox. (ADAMK)
+    Dialog cleanups. (SMUELLER, ADAMK, SZABGAB)
+    Replace the toolbar icons with icons from the Tango project. (SZABGAB)
+
 v0.14 2008.10.27
 
     Skip the Test::Compile test if the module is not installed. (SZABGAB)

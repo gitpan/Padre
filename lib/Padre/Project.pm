@@ -9,7 +9,7 @@ use Module::Inspector ();
 
 use base 'Module::Inspector';
 
-our $VERSION = '0.14';
+our $VERSION = '0.15';
 
 sub from_file {
 	my $class = shift;
@@ -44,3 +44,8 @@ sub from_file {
 }
 
 1;
+
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.
