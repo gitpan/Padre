@@ -6,7 +6,7 @@ use warnings;
 use Padre::Document ();
 use Padre::Util     (); # Px::
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 our @ISA     = 'Padre::Document';
 
 # Slightly less naive way to parse and colourise pasm files
@@ -137,20 +137,6 @@ sub _color {
 
 	$editor->StartStyling($start,  $color->());
 	$editor->SetStyling(  $length, $color->());
-	return;
-}
-
-
-sub remove_color {
-	my ($self) = @_;
-
-	my $editor = $self->editor;
-	# TODO this is strange, do we really need to do it with all?
-	for my $i ( 1 .. 5 ) {
-		$editor->StartStyling(0, $i);
-		$editor->SetStyling($editor->GetLength, 0);
-	}
-
 	return;
 }
 

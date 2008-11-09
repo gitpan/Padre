@@ -8,8 +8,9 @@ use warnings;
 
 use Padre::Wx;
 use Padre::Wx::Dialog;
+use Wx::Locale qw(:default);
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 my @cbs = qw(case_insensitive use_regex backwards close_on_hit);
 
@@ -18,31 +19,31 @@ sub get_layout {
 
 	my @layout = (
 		[
-			[ 'Wx::StaticText', undef,              'Find:'],
+			[ 'Wx::StaticText', undef,              gettext('Find:')],
 			[ 'Wx::ComboBox',   '_find_choice_',    $search_term, $config->{search_terms}],
 			[ 'Wx::Button',     '_find_',           Wx::wxID_FIND ],
 		],
 		[
-			[ 'Wx::StaticText', undef,              'Replace With:'],
+			[ 'Wx::StaticText', undef,              gettext('Replace With:')],
 			[ 'Wx::ComboBox',   '_replace_choice_',    '', $config->{replace_terms}],
-			[ 'Wx::Button',     '_replace_',        '&Replace'],
+			[ 'Wx::Button',     '_replace_',        gettext('&Replace')],
 		],
 		[
 			[],
 			[],
-			[ 'Wx::Button',     '_replace_all_',    'Replace &All'],
+			[ 'Wx::Button',     '_replace_all_',    gettext('Replace &All')],
 		],
 		[
-			['Wx::CheckBox',    'case_insensitive', 'Case &Insensitive',    ($config->{search}->{case_insensitive} ? 1 : 0) ],
+			['Wx::CheckBox',    'case_insensitive', gettext('Case &Insensitive'),    ($config->{search}->{case_insensitive} ? 1 : 0) ],
 		],
 		[
-			['Wx::CheckBox',    'use_regex',        '&Use Regex',           ($config->{search}->{use_regex} ? 1 : 0) ],
+			['Wx::CheckBox',    'use_regex',        gettext('&Use Regex'),           ($config->{search}->{use_regex} ? 1 : 0) ],
 		],
 		[
-			['Wx::CheckBox',    'backwards',        'Search &Backwards',    ($config->{search}->{backwards} ? 1 : 0) ],
+			['Wx::CheckBox',    'backwards',        gettext('Search &Backwards'),    ($config->{search}->{backwards} ? 1 : 0) ],
 		],
 		[
-			['Wx::CheckBox',    'close_on_hit',     'Close Window on &hit', ($config->{search}->{close_on_hit} ? 1 : 0) ],
+			['Wx::CheckBox',    'close_on_hit',     gettext('Close Window on &hit'), ($config->{search}->{close_on_hit} ? 1 : 0) ],
 		],
 		[
 			[],
@@ -53,29 +54,16 @@ sub get_layout {
 	return \@layout;
 }
 
-
-sub on_find {
-	my $main   = shift;
-	my $config = Padre->ide->config;
-	my $text   = $main->selected_text;
-	$text = '' if not defined $text;
-
-	# TODO: if selection is more than one lines then consider it as the limit
-	# of the search and replace and not as the string to be used
-
-	__PACKAGE__->dialog( $main, $config, { term => $text } );
-}
-
-
 sub dialog {
-	my ( $class, $win, $config, $args) = @_;
+	my ( $class, $win, $args) = @_;
 
+	my $config = Padre->ide->config;
 	my $search_term = $args->{term} || '';
 
 	my $layout = get_layout($search_term, $config);
 	my $dialog = Padre::Wx::Dialog->new(
 		parent => $win,
-		title  => "Search",
+		title  => gettext("Search"),
 		layout => $layout,
 		width  => [150, 200],
 	);
@@ -90,8 +78,46 @@ sub dialog {
 	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},      \&cancel_clicked      );
 
 	$dialog->{_widgets_}{_find_choice_}->SetFocus;
+
+	return $dialog;
+}
+
+sub find {
+	my ($class, $main) = @_;
+
+	my $text   = $main->selected_text;
+	$text = '' if not defined $text;
+
+	# TODO: if selection is more than one lines then consider it as the limit
+	# of the search and replace and not as the string to be used
+
+	my $dialog = $class->dialog( $main, { term => $text } );
 	$dialog->Show(1);
 
+	return;
+}
+
+sub find_next {
+	my ($class, $main) = @_;
+
+	my $term = Padre->ide->config->{search_terms}->[0];
+	if ( $term ) {
+		$class->search();
+	} else {
+		$class->find( $main );
+	}
+	return;
+}
+
+sub find_previous {
+	my ($class, $main) = @_;
+
+	my $term = Padre->ide->config->{search_terms}->[0];
+	if ( $term ) {
+		$class->search(rev => 1);
+	} else {
+		$class->find( $main );
+	}
 	return;
 }
 
@@ -111,7 +137,7 @@ sub replace_all_clicked {
 	my $regex = _get_regex();
 	return if not defined $regex;
 
-	my $config = Padre->ide->config;
+	my $config      = Padre->ide->config;
 	my $main_window = Padre->ide->wx->main_window;
 
 	my $id   = $main_window->{notebook}->GetSelection;
@@ -161,7 +187,7 @@ sub replace_clicked {
 
 	# if search window is still open, run a search_again on the whole text
 	if (not $config->{search}->{close_on_hit}) {
-		_search();
+		__PACKAGE__->search();
 	}
 
 	return;
@@ -171,7 +197,7 @@ sub find_clicked {
 	my ($dialog, $event) = @_;
 
 	_get_data_from( $dialog ) or return;
-	_search();
+	__PACKAGE__->search();
 
 	return;
 }
@@ -208,30 +234,6 @@ sub _get_data_from {
 	return 1;
 }
 
-sub on_find_next {
-	my $main_window = shift;
-
-	my $term = Padre->ide->config->{search_terms}->[0];
-	if ( $term ) {
-		_search();
-	} else {
-		on_find( $main_window );
-	}
-	return;
-}
-
-sub on_find_previous {
-	my $main_window = shift;
-
-	my $term = Padre->ide->config->{search_terms}->[0];
-	if ( $term ) {
-		_search(rev => 1);
-	} else {
-		on_find( $main_window );
-	}
-	return;
-}
-
 sub _get_regex {
 	my %args = @_;
 
@@ -254,14 +256,15 @@ sub _get_regex {
 	eval { $regex = qr/$search_term/m };
 	if ($@) {
 		my $main_window = Padre->ide->wx->main_window;
-		Wx::MessageBox("Cannot build regex for '$search_term'", "Search error", Wx::wxOK, $main_window);
+		Wx::MessageBox(sprintf(gettext("Cannot build regex for '%s'"), $search_term), gettext("Search error"), Wx::wxOK, $main_window);
 		return;
 	}
 	return $regex;
 }
 
-sub _search {
-	my ( %args ) = @_;
+sub search {
+	my ( $class, %args ) = @_;
+
 	my $main_window = Padre->ide->wx->main_window;
 
 	my $regex = _get_regex(%args);

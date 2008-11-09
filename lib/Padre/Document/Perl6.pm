@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Document ();
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 our @ISA     = 'Padre::Document';
 
 # Naive way to parse and colourise perl6 files
@@ -33,20 +33,6 @@ sub colourise {
 		}
 	}
 }
-
-sub remove_color {
-	my ($self) = @_;
-
-	my $editor = $self->editor;
-	# TODO this is strange, do we reall need to do it with all?
-	for my $i (1..5) {
-		$editor->StartStyling(0, $i);
-		$editor->SetStyling($editor->GetLength, 0);
-	}
-
-	return;
-}
-
 
 sub get_command {
 	my $self     = shift;

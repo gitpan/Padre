@@ -1,7 +1,23 @@
 package Padre::Document;
 
-# Provides a logical document abstraction, allowing Padre
-# to associate several Wx elements with the one document.
+=head1 NAME
+
+Padre::Document - document abstraction layer
+
+=head1 DESCRIPTION
+
+This is an internal module of L<Padre> that provides a 
+logical document abstraction, allowing Padre to associate 
+several Wx elements with the one document.
+
+The objective would be to allow the use of this module without
+loading Wx.
+
+Currently there are still interdependencies that need to be cleaned.
+
+=head1 METHODS
+
+=cut
 
 use 5.008;
 use strict;
@@ -9,6 +25,7 @@ use warnings;
 use File::Spec  ();
 use File::Slurp ();
 use List::Util  ();
+use Class::Autouse ();
 use Carp        ();
 use Wx qw{
 	wxSTC_LEX_ADA
@@ -17,6 +34,12 @@ use Wx qw{
 	wxSTC_LEX_CPP
 	wxSTC_LEX_CSS
 	wxSTC_LEX_DIFF
+	wxSTC_LEX_EIFFEL
+	wxSTC_LEX_EIFFELKW
+	wxSTC_LEX_ERRORLIST
+	wxSTC_LEX_ESCRIPT
+	wxSTC_LEX_FORTRAN
+	wxSTC_LEX_FORTH
 	wxSTC_LEX_HTML
 	wxSTC_LEX_LATEX
 	wxSTC_LEX_LISP
@@ -33,6 +56,7 @@ use Wx qw{
 	wxSTC_LEX_VBSCRIPT
 	wxSTC_LEX_YAML
 	wxSTC_LEX_XML
+
 	wxSTC_LEX_AUTOMATIC
 	wxSTC_LEX_CONTAINER
 
@@ -44,7 +68,7 @@ use Wx::STC;
 
 use Padre::Util;
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 my $cnt   = 0;
 
@@ -54,95 +78,98 @@ our %mode = (
 	UNIX => wxSTC_EOL_LF,
 );
 
-# see Wx-0.84/ext/stc/cpp/st_constants.cpp for extension
-# N.B. Some constants (wxSTC_LEX_ESCRIPT for example) are defined in 
-#  wxWidgets-2.8.7/contrib/include/wx/stc/stc.h 
+# see Wx-0.86/ext/stc/cpp/st_constants.cpp for extension
+# There might be some constants are defined in 
+#  wxWidgets-2.8.8/contrib/include/wx/stc/stc.h 
 # but not (yet) in 
-#  Wx-0.84/ext/stc/cpp/st_constants.cpp
+#  Wx-0.86/ext/stc/cpp/st_constants.cpp
 # so we have to hard-code their numeric value.
 
 	# asp => wxSTC_LEX_ASP, #in ifdef
-	#     => wxSTC_LEX_EIFFEL, # what is the default EIFFEL file extension?
-	#     => wxSTC_LEX_EIFFELKW,
-#	'4th' => wxSTC_LEX_FORTH,
+#	,
 #	f     => wxSTC_LEX_FORTRAN,
 	#     => wxSTC_LEX_VB, # What's the difference between VB and VBSCRIPT?
 
-# totally made-up MIME-types. 
+# partially made-up MIME-types; some parts extracted from /etc/mime.types
 # Someone should go over and see if there are official mime-type definitions
-# for the languages
+# missing from the languages list
 our %EXT_MIME = (
-	ada   => 'text/ada',
+	ada   => 'text/x-adasrc',
 	asm   => 'text/asm',
 	bat   => 'text/bat',
-	cpp   => 'text/cpp',
+	cpp   => 'text/x-c++src',
 	css   => 'text/css',
-	diff  => 'text/diff',
+	diff  => 'text/x-patch',
+	e     => 'text/eiffel',
+	f     => 'text/x-fortran',
 	html  => 'text/html',
 	js    => 'text/ecmascript',
 	json  => 'text/ecmascript',
 	latex => 'text/latex',
 	lsp   => 'text/lisp',
 	lua   => 'text/lua',
-	mak   => 'text/make',
+	mak   => 'text/x-makefile',
 	mat   => 'text/matlab',
-	pas   => 'text/pascal',
-	php   => 'text/php',
-	py    => 'text/python',
-	rb    => 'text/ruby',
-	sql   => 'text/sql',
-	tcl   => 'text/tcl',
+	pas   => 'text/x-pascal',
+	php   => 'application/x-php',
+	py    => 'text/x-python',
+	rb    => 'application/x-ruby',
+	sql   => 'text/x-sql',
+	tcl   => 'text/x-tcl',
 	vbs   => 'text/vbscript',
-	patch => 'text/diff',
-	pl    => 'text/perl',
-	plx   => 'text/perl',
-	pm    => 'text/perl',
-	pod   => 'text/perl',
-	t     => 'text/perl',
+	patch => 'text/x-patch',
+	pl    => 'application/x-perl',
+	plx   => 'application/x-perl',
+	pm    => 'application/x-perl',
+	pod   => 'application/x-perl',
+	t     => 'application/x-perl',
 	xml   => 'text/xml',
 	yml   => 'text/yaml',
 	yaml  => 'text/yaml',
+	'4th' => 'text/forth',
 
 	pasm  => 'text/pasm',
 	pir   => 'text/pir',
-	p6    => 'text/perl6',
+	p6    => 'application/x-perl6',
 );
 
 our %MIME_CLASS = (
-	'text/perl'  => 'Padre::Document::Perl',
-	'text/perl6' => 'Padre::Document::Perl6',
+	'application/x-perl'  => 'Padre::Document::Perl',
+	'application/x-perl6' => 'Padre::Document::Perl6',
 	'text/pasm'  => 'Padre::Document::Pasm',
 	'text/pir'   => 'Padre::Document::Pir',
 );
 
 our %MIME_LEXER = (
-	'text/ada'        => wxSTC_LEX_ADA,
-	'text/asm'        => wxSTC_LEX_ASM,
-	'text/bat'        => wxSTC_LEX_BATCH,
-	'text/cpp'        => wxSTC_LEX_CPP,
-	'text/css'        => wxSTC_LEX_CSS,
-	'text/diff'       => wxSTC_LEX_DIFF,
-	'text/html'       => wxSTC_LEX_HTML,
-	# wxSTC_LEX_ESCRIPT (presumably "ESCRIPT" refers to ECMA-script?) 
-	'text/ecmascript' => 41,
-	'text/latex'      => wxSTC_LEX_LATEX,
-	'text/lisp'       => wxSTC_LEX_LISP,
-	'text/lua'        => wxSTC_LEX_LUA,
-	'text/make'       => wxSTC_LEX_MAKEFILE,
-	'text/matlab'     => wxSTC_LEX_MATLAB,
-	'text/pascal'     => wxSTC_LEX_PASCAL,
-	'text/perl'       => wxSTC_LEX_PERL,
-	'text/python'     => wxSTC_LEX_PYTHON,
-	'text/php'        => wxSTC_LEX_PHPSCRIPT,
-	'text/ruby'       => wxSTC_LEX_RUBY,
-	'text/sql'        => wxSTC_LEX_SQL,
-	'text/tcl'        => wxSTC_LEX_TCL,
-	'text/vbscript'   => wxSTC_LEX_VBSCRIPT,
-	'text/xml'        => wxSTC_LEX_XML,
-	'text/yaml'       => wxSTC_LEX_YAML,
-	'text/pir'        => wxSTC_LEX_CONTAINER,
-	'text/pasm'       => wxSTC_LEX_CONTAINER,
-	'text/perl6'      => wxSTC_LEX_CONTAINER,
+	'text/x-adasrc'       => wxSTC_LEX_ADA,
+	'text/asm'            => wxSTC_LEX_ASM,
+	'text/bat'            => wxSTC_LEX_BATCH,
+	'text/x-c++src'       => wxSTC_LEX_CPP,
+	'text/css'            => wxSTC_LEX_CSS,
+	'text/x-patch'        => wxSTC_LEX_DIFF,
+	'text/eiffel'         => wxSTC_LEX_EIFFEL,
+	'text/forth'          => wxSTC_LEX_FORTH,
+	'text/x-fortran'      => wxSTC_LEX_FORTRAN,
+	'text/html'           => wxSTC_LEX_HTML,
+	'text/ecmascript'     => wxSTC_LEX_ESCRIPT,
+	'text/latex'          => wxSTC_LEX_LATEX,
+	'text/lisp'           => wxSTC_LEX_LISP,
+	'text/lua'            => wxSTC_LEX_LUA,
+	'text/x-makefile'     => wxSTC_LEX_MAKEFILE,
+	'text/matlab'         => wxSTC_LEX_MATLAB,
+	'text/x-pascal'       => wxSTC_LEX_PASCAL,
+	'application/x-perl'  => wxSTC_LEX_PERL,
+	'text/x-python'       => wxSTC_LEX_PYTHON,
+	'application/x-php'   => wxSTC_LEX_PHPSCRIPT,
+	'application/x-ruby'  => wxSTC_LEX_RUBY,
+	'text/x-sql'          => wxSTC_LEX_SQL,
+	'text/x-tcl'          => wxSTC_LEX_TCL,
+	'text/vbscript'       => wxSTC_LEX_VBSCRIPT,
+	'text/xml'            => wxSTC_LEX_XML,
+	'text/yaml'           => wxSTC_LEX_YAML,
+	'text/pir'            => wxSTC_LEX_CONTAINER,
+	'text/pasm'           => wxSTC_LEX_CONTAINER,
+	'application/x-perl6' => wxSTC_LEX_CONTAINER,
 );
 
 our $DEFAULT_LEXER = wxSTC_LEX_AUTOMATIC;
@@ -152,10 +179,25 @@ our $DEFAULT_LEXER = wxSTC_LEX_AUTOMATIC;
 #####################################################################
 # Constructor and Accessors
 
+=head2 new
+
+ my $doc = Padre::Document->new(
+		editor   => $editor,
+		filename => $file,
+ );
+ 
+$editor is required and is a Padre::Wx::Editor object
+
+$file is optional and if given it will be loaded in the document
+
+mime-type is defined by the guess_mimetype function
+
+=cut
+
 sub new {
 	my $class = shift;
 	my $self  = bless { @_ }, $class;
-
+	
 	# Check and derive params
 	unless ( $self->editor ) {
 		die "Missing or invalid editor";
@@ -166,20 +208,25 @@ sub new {
 	unless ( $self->mimetype ) {
 		$self->set_mimetype( $self->guess_mimetype );
 	}
-
-	# If we blessed as the base class, and the mime type has a
-	# specific subclass, rebless it.
-	# This isn't exactly the most elegant way to do this, but will
-	# do for a first implementation.
-	if ( $class eq __PACKAGE__ ) {
-		my $subclass = $MIME_CLASS{$self->mimetype};
-		if ( $subclass ) {
-			Class::Autouse->autouse($subclass);
-			bless $self, $subclass;
-		}
-	}
+	$self->rebless;
 
 	return $self;
+}
+
+sub rebless {
+	my ($self) = @_;
+
+	# Rebless as either to a subclass if there is a mime-type or
+	# to the the base class, 
+	# This isn't exactly the most elegant way to do this, but will
+	# do for a first implementation.
+	my $subclass = $MIME_CLASS{$self->mimetype} || __PACKAGE__;
+	if ( $subclass ) {
+		Class::Autouse->autouse($subclass);
+		bless $self, $subclass;
+	}
+	
+	return;
 }
 
 sub guess_mimetype {
@@ -187,7 +234,7 @@ sub guess_mimetype {
 
 	# default mime-type of new files, should be configurable in the GUI
 	if (not $self->filename) {
-		return 'text/perl';
+		return 'application/x-perl';
 	}
 
 	# Try derive the mime type from the name
@@ -202,7 +249,7 @@ sub guess_mimetype {
 	if ( $text =~ /\A#!/m ) {
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl\b/m ) {
-			return 'text/perl';
+			return 'application/x-perl';
 		}
 	}
 
@@ -308,7 +355,7 @@ sub save_file {
 		File::Slurp::write_file($filename, {binmode => ':raw'}, $content);
 	};
 	if ($@) {
-		return "Could not save: $!";
+		return "Could not save: $@";
 	}
 	$self->{_timestamp} = $self->time_on_file;
 
@@ -374,7 +421,7 @@ sub has_changed_on_disk {
 }
 
 sub time_on_file {
-	return if not defined $_[0]->filename;
+	return 0 if not defined $_[0]->filename;
 	return (stat($_[0]->filename))[9];
 }
 
@@ -502,6 +549,19 @@ sub autocomplete {
 	}
 
 	return (length($prefix), @words);
+}
+
+sub remove_color {
+	my ($self) = @_;
+
+	my $editor = $self->editor;
+	# TODO this is strange, do we reall need to do it with all?
+	for my $i (0..31) {
+		$editor->StartStyling(0, $i);
+		$editor->SetStyling($editor->GetLength, 0);
+	}
+
+	return;
 }
 
 1;

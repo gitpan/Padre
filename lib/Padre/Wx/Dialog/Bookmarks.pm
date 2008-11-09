@@ -8,8 +8,9 @@ use Data::Dumper qw(Dumper);
 
 use Padre::Wx;
 use Padre::Wx::Dialog;
+use Wx::Locale qw(:default);
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 sub get_layout {
 	my ($text, $shortcuts) = @_;
@@ -20,7 +21,7 @@ sub get_layout {
 	}
 	push @layout,
 		[
-			['Wx::StaticText', undef, "Existing bookmarks:"],
+			['Wx::StaticText', undef, gettext("Existing bookmarks:")],
 		],
 		[
 			['Wx::Treebook',   'tb', $shortcuts],
@@ -33,6 +34,8 @@ sub get_layout {
 	if (@$shortcuts) {
 		push @{ $layout[-1] }, 
 			['Wx::Button',     'delete', Wx::wxID_DELETE];
+		push @{ $layout[-1] }, 
+			['Wx::Button',     'delete_all', 'Delete &All'];
 	}
 	return \@layout;
 }
@@ -41,7 +44,7 @@ sub get_layout {
 sub dialog {
 	my ($class, $main, $text) = @_;
 
-	my $title = $text ? "Set Bookmark" : "GoTo Bookmark";
+	my $title = $text ? gettext("Set Bookmark") : gettext("GoTo Bookmark");
 	my $config = Padre->ide->config;
 	my @shortcuts = sort keys %{ $config->{bookmarks} };
 
@@ -64,7 +67,8 @@ sub dialog {
 	$dialog->{_widgets_}{ok}->SetDefault;
 
 	if ($dialog->{_widgets_}{delete}) {
-		Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{delete},  \&on_delete_bookmark );
+		Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{delete},     \&on_delete_bookmark );
+		Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{delete_all}, \&on_delete_all_bookmark );
 	}
 
 	if ($text) {
@@ -74,17 +78,6 @@ sub dialog {
 	}
 
 	return $dialog;
-}
-
-sub show_modal {
-	my ($dialog) = @_;
-	my $ret = $dialog->ShowModal;
-	if ( $ret eq Wx::wxID_CANCEL ) {
-		$dialog->Destroy;
-		return;
-	} else {
-		return 1;
-	}
 }
 
 sub _get_data {
@@ -107,8 +100,8 @@ sub set_bookmark {
 	my $path     = $main->selected_filename;
 	my $file     = File::Basename::basename($path || '');
 
-	my $dialog   = $class->dialog($main, "$file line $line");
-	return if not show_modal($dialog);
+	my $dialog   = $class->dialog($main, sprintf(gettext("%s line %s"), $file, $line));
+	return if not $dialog->show_modal;
 	
 	my $data     = _get_data($dialog);
 
@@ -130,7 +123,7 @@ sub goto_bookmark {
 	my ($class, $main) = @_;
 
 	my $dialog    = $class->dialog($main);
-	return if not show_modal($dialog);
+	return if not $dialog->show_modal;
 	
 	my $config    = Padre->ide->config;
 	my $selection = $dialog->{_widgets_}{tb}->GetSelection;
@@ -172,6 +165,17 @@ sub on_delete_bookmark {
 	
 	delete $config->{bookmarks}{ $shortcuts[$selection] };
 	$dialog->{_widgets_}{tb}->DeletePage($selection);
+
+	return;
+}
+
+sub on_delete_all_bookmark {
+	my ($dialog, $event) = @_;
+
+	my $config    = Padre->ide->config;
+	$config->{bookmarks} = {}; # clear
+	
+	$dialog->{_widgets_}{tb}->DeleteAllPages();
 
 	return;
 }

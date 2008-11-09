@@ -9,10 +9,11 @@ use strict;
 use warnings;
 use Params::Util ();
 use Padre::Wx    ();
+use Wx::Locale   qw(:default);
 
 use base 'Wx::TextCtrl';
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 sub new {
 	my $class  = shift;
@@ -28,7 +29,7 @@ sub new {
 
 	# Do custom startup stuff here
 	$self->clear;
-	$self->AppendText('No output');
+	$self->AppendText(gettext('No output'));
 
 	return $self;
 }

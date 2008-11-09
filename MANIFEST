@@ -22,7 +22,7 @@ lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl6.pm
 lib/Padre/Document/Pir.pm
 
-lib/Padre/Plugin/Parrot.pm
+lib/Padre/Plugin/Development/Tools.pm
 
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/Dialog.pm
@@ -54,9 +54,14 @@ t/00-compile.t
 t/01-load.t
 t/02-new.t
 t/03-wx.t
+t/70-document.t
 t/80-newline.t
 t/81-search.t
+t/82-plugin-manager.t
 t/lib/Padre.pm
+t/lib/Padre/Plugin/TestPlugin.pm
+t/lib/Padre/Plugin/Test/Plugin.pm
+t/lib/Padre/Editor.pm
 
 xt/99-critic.t
 xt/90-pod.t
@@ -75,6 +80,9 @@ eg/wx/02_label.pl
 eg/wx/03_button.pl
 eg/wx/04_button_with_event.pl
 
+share/locale/de.po
+share/locale/de.mo
+
 share/templates/template.pl
 share/templates/template.pm
 share/templates/template.t
@@ -86,8 +94,15 @@ share/languages/perl5/perl5.yml
 share/tango/16x16/actions/document-open.png
 share/tango/16x16/actions/document-new.png
 share/tango/16x16/actions/document-save.png
+share/tango/16x16/actions/edit-copy.png
+share/tango/16x16/actions/edit-cut.png
+share/tango/16x16/actions/edit-paste.png
+share/tango/16x16/actions/edit-redo.png
+share/tango/16x16/actions/edit-select-all.png
+share/tango/16x16/actions/edit-undo.png
 share/tango/16x16/emblems/emblem-unreadable.png
 
 
 META.yml
+
 

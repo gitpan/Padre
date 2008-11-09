@@ -16,15 +16,23 @@ use Padre::Wx          ();
 use Padre::Wx::Editor  ();
 use Padre::Wx::ToolBar ();
 use Padre::Wx::Output  ();
+use Padre::Document    ();
 use Padre::Documents   ();
+
+use Wx::Locale         qw(:default);
 
 use base qw{Wx::Frame};
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 my $default_dir = Cwd::cwd();
 
 
+my %shortname_of = (
+	58 => 'en',
+	87 => 'de',
+);
+my %number_of = reverse %shortname_of;
 
 
 
@@ -36,7 +44,13 @@ sub new {
 
 	my $config = Padre->ide->config;
 	Wx::InitAllImageHandlers();
+	
+	$config->{host}->{locale} ||= 
+		$shortname_of{ Wx::Locale::GetSystemLanguage } || $shortname_of{ 'en' };
 
+	Wx::Log::SetActiveTarget( Wx::LogStderr->new );
+	#Wx::LogMessage( 'Start');
+	
 	# Determine the initial frame style
 	my $wx_frame_style = Wx::wxDEFAULT_FRAME_STYLE;
 	if ( $config->{host}->{main_maximized} ) {
@@ -49,7 +63,7 @@ sub new {
 		my $dir = $0;
 		$dir =~ s/padre$//;
 		if ( -d "$dir.svn" ) {
-			$title .= '(running from SVN checkout)';
+			$title .= gettext('(running from SVN checkout)');
 		}
 	}
 	my $self = $class->SUPER::new(
@@ -67,6 +81,11 @@ sub new {
 		$wx_frame_style,
 	);
 
+	$self->set_locale( );
+
+	$self->{manager} = Wx::AuiManager->new;
+	$self->manager->SetManagedWindow( $self );
+
 	# Add some additional attribute slots
 	$self->{marker} = {};
 
@@ -83,33 +102,60 @@ sub new {
 	$self->{statusbar}->SetFieldsCount(4);
 	$self->{statusbar}->SetStatusWidths(-1, 100, 50, 100);
 
-	# Create the splitters but do not populate them yet
-	$self->{main_panel} = Wx::SplitterWindow->new(
+	# Create the main notebook for the documents
+	$self->{notebook} = Wx::AuiNotebook->new(
 		$self,
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxNO_FULL_REPAINT_ON_RESIZE | Wx::wxCLIP_CHILDREN,
+		Wx::wxAUI_NB_DEFAULT_STYLE | Wx::wxAUI_NB_WINDOWLIST_BUTTON,
 	);
-	$self->{main_panel}->SetSashGravity(1);
-	$self->{upper_panel} = Wx::SplitterWindow->new(
-		$self->{main_panel},
-		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxNO_FULL_REPAINT_ON_RESIZE | Wx::wxCLIP_CHILDREN,
+	$self->manager->AddPane($self->{notebook}, 
+		Wx::AuiPaneInfo->new->Name( "notebook" )
+			->CenterPane->Resizable->PaneBorder->Dockable
+#			->Floatable->PinButton->CaptionVisible->Movable
+#			->MinimizeButton->PaneBorder->Gripper->MaximizeButton
+#			->FloatingPosition(100, 100)->FloatingSize(500, 300)
+			->Caption( gettext("Files") )->Position( 1 )
+		);
+
+
+	Wx::Event::EVT_AUINOTEBOOK_PAGE_CHANGED(
+		$self,
+		$self->{notebook},
+		sub { $_[0]->refresh_all },
 	);
-	$self->{upper_panel}->SetSashGravity(1);
+	Wx::Event::EVT_AUINOTEBOOK_PAGE_CLOSE(
+		$self,
+		$self->{notebook},
+		\&on_close,
+	);
+#	Wx::Event::EVT_DESTROY(
+#		$self,
+#		$self->{notebook},
+#		sub {print "destroy @_\n"; },
+#	);
+#
 
 	# Create the right-hand sidebar
 	$self->{rightbar} = Wx::ListCtrl->new(
-		$self->{upper_panel},
+		$self,
 		-1, 
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
 	);
-	$self->{rightbar}->InsertColumn(0, 'Methods');
+	$self->manager->AddPane($self->{rightbar}, 
+		Wx::AuiPaneInfo->new->Name( "rightbar" )
+			->CenterPane->Resizable->PaneBorder->Dockable
+#			->Floatable->PinButton->CaptionVisible->Movable
+#			->MinimizeButton->PaneBorder->Gripper->MaximizeButton
+#			->FloatingPosition(100, 100)->FloatingSize(100, 400)
+			->Caption( gettext("Subs") )->Position( 3 )->Right
+		 );
+        
+
+	$self->{rightbar}->InsertColumn(0, gettext('Methods'));
 	$self->{rightbar}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
 	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
 		$self,
@@ -117,34 +163,18 @@ sub new {
 		\&on_function_selected,
 	);
 
-	# Create the main notebook for the documents
-	$self->{notebook} = Wx::Notebook->new(
-		$self->{upper_panel},
-		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxNO_FULL_REPAINT_ON_RESIZE | Wx::wxCLIP_CHILDREN,
-	);
-	Wx::Event::EVT_NOTEBOOK_PAGE_CHANGED(
-		$self,
-		$self->{notebook},
-		sub { $_[0]->refresh_all },
-	);
-
 	# Create the bottom-of-screen output textarea
 	$self->{output} = Padre::Wx::Output->new(
-		$self->{main_panel},
+		$self,
 	);
-
-	# Populate the layout
-	$self->{main_panel}->Initialize(
-		$self->{upper_panel},
-	);
-	$self->{upper_panel}->SplitVertically(
-		$self->{notebook},
-		$self->{rightbar},
-		-150,
-	);
+	$self->manager->AddPane($self->{output}, 
+		Wx::AuiPaneInfo->new->Name( "output" )
+			->CenterPane->Resizable->PaneBorder->Dockable
+#			->Floatable->PinButton->CaptionVisible->Movable
+#			->MinimizeButton->PaneBorder->Gripper->MaximizeButton
+#			->FloatingPosition(100, 100)
+			->Caption( gettext("Output") )->Position( 2 )->Bottom
+		);
 
 	# Special Key Handling
 	Wx::Event::EVT_KEY_UP( $self, sub {
@@ -163,6 +193,7 @@ sub new {
 		$event->Skip();
 		return;
 	} );
+	$self->manager->Update;
 
 	# Deal with someone closing the window
 	Wx::Event::EVT_CLOSE( $self, \&on_close_window);
@@ -171,6 +202,7 @@ sub new {
 	Wx::Event::EVT_STC_CHANGE(      $self, -1, \&on_stc_change       );
 	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
 	Wx::Event::EVT_STC_CHARADDED(   $self, -1, \&on_stc_char_added   );
+	Wx::Event::EVT_STC_DWELLSTART(  $self, -1, \&on_stc_dwell_start  );
 
 	# As ugly as the WxPerl icon is, the new file toolbar image is uglier
 	$self->SetIcon( Wx::GetWxPerlIcon() );
@@ -192,6 +224,11 @@ sub new {
 	return $self;
 }
 
+sub manager {
+	my ($self) = @_;
+	return $self->{manager};
+}
+
 # Load any default files
 sub load_files {
 	my ($self) = @_;
@@ -200,9 +237,6 @@ sub load_files {
 	my $files  = Padre->inst->{ARGV};
 	if ( $files and ref($files) eq 'ARRAY' and @$files ) {
 		foreach my $f ( @$files ) {
-		    if ( not File::Spec->file_name_is_absolute($f) ) {
-		        $f = File::Spec->catfile(Cwd::cwd(), $f);
-		    }
 		    $self->setup_editor($f);
 		}
 	} elsif ( $config->{main_startup} eq 'new' ) {
@@ -211,9 +245,20 @@ sub load_files {
 		# nothing
 	} elsif ( $config->{main_startup} eq 'last' ) {
 		if ( $config->{host}->{main_files} ) {
-		    foreach my $file ( @{$config->{host}->{main_files}} ) {
-		        $self->setup_editor($file);
+			my @main_files	 = @{$config->{host}->{main_files}};
+			my @main_files_pos = @{$config->{host}->{main_files_pos}};
+			foreach my $i ( 0 ..$#main_files ) {
+				my $file = $main_files[$i];
+		        my $id   = $self->setup_editor($file);
+		        if ( $id and $main_files_pos[$i] ) {
+		            my $doc  = Padre::Documents->by_id($id);
+		            $doc->editor->GotoPos( $main_files_pos[$i] );
+		        }
 		    }
+		    if ( $config->{host}->{main_file} ) {
+				my $id = $self->find_editor_of_file( $config->{host}->{main_file} );
+				$self->on_nth_pane($id) if (defined $id);
+			}
 		}
 	} else {
 		# should never happen
@@ -238,6 +283,7 @@ sub post_init {
 	$self->show_output(1);
 	$self->show_output($output) if not $output;
 
+#$self->Close;
 	return;
 }
 
@@ -287,6 +333,33 @@ sub refresh_all {
 	}
 
 	return;
+}
+
+    
+sub change_locale {
+	my ($self, $shortname) = @_;
+	my $config = Padre->ide->config;
+	$config->{host}->{locale} = $shortname;
+	$self->message( 'Currently you have to restart Padre for the language change to take effect' );
+	return;
+}
+
+sub set_locale {
+    my $self = shift;
+
+	my $config = Padre->ide->config;
+	my $shortname = $config->{host}->{locale};
+	my $lang = $number_of{ $shortname };
+    $self->{locale} = Wx::Locale->new($lang);
+    $self->{locale}->AddCatalogLookupPathPrefix( Padre::Wx::sharedir('locale') );
+    my $langname = $self->{locale}->GetCanonicalName();
+
+    #my $shortname = $langname ? substr( $langname, 0, 2 ) : 'en'; # only providing default sublangs
+    my $filename = Padre::Wx::sharefile( 'locale', $shortname ) . '.mo';
+
+    $self->{locale}->AddCatalog($shortname) if -f $filename;
+
+    return;
 }
 
 sub refresh_menu {
@@ -428,11 +501,11 @@ sub pages {
 # probably need to be combined with run_command
 sub on_run_command {
 	my $main_window = shift;
-	require Padre::Wx::History::TextDialog;
+
 	my $dialog = Padre::Wx::History::TextDialog->new(
 		$main_window,
-		"Command line",
-		"Run setup",
+		gettext("Command line"),
+		gettext("Run setup"),
 		"run_command",
 	);
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
@@ -452,10 +525,7 @@ sub run_command {
 	my $cmd    = shift;
 	my $config = Padre->ide->config;
 
-	# Temporarily hard-wire this to the appropriate menu
-	$self->{menu}->{run_run_script}->Enable(0);
-	$self->{menu}->{run_run_command}->Enable(0);
-	$self->{menu}->{run_stop}->Enable(1);
+	$self->{menu}->disable_run;
 
 	# Prepare the output window for the output
 	$self->show_output(1);
@@ -487,10 +557,7 @@ sub run_command {
 				$_[1]->Skip(1);
 				$_[1]->GetProcess->Destroy;
 
-				# Temporarily hard-wired to the Perl menu
-				$self->{menu}->{run_run_script}->Enable(1);
-				$self->{menu}->{run_run_command}->Enable(1);
-				$self->{menu}->{run_stop}->Enable(0);
+				$self->{menu}->enable_run;
 			},
 		);
 	}
@@ -499,9 +566,7 @@ sub run_command {
 	$self->{command} = Wx::Perl::ProcessStream->OpenProcess( $cmd, 'MyName1', $self );
 	unless ( $self->{command} ) {
 		# Failed to start the command. Clean up.
-		$self->{menu}->{run_run_script}->Enable(1);
-		$self->{menu}->{run_run_command}->Enable(1);
-		$self->{menu}->{run_stop}->Enable(0);
+		$self->{menu}->enable_run;
 	}
 
 	return;
@@ -512,7 +577,7 @@ sub run_script {
 	my $self     = shift;
 	my $document = Padre::Documents->current;
 
-	return $self->error("No open document") if not $document;
+	return $self->error(gettext("No open document")) if not $document;
 
 	# Apply the user's save-on-run policy
 	# TODO: Make this code suck less
@@ -526,7 +591,7 @@ sub run_script {
 	}
 	
 	if ( not $document->can('get_command') ) {
-		return $self->error("No execution mode was defined for this document");
+		return $self->error(gettext("No execution mode was defined for this document"));
 	}
 	
 	my $cmd = eval { $document->get_command };
@@ -545,13 +610,13 @@ sub debug_perl {
 	my $self     = shift;
 	my $document = $self->selected_document;
 	unless ( $document->isa('Perl::Document::Perl') ) {
-		return $self->error("Not a Perl document");
+		return $self->error(gettext("Not a Perl document"));
 	}
 
 	# Check the file name
 	my $filename = $document->filename;
 	unless ( $filename =~ /\.pl$/i ) {
-		return $self->error("Only .pl files can be executed");
+		return $self->error(gettext("Only .pl files can be executed"));
 	}
 
 	# Apply the user's save-on-run policy
@@ -587,14 +652,14 @@ sub debug_perl {
 sub message {
 	my $self    = shift;
 	my $message = shift;
-	my $title   = shift || 'Message';
+	my $title   = shift || gettext('Message');
 	Wx::MessageBox( $message, $title, Wx::wxOK | Wx::wxCENTRE, $self );
 	return;
 }
 
 sub error {
 	my $self = shift;
-	$self->message( shift, 'Error' );
+	$self->message( shift, gettext('Error') );
 }
 
 
@@ -680,7 +745,7 @@ sub on_autocompletition {
 	my $doc    = $self->selected_document or return;
 	my ( $length, @words ) = $doc->autocomplete;
 	if ( $length =~ /\D/ ) {
-		Wx::MessageBox($length, "Autocompletions error", Wx::wxOK);
+		Wx::MessageBox($length, gettext("Autocompletions error"), Wx::wxOK);
 	}
 	if ( @words ) {
 		$doc->editor->AutoCompShow($length, join " ", @words);
@@ -691,7 +756,7 @@ sub on_autocompletition {
 sub on_goto {
 	my $self = shift;
 
-	my $dialog = Wx::TextEntryDialog->new( $self, "Line number:", "", '' );
+	my $dialog = Wx::TextEntryDialog->new( $self, gettext("Line number:"), "", '' );
 	if ($dialog->ShowModal == Wx::wxID_CANCEL) {
 		return;
 	}   
@@ -721,6 +786,15 @@ sub on_close_window {
 		map  { Padre::Documents->by_id($_) }
 		$self->pageids
 	];
+	# Save all Pos for open files
+	$config->{host}->{main_files_pos} = [
+        map  { $_->editor->GetCurrentPos }
+		grep { $_ } 
+		map  { Padre::Documents->by_id($_) }
+		$self->pageids
+	];
+	# Save selected tab
+	$config->{host}->{main_file} = $self->selected_filename;
 
 	# Check that all files have been saved
 	if ( $event->CanVeto ) {
@@ -781,8 +855,9 @@ sub on_split_window {
 	my $new_editor = Padre::Wx::Editor->new( $self->{notebook} );
 	$new_editor->{Document} = $editor->{Document};
 	$new_editor->padre_setup;
-
 	$new_editor->SetDocPointer($pointer);
+	$new_editor->set_preferences;
+	
 	$self->create_tab($new_editor, $file, " $title");
 
 	return;
@@ -847,7 +922,7 @@ sub on_open_selection {
 	my ($self, $event) = @_;
 	my $selection = $self->selected_text();
 	if (not $selection) {
-		Wx::MessageBox("Need to have something selected", "Open Selection", Wx::wxOK, $self);
+		Wx::MessageBox(gettext("Need to have something selected"), gettext("Open Selection"), Wx::wxOK, $self);
 		return;
 	}
 	my $file;
@@ -884,7 +959,7 @@ sub on_open_selection {
 	}
 
 	if (not $file) {
-		Wx::MessageBox("Could not find file '$selection'", "Open Selection", Wx::wxOK, $self);
+		Wx::MessageBox(sprintf(gettext("Could not find file '%s'"), $selection), gettext("Open Selection"), Wx::wxOK, $self);
 		return;
 	}
 
@@ -896,14 +971,15 @@ sub on_open_selection {
 }
 
 sub on_open {
-	my $self = shift;
+	my ($self, $event) = @_;
+
 	my $current_filename = $self->selected_filename;
 	if ($current_filename) {
 		$default_dir = File::Basename::dirname($current_filename);
 	}
 	my $dialog = Wx::FileDialog->new(
 		$self,
-		"Open file",
+		gettext("Open file"),
 		$default_dir,
 		"",
 		"*.*",
@@ -925,7 +1001,7 @@ sub on_open {
 	# and it is unused, close it.
 	if ( $self->{notebook}->GetPageCount == 1 ) {
 		if ( Padre::Documents->current->is_unused ) {
-			$self->on_close;
+			$self->on_close($self);
 		}
 	}
 
@@ -956,7 +1032,7 @@ sub on_save_as {
 	while (1) {
 		my $dialog = Wx::FileDialog->new(
 			$self,
-			"Save file as...",
+			gettext("Save file as..."),
 			$default_dir,
 			"",
 			"*.*",
@@ -970,8 +1046,8 @@ sub on_save_as {
 		my $path = File::Spec->catfile($default_dir, $filename);
 		if ( -e $path ) {
 			my $res = Wx::MessageBox(
-				"File already exists. Overwrite it?",
-				"Exist",
+				gettext("File already exists. Overwrite it?"),
+				gettext("Exist"),
 				Wx::wxYES_NO,
 				$self,
 			);
@@ -991,6 +1067,7 @@ sub on_save_as {
 
 	$doc->set_mimetype( $doc->guess_mimetype );
 	$doc->editor->padre_setup;
+	$doc->rebless;
 
 	$self->refresh_all;
 
@@ -1032,8 +1109,8 @@ sub _save_buffer {
 
 	if ($doc->has_changed_on_disk) {
 		my $ret = Wx::MessageBox(
-			"File changed on disk since last saved. Do you want to overwrite it?",
-			$doc->filename || "File not in sync",
+			gettext("File changed on disk since last saved. Do you want to overwrite it?"),
+			$doc->filename || gettext("File not in sync"),
 			Wx::wxYES_NO|Wx::wxCENTRE,
 			$self,
 		);
@@ -1042,7 +1119,7 @@ sub _save_buffer {
 	
 	my $error = $doc->save_file;
 	if ($error) {
-		Wx::MessageBox($error, "Error", Wx::wxOK, $self);
+		Wx::MessageBox($error, gettext("Error"), Wx::wxOK, $self);
 		return;
 	}
 
@@ -1056,7 +1133,15 @@ sub _save_buffer {
 # Returns true if closed.
 # Returns false on cancel.
 sub on_close {
-	my $self = shift;
+	my ($self, $event) = @_;
+
+	# When we get an Wx::AuiNotebookEvent from it will try to close
+	# the notebook no matter what. For the other events we have to
+	# close the tab manually which we do in the close() function
+	# Hence here we don't allow the automatic closing of the window. 
+	if ($event and $event->isa('Wx::AuiNotebookEvent')) {
+		$event->Veto;
+	}
 	$self->close;
 	$self->refresh_all;
 }
@@ -1075,8 +1160,8 @@ sub close {
 
 	if ( $doc->is_modified and not $doc->is_unused ) {
 		my $ret = Wx::MessageBox(
-			"File changed. Do you want to save it?",
-			$doc->filename || "Unsaved File",
+			gettext("File changed. Do you want to save it?"),
+			$doc->filename || gettext("Unsaved File"),
 			Wx::wxYES_NO|Wx::wxCANCEL|Wx::wxCENTRE,
 			$self,
 		);
@@ -1133,7 +1218,7 @@ sub on_nth_pane {
 	my ($self, $id) = @_;
 	my $page = $self->{notebook}->GetPage($id);
 	if ($page) {
-	   $self->{notebook}->ChangeSelection($id);
+	   $self->{notebook}->SetSelection($id);
 	   $self->refresh_status;
 	   return 1;
 	}
@@ -1168,6 +1253,28 @@ sub on_prev_pane {
 	return;
 }
 
+sub on_diff {
+	my ( $self ) = @_;
+	my $doc = Padre::Documents->current;
+	return if not $doc;
+	
+	use Text::Diff ();
+	my $current = $doc->text_get;
+	my $file    = $doc->filename;
+	return $self->error(gettext("Cannot diff if file was never saved")) if not $file;
+	
+	my $diff = Text::Diff::diff($file, \$current);
+	
+	if (not $diff) {
+		$diff = gettext("There are no differences\n");
+	}
+	$self->show_output;
+	$self->{output}->clear;
+	$self->{output}->AppendText($diff);
+	return;
+}
+
+
 ###### preferences and toggle functions
 
 sub zoom {
@@ -1180,9 +1287,8 @@ sub zoom {
 
 sub on_preferences {
 	my $self   = shift;
-	my $config = Padre->ide->config;
 
-	Padre::Wx::Dialog::Preferences->run( $self, $config );
+	Padre::Wx::Dialog::Preferences->run( $self );
 
 	foreach my $editor ( $self->pages ) {
 		$editor->set_preferences;
@@ -1237,21 +1343,38 @@ sub show_output {
 	unless ( $on == $self->{menu}->{view_output}->IsChecked ) {
 		$self->{menu}->{view_output}->Check($on);
 	}
-	if ( $on and not $self->{main_panel}->IsSplit ) {
-		$self->{main_panel}->SplitHorizontally(
-			$self->{upper_panel},
-			$self->{output},
-			-100,
-		);
+	if ( $on ) {
 		$self->{output}->Show;
-	}
-	if ( $self->{main_panel}->IsSplit and not $on ) {
-		$self->{main_panel}->Unsplit;
+	} else {
 		$self->{output}->Hide;
 	}
 	Padre->ide->config->{main_output} = $on;
+
 	return;
 }
+
+sub on_ppi_highlight {
+	my ($self, $event) = @_;
+
+	my $config = Padre->ide->config;
+	$config->{ppi_highlight} = $event->IsChecked ? 1 : 0;
+	$Padre::Document::MIME_LEXER{'application/x-perl'} = 
+		$config->{ppi_highlight} ? Wx::wxSTC_LEX_CONTAINER : Wx::wxSTC_LEX_PERL;
+		
+	foreach my $editor ( $self->pages ) {
+		#my $editor = $self->selected_editor;
+		next if not $editor->{Document}->isa('Padre::Document::Perl');
+		if ($config->{ppi_highlight}) {
+			$editor->{Document}->colourise;
+		} else {
+			$editor->{Document}->remove_color;
+			$editor->Colourise(0, $editor->GetLength);
+		}
+	}
+
+	return;
+}
+
 
 sub on_toggle_status_bar {
 	my ($self, $event) = @_;
@@ -1311,7 +1434,7 @@ sub run_in_padre {
 	my $code = $doc->text_get;
 	eval $code;
 	if ( $@ ) {
-		Wx::MessageBox("Error: $@", "Self error", Wx::wxOK, $self);
+		Wx::MessageBox(sprintf(gettext("Error: %s"), $@), gettext("Self error"), Wx::wxOK, $self);
 		return;
 	}
 	return;
@@ -1323,7 +1446,7 @@ sub on_function_selected {
 	return if not defined $sub;
 
 	my $doc = $self->selected_document;
-	Padre::Wx::Dialog::Find::_search( search_term => $doc->get_function_regex($sub) );
+	Padre::Wx::Dialog::Find->search( search_term => $doc->get_function_regex($sub) );
 	$self->selected_editor->SetFocus;
 	return;
 }
@@ -1336,6 +1459,15 @@ sub on_stc_style_needed {
 
 	my $doc = Padre::Documents->current or return;
 	if ($doc->can('colourise')) {
+
+		# workaround something that seems like a Scintilla bug
+		# when the cursor is close to the end of the document
+		# and there is code at the end of the document (and not comment)
+		# the STC_STYLE_NEEDED event is being constantly called
+		my $text = $doc->text_get;
+		return if defined $doc->{_text} and $doc->{_text} eq $text;
+		$doc->{_text} = $text;
+
 		$doc->colourise;
 	}
 
@@ -1374,6 +1506,206 @@ sub on_stc_char_added {
 		$editor->autoindent;
 	}
 	return;
+}
+
+sub on_stc_dwell_start {
+	my ($self, $event) = @_;
+
+	print Data::Dumper::Dumper $event;
+	my $editor = $self->selected_editor;
+	print "dwell: ", $event->GetPosition, "\n";
+	#$editor->show_tooltip;
+	#print Wx::GetMousePosition, "\n";
+	#print Wx::GetMousePositionXY, "\n";
+
+	return;
+}
+
+sub on_doc_stats {
+	my ($self, $event) = @_;
+
+    my ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly );
+
+	my $code;
+    my $src = $self->selected_text;
+    my $doc = $self->selected_document;
+   	if (not $doc) {
+		$self->message( 'No file is open', 'Stats' );
+		return;
+	}
+
+    if ( $src ) {
+        $code = $src;
+		
+		my $code2 = $code; # it's ugly, need improvement
+		$code2 =~ s/\r\n/\n/g;
+		$lines = 1; # by default
+		$lines++ while ( $code2 =~ /[\r\n]/g );
+		$chars_with_space = length($code);
+    } else {
+        $code = $doc->text_get;
+        
+        # I trust editor more
+        my $editor = $doc->editor;
+        $lines = $editor->GetLineCount();
+        $chars_with_space = $editor->GetTextLength();
+        $is_readonly = $editor->GetReadOnly();
+    }
+    
+	$words++ while ( $code =~ /\b\w+\b/g );
+	$chars_without_space++ while ( $code =~ /\S/g );
+	
+	my $message = <<MESSAGE;
+Words: $words
+Lines: $lines
+Chars without spaces: $chars_without_space
+Chars with spaces: $chars_with_space
+MESSAGE
+
+	if (defined $doc->filename) {
+		$message .= sprintf("Filename: '%s'\n", $doc->filename);
+	} else {
+		$message .= "No filename\n";
+	}
+
+	if ($is_readonly) {
+		$message .= "File is read-only.\n";
+	}
+	
+	$self->message( $message, 'Stats' );
+	return;
+}
+
+sub on_tab_and_space {
+	my ( $self, $type ) = @_;
+	
+	my $doc = $self->selected_document;
+	if (not $doc) {
+		$self->message( 'No file is open' );
+		return;
+	}
+
+	my $title = $type eq 'Space_to_Tab' ? 'Space to Tab' : 'Tab to Space';
+	
+	my $dialog = Padre::Wx::History::TextDialog->new(
+		$self, 'How many spaces for each tab:', $title, $type,
+	);
+	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		return;
+	}
+	my $space_num = $dialog->GetValue;
+	$dialog->Destroy;
+	unless ( defined $space_num and $space_num =~ /^\d+$/ ) {
+		return;
+	}
+	
+	my $src = $self->selected_text;
+	my $code = ( $src ) ? $src : $doc->text_get;
+	
+	return unless ( defined $code and length($code) );
+	
+	my $to_space = ' ' x $space_num;
+	if ( $type eq 'Space_to_Tab' ) {
+		$code =~ s/$to_space/\t/isg;
+	} else {
+		$code =~ s/\t/$to_space/isg;
+	}
+	
+	if ( $src ) {
+		my $editor = $self->selected_editor;
+		$editor->ReplaceSelection( $code );
+	} else {
+		$doc->text_set( $code );
+	}
+}
+
+sub on_delete_ending_space {
+	my ( $self ) = @_;
+	
+	my $doc = $self->selected_document;
+	if (not $doc) {
+		$self->message( 'No file is open' );
+		return;
+	}
+	
+	my $src = $self->selected_text;
+	my $code = ( $src ) ? $src : $doc->text_get;
+	
+	# remove ending space
+	$code =~ s/([^\n\S]+)$//mg;
+	
+	if ( $src ) {
+		my $editor = $self->selected_editor;
+		$editor->ReplaceSelection( $code );
+	} else {
+		$doc->text_set( $code );
+	}
+}
+
+sub on_delete_leading_space {
+	my ( $self ) = @_;
+	
+	my $src = $self->selected_text;
+	unless ( $src ) {
+		$self->message('No selection');
+		return;
+	}
+	
+	my $dialog = Padre::Wx::History::TextDialog->new(
+		$self, 'How many leading spaces to delete(1 tab == 4 spaces):',
+		'Delete Leading Space', 'fay_delete_leading_space',
+	);
+	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		return;
+	}
+	my $space_num = $dialog->GetValue;
+	$dialog->Destroy;
+	unless ( defined $space_num and $space_num =~ /^\d+$/ ) {
+		return;
+	}
+
+	my $code = $src;
+	my $spaces = ' ' x $space_num;
+	my $tab_num = int($space_num/4);
+	my $space_num_left = $space_num - 4 * $tab_num;
+	my $tabs   = "\t" x $tab_num;
+	$tabs .= '' x $space_num_left if ( $space_num_left );
+	$code =~ s/^($spaces|$tabs)//mg;
+	
+	my $editor = $self->selected_editor;
+	$editor->ReplaceSelection( $code );
+}
+
+sub on_upper_and_lower {
+	my ($self, $type) = @_;
+	
+	my $doc  = $self->selected_document;
+	if (not $doc) {
+		$self->message( 'No file is open' );
+		return;
+	}
+	my $src  = $self->selected_text;
+	my $code = ( $src ) ? $src : $doc->text_get;
+
+	return unless ( defined $code and length($code) );
+	
+	if ( $type eq 'Upper_All' ) {
+		$code = uc($code);
+	} elsif ( $type eq 'Lower_All' ) {
+		$code = lc($code);
+	} elsif ( $type eq 'Upper_First' ) {
+		$code =~ s/\b(\S+)\b/ucfirst($1)/ge;
+	} elsif ( $type eq 'Lower_First' ) {
+		$code =~ s/\b(\S+)\b/lcfirst($1)/ge;
+	}
+	
+	if ( $src ) {
+		my $editor = $self->selected_editor;
+		$editor->ReplaceSelection( $code );
+	} else {
+		$doc->text_set( $code );
+	}
+
 }
 
 1;

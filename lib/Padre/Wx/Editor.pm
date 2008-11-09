@@ -7,21 +7,30 @@ use warnings;
 use YAML::Tiny      ();
 
 use Padre::Documents ();
+use Wx               qw(:dnd wxTheClipboard);
+use Wx::DND;
 use Wx::STC;
 use Padre::Wx;
+use Wx::Locale       qw(:default);
+
 
 use base 'Wx::StyledTextCtrl';
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 my $data;
+my $width;
 
 sub new {
 	my( $class, $parent ) = @_;
 
 	my $self = $class->SUPER::new( $parent );
+#	$self->UsePopUp(0);
 	$data = data();
+#	$self->SetMouseDwellTime(1000); # off: Wx::SC_TIME_FOREVER
 
+	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
+	Wx::Event::EVT_LEFT_UP(  $self, \&on_left_up );
 	return $self;
 }
 
@@ -51,7 +60,7 @@ sub padre_setup {
 	# and Wx::wxUNICODE() or wxUSE_UNICODE should be on
 
 	my $mimetype = $self->{Document}->mimetype;
-    if ($mimetype eq 'text/perl') {
+    if ($mimetype eq 'application/x-perl') {
         $self->padre_setup_style('perl');
     } elsif ($mimetype eq 'text/pasm') {
         $self->padre_setup_style('pasm');
@@ -163,9 +172,13 @@ sub show_line_numbers {
 
 	$self->SetMarginWidth(1, 0);
 	$self->SetMarginWidth(2, 0);
+
+	# premature optimization, caching the with that was on the 3rd place at load time
+	# as timed my Deve::NYTProf
+	$width ||= $self->TextWidth(Wx::wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
 	if ($on) {
 		my $n = 1 + List::Util::max (2, length ($self->GetLineCount * 2));
-		my $width = $n * $self->TextWidth(Wx::wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
+		my $width = $n * $width;
 		$self->SetMarginWidth(0, $width);
 		$self->SetMarginType(0, Wx::wxSTC_MARGIN_NUMBER);
 	} else {
@@ -244,6 +257,200 @@ sub autoindent {
 		$self->GotoPos($pos + length($indent));
 	}
 
+	return;
+}
+
+sub on_right_down {
+	my ($self, $event) = @_;
+	
+	my $win = Padre->ide->wx->main_window;
+	
+# Popup Was: Undo, Redo | Cut, Copy, Paste, Delete | Select All
+
+	my $pos       = $self->GetCurrentPos;
+	#my $line      = $self->LineFromPosition($pos);
+	#print "right down: $pos\n"; # this is the position of the cursor and not that of the mouse!
+	#my $p = $event->GetLogicalPosition;
+	#print "x: ", $p->x, "\n";
+	
+	my $menu = Wx::Menu->new;
+	my $undo = $menu->Append( Wx::wxID_UNDO, '' );
+	if (not $self->CanUndo) {
+		$undo->Enable(0);
+	}
+	my $z = Wx::Event::EVT_MENU( $win, # Ctrl-Z
+		$undo,
+		sub {
+			my $editor = Padre::Documents->current->editor;
+			if ( $editor->CanUndo ) {
+				$editor->Undo;
+			}
+			return;
+		},
+	);
+	my $redo = $menu->Append( Wx::wxID_REDO, '' );
+	if ( not $self->CanRedo ) {
+		$redo->Enable(0);
+	}
+	
+	Wx::Event::EVT_MENU( $win, # Ctrl-Y
+		$redo,
+		sub {
+			my $editor = Padre::Documents->current->editor;
+			if ( $editor->CanRedo ) {
+				$editor->Redo;
+			}
+			return;
+		},
+	);
+	$menu->AppendSeparator;
+
+	my $selection_exists = 0;
+	my $id = $win->{notebook}->GetSelection;
+	if ( $id != -1 ) {
+		my $txt = $win->{notebook}->GetPage($id)->GetSelectedText;
+		if ( defined($txt) && length($txt) > 0 ) {
+			$selection_exists = 1;
+		}
+	}
+
+	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, gettext("Select all\tCtrl-A") );
+	if ( not $win->{notebook}->GetPage($id)->GetTextLength > 0 ) {
+		$sel_all->Enable(0);
+	}
+	Wx::Event::EVT_MENU( $win, # Ctrl-A
+		$sel_all,
+		sub { \&text_select_all(@_) },
+	);
+	$menu->AppendSeparator;
+	
+	my $copy = $menu->Append( Wx::wxID_COPY, '' );
+	if ( not $selection_exists ) {
+		$copy->Enable(0);
+	}
+	Wx::Event::EVT_MENU( $win, # Ctrl-C
+		$copy,
+		sub { \&text_copy_to_clipboard(@_) },
+	);
+
+	my $cut = $menu->Append( Wx::wxID_CUT, '' );
+	if ( not $selection_exists ) {
+		$cut->Enable(0);
+	}
+	Wx::Event::EVT_MENU( $win, # Ctrl-X
+		$cut,
+		sub { \&text_cut_to_clipboard(@_) },
+	);
+
+	my $paste = $menu->Append( Wx::wxID_PASTE, '' );
+	wxTheClipboard->Open;
+	if ( wxTheClipboard->IsSupported(wxDF_TEXT) ) {
+		my $data = Wx::TextDataObject->new;
+		my $ok   = wxTheClipboard->GetData($data);
+		if ( $ok && $data->GetTextLength > 0 && $win->{notebook}->GetPage($id)->CanPaste ) {
+			Wx::Event::EVT_MENU( $win, # Ctrl-V
+				$paste,
+				sub { \&text_paste_from_clipboard(@_) },
+			);
+		}
+		else {
+			$paste->Enable(0);
+		}
+	}
+	wxTheClipboard->Close;
+
+	$menu->AppendSeparator;
+
+#	$menu->Append( Wx::wxID_NEW, '' );
+	Wx::Event::EVT_MENU( $win,
+		$menu->Append( -1, gettext("&Split window") ),
+		\&Padre::Wx::MainWindow::on_split_window,
+	);
+
+	$self->PopupMenu( $menu, $event->GetX, $event->GetY);
+}
+
+sub on_left_up {
+	my ($self, $event) = @_;
+
+	my $pos       = $self->GetCurrentPos;
+	#my $line      = $self->LineFromPosition($pos);
+	#print "$pos\n"; # this is the position of the cursor and not that of the mouse!
+
+	#print "left $pos\n";
+
+	$event->Skip();
+	return;
+}
+
+sub text_select_all {
+	my ( $win, $event ) = @_;
+
+	my $id = $win->{notebook}->GetSelection;
+	return if $id == -1;
+	$win->{notebook}->GetPage($id)->SelectAll;
+	return;
+}
+
+sub text_copy_to_clipboard {
+	my ( $win, $event ) = @_;
+
+	my $id = $win->{notebook}->GetSelection;
+	return if $id == -1;
+	wxTheClipboard->Open;
+
+	my $txt = $win->{notebook}->GetPage($id)->GetSelectedText;
+	if ( defined($txt) ) {
+		wxTheClipboard->SetData( Wx::TextDataObject->new($txt) );
+	}
+
+	wxTheClipboard->Close;
+	return;
+}
+
+sub text_cut_to_clipboard {
+	my ( $win, $event ) = @_;
+
+	my $id = $win->{notebook}->GetSelection;
+	return if $id == -1;
+	wxTheClipboard->Open;
+
+	my $txt = $win->{notebook}->GetPage($id)->GetSelectedText;
+	if ( defined($txt) ) {
+		wxTheClipboard->SetData( Wx::TextDataObject->new($txt) );
+		$win->{notebook}->GetPage($id)->ReplaceSelection('');
+	}
+
+	wxTheClipboard->Close;
+	return;
+}
+
+sub text_paste_from_clipboard {
+    my ( $win, $event ) = @_;
+
+	my $id  = $win->{notebook}->GetSelection;
+	return if $id == -1;
+
+	wxTheClipboard->Open;
+	my $text   = '';
+	my $length = 0;
+	if ( wxTheClipboard->IsSupported(wxDF_TEXT) ) {
+		my $data = Wx::TextDataObject->new;
+		my $ok   = wxTheClipboard->GetData($data);
+		if ($ok) {
+			$text   = $data->GetText;
+			$length = $data->GetTextLength;
+		}
+		else {
+			$text   = '';
+			$length = 1;
+		}
+	}
+	my $pos = $win->{notebook}->GetPage($id)->GetCurrentPos;
+	$win->{notebook}->GetPage($id)->InsertText( $pos, $text );
+	$win->{notebook}->GetPage($id)->GotoPos( $pos + $length - 1 );
+
+	wxTheClipboard->Close;
 	return;
 }
 

@@ -146,17 +146,142 @@ For example, imagine you have the following nicely formatted hash assignment in 
 	key3 => 'value3',
  );
 
-With a rectangular text selection you can select only the keys, only the values, etc.. 
+With a rectangular text selection you can select only the keys, only the values, etc..
+
+=head1 Syntax highlighting
+
+Padre is using L<Wx> (aka wxPerl), wxWidgtes for GUI and Scintilla for the editor.
+Scintiall provides very good syntax highlighting for many languages but Padre is still
+bound by the version of Scintilla included.
+
+The share/styles/default.yml file is the mapping between the Scintialla defined
+constants for various syntactical elements of each language and the RGB values
+of the color to be used to highlight them.
+
+We plan to allow the user to switch between styles.
+
+=head2 Adding new syntax highlighting
+
+Need to define constanst in L<Padre::Util> to be in the Px:: namespace.
+
+Need to add the color mapping to share/styles/default.yml
+
+Need to implement the C<Padre::Document::Language> class.
+
+Need to define the mime-type mapping in L<Padre::Document>
+
+For examples see L<Padre::Document::Pasm>, L<Padre::Document::Pir>,
+L<Padre::Document::Perl>.
 
 =head1 Command line options
 
  --index   will go over the @INC and list all the available modules in the database
  
  a list of filenames can be given to be opened
+ 
+=head1 Preferences
+
+There are several types of preferences we can think of.
+There are the current view orinted preferences such as B<Show newlines>
+or B<Show Line numbers> and there are the project and file 
+oriented preferences such as the use of TAB or whitespace
+for indentation.
+
+We would like to achive that the 
+
+Currently some of the preferences are accesible via the 
+B<Edit/Preferences> menu options, others via the B<View> 
+menu option.
+
+We have to make sure that when changing the preferences via
+the GUI it change for the correct things.
+
+e.g. When changing the B<Use TABs> preference it currently 
+applyes to all the files open currently or in the future.
+It should probably apply to the current file and/or the 
+current project. Such options - when changing them - might even
+be applied "retroactively". That is when I change the TAB/space
+mode of a file or a project it should ask if I want to reflow the
+file with the new method of indentation?
+
+On the other hand the "TAB display size" is purely a local, edior
+oriented preference. It should probably apply to all files currently
+open.
+
+=head2 Editor or view oriented preferences
+
+=over 4
+
+=item Size and location of windows
+
+=item Show/Hide various windows, Status bar, Toolbar
+
+=item Files recently opened
+
+=item Files that were open last time, cursor location
+
+=item Show newlines
+
+=item Show Line numbers
+
+=item Show indentation guide
+
+=item Show Call Tips
+
+=item TAB display size
+
+=item Allow experimental features
+
+=item Open file policy
+
+What files to open when launchin Padre? 
+nothing, new, those that were open last time?
+
+=item Max/Min number of modules to display in podviewer
+
+=item Autoindentation on/off?
+
+=item Autosave on/off?
+
+=item Autobackup (Planned)
+
+When Padre opens a file it automatically creates a copy of the original
+in ~/.padre/backup/PATH  where PATH is the same PATH as the full PATH of
+the file. On Windows the initial drive letter is converted to another 
+subdirectory so c:\dir\file.txt  will be saved as
+~/padre/backup/dir/file.txt
+
+When a new file is created no need for autobackup.
+
+When a remote file is opened the backup will probably go to
+~/padre/backup_remote/
+
+Configurable options: on/off
+
+=item Autosave files (Planned)
+
+Every N seconds all the files changed since the last autosave are 
+saved to a temporary place maybe ~/.padre/save.
+
+When the user closes the file, the autosaved file is removed.
+
+Configurable options: on/off, frequency in seconds
+
+=back
+
+=head2 File and Project oriented preferences
+
+=over 4
+
+=item Indentation should be by TABs or spaces
+
+=item In case of using spaces for indentation, the width  of every indentation level
+
+=back
 
 =head1 Plugins
 
-There is a highly experimental but quit simple plugin system.
+There is a highly experimental but quite simple plugin system.
 
 A plugin is a module in the Padre::Plugin::* namespace.
 
@@ -174,11 +299,35 @@ Padre will add a menu entry for every plugin under the B<Plugins>
 menu item. For each plugin menu item it will add all the Name_1,
 Name_2 subitems.
 
+See also L<Padre::PluginManager> and L<Padre::PluginBuilder> 
+
+=head1 Editing tools
+
+=head2 Case Changes
+
+Change the case of the selected text or if there 
+is no selection all the text in the current file.
+
+Change all characters to upper or lower case
+
+Change the first character ot every word to upper/lower
+case leaving the rest as they were.
+
+=head2 Tab and space conversion
+
+Tab to Space and Space to Tab conversions ask the number of spaces
+each tab should substitute. It currently works everywhere.
+We probably should add a mode to operate only at the beginning of 
+the lines or better yet only at the indentation levels.
+
+Delete All Ending space does just what it sais.
+
+Delete Leading Space will ask How many leading spaces and act accordingly.
+
 
 =head1 Search, Find and Replace
 
 (planning)
-
 
 =head2 Search
 
@@ -242,6 +391,7 @@ use 5.008;
 use strict;
 use warnings;
 use Carp           ();
+use Cwd            ();
 use File::Spec     ();
 use File::HomeDir  ();
 use Getopt::Long   ();
@@ -249,7 +399,7 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -281,6 +431,7 @@ use Class::Autouse qw{
 	Padre::Wx::Dialog::Find
 	Padre::Wx::Dialog::ModuleStart
 	Padre::Wx::Dialog::Preferences
+	Padre::Wx::History::TextDialog
 };
 
 # Globally shared Perl detection object
@@ -306,19 +457,19 @@ sub new {
 	# Create the empty object
 	my $self = $SINGLETON = bless {
 		# Wx Attributes
-		wx          => undef,
+		wx             => undef,
 
 		# Internal Attributes
-		config_dir  => undef,
-		config_yaml => undef,
+		config_dir     => undef,
+		config_yaml    => undef,
 
 		# Plugin Attributes
 		plugin_manager => undef,
 
 		# Second-Generation Object Model
 		# (Adam says ignore these for now, but don't comment out)
-		project  => {},
-		document => {},
+		project        => {},
+		document       => {},
 
 	}, $class;
 
@@ -329,7 +480,7 @@ sub new {
 	$self->{config}    ||= Padre::Config->create( $self->config_yaml );
 
 	$self->{plugin_manager} = Padre::PluginManager->new($self);
-	
+
 	eval {
 		require Parrot::Embed;
 		$self->{parrot} = Parrot::Interpreter->new;
@@ -375,18 +526,34 @@ sub plugin_manager {
 sub run {
 	my $self = shift;
 
-	my %opt;
-	Getopt::Long::GetOptions(\%opt, "index", "help") or usage();
-	usage() if $opt{help};
+	# Handle architectural command line options
+	foreach my $M ( grep { /^-M/ } @ARGV ) {
+		my $module = substr($M, 2);
+		eval "use $module";
+		die $@ if $@;
+	}
+	@ARGV = grep { ! /^-M/ } @ARGV;
+
+	# Handle regular command line options
+	my $USAGE = '';
+	my $INDEX = '';
+	my $rv    = Getopt::Long::GetOptions(
+		help  => \$USAGE,
+		index => \$INDEX,
+	);
+	if ( $USAGE or ! $rv ) {
+		usage();
+	}
 
 	# Launch the indexer if requested
-	return $self->run_indexer if $opt{index};
+	return $self->run_indexer if $INDEX;
 
 	# FIXME: This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
 	# (RT #1)
 	$self->plugin_manager->load_plugins;
-	$self->{ARGV} = \@ARGV;
+	
+	$self->{ARGV} = [ map {File::Spec->rel2abs( $_ )} @ARGV ];
 
 	return $self->run_editor;
 }
@@ -411,6 +578,7 @@ sub run_indexer {
 sub run_editor {
 	my $self = shift;
 
+	$self->{original_dir} = Cwd::cwd();
 	# Move our current dir to the user's documents directory by default
 	my $documents = File::HomeDir->my_documents;
 	if ( defined $documents ) {
@@ -463,8 +631,6 @@ Usage: $0 [FILENAMEs]
 END_USAGE
 
 1;
-
-=pod
 
 =head1 BUGS
 
@@ -527,7 +693,7 @@ To Adam Kennedy for lots of refactoring.
 
 To Steffen Muller for PAR plugins.
 
-To Patrick Donelan, Fayland Lam, Brian Cassidy
+To Patrick Donelan, Fayland Lam, Brian Cassidy, Heiko Jansen
 
 To Herbert Breunung for letting me work on Kephra.
 

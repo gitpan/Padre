@@ -1,11 +1,13 @@
 package Padre::PluginManager;
 use strict;
 use warnings;
-use File::Path ();
-use File::Spec ();
-use Carp       qw(croak);
 
-our $VERSION = '0.15';
+use Carp         qw(croak);
+use File::Path   ();
+use File::Spec   ();
+use File::Find::Rule;
+
+our $VERSION = '0.16';
 
 =pod
 
@@ -134,16 +136,16 @@ sub _load_plugins_from_inc {
 	# Try the plugin directory first:
 	my $plugin_dir = $self->plugin_dir;
 	unshift @INC, $plugin_dir unless grep {$_ eq $plugin_dir} @INC;
-
-	foreach my $path (@INC) {
-		my $dir = File::Spec->catdir($path, 'Padre', 'Plugin');
-		opendir my $dh, $dir or next;
-		while (my $file = readdir $dh) {
-			if ($file =~ /^\w+\.pm$/) {
-				$file =~ s/\.pm$//;
-				$self->_load_plugin($file);
-			}
-		}
+	
+	my @dirs = grep {-d $_} map {File::Spec->catdir($_, 'Padre', 'Plugin')} @INC;
+	
+	my @files = File::Find::Rule->file()->name('*.pm')->in( @dirs );
+	foreach my $file (@files) {
+		# full path filenames
+		$file =~ s/\.pm$//;
+		$file =~ s{^.*Padre[/\\]Plugin\W*}{};
+		$file =~ s{[/\\]}{::}g;
+		$self->_load_plugin($file); # Foo::Bar names
 	}
 
 	return;
@@ -184,23 +186,20 @@ sub _setup_par {
 	return();
 }
 
-# given a file name (Foo.pm), load the corresponding module
+# given a plugin name such as Foo or Foo::Bar (the part after Padre::Plugin),
+# load the corresponding module
 sub _load_plugin {
 	my ($self, $file) = @_;
 	my $plugins = $self->plugins;
-	delete $plugins->{$file};
-	
-	my $module = "Padre::Plugin::$file";
 
 	# skip if that plugin was already loaded
-	my $inc_file = $module.".pm";
-	$inc_file =~ s/::/\//g;
-	return if exists $INC{$inc_file};
+	return if exists $plugins->{$file};
 
+	my $module = "Padre::Plugin::$file";
 	eval "use $module"; ## no critic
 	if ($@) {
 		warn "ERROR while trying to load plugin '$file': $@";
-		return();
+		return;
 	}
 	$plugins->{$file} = $module;
 	return 1;

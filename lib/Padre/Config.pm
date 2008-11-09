@@ -10,7 +10,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 
 
@@ -86,6 +86,9 @@ sub new {
 	unless ( _ARRAY($self->{host}->{main_files}) ) {
 		$self->{host}->{main_files} = [];
 	}
+	unless ( _ARRAY($self->{host}->{main_files_pos}) ) {
+		$self->{host}->{main_files_pos} = [];
+	}
 	$self->{host}->{main_files} = [
 		grep { -f $_ and -r _ }
 		@{ $self->{host}->{main_files} }
@@ -94,52 +97,53 @@ sub new {
 	# When they want to run an arbitrary command
 	$self->{host}->{run_command}    ||= '';
 
-	# Number of modules to display when searching for documentation
-	$self->{pod_maxlist} ||= 200;
-	unless ( defined $self->{pod_minlist} ) {
-		$self->{pod_minlist} = 2;
-	}
+	my %defaults = (
 
-	# startup mode, if no files given on the command line this can be
-	#   new        - a new empty buffer
-	#   nothing    - nothing to open
-	#   last       - the files that were open last time    
-	$self->{main_startup}  ||= 'new';
+		# Number of modules to display when searching for documentation
+		pod_maxlist               => 200,
+		pod_minlist               => 2,
 
-	# Look and feel preferences
-	$self->{main_statusbar}           ||= 1;
-	$self->{main_output}              ||= 0;
-	$self->{editor_use_tabs}          ||= 1;
-	$self->{editor_tabwidth}          ||= 4;
-	$self->{editor_linenumbers}       ||= 0;
-	$self->{editor_eol}               ||= 0;
-	$self->{editor_indentationguides} ||= 0;
-	unless ( defined $self->{editor_calltips} ) {
-		$self->{editor_calltips} = 1;
-	}
+		# startup mode, if no files given on the command line this can be
+		#   new        - a new empty buffer
+		#   nothing    - nothing to open
+		#   last       - the files that were open last time
+		main_startup              => 'new',
+	
+		# Look and feel preferences
+		main_statusbar            => 1,
+		main_output               => 0,
+		editor_use_tabs           => 1,
+		editor_tabwidth           => 4,
+		editor_linenumbers        => 0,
+		editor_eol                => 0,
+		editor_indentationguides  => 0,
+		editor_calltips           => 1,
 
-	# When running a script from the application some of the files might have not been saved yet.
-	# There are several option what to do before running the script
-	# none - don's save anything
-	# same - save the file in the current buffer
-	# all_files - all the files (but not buffers that have no filenames)
-	# all_buffers - all the buffers even if they don't have a name yet
-	$self->{run_save}        ||= 'same';
+		# When running a script from the application some of the files might have not been saved yet.
+		# There are several option what to do before running the script
+		# none - don's save anything
+		# same - save the file in the current buffer
+		# all_files - all the files (but not buffers that have no filenames)
+		# all_buffers - all the buffers even if they don't have a name yet
+		run_save                  => 'same',
 
-	# Search and replace recent values
-	$self->{search_terms}  ||= [];
-	$self->{replace_terms} ||= [];
+		# Search and replace recent values
+		search_terms              => [],
+		replace_terms             => [],
 
-	# Various things that should probably be in the database
-	$self->{bookmarks}       ||= {};
-	$self->{projects}        ||= {};
-	$self->{current_project} ||= '';
+		# Various things that should probably be in the database
+		bookmarks                 => {},
+		projects                  => {},
+		current_project           => '',
 
-	# By default we have an empty plugins configuration
-	$self->{plugins}      ||= {};
+		# By default we have an empty plugins configuration
+		plugins                   => {},
 
-	# By default, don't enable experimental features
-	$self->{experimental} ||= 0;
+		# By default, don't enable experimental features
+		experimental              => 0,
+
+	);
+	%$self = (%defaults, %$self);
 
 	return $self;
 }
@@ -179,6 +183,11 @@ sub read {
 			 split /\n/, $host->{main_files}
 		];
 	}
+	if ( defined _STRING($host->{main_files_pos}) ) {
+		$host->{main_files_pos} = [
+			 split /\n/, $host->{main_files_pos}
+		];
+	}
 
 	# Merge and create the configuration
 	return $class->new( %$hash, host => $host );
@@ -198,6 +207,11 @@ sub write {
 
 	# Serialize some values
 	$copy->{host}->{main_files} = join( "\n", grep { defined } @{$copy->{host}->{main_files}} );
+	$copy->{host}->{main_files_pos} = join( "\n", grep { defined } @{$copy->{host}->{main_files_pos}} );
+	
+	# Limit the search_terms/replace_terms
+	@{$copy->{search_terms}}  = splice(@{$copy->{search_terms}},  0, 30);
+	@{$copy->{replace_terms}} = splice(@{$copy->{replace_terms}}, 0, 30);
 
 	# Save the host configuration
 	Padre::DB->hostconf_write( delete $copy->{host} );

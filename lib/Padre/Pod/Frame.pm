@@ -2,7 +2,7 @@ package Padre::Pod::Frame;
 use strict;
 use warnings;
 
-our $VERSION = '0.15';
+our $VERSION = '0.16';
 
 use Data::Dumper qw(Dumper);
 
@@ -45,17 +45,9 @@ sub _setup_podviewer {
     $but_s->Add( $back );
     $but_s->Add( $forward );
 
-    # TODO: remove magic values and just add the Choice box after the buttons
     # TODO: update list when a file is opened
-    $choice = Wx::Choice->new(
-        $panel,
-        -1,
-        [ 175, 5 ],
-        [ -1, 32 ],
-        [
-            Padre::DB->get_recent_pod
-        ]
-    );
+    $choice = Wx::Choice->new( $panel, wxID_ANY, [ 0, 0 ], Wx::wxDefaultSize, scalar(Padre::DB->get_recent_pod), [ Padre::DB->get_recent_pod ] );
+    $but_s->Add($choice);
     EVT_CHOICE( $panel, $choice, \&on_selection );
 
     $choices = Padre::DB->find_modules;
@@ -111,8 +103,23 @@ sub on_selection {
     my $current = $choice->GetCurrentSelection;
     my $module  = (Padre::DB->get_recent_pod)[$current];
     if ( $module ) {
-        $self->{html}->display($module);
-    } # TODO: else error message?
+        # apparently there are cases where self isn't the window but a
+        # subordinate panel
+        # I still don't really understand who calls what so lets play save...
+        if ( defined $self->{html} ) {
+            $self->{html}->display($module);
+        }
+        else {
+            my $win = $self;
+            while ( $win = $win->GetParent ) {
+                if ( defined $win->{html} ) {
+                    $win->{html}->display($module);
+                    last;
+                }
+            }
+            # TODO error message?
+        }
+    } # TODO else error message?
     return;
 }
 
@@ -170,8 +177,7 @@ sub on_open {
 
     my $path = $self->{html}->module_to_path($module);
     if (not $path) {
-        # TODO put exclamation mark on the window!
-        Wx::MessageBox( "Could not find module $module", "Invalid module name", wxOK|wxCENTRE, $self );
+        Wx::MessageBox( "Could not find module $module", "Invalid module name", wxOK|wxCENTRE|wxICON_EXCLAMATION, $self );
         return;
     }
 
