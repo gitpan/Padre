@@ -9,6 +9,7 @@ use Carp               ();
 use Data::Dumper       ();
 use File::Spec         ();
 use File::Basename     ();
+use File::Slurp        ();
 use List::Util         ();
 use Params::Util       ();
 use Padre::Util        ();
@@ -18,12 +19,14 @@ use Padre::Wx::ToolBar ();
 use Padre::Wx::Output  ();
 use Padre::Document    ();
 use Padre::Documents   ();
+use Padre::Wx::DNDFilesDropTarget ();
+
 
 use Wx::Locale         qw(:default);
 
 use base qw{Wx::Frame};
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 my $default_dir = Cwd::cwd();
 
@@ -80,11 +83,18 @@ sub new {
 		],
 		$wx_frame_style,
 	);
+	$self->SetDropTarget(Padre::Wx::DNDFilesDropTarget->new($self));
 
 	$self->set_locale( );
 
 	$self->{manager} = Wx::AuiManager->new;
-	$self->manager->SetManagedWindow( $self );
+	$self->{manager}->SetManagedWindow( $self );
+
+	# do NOT use hints other than Rectangle or the app will crash on Linux/GTK
+	my $flags = $self->{manager}->GetFlags;
+	$flags &= ~Wx::wxAUI_MGR_TRANSPARENT_HINT;
+	$flags &= ~Wx::wxAUI_MGR_VENETIAN_BLINDS_HINT;
+	$self->{manager}->SetFlags( $flags ^ Wx::wxAUI_MGR_RECTANGLE_HINT );
 
 	# Add some additional attribute slots
 	$self->{marker} = {};
@@ -119,7 +129,6 @@ sub new {
 			->Caption( gettext("Files") )->Position( 1 )
 		);
 
-
 	Wx::Event::EVT_AUINOTEBOOK_PAGE_CHANGED(
 		$self,
 		$self->{notebook},
@@ -145,12 +154,12 @@ sub new {
 		Wx::wxDefaultSize,
 		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
 	);
+	Wx::Event::EVT_KILL_FOCUS($self->{rightbar}, \&on_rightbar_left );
 	$self->manager->AddPane($self->{rightbar}, 
 		Wx::AuiPaneInfo->new->Name( "rightbar" )
-			->CenterPane->Resizable->PaneBorder->Dockable
-#			->Floatable->PinButton->CaptionVisible->Movable
-#			->MinimizeButton->PaneBorder->Gripper->MaximizeButton
-#			->FloatingPosition(100, 100)->FloatingSize(100, 400)
+			->CenterPane->Resizable(1)->PaneBorder(1)->Movable(1)
+			->CaptionVisible(1)->CloseButton(1)->DestroyOnClose(0)
+			->MaximizeButton(1)->Floatable(1)->Dockable(1)
 			->Caption( gettext("Subs") )->Position( 3 )->Right
 		 );
         
@@ -163,18 +172,26 @@ sub new {
 		\&on_function_selected,
 	);
 
+	if (Padre->ide->config->{experimental}) {
+		$self->create_syntaxbar;
+	}
+
 	# Create the bottom-of-screen output textarea
 	$self->{output} = Padre::Wx::Output->new(
 		$self,
 	);
 	$self->manager->AddPane($self->{output}, 
 		Wx::AuiPaneInfo->new->Name( "output" )
-			->CenterPane->Resizable->PaneBorder->Dockable
-#			->Floatable->PinButton->CaptionVisible->Movable
-#			->MinimizeButton->PaneBorder->Gripper->MaximizeButton
-#			->FloatingPosition(100, 100)
+			->CenterPane->Resizable(1)->PaneBorder(1)->Movable(1)
+			->CaptionVisible(1)->CloseButton(1)->DestroyOnClose(0)
+			->MaximizeButton(1)->Floatable(1)->Dockable(1)
 			->Caption( gettext("Output") )->Position( 2 )->Bottom
 		);
+
+	# on close pane
+	Wx::Event::EVT_AUI_PANE_CLOSE(
+        $self, \&on_close_pane
+    );
 
 	# Special Key Handling
 	Wx::Event::EVT_KEY_UP( $self, sub {
@@ -183,16 +200,28 @@ sub new {
 		$self->refresh_toolbar;
 		my $mod  = $event->GetModifiers || 0;
 		my $code = $event->GetKeyCode;
-		if ( $mod == 2 ) { # Ctrl
+		
+		# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
+		$mod = $mod & (Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT());
+		if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
 			# Ctrl-TAB  #TODO it is already in the menu
 			$self->on_next_pane if $code == Wx::WXK_TAB;
-		} elsif ( $mod == 6 ) { # Ctrl-Shift
+		} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT()) { # Ctrl-Shift
 			# Ctrl-Shift-TAB #TODO it is already in the menu
 			$self->on_prev_pane if $code == Wx::WXK_TAB;
 		}
 		$event->Skip();
 		return;
 	} );
+	
+	# remember the last time we show them or not
+	unless ( $self->{menu}->{view_output}->IsChecked ) {
+		$self->manager->GetPane('output')->Hide();
+	}
+	unless ( $self->{menu}->{view_functions}->IsChecked ) {
+		$self->manager->GetPane('rightbar')->Hide();
+	}
+	
 	$self->manager->Update;
 
 	# Deal with someone closing the window
@@ -222,6 +251,40 @@ sub new {
 	$timer->Start( 1, 1 );
 
 	return $self;
+}
+
+sub create_syntaxbar {
+	my $self = shift;
+
+	$self->{syntaxbar} = Wx::ListView->new(
+		$self,
+		Wx::wxID_ANY,
+		Wx::wxDefaultPosition,
+		Wx::wxDefaultSize,
+		Wx::wxLC_REPORT | Wx::wxLC_SINGLE_SEL
+	);
+	$self->{syntaxbar}->InsertColumn( 0, gettext('Line') );
+	$self->{syntaxbar}->InsertColumn( 1, gettext('Type') );
+	$self->{syntaxbar}->InsertColumn( 2, gettext('Description') );
+	$self->manager->AddPane($self->{syntaxbar},
+		Wx::AuiPaneInfo->new->Name( "syntaxbar" )
+			->CenterPane->Resizable(1)->PaneBorder(1)->Movable(1)
+			->CaptionVisible(1)->CloseButton(1)->DestroyOnClose(0)
+			->MaximizeButton(1)->Floatable(1)->Dockable(1)
+			->Caption( gettext("Syntax") )->Position( 3 )->Bottom
+	);
+	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
+		$self,
+		$self->{syntaxbar},
+		\&on_synchkmsg_selected,
+	);
+	if ( $self->{menu}->{experimental_syntaxcheck}->IsChecked ) {
+		$self->manager->GetPane('syntaxbar')->Show();
+	}
+	else {
+		$self->manager->GetPane('syntaxbar')->Hide();
+	}
+	return;
 }
 
 sub manager {
@@ -284,6 +347,114 @@ sub post_init {
 	$self->show_output($output) if not $output;
 
 #$self->Close;
+
+	if (Padre->ide->config->{experimental}) {
+	if ( $self->{menu}->{experimental_syntaxcheck}->IsChecked ) {
+		$self->enable_syntax_checker(1);
+	}
+	}
+
+	return;
+}
+
+sub enable_syntax_checker {
+	my $self = shift;
+	my $on   = shift;
+
+	if ($on) {
+		if (   defined( $self->{synCheckTimer} )
+			&& ref $self->{synCheckTimer} eq 'Wx::Timer'
+		) {
+			$self->{synCheckTimer}->Start(-1);
+			$self->on_synchk_timer( undef, 1 );
+		}
+		else {
+			$self->{synCheckTimer} = Wx::Timer->new($self);
+			Wx::Event::EVT_TIMER( $self, -1, \&on_synchk_timer );
+			$self->{synCheckTimer}->Start(1000);
+		}
+        $self->show_syntaxbar(1);
+	}
+	else {
+		if (   defined($self->{synCheckTimer})
+			&& ref $self->{synCheckTimer} eq 'Wx::Timer'
+		) {
+			$self->{synCheckTimer}->Stop;
+        }
+		my $id   = $self->{notebook}->GetSelection;
+		my $page = $self->{notebook}->GetPage($id);
+		$page->MarkerDeleteAll(Padre::Wx::MarkError);
+		$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
+		$self->{syntaxbar}->DeleteAllItems;
+		$self->show_syntaxbar(0);
+	}
+
+	return;
+}
+
+sub on_synchk_timer {
+	my ( $win, $event, $force ) = @_;
+
+	my $id = $win->{notebook}->GetSelection;
+	if ( defined $id ) {
+		my $page = $win->{notebook}->GetPage($id);
+
+		unless (   defined( $page->{Document} )
+				&& $page->{Document}->can_check_syntax
+		) {
+            if ( ref $page eq 'Padre::Wx::Editor' ) {
+				$page->MarkerDeleteAll(Padre::Wx::MarkError);
+				$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
+			}
+			$win->{syntaxbar}->DeleteAllItems;
+			return;
+		}
+
+		my $messages = $page->{Document}->check_syntax($force);
+		return unless defined $messages;
+
+		if ( scalar(@{$messages}) > 0 ) {
+			$page->MarkerDeleteAll(Padre::Wx::MarkError);
+			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
+
+			# Setup a margin to hold fold markers
+			$page->SetMarginType(1, Wx::wxSTC_MARGIN_SYMBOL); # margin number 1 for symbols
+			$page->SetMarginWidth(1, 16);                     # set margin 1 16 px wide
+			$page->MarkerDefine(Padre::Wx::MarkError, Wx::wxSTC_MARK_SMALLRECT, Wx::Colour->new("red"),    Wx::Colour->new("red"));
+			$page->MarkerDefine(Padre::Wx::MarkWarn,  Wx::wxSTC_MARK_SMALLRECT, Wx::Colour->new("orange"), Wx::Colour->new("orange"));
+
+			my $i = 0;
+			$win->{syntaxbar}->DeleteAllItems;
+			my $last_hint = '';
+			foreach my $hint ( sort { $a->{line} <=> $b->{line} } @{$messages} ) {
+				if ( $hint->{severity} eq 'W' ) {
+					$page->MarkerAdd( $hint->{line} - 1, 2);
+				}
+				else {
+					$page->MarkerAdd( $hint->{line} - 1, 1);
+				}
+				my $idx = $win->{syntaxbar}->InsertStringItem( $i++, $hint->{line} );
+				$win->{syntaxbar}->SetItem( $idx, 1, $hint->{severity} );
+				$win->{syntaxbar}->SetItem( $idx, 2, $hint->{msg} );
+
+				$last_hint = $hint;
+			}
+
+			my $width0_default = $page->TextWidth( Wx::wxSTC_STYLE_DEFAULT, gettext("Line") . ' ' );
+			my $width0 = $page->TextWidth( Wx::wxSTC_STYLE_DEFAULT, $last_hint->{line} x 2 );
+			my $width1 = $page->TextWidth( Wx::wxSTC_STYLE_DEFAULT, gettext("Type") x 2 );
+			my $width2 = $win->{syntaxbar}->GetSize->GetWidth - $width0 - $width1 - $win->{syntaxbar}->GetCharWidth * 2;
+			$win->{syntaxbar}->SetColumnWidth( 0, ( $width0_default > $width0 ? $width0_default : $width0 ) );
+			$win->{syntaxbar}->SetColumnWidth( 1, $width1 );
+			$win->{syntaxbar}->SetColumnWidth( 2, $width2 );
+		}
+		else {
+			$page->MarkerDeleteAll(Padre::Wx::MarkError);
+			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
+			$win->{syntaxbar}->DeleteAllItems;
+		}
+	}
+
 	return;
 }
 
@@ -414,6 +585,7 @@ sub refresh_status {
 sub refresh_methods {
 	my ($self) = @_;
 	return if $self->no_refresh;
+    return unless ( $self->{menu}->{view_functions}->IsChecked );
 
 	$self->{rightbar}->DeleteAllItems;
 
@@ -970,6 +1142,16 @@ sub on_open_selection {
 	return;
 }
 
+sub on_open_all_recent_files {
+	my ( $self ) = @_;
+	
+	my $files = Padre::DB->get_recent_files();
+	foreach my $file ( @$files ) {
+		$self->setup_editor($file);
+	}
+	$self->refresh_all;
+}
+
 sub on_open {
 	my ($self, $event) = @_;
 
@@ -983,7 +1165,7 @@ sub on_open {
 		$default_dir,
 		"",
 		"*.*",
-		Wx::wxFD_OPEN,
+		Wx::wxFD_MULTIPLE,
 	);
 	unless ( Padre::Util::WIN32 ) {
 		$dialog->SetWildcard("*");
@@ -991,11 +1173,8 @@ sub on_open {
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 		return;
 	}
-	my $filename = $dialog->GetFilename;
+	my @filenames = $dialog->GetFilenames;
 	$default_dir = $dialog->GetDirectory;
-
-	my $file = File::Spec->catfile($default_dir, $filename);
-	Padre::DB->add_recent_files($file);
 
 	# If and only if there is only one current file,
 	# and it is unused, close it.
@@ -1005,7 +1184,12 @@ sub on_open {
 		}
 	}
 
-	$self->setup_editor($file);
+	foreach my $filename ( @filenames ) {
+		my $file = File::Spec->catfile($default_dir, $filename);
+		Padre::DB->add_recent_files($file);
+
+		$self->setup_editor($file);
+	}
 	$self->refresh_all;
 
 	return;
@@ -1274,6 +1458,39 @@ sub on_diff {
 	return;
 }
 
+#
+# on_full_screen()
+#
+# toggle full screen status.
+#
+sub on_full_screen {
+	my ($self, $event) = @_;
+	$self->ShowFullScreen( ! $self->IsFullScreen );
+}
+
+#
+# on_join_lines()
+#
+# join current line with next one (a-la vi with Ctrl+J)
+#
+sub on_join_lines {
+	my ($self) = @_;
+
+	my $notebook = $self->{notebook};
+	my $id   = $notebook->GetSelection;
+	my $page = $notebook->GetPage($id);
+	
+	# find positions
+	my $pos1 = $page->GetCurrentPos;
+	my $line = $page->LineFromPosition($pos1);
+	my $pos2 = $page->PositionFromLine($line+1);
+
+	# mark target & join lines
+	$page->SetTargetStart($pos1);
+	$page->SetTargetEnd($pos2);
+	$page->LinesJoin;
+}
+
 
 ###### preferences and toggle functions
 
@@ -1311,6 +1528,45 @@ sub on_toggle_line_numbers {
 	return;
 }
 
+sub on_toggle_code_folding {
+	my ($self, $event) = @_;
+
+	my $config = Padre->ide->config;
+	$config->{editor_codefolding} = $event->IsChecked ? 1 : 0;
+
+	foreach my $editor ( $self->pages ) {
+		$editor->show_folding( $config->{editor_codefolding} );
+	}
+
+	return;
+}
+
+sub on_toggle_current_line_background {
+	my ($self, $event) = @_;
+
+	my $config = Padre->ide->config;
+	$config->{editor_currentlinebackground} = $event->IsChecked ? 1 : 0;
+
+	foreach my $editor ( $self->pages ) {
+		$editor->show_currentlinebackground( $config->{editor_currentlinebackground} ? 1 : 0 );
+	}
+
+	return;
+}
+
+sub on_toggle_synchk {
+	my ($self, $event) = @_;
+
+	my $config = Padre->ide->config;
+	$config->{editor_syntaxcheck} = $event->IsChecked ? 1 : 0;
+
+	$self->enable_syntax_checker( $config->{editor_syntaxcheck} );
+
+    #$self->{menu}->{window_goto_synchk}->Enable( $config->{editor_syntaxcheck} );
+
+	return;
+}
+
 sub on_toggle_indentation_guide {
 	my $self   = shift;
 
@@ -1337,6 +1593,44 @@ sub on_toggle_eol {
 	return;
 }
 
+#
+# on_toggle_whitespaces()
+#
+# show/hide spaces and tabs (with dots and arrows respectively).
+#
+sub on_toggle_whitespaces {
+	my ($self) = @_;
+	
+	# check whether we need to show / hide spaces & tabs.
+	my $config = Padre->ide->config;
+	$config->{editor_whitespaces} = $self->{menu}->{view_whitespaces}->IsChecked
+		? Wx::wxSTC_WS_VISIBLEALWAYS
+		: Wx::wxSTC_WS_INVISIBLE;
+	
+	# update all open views with the new config.
+	foreach my $editor ( $self->pages ) {
+		$editor->SetViewWhiteSpace( $config->{editor_whitespaces} );
+	}
+}
+
+
+sub on_word_wrap {
+	my $self = shift;
+	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
+	unless ( $on == $self->{menu}->{view_word_wrap}->IsChecked ) {
+		$self->{menu}->{view_word_wrap}->Check($on);
+	}
+	
+	my $doc = $self->selected_document;
+	return unless $doc;
+	
+	if ( $on ) {
+		$doc->editor->SetWrapMode( Wx::wxSTC_WRAP_WORD );
+	} else {
+		$doc->editor->SetWrapMode( Wx::wxSTC_WRAP_NONE );
+	}
+}
+
 sub show_output {
 	my $self = shift;
 	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
@@ -1344,12 +1638,52 @@ sub show_output {
 		$self->{menu}->{view_output}->Check($on);
 	}
 	if ( $on ) {
-		$self->{output}->Show;
+		$self->manager->GetPane('output')->Show();
+		$self->manager->Update;
 	} else {
-		$self->{output}->Hide;
+		$self->manager->GetPane('output')->Hide();
+		$self->manager->Update;
 	}
 	Padre->ide->config->{main_output} = $on;
 
+	return;
+}
+
+sub show_functions {
+	my $self = shift;
+	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
+	unless ( $on == $self->{menu}->{view_functions}->IsChecked ) {
+		$self->{menu}->{view_functions}->Check($on);
+	}
+	if ( $on ) {
+	    $self->refresh_methods();
+		$self->manager->GetPane('rightbar')->Show();
+		$self->manager->Update;
+	} else {
+		$self->manager->GetPane('rightbar')->Hide();
+		$self->manager->Update;
+	}
+	Padre->ide->config->{main_rightbar} = $on;
+
+	return;
+}
+
+sub show_syntaxbar {
+	my $self = shift;
+	my $on   = scalar(@_) ? $_[0] ? 1 : 0 : 1;
+	unless ( $self->{menu}->{experimental_syntaxcheck}->IsChecked ) {
+		$self->manager->GetPane('syntaxbar')->Hide();
+		$self->manager->Update;
+		return;
+	}
+	if ( $on ) {
+		$self->manager->GetPane('syntaxbar')->Show();
+		$self->manager->Update;
+	}
+	else {
+		$self->manager->GetPane('syntaxbar')->Hide();
+		$self->manager->Update;
+	}
 	return;
 }
 
@@ -1396,6 +1730,48 @@ sub on_toggle_status_bar {
 	}
 
 	return;
+}
+
+sub on_insert_from_file {
+	my ( $win ) = @_;
+	
+	my $id  = $win->{notebook}->GetSelection;
+	return if $id == -1;
+	
+	# popup the window
+	my $last_filename = $win->selected_filename;
+    my $default_dir;
+    if ($last_filename) {
+        $default_dir = File::Basename::dirname($last_filename);
+    }
+    my $dialog = Wx::FileDialog->new(
+        $win, gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
+    );
+    unless ( Padre::Util::WIN32 ) {
+        $dialog->SetWildcard("*");
+    }
+    if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+        return;
+    }
+    my $filename = $dialog->GetFilename;
+    $default_dir = $dialog->GetDirectory;
+    
+    my $file = File::Spec->catfile($default_dir, $filename);
+    
+    my $text = eval { File::Slurp::read_file($file, binmode => ':raw') };
+	if ($@) {
+		$win->error($@);
+		return;
+	}
+	
+    my $data = Wx::TextDataObject->new;
+    $data->SetText($text);
+    my $length = $data->GetTextLength;
+	
+	$win->{notebook}->GetPage($id)->ReplaceSelection('');
+	my $pos = $win->{notebook}->GetPage($id)->GetCurrentPos;
+	$win->{notebook}->GetPage($id)->InsertText( $pos, $text );
+	$win->{notebook}->GetPage($id)->GotoPos( $pos + $length - 1 );
 }
 
 sub convert_to {
@@ -1450,6 +1826,26 @@ sub on_function_selected {
 	$self->selected_editor->SetFocus;
 	return;
 }
+
+sub on_synchkmsg_selected {
+	my ($self, $event) = @_;
+
+	my $id   = $self->{notebook}->GetSelection;
+	my $page = $self->{notebook}->GetPage($id);
+
+	my $line_number = $event->GetItem->GetText;
+	return if  not defined($line_number)
+			or $line_number !~ /^\d+$/o
+			or $page->GetLineCount < $line_number;
+
+	$line_number--;
+	$page->EnsureVisible($line_number);
+	$page->GotoPos( $page->GetLineIndentPosition($line_number) );
+	$page->SetFocus;
+
+	return;
+}
+
 
 
 ## STC related functions
@@ -1517,6 +1913,50 @@ sub on_stc_dwell_start {
 	#$editor->show_tooltip;
 	#print Wx::GetMousePosition, "\n";
 	#print Wx::GetMousePositionXY, "\n";
+
+	return;
+}
+
+sub on_close_pane {
+    my ( $self, $event ) = @_;
+    my $pane = $event->GetPane();
+
+    # it's ugly, but it works
+    if ( Data::Dumper::Dumper(\$pane) eq 
+         Data::Dumper::Dumper(\$self->manager->GetPane('output')) ) {
+    	$self->{menu}->{view_output}->Check(0);
+    } elsif ( Data::Dumper::Dumper(\$pane) eq
+              Data::Dumper::Dumper(\$self->manager->GetPane('rightbar')) ) {
+		$self->{menu}->{view_functions}->Check(0);
+    }
+}
+
+sub on_quick_find {
+	my $self = shift;
+	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
+	unless ( $on == $self->{menu}->{experimental_quick_find}->IsChecked ) {
+		$self->{menu}->{experimental_quick_find}->Check($on);
+	}
+	Padre->ide->config->{is_quick_find} = $on;
+
+	return;
+}
+
+sub on_set_vi_mode {
+	my $self = shift;
+	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
+	unless ( $on == $self->{menu}->{experimental_vi_mode}->IsChecked ) {
+		$self->{menu}->{experimental_vi_mode}->Check($on);
+	}
+	Padre->ide->config->{vi_mode} = $on;
+
+	if ($on) {
+		require Padre::Wx::Editor::Vi;
+		require Padre::Wx::Dialog::CommandLine;
+		foreach my $editor ( $self->pages ) {
+			$editor->setup_vi_mode;
+		}
+	}
 
 	return;
 }
@@ -1706,6 +2146,18 @@ sub on_upper_and_lower {
 		$doc->text_set( $code );
 	}
 
+}
+
+# TODO next function
+# should be in a class representing the rightbar
+sub on_rightbar_left {
+	my ($self, $event) = @_;
+	my $main  = Padre->ide->wx->main_window;
+	if ($main->{rightbar_was_closed}) {
+		$main->show_functions(0);
+		$main->{rightbar_was_closed} = 0;
+	}
+	return;
 }
 
 1;

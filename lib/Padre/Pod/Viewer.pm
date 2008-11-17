@@ -2,7 +2,7 @@ package Padre::Pod::Viewer;
 use strict;
 use warnings;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 use Wx qw(wxOK wxCENTRE wxVERSION_STRING);
 use Wx::Html;
@@ -32,6 +32,7 @@ If no file found, returns undef.
 
 
 =cut
+
 sub module_to_path {
     my ($self, $module) = @_;
 

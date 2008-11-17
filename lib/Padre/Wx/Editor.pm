@@ -16,7 +16,7 @@ use Wx::Locale       qw(:default);
 
 use base 'Wx::StyledTextCtrl';
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 my $data;
 my $width;
@@ -31,6 +31,14 @@ sub new {
 
 	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
 	Wx::Event::EVT_LEFT_UP(  $self, \&on_left_up );
+	
+	if ( Padre->ide->config->{editor_use_wordwrap} ) {
+		$self->SetWrapMode( Wx::wxSTC_WRAP_WORD );
+	}
+	if ( Padre->ide->config->{vi_mode} ) {
+		$self->setup_vi_mode;
+	}
+
 	return $self;
 }
 
@@ -170,8 +178,8 @@ sub highlight_braces {
 sub show_line_numbers {
 	my ($self, $on) = @_;
 
-	$self->SetMarginWidth(1, 0);
-	$self->SetMarginWidth(2, 0);
+	#$self->SetMarginWidth(1, 0);
+	#$self->SetMarginWidth(2, 0);
 
 	# premature optimization, caching the with that was on the 3rd place at load time
 	# as timed my Deve::NYTProf
@@ -189,17 +197,96 @@ sub show_line_numbers {
 	return;
 }
 
+# Just a placeholder
+sub show_symbols {
+    my ( $self, $on ) = @_;
+
+	$self->SetMarginWidth(1, 0);
+
+	# $self->SetMarginWidth(1, 16);   #margin 1 for symbols, 16 px wide
+	# $self->SetMarginType(1, Wx::wxSTC_MARGIN_SYMBOL);
+
+	return;
+}
+
+sub show_folding {
+	my ( $self, $on ) = @_;
+
+	if ( $on ) {
+		# Setup a margin to hold fold markers
+		$self->SetMarginType(2, Wx::wxSTC_MARGIN_SYMBOL); # margin number 2 for symbols
+		$self->SetMarginMask(2, Wx::wxSTC_MASK_FOLDERS);  # set up mask for folding symbols
+		$self->SetMarginSensitive(2, 1);                  # this one needs to be mouse-aware
+		$self->SetMarginWidth(2, 16);                     # set margin 2 16 px wide
+
+		# define folding markers
+		my $w = Wx::Colour->new("white");
+		my $b = Wx::Colour->new("black");
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDEREND,     Wx::wxSTC_MARK_BOXPLUSCONNECTED,  $w, $b);
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDEROPENMID, Wx::wxSTC_MARK_BOXMINUSCONNECTED, $w, $b);
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDERMIDTAIL, Wx::wxSTC_MARK_TCORNER,  $w, $b);
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDERTAIL,    Wx::wxSTC_MARK_LCORNER,  $w, $b);
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDERSUB,     Wx::wxSTC_MARK_VLINE,    $w, $b);
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDER,        Wx::wxSTC_MARK_BOXPLUS,  $w, $b);
+		$self->MarkerDefine(Wx::wxSTC_MARKNUM_FOLDEROPEN,    Wx::wxSTC_MARK_BOXMINUS, $w, $b);
+
+		# This would be nice but the colour used for drawing the lines is 
+		# Wx::wxSTC_STYLE_DEFAULT, i.e. usually black and therefore quite
+		# obtrusive...
+		# $self->SetFoldFlags( Wx::wxSTC_FOLDFLAG_LINEBEFORE_CONTRACTED | Wx::wxSTC_FOLDFLAG_LINEAFTER_CONTRACTED );
+
+		# activate 
+		$self->SetProperty('fold' => 1);
+
+		Wx::Event::EVT_STC_MARGINCLICK(
+		    $self,
+    		Wx::wxID_ANY,
+    		sub {
+        		my ( $editor, $event ) = @_;
+        		if ( $event->GetMargin() == 2 ) {
+            		my $line_clicked = $editor->LineFromPosition( $event->GetPosition() );
+            		my $level_clicked = $editor->GetFoldLevel($line_clicked);
+                    # TODO check this (cf. ~/contrib/samples/stc/edit.cpp from wxWidgets)
+            		#if ( $level_clicked && wxSTC_FOLDLEVELHEADERFLAG) > 0) {
+                		$editor->ToggleFold($line_clicked);
+            		#}
+        		}
+    		}
+		);
+	}
+	else {
+		$self->SetMarginSensitive(2, 0);
+        $self->SetMarginWidth(2, 0);
+		# deactivate
+        $self->SetProperty('fold' => 1);
+	}
+
+	return;
+}
+
 sub set_preferences {
 	my ($self) = @_;
 
 	my $config = Padre->ide->config;
 
 	$self->show_line_numbers(    $config->{editor_linenumbers}       );
+	$self->show_folding(         $config->{editor_codefolding}       );
 	$self->SetIndentationGuides( $config->{editor_indentationguides} );
 	$self->SetViewEOL(           $config->{editor_eol}               );
+	$self->SetViewWhiteSpace(    $config->{editor_whitespaces}       );
+	$self->show_currentlinebackground( $config->{editor_currentlinebackground} );
 
 	$self->SetTabWidth( $config->{editor_tabwidth} );
 	$self->SetUseTabs(  $config->{editor_use_tabs} );
+
+	return;
+}
+
+sub show_currentlinebackground {
+	my ($self, $on) = (@_);
+
+	$self->SetCaretLineBackground( Wx::Colour->new(238, 238, 238, 255) );
+	$self->SetCaretLineVisible( ( defined($on) && $on ) ? 1 : 0 );
 
 	return;
 }
@@ -242,6 +329,9 @@ sub show_calltip {
 sub autoindent {
 	my ($self) = @_;
 
+	my $config = Padre->ide->config;
+	return if not $config->{editor_autoindent} or $config->{editor_autoindent} eq 'no';
+	
 	my $pos       = $self->GetCurrentPos;
 	my $prev_line = $self->LineFromPosition($pos) -1;
 	return if $prev_line < 0;
@@ -251,12 +341,18 @@ sub autoindent {
 	#my $length    = $self->LineLength($prev_line);
 	my $content   = $self->GetTextRange($start, $end);
 	#print "'$content'\n";
+	my $indent = '';
 	if ($content =~ /^(\s+)/) {
-		my $indent = $1;
+		$indent = $1;
+	}
+	if ($config->{editor_autoindent} eq 'deep' and $content =~ /\{\s*$/) {
+		$indent .= "\t";
+	}
+	if ($indent ne '') {
 		$self->InsertText($pos, $indent);
 		$self->GotoPos($pos + length($indent));
 	}
-
+	
 	return;
 }
 
@@ -330,7 +426,7 @@ sub on_right_down {
 	}
 	Wx::Event::EVT_MENU( $win, # Ctrl-C
 		$copy,
-		sub { \&text_copy_to_clipboard(@_) },
+		sub { text_copy_to_clipboard() },
 	);
 
 	my $cut = $menu->Append( Wx::wxID_CUT, '' );
@@ -350,7 +446,7 @@ sub on_right_down {
 		if ( $ok && $data->GetTextLength > 0 && $win->{notebook}->GetPage($id)->CanPaste ) {
 			Wx::Event::EVT_MENU( $win, # Ctrl-V
 				$paste,
-				sub { \&text_paste_from_clipboard(@_) },
+				sub { text_paste_from_clipboard() },
 			);
 		}
 		else {
@@ -392,8 +488,52 @@ sub text_select_all {
 	return;
 }
 
+sub text_selection_mark_start {
+	my ($win) = @_;
+
+	# find positions
+	my $notebook = $win->{notebook};
+	my $id   = $notebook->GetSelection;
+	my $page = $notebook->GetPage($id);
+	$page->{selection_mark_start} = $page->GetCurrentPos;
+	
+	# change selection if start and end are defined
+	$page->SetSelection(
+		$page->{selection_mark_start},
+		$page->{selection_mark_end}
+	) if defined $page->{selection_mark_end};
+}
+
+sub text_selection_mark_end {
+	my ($win) = @_;
+
+	# find positions
+	my $notebook = $win->{notebook};
+	my $id   = $notebook->GetSelection;
+	my $page = $notebook->GetPage($id);
+	$page->{selection_mark_end} = $page->GetCurrentPos;
+	
+	# change selection if start and end are defined
+	$page->SetSelection(
+		$page->{selection_mark_start},
+		$page->{selection_mark_end}
+	) if defined $page->{selection_mark_start};
+}
+
+sub text_selection_clear_marks {
+	my ($win) = @_;
+
+	# find positions
+	my $notebook = $win->{notebook};
+	my $id   = $notebook->GetSelection;
+	my $page = $notebook->GetPage($id);
+
+	undef $page->{selection_mark_start};
+	undef $page->{selection_mark_end};
+}
+
 sub text_copy_to_clipboard {
-	my ( $win, $event ) = @_;
+	my $win = Padre->ide->wx->main_window;
 
 	my $id = $win->{notebook}->GetSelection;
 	return if $id == -1;
@@ -409,7 +549,7 @@ sub text_copy_to_clipboard {
 }
 
 sub text_cut_to_clipboard {
-	my ( $win, $event ) = @_;
+	my $win = Padre->ide->wx->main_window;
 
 	my $id = $win->{notebook}->GetSelection;
 	return if $id == -1;
@@ -426,7 +566,7 @@ sub text_cut_to_clipboard {
 }
 
 sub text_paste_from_clipboard {
-    my ( $win, $event ) = @_;
+	my $win = Padre->ide->wx->main_window;
 
 	my $id  = $win->{notebook}->GetSelection;
 	return if $id == -1;
@@ -446,6 +586,7 @@ sub text_paste_from_clipboard {
 			$length = 1;
 		}
 	}
+	$win->{notebook}->GetPage($id)->ReplaceSelection('');
 	my $pos = $win->{notebook}->GetPage($id)->GetCurrentPos;
 	$win->{notebook}->GetPage($id)->InsertText( $pos, $text );
 	$win->{notebook}->GetPage($id)->GotoPos( $pos + $length - 1 );

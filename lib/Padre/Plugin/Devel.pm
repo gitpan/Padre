@@ -1,19 +1,22 @@
-package Padre::Plugin::Development::Tools;
+package Padre::Plugin::Devel;
+
 use strict;
 use warnings;
 
-
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 use Padre::Wx ();
 
+use Wx         ':everything';
+use Wx::Menu   ();
+use Wx::Locale qw(:default);
+
+use File::Basename ();
+use File::Spec     ();
 use Data::Dumper   ();
+use Padre::Util    ();
 
-=head1 NAME
-
-Padre::Plugin::Development::Tools - tools used by the Padre developers
-
-=cut
+sub menu_name { 'Development Tools' }
 
 # TODO fix this
 # we need to create anonymous subs in order to makes
@@ -21,11 +24,11 @@ Padre::Plugin::Development::Tools - tools used by the Padre developers
 # A better to replace the whole Plugins/ menu when we
 # reload plugins.
 my @menu = (
-	['About',          sub {about(@_)}          ],
 	['Show %INC',      sub {show_inc(@_)}       ],
-	['Reload plugins', sub {reload_plugins(@_)} ],
-	['Info',           sub {info(@_)} ],
+	['Info',           sub {info(@_)}           ],
+	['About',          sub {about(@_)}          ],
 );
+
 sub menu {
     my ($self) = @_;
 	return @menu;
@@ -35,7 +38,7 @@ sub about {
 	my ($main) = @_;
 
 	my $about = Wx::AboutDialogInfo->new;
-	$about->SetName("Padre::Plugin::Development::Tools");
+	$about->SetName("Padre::Plugin::Devel");
 	$about->SetDescription(
 		"A set of unrelated tools used by the Padre developers\n" .
 		"Some of these might end up in core Padre or in oter plugins"
@@ -67,26 +70,29 @@ sub show_inc {
 	
 }
 
-sub reload_plugins {
-	my ($main) = @_;
-
-	my $manager = Padre->ide->plugin_manager;
-	my $plugins = $manager->plugins;
-	%$plugins = ();
-#	foreach my $k (keys %INC) {
-#		if ($k =~ m{^Padre/Plugin/}) {
-#			print "$k\n";
-#			delete $INC{$k};
-#		}
-#	}
-	delete $INC{'Padre/Plugin/Development/Tools.pm'};
-	$manager->load_plugins;
-
-	Wx::MessageBox( "done", "done", Wx::wxOK|Wx::wxCENTRE, $main );
-	
-	return;
-}
-
-
-
 1;
+
+__END__
+
+=head1 NAME
+
+Padre::Plugin::Development::Tools - tools used by the Padre developers
+
+=head1 DESCRIPTION
+
+=head2 Show %INC
+
+Dumper %INC
+
+=head2 Info
+
+=head2 About
+
+=head1 AUTHOR
+
+Gabor Szabo
+
+=head1 LICENSE
+
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl itself.

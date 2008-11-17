@@ -6,11 +6,12 @@ use warnings;
 use Storable      ();
 use File::Path    ();
 use File::Spec    ();
+use File::Copy    ();
 use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 
 
@@ -61,6 +62,19 @@ sub default_plugin_dir {
 		die "Cannot create plugins dir '$plugins_full_path' $!";
 	}
 
+	# copy the MY Plugin
+	my $file = File::Spec->catfile( $plugins_full_path, 'MY.pm' );
+	if (not -e $file) {
+		my $src = File::Spec->catfile( File::Basename::dirname($INC{'Padre/Config.pm'}), 'Plugin', 'MY.pm' );
+		if (not $src) {
+			die "Could not find the original MY plugin";
+		}
+		if (not File::Copy::copy($src, $file) ) {
+			return die "Could not copy the MY plugin ($src) to : $!";
+		}
+		chmod 0644, $file;
+	}
+
 	return $pluginsdir;
 }
 
@@ -81,6 +95,7 @@ sub new {
 	$self->{host}->{main_left}      ||= Wx::wxDefaultPosition()->x;
 	$self->{host}->{main_top}       ||= Wx::wxDefaultPosition()->y;
 	$self->{host}->{main_maximized} ||= 0;
+	$self->{host}->{locale}         ||= 'en';
 
 	# Files that were previously open (and can be still)
 	unless ( _ARRAY($self->{host}->{main_files}) ) {
@@ -112,12 +127,15 @@ sub new {
 		# Look and feel preferences
 		main_statusbar            => 1,
 		main_output               => 0,
+		main_rightbar             => 1,
 		editor_use_tabs           => 1,
 		editor_tabwidth           => 4,
 		editor_linenumbers        => 0,
 		editor_eol                => 0,
 		editor_indentationguides  => 0,
 		editor_calltips           => 1,
+		editor_autoindent         => 'deep',
+		editor_whitespaces        => 0,
 
 		# When running a script from the application some of the files might have not been saved yet.
 		# There are several option what to do before running the script
@@ -141,10 +159,15 @@ sub new {
 
 		# By default, don't enable experimental features
 		experimental              => 0,
+		vi_mode                   => 0,
 
 	);
 	%$self = (%defaults, %$self);
 
+	if ($self->{vi_mode}) {
+		require Padre::Wx::Editor::Vi;
+		require Padre::Wx::Dialog::CommandLine;
+	}
 	return $self;
 }
 

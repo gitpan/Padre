@@ -11,7 +11,7 @@ use ORLite 0.15 {
 	tables => 0,
 };
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 # At load time, autocrate if needed
 unless ( Padre::DB->pragma('user_version') == 2 ) {
@@ -160,6 +160,17 @@ sub get_recent {
 		{}, $type,
 	) or die "Failed to find revent files";
 	return wantarray ? @$recent : $recent;
+}
+
+sub delete_recent {
+	my ( $class, $type ) = @_;
+	
+	$class->do(
+		"DELETE FROM history WHERE type = ?",
+		{}, $type
+	);
+	
+	return 1;
 }
 
 sub get_last {

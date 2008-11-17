@@ -6,17 +6,29 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use File::Spec     ();
+use File::Spec          ();
 use File::ShareDir::PAR ();
 
 # Load every exportable constant into here, so that they come into
 # existance in the Wx:: packages, allowing everywhere else in the code to
 # use them without braces.
-use Wx        ':everything';
-use Wx::Event ':everything';
-use Wx::AUI   ();
+use Wx         ':everything';
+use Wx::Event  ':everything';
+use Wx::AUI    ();
+use Wx::Locale ':default';
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
+
+
+
+
+
+#####################################################################
+# Defines for sidebar marker; others may be needed for breakpoint
+# icons etc.
+
+sub MarkError { 1 }
+sub MarkWarn  { 2 }
 
 
 
@@ -52,9 +64,10 @@ sub bitmap {
 		Wx::wxBITMAP_TYPE_XPM,
 	);
 }
+
 sub tango {
 	Wx::Bitmap->new(
-		sharefile( 'tango', '16x16', $_[0] ),
+		sharefile( 'tango', '16x16', @_ ),
 		Wx::wxBITMAP_TYPE_PNG,
 	);
 }

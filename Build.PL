@@ -25,6 +25,7 @@ my %prereqs = (
 	'List::Util'              => 0,
 	'IO::Socket'              => 0,
 	'Term::ReadLine'          => 0,
+	'Module::Refresh'		  => 0,
 
 	'App::Ack'                => '1.86',
 	'Class::Autouse'          => '1.26',
@@ -35,7 +36,7 @@ my %prereqs = (
 	'File::HomeDir'           => 0,
 #	'File::LocalizeNewlines'  => '1.10',
 	'File::ShareDir'          => '1.00',
-	'File::ShareDir::PAR'     => '0.02',
+	'File::ShareDir::PAR'     => '0.03',
 	'File::Slurp'             => 0,
 	'File::Which'             => '0.05',
 	'Module::Inspector'       => '0.04',

@@ -23,6 +23,9 @@ Not only it is missing several important feature, everything is in
 a constant flux. Menus, shortcuts and the way they work will change
 from version to version.
 
+Configuration options are also changing which means if you configure it in
+one version you might need to configure it again.
+
 Having said that you can already use it for serious editing and you
 can even get involved and add the missing features.
 
@@ -30,6 +33,25 @@ You should also know that I am mostly working on Linux and I
 have been using vi for many years now. This means that I am 
 not that familiar with the expectations of people using 
 Windows.
+
+=head1 Getting Started
+
+After installing Padre you can start it by typing B<padre> on the command line.
+On Windows that would be Start/Run padre.bat
+
+(TODO) By default Padre starts with an editor containing a simple Perl script
+and instructions. 
+
+You can edit the file and save it using File/Save (Ctrl-S ).
+
+You can run the script by pressing Run/Run Script (F5)
+
+You can start new files File/New (Ctrl-N) 
+or open existing files File/Open (Ctrl-O).
+
+By default Padre uses the same perl interpreter fo 
+executing code that it uses for itself but this will be configurable
+later.
 
 =head1 FEATURES
 
@@ -39,8 +61,127 @@ of existing and planned features.
 
 =head1 DESCRIPTION
 
+=head2 Configuration
+
 The application maintains its configuration information in a 
 directory called F<.padre>.
+
+
+=head2 Files operations
+
+B<File/New> creates a new empty file. By default Padre assumes this is a perl script.
+(TODO later this default will be configurable).
+
+B<File/Open>  allows you to select brows for a file and select it for opening.
+
+B<File/Open Selection>, (Ctrl-Shift-O) if there is a selected text this will
+try to locate files that match the selction. If the selection looks like a path
+Padre will try to open that path either absolute or relative.
+If it looks like a module name (Some::Thing) it will try to find the appropriate file
+Some/Thing.pm in @INC and open it.
+currently this feature opens the firs file encountered. 
+(TODO it should find all the possibilities and if there are multiple hits
+offer the user to choose. This will be especially important if we are 
+working on a module that is also already installed. Padre might
+find the installed version first while we might want to open the 
+development version.)
+
+(TODO: when the file is not of perl type we should have other ways to recognize
+files from internal naming and have pathes to search. Surprise, not every
+language uses @INC.)
+
+B<File/Close> checks if the file is saved, if it is closes the current tab.
+
+B<File/Close All> closes all the file (in case they are not saved yet ask for instructions).
+
+B<File/Close All but Current Document>. 
+
+B<File/Reload File> is interesting if you either made changes and want to discard them
+and/or if the file has changed on the disk. If there are unsaved changes Padre will ask 
+you if you really want to throw them away. (TODO: make a backup of the file before discarding it)
+
+B<File/Save> Ctrl-S - save the current file. If the buffer has not yet save and has no filename
+associated with it, Padre will ask you for a filename.
+
+B<File/Save As> - Offer the user to select a new filename and save the content under that name.
+
+B<File/Save All> - Save all the currently opened files.
+
+B<File/Convert> - Convert line endings to Windows, Unix or Mac Classic style.
+(TODO stop the autoconversion of mixed files, just report them.)
+
+B<Files/Recent Files> - a list of recently opened files to open them easily.
+(TODO: update the list when we open a file, not only when opening padre)
+(TODO: allow the user to configure size of history)
+
+B<File/Doc Stats> - just random statistics about the current document.
+(TODO: If you miss anything important let us know!)
+
+B<File/Quit> also called exit.
+
+
+=head2 Simple editing
+
+The simple editing features (should) provide the expected behavior
+for Windows users.
+
+B<Edit/Undo> Ctrl-Z
+
+B<Edit/Redo>
+
+B<Edit/Select All> Ctrl-A , select all the characters in the current document
+
+B<Edit/Copy> Ctrl-C
+
+B<Edit/Cut> Ctrl-X
+
+B<Edit/Paste> Ctrl-V
+
+
+(TODO What is Ctrl-D ?, duplicate the current line?)
+
+=head2 Mouse right click
+
+Click on the right button of the mouse brings up a context sensitive menu.
+It provides the basic editing functions and will provide other context 
+sensitive options.
+
+
+=head2 Projects (TODO)
+
+Padre will have the notion of a Perl project. As we would like 
+to make things as natural as possible for the perl developer
+and we think the distribution methods used for CPAN module are
+a good way to handle any project Padre will understand a project
+as a CPAN module. This does not mean that you project needs to end
+up on CPAN of course. But if your projects directory structure
+follows that of the modules on CPAN, Padre will be automtically
+recognize it.
+
+
+=head2 Module::Starter
+
+As a first step in the direction of supporting CPAN-style perl
+projects we integrated into Padre the use of L<Module::Starter>
+
+B<File/New.../Perl Distribution> will bring up a dialog box where
+you can select some of the parameters your new project has such
+as Name of the Project (e.g. My::Widgets), Author - that is probably 
+your name, e-mail (your e-mail).
+
+Builder is the tool that you project is going to use to package itself 
+and then your user will use to install the project. 
+Currently L<Module::Build> and L<ExtUtils::MakeMaker> are supported.
+(TODO add Module::Install as well).
+
+License is one of the keywords currently listed in the META.yml spec of
+Module::Build. (TODO: update the list or make it dynamic)
+
+Once you click B<OK>, Module::Starter will create a new 
+directory called My-Widgets in the parent directory you selected 
+in the last field.
+
+=head2 Other
 
 On Strawberry Perl you can associate .pl file extension with
 C:\strawberry\perl\bin\wxperl and then you can start double 
@@ -61,6 +202,25 @@ option. Currently Ctrl-F5 does not save any file.
 
 You can edit the command line using the Run/Setup menu item.
 
+=head2 Bookmarks
+
+B<View/Set Bookmark> (Ctrl-B) brings up a window with a
+predefined text containing the file name and line number
+(TODO should be the content of the current line).
+
+B<View/Goto Bookmark> (Ctrl-Shift-B) brings up a window with the
+list of available bookmarks. You can select one and press B<OK>
+to jump to that location. If the file where the bookmark belongs
+to is not open currently, it will be opened and the cursor will
+jump to the desired place.
+
+In both cases while the window is open you can select 
+existing bookmarks and press the B<Delete> button to remove the
+selected one or press B<Delete All> to remove all the existing
+bookmarks.
+
+=head2 Navigation
+
   Ctr-1          matching brace
   Ctr-P          Autocompletition
   Alt-N          Nth Pane
@@ -68,8 +228,6 @@ You can edit the command line using the Run/Setup menu item.
   Ctr-Shift-TAB  Previous Pane
   Alt-S          Jump to list of subs window
   
-  Ctr-1 .. Ctrl-9 can set markers
-  Ctr-Shift-1 .. Ctrl-Shift-9 jump to marker
   
   Ctr-M Ctr-Shift-M  comment/uncomment selected lines of code
   
@@ -208,6 +366,19 @@ On the other hand the "TAB display size" is purely a local, edior
 oriented preference. It should probably apply to all files currently
 open.
 
+There are other aspects of preferences as well that might not exactly 
+overlap with the above set:
+
+The developer might work on the same project on different machines.
+In such case some of the personal preferences should apply only 
+only on one computer while others apply in both places.
+
+In particular if Padre is installed in a Portable Perl it might 
+run on machines with different parameters. Screen size and resolution
+might be different along other parameters. We would like to make sure
+the relevant preferences are separated from those that are constant
+even when moving betwen computers.
+
 =head2 Editor or view oriented preferences
 
 =over 4
@@ -226,11 +397,39 @@ open.
 
 =item Show indentation guide
 
+B<View/Show Indentation Guide>
+
+When set, Padre will display a thin vertical line at every indentation
+level on every row with are indented more than one level.
+
+=item Highlight indentation guide (TODO)
+
+This should be a separate option available only
+if the C<Show indentation guide> and brace matching is on.
+
+If SetHighlightGuide is set to 8 then when the user reaches one
+side of a pair of praces the indentation guide - if there is one
+on column 8 - will be highlighted. (in green).
+
+As I understand Padre should constantly adjust the SetHighlightGuide
+so that in every block the "correct" indentation guide is highlighted.
+
 =item Show Call Tips
 
 =item TAB display size
 
 =item Allow experimental features
+
+In order to allow the experimental features one needs to manually turn on the
+experimental flag to 1 in config.yml. As Padre keeps overwriting this file you'll 
+have to make this change with another editor and while Padre is B<not> open.
+
+The config.yml file is in ~/.padre/ on Linux/Unix and in general in
+your home directory on Windows. In any case the B<Help/About> box will show
+you the path of the .padrfe directory of Padre.
+
+Once you set the experimental flag when you start Padre you will see a new
+menu on the right side of the menu bar called B<Experimental>.
 
 =item Open file policy
 
@@ -239,11 +438,43 @@ nothing, new, those that were open last time?
 
 =item Max/Min number of modules to display in podviewer
 
-=item Autoindentation on/off?
+=item Autoindentation 
+
+Possible values: no/same level/deep
+
+There are at least two levels of autoindentation:
+
+1) when ENTER is pressed indent to exactly the same level as the previous line
+
+2) if there is an opening brace { on the previous line, indent one level more
+
+=item Brace matching
+
+When the cursor reaches an opening or closing brace { }, square bracket [ ]
+or parentheses ( ), Padre automatically highlight the pair of the braces.
+
+TODO make this optional, let the user set the color
+
 
 =item Autosave on/off?
 
-=item Autobackup (Planned)
+=back
+
+=head2 File and Project oriented preferences
+
+=over 4
+
+=item Indentation should be by TABs or spaces
+
+=item In case of using spaces for indentation, the width  of every indentation level
+
+=back
+
+=head1 Other features
+
+=head2 Autobackup (Planned)
+
+See L<Padre::Autosave>
 
 When Padre opens a file it automatically creates a copy of the original
 in ~/.padre/backup/PATH  where PATH is the same PATH as the full PATH of
@@ -258,7 +489,7 @@ When a remote file is opened the backup will probably go to
 
 Configurable options: on/off
 
-=item Autosave files (Planned)
+=head2 Autosave files (Planned)
 
 Every N seconds all the files changed since the last autosave are 
 saved to a temporary place maybe ~/.padre/save.
@@ -267,17 +498,19 @@ When the user closes the file, the autosaved file is removed.
 
 Configurable options: on/off, frequency in seconds
 
-=back
 
-=head2 File and Project oriented preferences
+=head1 SQLite
 
-=over 4
+Padre is using an SQLite database (~/.padre/config.db) for two 
+things.
+Part of the preferences/configuration information is kept there
+and it is used for the podreader.
 
-=item Indentation should be by TABs or spaces
+=head1 Documentation POD reader
 
-=item In case of using spaces for indentation, the width  of every indentation level
-
-=back
+Padre currently can index (the names of) all the modules on
+your system and it was planned to have a search capability for
+modules/functions/etc.
 
 =head1 Plugins
 
@@ -298,6 +531,10 @@ which is a list of lists:
 Padre will add a menu entry for every plugin under the B<Plugins>
 menu item. For each plugin menu item it will add all the Name_1,
 Name_2 subitems.
+
+If the B<menu_name> method is provided its return value will be the displayed
+entry in the Plugins/ menu. If this method is omitted the name of the plugin
+without the Padre::Plugin part will be used.
 
 See also L<Padre::PluginManager> and L<Padre::PluginBuilder> 
 
@@ -385,6 +622,60 @@ If the user then presses Replace we open the file in an editor window and go on.
 If the user presses Search then we show the next occurance.
 Opened and edited files will be left in a not saved state.
 
+
+=head1 Code layout
+
+Padre.pm is the main module.
+
+L<Padre::Config> reads/writes the configuration files.
+
+There is an SQLite database and a yml file to keep various pices of information
+The SQLite database holds the list of modules available on the system.
+It will also contain indexing of the documentation
+Looking at the C<X<>> entries of modules
+List of functions
+
+The yml file contains individual configuration options
+
+L<Padre::Document> is an abstraction class to deal with a single document.
+
+L<Padre::Documents> aggregated the list of all currently open documents.
+
+L<Padre::DB> is the database abstraction for SQLite.
+
+L<Padre::PluginManager> locates and loads the plugins.
+
+L<Padre::PluginBuilder> 
+
+L<Padre::PPI>
+
+=head2 Wx GUI
+
+The Padre::WX::* namespace is supposed to deal with all the 
+wx related code. Outside of that the code is not supposed to
+know about wx, but currently it still does. 
+
+L<Padre::Wx::Dialog> is the parent class of all the major dialogs
+that are all implemented in modules in the C<Padre::Wx::Dialog::*>
+namespace.
+
+L<Padre::Wx::App> is the L<Wx::App> subclass
+
+L<Padre::Wx::MainWindow> is the main frame, most of the code is currently there.
+
+L<Padre::Wx::Editor> holds an editor text control instance (one for each buffer/file).
+
+L<Padre::Wx::Menu> handles everythin the menu should know and do.
+
+L<Padre::Wx::ToolBar> handles everythin the toolbar should know and do.
+
+L<Padre::Wx::Output> - the output window.
+
+=head2 POD viewer
+
+Padre::Pod::* are there to index and show documentation written in pod.
+TODO: One day we might be able to factor it out into a separate pod-viewer class.
+
 =cut
 
 use 5.008;
@@ -399,7 +690,7 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -635,26 +926,6 @@ END_USAGE
 =head1 BUGS
 
 Please submit your bugs at L<http://padre.perlide.org/>
-
-=head1 Code layout
-
-Padre is the main module that reads/writes the configuration files
-There is an SQLite database and a yml file to keep various pices of information
-The SQLite database holds the list of modules available on the system.
-It will also contain indexing of the documentation
-Looking at the X<> entries of modules
-List of functions
-
-The yml file contains individual configuration options
-
-Padre::Wx::App is the Wx::App subclass
-
-Padre::Wx::MainWindow is the main frame, most of the code is currently there.
-
-Padre::Wx::Editor holds an editor text control instance
-(one for each buffer/file)
-
-Padre::Pod::* are there to index and show documentation written in pod.
 
 =head1 SUPPORT
 

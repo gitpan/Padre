@@ -8,10 +8,10 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Wx::Locale        qw(:default);
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 sub get_layout {
-	my ($config, $main_startup) = @_;
+	my ($config, $main_startup, $editor_autoindent) = @_;
 
 	return [
 		[
@@ -35,6 +35,15 @@ sub get_layout {
 			[ 'Wx::Choice',     'main_startup',    $main_startup],
 		],
 		[
+			[ 'Wx::StaticText', undef,              gettext('Autoindent:')],
+			[ 'Wx::Choice',     'editor_autoindent',    $editor_autoindent],
+		],
+		[
+			[ 'Wx::StaticText', undef,              gettext('Default word wrap on for each file')],
+			['Wx::CheckBox',    'editor_use_wordwrap', '',
+				($config->{editor_use_wordwrap} ? 1 : 0) ],
+		],
+		[
 			[ 'Wx::Button',     '_ok_',           Wx::wxID_OK     ],
 			[ 'Wx::Button',     '_cancel_',       Wx::wxID_CANCEL ],
 		],
@@ -42,10 +51,10 @@ sub get_layout {
 }
 
 sub dialog {
-	my ($class, $win, $main_startup) = @_;
+	my ($class, $win, $main_startup, $editor_autoindent) = @_;
 
 	my $config = Padre->ide->config;
-	my $layout = get_layout($config, $main_startup);
+	my $layout = get_layout($config, $main_startup, $editor_autoindent);
 	my $dialog = Padre::Wx::Dialog->new(
 		parent => $win,
 		title  => gettext("Preferences"),
@@ -73,8 +82,12 @@ sub run {
 		$config->{main_startup},
 		grep { $_ ne $config->{main_startup} } qw( new nothing last )
 	);
+	my @editor_autoindent = (
+		$config->{editor_autoindent},
+		grep { $_ ne $config->{editor_autoindent} } qw( no same_level deep )
+	);
 
-	my $dialog = $class->dialog( $win, \@main_startup );
+	my $dialog = $class->dialog( $win, \@main_startup, \@editor_autoindent );
 	return if not $dialog->show_modal;
 
 	my $data = $dialog->get_data;
@@ -82,10 +95,12 @@ sub run {
 	foreach my $f (qw(pod_maxlist pod_minlist editor_tabwidth)) {
 		$config->{$f} = $data->{$f};
 	}
-	foreach my $f (qw(editor_use_tabs)) {
+	foreach my $f (qw(editor_use_tabs editor_use_wordwrap)) {
 		$config->{$f} = $data->{$f} ? 1 :0;
 	}
-	$config->{main_startup}    = $main_startup[ $data->{main_startup} ];
+
+	$config->{main_startup}        = $main_startup[ $data->{main_startup} ];
+	$config->{editor_autoindent}   = $editor_autoindent[ $data->{editor_autoindent} ];
 
 	return;
 }

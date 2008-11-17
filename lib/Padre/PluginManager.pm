@@ -7,7 +7,11 @@ use File::Path   ();
 use File::Spec   ();
 use File::Find::Rule;
 
-our $VERSION = '0.16';
+use Padre::Wx    ();
+use Padre::Util  ();
+use Wx::Locale qw(:default);
+
+our $VERSION = '0.17';
 
 =pod
 
@@ -139,7 +143,7 @@ sub _load_plugins_from_inc {
 	
 	my @dirs = grep {-d $_} map {File::Spec->catdir($_, 'Padre', 'Plugin')} @INC;
 	
-	my @files = File::Find::Rule->file()->name('*.pm')->in( @dirs );
+	my @files = File::Find::Rule->file()->name('*.pm')->maxdepth(1)->in( @dirs );
 	foreach my $file (@files) {
 		# full path filenames
 		$file =~ s/\.pm$//;
@@ -159,9 +163,12 @@ sub _load_plugins_from_par {
 	opendir my $dh, $plugin_dir or return;
 	while (my $file = readdir $dh) {
 		if ($file =~ /^\w+\.par$/i) {
+                # only single-level plugins for now.
+		#if ($file =~ /^[\w-]+\.par$/i) {
 			my $parfile = File::Spec->catfile($plugin_dir, $file);
-			$file =~ s/\.par$//i;
 			PAR->import($parfile);
+			$file =~ s/\.par$//i;
+                        $file =~ s/-/::/g;
 			$self->_load_plugin($file);
 		}
 	}
@@ -189,22 +196,107 @@ sub _setup_par {
 # given a plugin name such as Foo or Foo::Bar (the part after Padre::Plugin),
 # load the corresponding module
 sub _load_plugin {
-	my ($self, $file) = @_;
+	my ($self, $plugin_name) = @_;
 	my $plugins = $self->plugins;
 
 	# skip if that plugin was already loaded
-	return if exists $plugins->{$file};
+	return if exists $plugins->{$plugin_name};
 
-	my $module = "Padre::Plugin::$file";
+	my $module = "Padre::Plugin::$plugin_name";
 	eval "use $module"; ## no critic
 	if ($@) {
-		warn "ERROR while trying to load plugin '$file': $@";
+		warn "ERROR while trying to load plugin '$plugin_name': $@";
 		return;
 	}
-	$plugins->{$file} = $module;
+	$plugins->{$plugin_name} = $module;
 	return 1;
 }
 
+sub reload_plugins {
+    my ( $win ) = @_;
+
+	require Module::Refresh;
+    my $refresher = Module::Refresh->new;
+
+    my %plugins = %{ Padre->ide->plugin_manager->plugins };
+    foreach my $name ( sort keys %plugins ) {
+		reload_module( $refresher, $name );
+    }
+    reload_menu($win);
+}
+
+sub reload_plugin {
+	my ( $win, $name ) = @_;
+	
+	require Module::Refresh;
+	my $refresher = Module::Refresh->new;
+	reload_module( $refresher, $name );
+	reload_menu($win);
+	return;
+}
+
+sub reload_module {
+    my ( $refresher, $name ) = @_;
+	my $file_in_INC = "Padre/Plugin/${name}.pm";
+	$file_in_INC =~ s/\:\:/\//;
+	$refresher->refresh_module($file_in_INC);
+	return;
+}
+
+
+sub reload_menu {
+    my ( $win ) = @_;
+
+    # re-create menu,
+    my $plugin_menu = $win->{menu}->menu_plugin( $win );
+    my $plugin_menu_place = $win->{menu}->{wx}->FindMenu( gettext("Pl&ugins") );
+    $win->{menu}->{wx}->Replace( $plugin_menu_place, $plugin_menu, gettext("Pl&ugins") );
+    
+    $win->{menu}->refresh;
+    
+    Wx::MessageBox( 'done', 'done', Wx::wxOK|Wx::wxCENTRE, $win );
+}
+
+sub test_a_plugin {
+    my ( $win ) = @_;
+
+    my $config = Padre->ide->config;
+    my $last_filename = $config->{last_test_plugin_file};
+    $last_filename  ||= $win->selected_filename;
+    my $default_dir;
+    if ($last_filename) {
+        $default_dir = File::Basename::dirname($last_filename);
+    }
+    my $dialog = Wx::FileDialog->new(
+        $win, gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
+    );
+    unless ( Padre::Util::WIN32 ) {
+        $dialog->SetWildcard("*");
+    }
+    if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+        return;
+    }
+    my $filename = $dialog->GetFilename;
+    $default_dir = $dialog->GetDirectory;
+    
+    my $file = File::Spec->catfile($default_dir, $filename);
+    
+    # save into plugin for next time
+    $config->{last_test_plugin_file} = $file;
+    
+    ( $default_dir, $filename ) = split(/Padre[\\\/]Plugin[\\\/]/, $file, 2);
+    $filename    =~ s/\.pm$//; # remove last .pm
+    $filename    =~ s/[\\\/]/\:\:/;
+    
+    unshift @INC, $default_dir unless ($INC[0] eq $default_dir);
+    my $plugins = Padre->ide->plugin_manager->plugins;
+    $plugins->{$filename} = "Padre::Plugin::$filename";
+    eval { require $file; 1 }; # load for Module::Refresh
+    return $win->error( $@ ) if ( $@ );
+    
+    # reload all means rebuild the 'Plugins' menu
+    reload_plugins( $win );
+}
 
 1;
 

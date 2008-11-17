@@ -6,6 +6,7 @@ inc/Padre/Install.pm
 
 lib/Padre.pm
 lib/Padre/Wx/Ack.pm
+lib/Padre/Autosave.pm
 lib/Padre/Config.pm
 lib/Padre/DB.pm
 lib/Padre/Document.pm
@@ -17,20 +18,25 @@ lib/Padre/Util.pm
 lib/Padre/PPI.pm
 lib/Padre/Wx.pm
 
+lib/Padre/Document/JavaScript.pm
 lib/Padre/Document/Pasm.pm
 lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl6.pm
 lib/Padre/Document/Pir.pm
 
-lib/Padre/Plugin/Development/Tools.pm
+lib/Padre/Plugin/Devel.pm
+lib/Padre/Plugin/MY.pm
 
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
+lib/Padre/Wx/Dialog/CommandLine.pm
 lib/Padre/Wx/Dialog/Find.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/Preferences.pm
+lib/Padre/Wx/DNDFilesDropTarget.pm
 lib/Padre/Wx/Editor.pm
+lib/Padre/Wx/Editor/Vi.pm
 lib/Padre/Wx/MainWindow.pm
 lib/Padre/Wx/Menu.pm
 lib/Padre/Wx/Output.pm
@@ -54,14 +60,19 @@ t/00-compile.t
 t/01-load.t
 t/02-new.t
 t/03-wx.t
+t/60-db.t
 t/70-document.t
+t/71-perl.t
 t/80-newline.t
 t/81-search.t
 t/82-plugin-manager.t
+t/83-autosave.t
 t/lib/Padre.pm
 t/lib/Padre/Plugin/TestPlugin.pm
 t/lib/Padre/Plugin/Test/Plugin.pm
 t/lib/Padre/Editor.pm
+
+t/files/missing_brace_1.pl
 
 xt/99-critic.t
 xt/90-pod.t
@@ -81,7 +92,6 @@ eg/wx/03_button.pl
 eg/wx/04_button_with_event.pl
 
 share/locale/de.po
-share/locale/de.mo
 
 share/templates/template.pl
 share/templates/template.pm
@@ -103,6 +113,5 @@ share/tango/16x16/actions/edit-undo.png
 share/tango/16x16/emblems/emblem-unreadable.png
 
 
+share/locale/de.mo
 META.yml
-
-

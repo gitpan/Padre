@@ -23,9 +23,6 @@ use 5.008;
 use strict;
 use warnings;
 use File::Spec  ();
-use File::Slurp ();
-use List::Util  ();
-use Class::Autouse ();
 use Carp        ();
 use Wx qw{
 	wxSTC_LEX_ADA
@@ -68,7 +65,7 @@ use Wx::STC;
 
 use Padre::Util;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 
 my $cnt   = 0;
 
@@ -138,6 +135,7 @@ our %MIME_CLASS = (
 	'application/x-perl6' => 'Padre::Document::Perl6',
 	'text/pasm'  => 'Padre::Document::Pasm',
 	'text/pir'   => 'Padre::Document::Pir',
+	'text/ecmascript' => 'Padre::Document::JavaScript',
 );
 
 our %MIME_LEXER = (
@@ -222,6 +220,7 @@ sub rebless {
 	# do for a first implementation.
 	my $subclass = $MIME_CLASS{$self->mimetype} || __PACKAGE__;
 	if ( $subclass ) {
+                require Class::Autouse;
 		Class::Autouse->autouse($subclass);
 		bless $self, $subclass;
 	}
@@ -302,6 +301,7 @@ sub _auto_convert {
 sub load_file {
 	my ($self, $file, $editor) = @_;
 
+	require File::Slurp;
 	my $newline_type = $self->_get_default_newline_type;
 	my $convert_to;
 	my $content = eval { File::Slurp::read_file($file, binmode => ':raw') };
@@ -350,7 +350,8 @@ sub save_file {
 	my $content      = $self->text_get;
 	my $filename     = $self->filename;
     #my $newline_type = $self->get_newline_type;
-
+        
+	require File::Slurp;
 	eval {
 		File::Slurp::write_file($filename, {binmode => ':raw'}, $content);
 	};
@@ -422,6 +423,7 @@ sub has_changed_on_disk {
 
 sub time_on_file {
 	return 0 if not defined $_[0]->filename;
+	return 0 if not -e $_[0]->filename;
 	return (stat($_[0]->filename))[9];
 }
 
@@ -450,6 +452,58 @@ sub reload {
 	return 1;
 }
 
+=head2 can_check_syntax
+
+Returns a B<true> value if the class provides a method C<check_syntax>
+for retrieving information on syntax errors and warnings in the 
+current document.
+
+The method in this base class returns B<false>.
+
+=cut
+
+sub can_check_syntax {
+	return 0;
+}
+
+=head2 check_syntax ( [ FORCE ] )
+
+NOT IMPLEMENTED IN THIS BASE CLASS
+
+An implementation in a derived class needs to return an arrayref of
+syntax problems.
+Each entry in the array has to be an anonymous hash with the 
+following keys:
+
+=over 4
+
+=item * line
+
+The line where the problem resides
+
+=item * msg
+
+A short description of the problem
+
+=item * severity
+
+A flag indicating the problem class: Either 'B<W>' (warning) or 'B<E>' (error)
+
+=item * desc
+
+A longer description with more information on the error (currently 
+not used but intended to be)
+
+=back
+
+Returns an empty arrayref if no problems can be found.
+
+Returns B<undef> if nothing has changed since the last invocation.
+
+Must return the problem list even if nothing has changed when a 
+param is present which evaluates to B<true>.
+
+=cut
 
 
 
@@ -494,6 +548,7 @@ sub find_project {
 	my ($v, $d, $f) = File::Spec->splitpath( $self->filename );
 	my @d = File::Spec->splitdir($d);
 	pop @d if $d[-1] eq '';
+	require List::Util;
 	my $dirs = List::Util::first {
 		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
 		or

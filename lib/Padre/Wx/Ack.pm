@@ -2,9 +2,6 @@ package Padre::Wx::Ack;
 
 use strict;
 use warnings;
-use Data::Dumper            qw(Dumper);
-
-use App::Ack;
 
 use Padre::Wx;
 use Wx::Locale qw(:default);
@@ -12,21 +9,49 @@ use Wx::Locale qw(:default);
 my $iter;
 my %opts;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
+my $DONE_EVENT : shared = Wx::NewEventType;
 
-{
-	no warnings 'redefine';
-	sub App::Ack::print_first_filename { print_results("$_[0]\n"); }
-	sub App::Ack::print_separator      { print_results("--\n"); }
-	sub App::Ack::print                { print_results($_[0]); }
-	sub App::Ack::print_filename       { print_results("$_[0]$_[1]"); }
-	sub App::Ack::print_line_no        { print_results("$_[0]$_[1]"); }
+my $ack_loaded = 0;
+sub load_ack {
+	my $minver = 1.86;
+	my $error  = "App::Ack $minver required for this feature";
+
+	# try to load app::ack - we don't require $minver in the eval to
+	# provide a meaningful error message if needed.
+	eval "use App::Ack";
+	return "$error (module not installed)" if $@;
+	return "$error (you have $App::Ack::VERSION installed)"
+		if $App::Ack::VERSION < $minver;
+
+	# redefine some app::ack subs to display results in padre's output
+	{
+		no warnings 'redefine';
+		*{App::Ack::print_first_filename} = sub { print_results("$_[0]\n"); };
+		*{App::Ack::print_separator}      = sub { print_results("--\n"); };
+		*{App::Ack::print}                = sub { print_results($_[0]); };
+		*{App::Ack::print_filename}       = sub { print_results("$_[0]$_[1]"); };
+		*{App::Ack::print_line_no}        = sub { print_results("$_[0]$_[1]"); };
+	}
+	
+	return;
 }
 
-my $DONE_EVENT : shared = Wx::NewEventType;
 
 sub on_ack {
 	my ($self) = @_;
+
+	# delay App::Ack loading till first use, to reduce memory
+	# usage and init time.
+	if ( ! $ack_loaded ) {
+		my $error = load_ack();
+		if ( $error ) {
+			$self->error($error);
+			return;
+		}
+		$ack_loaded = 1;
+	}
+	
 	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
 
 	# TODO kill the thread before closing the application

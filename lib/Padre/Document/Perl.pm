@@ -9,7 +9,7 @@ use Padre::Document ();
 use YAML::Tiny      ();
 use PPI;
 
-our $VERSION = '0.16';
+our $VERSION = '0.17';
 our @ISA     = 'Padre::Document';
 
 
@@ -97,7 +97,7 @@ sub get_functions {
 
 sub get_function_regex {
 	my ( $self, $sub ) = @_;
-	return qr{sub\s+$sub\b};
+	return qr{(^|\n)sub\s+$sub\b};
 }
 
 
@@ -250,6 +250,115 @@ sub _css_class {
 	my $css = ref $Token;
 	$css =~ s/^.+:://;
 	$css;
+}
+
+sub can_check_syntax {
+	return 1;
+}
+
+sub check_syntax {
+	my $self  = shift;
+    my $force = shift;
+
+	my $txt = $self->text_get;
+	return [] unless defined($txt) && $txt;
+
+	unless ($force) {
+		if (   defined( $self->{last_checked_txt} )
+			&& $self->{last_checked_txt} eq $txt
+		) {
+			return undef;
+		}
+	}
+	$self->{last_checked_txt} = $txt;
+
+	my $report = '';
+	{
+		require File::Temp;
+
+		my $fh = File::Temp->new();
+		my $fname = $fh->filename;
+		print $fh $txt;
+		$report = `$^X -Mdiagnostics -c $fname 2>&1 1>/dev/null`;
+	}
+
+	# Don't really know where that comes from...
+	my $i = index( $report, 'Uncaught exception from user code' );
+	if ( $i > 0 ) {
+		$report = substr( $report, 0, $i );
+	}
+
+	my $nlchar = "\n";
+	if ( $self->get_newline_type eq 'WIN' ) {
+		$nlchar = "\r\n";
+	}
+	elsif ( $self->get_newline_type eq 'MAC' ) {
+        $nlchar = "\r";
+    }
+
+	return [] if $report =~ /\A[^\n]+syntax OK$nlchar\z/o;
+
+	$report =~ s/$nlchar$nlchar/$nlchar/go;
+	$report =~ s/$nlchar\s/\x1F /go;
+	my @msgs = split(/$nlchar/, $report);
+
+	my $issues = [];
+	my @diag = ();
+	foreach my $msg ( @msgs ) {
+		if (   index( $msg, 'has too many errors' )    > 0
+			or index( $msg, 'had compilation errors' ) > 0
+			or index( $msg, 'syntax OK' ) > 0
+		) {
+			last;
+		}
+
+		my $cur = {};
+		my $tmp = '';
+
+		if ( $msg =~ s/\s\(\#(\d+)\)\s*\Z//o ) {
+			$cur->{diag} = $1 - 1;
+		}
+
+		if ( $msg =~ m/\)\s*\Z/o ) {
+			my $pos = rindex( $msg, '(' );
+			$tmp = substr( $msg, $pos, length($msg) - $pos, '' );
+		}
+
+		if ( $msg =~ s/\s\(\#(\d+)\)(.+)//o ) {
+			$cur->{diag} = $1 - 1;
+			my $diagtext = $2;
+			$diagtext =~ s/\x1F//go;
+			push @diag, join( ' ', split( ' ', $diagtext ) );
+		}
+
+		if ( $msg =~ s/\sat(?:\s|\x1F)+.+?(?:\s|\x1F)line(?:\s|\x1F)(\d+)//o ) {
+			$cur->{line} = $1;
+			$cur->{msg}  = $msg;
+		}
+
+		if ($tmp) {
+			$cur->{msg} .= "\n" . $tmp;
+		}
+
+		$cur->{msg} =~ s/\x1F/$nlchar/go;
+
+		if ( defined $cur->{diag} ) {
+			$cur->{desc} = $diag[ $cur->{diag} ];
+			delete $cur->{diag};
+		}
+		if (   defined( $cur->{desc} )
+			&& $cur->{desc} =~ /^\s*\([WD]/o
+		) {
+			$cur->{severity} = 'W';
+		}
+		else {
+			$cur->{severity} = 'E';
+		}
+
+		push @{$issues}, $cur;
+	}
+
+	return $issues;
 }
 
 1;
