@@ -42,7 +42,7 @@ On Windows that would be Start/Run padre.bat
 (TODO) By default Padre starts with an editor containing a simple Perl script
 and instructions. 
 
-You can edit the file and save it using File/Save (Ctrl-S ).
+You can edit the file and save it using File/Save (Ctrl-S).
 
 You can run the script by pressing Run/Run Script (F5)
 
@@ -263,30 +263,30 @@ Configure PARROT_PATH to point to the root of parrot
 
 Configure LD_LIBRARY_PATH
 
- export LD_LIBRARY_PATH=$PARROT_PATH/blib/lib/
+  export LD_LIBRARY_PATH=$PARROT_PATH/blib/lib/
  
 Build Parrot
 
- cd $PARROT_PATH
- svn up
- make realclean
- perl Configure.pl
- make
- make test
+  cd $PARROT_PATH
+  svn up
+  make realclean
+  perl Configure.pl
+  make
+  make test
 
 Build Parrot::Embed
 
- cd ext/Parrot-Embed/
- ./Build realclean
- perl Build.PL
- ./Build
- ./Build test
+  cd ext/Parrot-Embed/
+  ./Build realclean
+  perl Build.PL
+  ./Build
+  ./Build test
 
 Now if you run Padre it will come with an embedded Parrot interpreter.
 
 You can get the interpreter by calling 
 
- Padre->ide->parrot
+  Padre->ide->parrot
 
 
 =head2 Rectangular Text Selection
@@ -298,10 +298,10 @@ by holding down Ctr-Alt whilst selecting text with your mouse.
 
 For example, imagine you have the following nicely formatted hash assignment in a perl source file:
 
- my %hash = (
-	key1 => 'value1',
-	key2 => 'value2',
-	key3 => 'value3',
+  my %hash = (
+      key1 => 'value1',
+      key2 => 'value2',
+      key3 => 'value3',
  );
 
 With a rectangular text selection you can select only the keys, only the values, etc..
@@ -333,9 +333,9 @@ L<Padre::Document::Perl>.
 
 =head1 Command line options
 
- --index   will go over the @INC and list all the available modules in the database
+  --index   will go over the @INC and list all the available modules in the database
  
- a list of filenames can be given to be opened
+  a list of filenames can be given to be opened
  
 =head1 Preferences
 
@@ -455,7 +455,6 @@ or parentheses ( ), Padre automatically highlight the pair of the braces.
 
 TODO make this optional, let the user set the color
 
-
 =item Autosave on/off?
 
 =back
@@ -480,7 +479,7 @@ When Padre opens a file it automatically creates a copy of the original
 in ~/.padre/backup/PATH  where PATH is the same PATH as the full PATH of
 the file. On Windows the initial drive letter is converted to another 
 subdirectory so c:\dir\file.txt  will be saved as
-~/padre/backup/dir/file.txt
+~/padre/backup/c/dir/file.txt
 
 When a new file is created no need for autobackup.
 
@@ -497,7 +496,6 @@ saved to a temporary place maybe ~/.padre/save.
 When the user closes the file, the autosaved file is removed.
 
 Configurable options: on/off, frequency in seconds
-
 
 =head1 SQLite
 
@@ -516,27 +514,32 @@ modules/functions/etc.
 
 There is a highly experimental but quite simple plugin system.
 
-A plugin is a module in the Padre::Plugin::* namespace.
+A plugin is a module in the Padre::Plugin::* namespace optionally
+packaged as a L<PAR> archive.
 
-At startup time Padre looks for all such modules in @INC 
-and loads them.
-Every plugin must have a C<menu> method that returns its menu items
-which is a list of lists:
+At startup time Padre looks for all such modules in @INC and
+in its own private directory and loads them.
 
- ( 
-   [ Name_1, \&callback_1 ],
-   [ Name_2, \&callback_2 ],
- )
+Every plugin must be a subclass of L<Padre::Plugin> and follow the rules
+defined in the L<Padre::Plugin> API documentation.
 
-Padre will add a menu entry for every plugin under the B<Plugins>
-menu item. For each plugin menu item it will add all the Name_1,
-Name_2 subitems.
+See also L<Padre::PluginManager> and L<Padre::PluginBuilder>
 
-If the B<menu_name> method is provided its return value will be the displayed
-entry in the Plugins/ menu. If this method is omitted the name of the plugin
-without the Padre::Plugin part will be used.
+While Padre is running there is a menu option to show the Plugin configuration
+window that shows the list of all the plugins.
 
-See also L<Padre::PluginManager> and L<Padre::PluginBuilder> 
+TODO: What to do if a newer version of the same plugin was installed?
+
+TODO: What to do if a module was removed ? Shall we keep its data in 
+the configuration file or remove it?
+
+The configuration file has a plugins hash. The keys are the names of the plugins
+(sans the Padre::Plugin:: part)
+
+TODO Padre should offer an easy but simple way for plugin authors 
+to declare configuration variables and automaticly generate both configuration
+file and configuration dialog. Padre should also allow for full customization
+of both for those more advanced in wx foo.
 
 =head1 Editing tools
 
@@ -690,15 +693,12 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
 use Padre::Util           ();
 use Padre::Config         ();
-use Padre::DB             ();
-use Padre::Wx::App        ();
-use Padre::Wx::MainWindow ();
 
 # Nudges to make Class::Autouse behave
 BEGIN {
@@ -708,6 +708,7 @@ use Class::Autouse qw{
 	Padre::DB
 	Padre::Document
 	Padre::Document::Perl
+	Padre::PPI
 	Padre::Project
 	Padre::PluginManager
 	Padre::Pod::Frame
@@ -718,11 +719,16 @@ use Class::Autouse qw{
 	Padre::Wx::Menu
 	Padre::Wx::Menu::Help
 	Padre::Wx::Ack
+	Padre::Wx::App
 	Padre::Wx::Dialog::Bookmarks
 	Padre::Wx::Dialog::Find
 	Padre::Wx::Dialog::ModuleStart
+	Padre::Wx::Dialog::PluginManager
 	Padre::Wx::Dialog::Preferences
+	Padre::Wx::Dialog::Search
+	Padre::Wx::Dialog::Snippets
 	Padre::Wx::History::TextDialog
+	Padre::Wx::MainWindow
 };
 
 # Globally shared Perl detection object
@@ -741,6 +747,7 @@ sub inst {
 	Carp::croak("Padre->new has not been called yet") if not $SINGLETON;
 	return $SINGLETON;
 }
+
 sub new {
 	Carp::croak("Padre->new already called. Use Padre->inst") if $SINGLETON;
 	my $class = shift;
@@ -859,7 +866,7 @@ sub run_indexer {
 
 	# Save to the database
 	Padre::DB->begin;
-	Padre::DB->remove_modules;
+	Padre::DB->delete_modules;
 	Padre::DB->add_modules(@files);
 	Padre::DB->commit;
 
@@ -878,41 +885,13 @@ sub run_editor {
 
 	$self->wx->MainLoop;
 	$self->{wx} = undef;
+
 	return;
 }
 
 # Save the YAML configuration file
 sub save_config {
 	$_[0]->config->write( $_[0]->config_yaml );
-}
-
-# returns the name of the next module
-sub next_module {
-	my ($self) = @_;
-
-	# Temporarily breaking the next and back buttons
-	# my $current = $self->get_current_index('pod');
-	# return if not defined $current;
-	#
-	# my @current = Padre::DB->get_recent_pod;
-	# return if $current == $#current;
-	# $self->set_current_index('pod', $current + 1);
-
-	return Padre::DB->get_last_pod;
-}
-
-# returns the name of the previous module
-sub prev_module {
-	my ($self) = @_;
-
-	# Temporarily breaking the next and back buttons
-	# my $current = $self->get_current_index('pod');
-	# return if not defined $current;
-	#
-	# return if not $current;
-	# $self->set_current_index('pod', $current - 1);
-
-	return Padre::DB->get_last_pod;
 }
 
 sub usage { print <<"END_USAGE"; exit(1) }
@@ -922,6 +901,8 @@ Usage: $0 [FILENAMEs]
 END_USAGE
 
 1;
+
+=pod
 
 =head1 BUGS
 

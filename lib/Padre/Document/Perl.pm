@@ -3,13 +3,16 @@ package Padre::Document::Perl;
 use 5.008;
 use strict;
 use warnings;
+
 use Carp            ();
 use Params::Util    '_INSTANCE';
-use Padre::Document ();
 use YAML::Tiny      ();
 use PPI;
 
-our $VERSION = '0.17';
+use Padre::Document ();
+use Padre::Util     ();
+
+our $VERSION = '0.18';
 our @ISA     = 'Padre::Document';
 
 
@@ -83,7 +86,7 @@ my $keywords;
 sub keywords {
 	unless ( defined $keywords ) {
 		$keywords = YAML::Tiny::LoadFile(
-			Padre::Wx::sharefile( 'languages', 'perl5', 'perl5.yml' )
+			Padre::Util::sharefile( 'languages', 'perl5', 'perl5.yml' )
 		);
 	}
 	return $keywords;
@@ -359,6 +362,28 @@ sub check_syntax {
 	}
 
 	return $issues;
+}
+
+sub comment_lines_str { return '#' }
+
+
+sub find_unmatched_brace {
+	my ($self) = @_;
+
+	my $ppi   = $self->ppi_get or return;
+	my $where = $ppi->find( \&Padre::PPI::find_unmatched_brace );
+	if ( $where ) {
+		@$where = sort {
+			Padre::PPI::element_depth($b) <=> Padre::PPI::element_depth($a)
+			or
+			$a->location->[0] <=> $b->location->[0]
+			or
+			$a->location->[1] <=> $b->location->[1]
+		} @$where;
+		$self->ppi_select( $where->[0] );
+		return 1;
+	}
+	return 0;
 }
 
 1;

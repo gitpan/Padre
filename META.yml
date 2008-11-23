@@ -1,6 +1,6 @@
 ---
 name: Padre
-version: 0.17
+version: 0.18
 author:
   - Gabor Szabo
 abstract: Perl Application Development and Refactoring Environment
@@ -16,6 +16,7 @@ requires:
   Carp: 0
   Class::Adapter: 1.05
   Class::Autouse: 1.26
+  Class::Unload: 0
   Cwd: 0
   DBD::SQLite: 0
   DBI: 0
@@ -32,6 +33,8 @@ requires:
   File::Which: 0.05
   FindBin: 0
   Getopt::Long: 0
+  HTML::Entities: 3.57
+  HTML::Parser: 3.58
   IO::Socket: 0
   List::Util: 0
   Module::Inspector: 0.04
@@ -41,10 +44,11 @@ requires:
   PAR: 0.970
   PPI: 1.203
   Pod::POM: 0
-  Pod::Simple: 0
+  Pod::Simple: 3.07
   Probe::Perl: 0.01
   Term::ReadLine: 0
   Text::Diff: 0.35
+  Text::FindIndent: 0.03
   Wx: 0.86
   Wx::Perl::Dialog: 0.02
   Wx::Perl::ProcessStream: 0
@@ -58,137 +62,158 @@ build_requires:
 provides:
   Padre:
     file: lib/Padre.pm
-    version: 0.17
+    version: 0.18
   Padre::Autosave:
     file: lib/Padre/Autosave.pm
-    version: 0.17
+    version: 0.18
   Padre::Config:
     file: lib/Padre/Config.pm
-    version: 0.17
+    version: 0.18
   Padre::DB:
     file: lib/Padre/DB.pm
-    version: 0.17
+    version: 0.18
   Padre::Document:
     file: lib/Padre/Document.pm
-    version: 0.17
+    version: 0.18
   Padre::Document::JavaScript:
     file: lib/Padre/Document/JavaScript.pm
-    version: 0.17
+    version: 0.18
   Padre::Document::Pasm:
     file: lib/Padre/Document/Pasm.pm
-    version: 0.17
+    version: 0.18
   Padre::Document::Perl:
     file: lib/Padre/Document/Perl.pm
-    version: 0.17
+    version: 0.18
   Padre::Document::Perl6:
     file: lib/Padre/Document/Perl6.pm
-    version: 0.17
+    version: 0.18
   Padre::Document::Pir:
     file: lib/Padre/Document/Pir.pm
-    version: 0.17
+    version: 0.18
   Padre::Documents:
     file: lib/Padre/Documents.pm
-    version: 0.17
+    version: 0.18
   Padre::PPI:
     file: lib/Padre/PPI.pm
-    version: 0.17
+    version: 0.18
+  Padre::Plugin:
+    file: lib/Padre/Plugin.pm
+    version: 0.18
   Padre::Plugin::Devel:
     file: lib/Padre/Plugin/Devel.pm
-    version: 0.17
-  Padre::Plugin::MY:
-    file: lib/Padre/Plugin/MY.pm
-    version: 0.17
+    version: 0.18
+  Padre::Plugin::My:
+    file: lib/Padre/Plugin/My.pm
+    version: 0.18
+  Padre::Plugin::Vi:
+    file: lib/Padre/Plugin/Vi.pm
+    version: 0.18
+  Padre::Plugin::Vi::CommandLine:
+    file: lib/Padre/Plugin/Vi/CommandLine.pm
+    version: 0.18
+  Padre::Plugin::Vi::Editor:
+    file: lib/Padre/Plugin/Vi/Editor.pm
+    version: 0.18
   Padre::PluginBuilder:
     file: lib/Padre/PluginBuilder.pm
-    version: 0.17
+    version: 0.18
   Padre::PluginManager:
     file: lib/Padre/PluginManager.pm
-    version: 0.17
+    version: 0.18
+  Padre::Pod2HTML:
+    file: lib/Padre/Pod2HTML.pm
+    version: 0.18
   Padre::Pod::Frame:
     file: lib/Padre/Pod/Frame.pm
-    version: 0.17
+    version: 0.18
   Padre::Pod::Indexer:
     file: lib/Padre/Pod/Indexer.pm
-    version: 0.17
+    version: 0.18
   Padre::Pod::Viewer:
     file: lib/Padre/Pod/Viewer.pm
-    version: 0.17
+    version: 0.18
   Padre::Pod::Viewer::POD:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Pod::Viewer::View:
     file: lib/Padre/Pod/Viewer.pm
   Padre::Project:
     file: lib/Padre/Project.pm
-    version: 0.17
+    version: 0.18
   Padre::Util:
     file: lib/Padre/Util.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx:
     file: lib/Padre/Wx.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Ack:
     file: lib/Padre/Wx/Ack.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::App:
     file: lib/Padre/Wx/App.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::DNDFilesDropTarget:
     file: lib/Padre/Wx/DNDFilesDropTarget.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Dialog:
     file: lib/Padre/Wx/Dialog.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Dialog::Bookmarks:
     file: lib/Padre/Wx/Dialog/Bookmarks.pm
-    version: 0.17
-  Padre::Wx::Dialog::CommandLine:
-    file: lib/Padre/Wx/Dialog/CommandLine.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Dialog::Find:
     file: lib/Padre/Wx/Dialog/Find.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Dialog::ModuleStart:
     file: lib/Padre/Wx/Dialog/ModuleStart.pm
-    version: 0.17
+    version: 0.18
+  Padre::Wx::Dialog::PluginManager:
+    file: lib/Padre/Wx/Dialog/PluginManager.pm
+    version: 0.18
   Padre::Wx::Dialog::Preferences:
     file: lib/Padre/Wx/Dialog/Preferences.pm
-    version: 0.17
+    version: 0.18
+  Padre::Wx::Dialog::Search:
+    file: lib/Padre/Wx/Dialog/Search.pm
+    version: 0.18
+  Padre::Wx::Dialog::Snippets:
+    file: lib/Padre/Wx/Dialog/Snippets.pm
+    version: 0.18
   Padre::Wx::Editor:
     file: lib/Padre/Wx/Editor.pm
-    version: 0.17
-  Padre::Wx::Editor::Vi:
-    file: lib/Padre/Wx/Editor/Vi.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::History::ComboBox:
     file: lib/Padre/Wx/History/ComboBox.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::History::TextDialog:
     file: lib/Padre/Wx/History/TextDialog.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::MainWindow:
     file: lib/Padre/Wx/MainWindow.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Menu:
     file: lib/Padre/Wx/Menu.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Menu::Help:
     file: lib/Padre/Wx/Menu/Help.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Output:
     file: lib/Padre/Wx/Output.pm
-    version: 0.17
+    version: 0.18
+  Padre::Wx::Pod2HTML:
+    file: lib/Padre/Wx/Pod2HTML.pm
+    version: 0.18
   Padre::Wx::Popup:
     file: lib/Padre/Wx/Popup.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::Project:
     file: lib/Padre/Wx/Project.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::RightClick:
     file: lib/Padre/Wx/RightClick.pm
-    version: 0.17
+    version: 0.18
   Padre::Wx::ToolBar:
     file: lib/Padre/Wx/ToolBar.pm
-    version: 0.17
+    version: 0.18
   Px:
     file: lib/Padre/Util.pm
 generated_by: Module::Build version 0.280801
@@ -198,5 +223,7 @@ meta-spec:
 no_index:
   directory:
     - t
+    - xt
     - eg
     - share
+    - inc

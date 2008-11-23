@@ -3,20 +3,15 @@ package Padre::Wx::Editor;
 use 5.008;
 use strict;
 use warnings;
-
-use YAML::Tiny      ();
-
+use YAML::Tiny       ();
+use Padre::Util      ();
+use Padre::Wx        ();
 use Padre::Documents ();
-use Wx               qw(:dnd wxTheClipboard);
 use Wx::DND;
-use Wx::STC;
-use Padre::Wx;
-use Wx::Locale       qw(:default);
-
 
 use base 'Wx::StyledTextCtrl';
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 my $data;
 my $width;
@@ -29,23 +24,24 @@ sub new {
 	$data = data();
 #	$self->SetMouseDwellTime(1000); # off: Wx::SC_TIME_FOREVER
 
+	$self->SetMarginWidth(0, 0);
+	$self->SetMarginWidth(1, 0);
+	$self->SetMarginWidth(2, 0);
+
 	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
 	Wx::Event::EVT_LEFT_UP(  $self, \&on_left_up );
 	
 	if ( Padre->ide->config->{editor_use_wordwrap} ) {
 		$self->SetWrapMode( Wx::wxSTC_WRAP_WORD );
 	}
-	if ( Padre->ide->config->{vi_mode} ) {
-		$self->setup_vi_mode;
-	}
-
+	$self->SetDropTarget(Padre::Wx::DNDFilesDropTarget->new(Padre->ide->wx->main_window));	
 	return $self;
 }
 
 sub data {
 	unless ( defined $data ) {
 		$data = YAML::Tiny::LoadFile(
-			Padre::Wx::sharefile( 'styles', 'default.yml' )
+			Padre::Util::sharefile( 'styles', 'default.yml' )
 		);
 	}
 	return $data;
@@ -64,13 +60,13 @@ sub padre_setup {
 	# See: http://www.yellowbrain.com/stc/keymap.html
 	#$self->CmdKeyAssign(Wx::wxSTC_KEY_ESCAPE, 0, Wx::wxSTC_CMD_CUT);
 
-	$self->SetCodePage(65001); # which is supposed to be wxSTC_CP_UTF8
+	$self->SetCodePage(65001); # which is supposed to be Wx::wxSTC_CP_UTF8
 	# and Wx::wxUNICODE() or wxUSE_UNICODE should be on
 
 	my $mimetype = $self->{Document}->mimetype;
     if ($mimetype eq 'application/x-perl') {
         $self->padre_setup_style('perl');
-    } elsif ($mimetype eq 'text/pasm') {
+    } elsif ( $mimetype eq 'application/x-pasm' ) {
         $self->padre_setup_style('pasm');
     } elsif ($mimetype) {
 		# setup some default colouring
@@ -178,9 +174,6 @@ sub highlight_braces {
 sub show_line_numbers {
 	my ($self, $on) = @_;
 
-	#$self->SetMarginWidth(1, 0);
-	#$self->SetMarginWidth(2, 0);
-
 	# premature optimization, caching the with that was on the 3rd place at load time
 	# as timed my Deve::NYTProf
 	$width ||= $self->TextWidth(Wx::wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
@@ -201,7 +194,7 @@ sub show_line_numbers {
 sub show_symbols {
     my ( $self, $on ) = @_;
 
-	$self->SetMarginWidth(1, 0);
+#	$self->SetMarginWidth(1, 0);
 
 	# $self->SetMarginWidth(1, 16);   #margin 1 for symbols, 16 px wide
 	# $self->SetMarginType(1, Wx::wxSTC_MARGIN_SYMBOL);
@@ -410,7 +403,7 @@ sub on_right_down {
 		}
 	}
 
-	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, gettext("Select all\tCtrl-A") );
+	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
 	if ( not $win->{notebook}->GetPage($id)->GetTextLength > 0 ) {
 		$sel_all->Enable(0);
 	}
@@ -426,7 +419,7 @@ sub on_right_down {
 	}
 	Wx::Event::EVT_MENU( $win, # Ctrl-C
 		$copy,
-		sub { text_copy_to_clipboard() },
+		sub { Padre->ide->wx->main_window->selected_editor->Copy; }
 	);
 
 	my $cut = $menu->Append( Wx::wxID_CUT, '' );
@@ -435,35 +428,33 @@ sub on_right_down {
 	}
 	Wx::Event::EVT_MENU( $win, # Ctrl-X
 		$cut,
-		sub { \&text_cut_to_clipboard(@_) },
+		sub { Padre->ide->wx->main_window->selected_editor->Cut; }
 	);
 
 	my $paste = $menu->Append( Wx::wxID_PASTE, '' );
-	wxTheClipboard->Open;
-	if ( wxTheClipboard->IsSupported(wxDF_TEXT) ) {
-		my $data = Wx::TextDataObject->new;
-		my $ok   = wxTheClipboard->GetData($data);
-		if ( $ok && $data->GetTextLength > 0 && $win->{notebook}->GetPage($id)->CanPaste ) {
-			Wx::Event::EVT_MENU( $win, # Ctrl-V
-				$paste,
-				sub { text_paste_from_clipboard() },
-			);
-		}
-		else {
-			$paste->Enable(0);
-		}
+ 	my $text  = get_text_from_clipboard();
+
+	if ( length($text) && $win->{notebook}->GetPage($id)->CanPaste ) {
+		Wx::Event::EVT_MENU( $win, # Ctrl-V
+			$paste,
+			sub { Padre->ide->wx->main_window->selected_editor->Paste },
+		);
+	} else {
+		$paste->Enable(0);
 	}
-	wxTheClipboard->Close;
 
 	$menu->AppendSeparator;
 
 #	$menu->Append( Wx::wxID_NEW, '' );
 	Wx::Event::EVT_MENU( $win,
-		$menu->Append( -1, gettext("&Split window") ),
+		$menu->Append( -1, Wx::gettext("&Split window") ),
 		\&Padre::Wx::MainWindow::on_split_window,
 	);
-
-	$self->PopupMenu( $menu, $event->GetX, $event->GetY);
+	if ($event->isa('Wx::MouseEvent')) {
+		$self->PopupMenu( $menu, $event->GetX, $event->GetY);
+	} else { #Wx::CommandEvent
+		$self->PopupMenu( $menu, 50, 50); # TODO better location
+	}
 }
 
 sub on_left_up {
@@ -479,6 +470,28 @@ sub on_left_up {
 	return;
 }
 
+sub on_mouse_motion {
+	my ( $self, $event ) = @_;
+
+	return unless Padre->ide->config->{editor_syntaxcheck};
+
+	my $mousePos = $event->GetPosition;
+	my $line = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
+	my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
+
+	if (   $mousePos->x < ( $firstPointInLine->x - 18 )
+		&& $mousePos->x > ( $firstPointInLine->x - 36 )
+	) {
+		$self->CallTipCancel, return unless $self->MarkerGet($line);
+		$self->CallTipShow( $self->PositionFromLine($line), $self->{synchk_calltips}->{$line} );
+	}
+	else {
+		$self->CallTipCancel;
+	}
+
+	return;
+}
+
 sub text_select_all {
 	my ( $win, $event ) = @_;
 
@@ -489,35 +502,28 @@ sub text_select_all {
 }
 
 sub text_selection_mark_start {
-	my ($win) = @_;
+	my ($self) = @_;
 
 	# find positions
-	my $notebook = $win->{notebook};
-	my $id   = $notebook->GetSelection;
-	my $page = $notebook->GetPage($id);
-	$page->{selection_mark_start} = $page->GetCurrentPos;
+	$self->{selection_mark_start} = $self->GetCurrentPos;
 	
 	# change selection if start and end are defined
-	$page->SetSelection(
-		$page->{selection_mark_start},
-		$page->{selection_mark_end}
-	) if defined $page->{selection_mark_end};
+	$self->SetSelection(
+		$self->{selection_mark_start},
+		$self->{selection_mark_end}
+	) if defined $self->{selection_mark_end};
 }
 
 sub text_selection_mark_end {
-	my ($win) = @_;
+	my ($self) = @_;
 
-	# find positions
-	my $notebook = $win->{notebook};
-	my $id   = $notebook->GetSelection;
-	my $page = $notebook->GetPage($id);
-	$page->{selection_mark_end} = $page->GetCurrentPos;
+	$self->{selection_mark_end} = $self->GetCurrentPos;
 	
 	# change selection if start and end are defined
-	$page->SetSelection(
-		$page->{selection_mark_start},
-		$page->{selection_mark_end}
-	) if defined $page->{selection_mark_start};
+	$self->SetSelection(
+		$self->{selection_mark_start},
+		$self->{selection_mark_end}
+	) if defined $self->{selection_mark_start};
 }
 
 sub text_selection_clear_marks {
@@ -532,68 +538,70 @@ sub text_selection_clear_marks {
 	undef $page->{selection_mark_end};
 }
 
-sub text_copy_to_clipboard {
-	my $win = Padre->ide->wx->main_window;
+sub put_text_to_clipboard {
+	my ($txt) = @_;
 
-	my $id = $win->{notebook}->GetSelection;
-	return if $id == -1;
-	wxTheClipboard->Open;
+	Wx::wxTheClipboard->Open;
+	Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($txt) );
+	Wx::wxTheClipboard->Close;
 
-	my $txt = $win->{notebook}->GetPage($id)->GetSelectedText;
-	if ( defined($txt) ) {
-		wxTheClipboard->SetData( Wx::TextDataObject->new($txt) );
-	}
-
-	wxTheClipboard->Close;
 	return;
 }
 
-sub text_cut_to_clipboard {
-	my $win = Padre->ide->wx->main_window;
-
-	my $id = $win->{notebook}->GetSelection;
-	return if $id == -1;
-	wxTheClipboard->Open;
-
-	my $txt = $win->{notebook}->GetPage($id)->GetSelectedText;
-	if ( defined($txt) ) {
-		wxTheClipboard->SetData( Wx::TextDataObject->new($txt) );
-		$win->{notebook}->GetPage($id)->ReplaceSelection('');
-	}
-
-	wxTheClipboard->Close;
-	return;
-}
-
-sub text_paste_from_clipboard {
-	my $win = Padre->ide->wx->main_window;
-
-	my $id  = $win->{notebook}->GetSelection;
-	return if $id == -1;
-
-	wxTheClipboard->Open;
+sub get_text_from_clipboard {
+	Wx::wxTheClipboard->Open;
 	my $text   = '';
-	my $length = 0;
-	if ( wxTheClipboard->IsSupported(wxDF_TEXT) ) {
+	if ( Wx::wxTheClipboard->IsSupported(Wx::wxDF_TEXT) ) {
 		my $data = Wx::TextDataObject->new;
-		my $ok   = wxTheClipboard->GetData($data);
+		my $ok   = Wx::wxTheClipboard->GetData($data);
 		if ($ok) {
 			$text   = $data->GetText;
-			$length = $data->GetTextLength;
-		}
-		else {
-			$text   = '';
-			$length = 1;
 		}
 	}
-	$win->{notebook}->GetPage($id)->ReplaceSelection('');
-	my $pos = $win->{notebook}->GetPage($id)->GetCurrentPos;
-	$win->{notebook}->GetPage($id)->InsertText( $pos, $text );
-	$win->{notebook}->GetPage($id)->GotoPos( $pos + $length - 1 );
+	Wx::wxTheClipboard->Close;
+	return $text;
+}
 
-	wxTheClipboard->Close;
+# $editor->comment_lines($begin, $end, $str);
+# $str is either # for perl or // for Javascript, etc.
+sub comment_lines {
+	my ($self, $begin, $end, $str) = @_;
+
+	$self->BeginUndoAction;
+	for my $line ($begin .. $end) {
+		# insert $str (# or //)
+		my $pos = $self->PositionFromLine($line);
+		$self->InsertText($pos, $str);
+	}
+	$self->EndUndoAction;
 	return;
 }
+
+#
+# $editor->uncomment_lines($begin, $end, $str);
+#
+# uncomment lines $begin..$end
+#
+sub uncomment_lines {
+	my ($self, $begin, $end, $str) = @_;
+
+	my $length = length $str;
+	$self->BeginUndoAction;
+	for my $line ($begin .. $end) {
+		my $first = $self->PositionFromLine($line);
+		my $last  = $first + $length;
+		my $text  = $self->GetTextRange($first, $last);
+		if ($text eq $str) {
+			$self->SetSelection($first, $last);
+			$self->ReplaceSelection('');
+		}
+	}
+	$self->EndUndoAction;
+
+	return;
+}
+
+
 
 1;
 

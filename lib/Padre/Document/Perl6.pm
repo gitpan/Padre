@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Document ();
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 our @ISA     = 'Padre::Document';
 
 # Naive way to parse and colourise perl6 files
@@ -55,6 +55,7 @@ sub get_command {
 
 }
 
+sub comment_lines_str { return '#' }
 
 1;
 

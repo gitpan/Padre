@@ -4,7 +4,7 @@ package Padre::Util;
 
 =head1 NAME
 
-Padre::Util - Padre Utility Functions
+Padre::Util - Padre Non-Wx Utility Functions
 
 =head1 DESCRIPTION
 
@@ -24,10 +24,12 @@ may be moved, removed or changed at any time without notice.
 use 5.008;
 use strict;
 use warnings;
+
 use Exporter     ();
+use File::Spec   ();
 use List::Util   qw(first);
 
-our $VERSION   = '0.17';
+our $VERSION   = '0.18';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches);
 
@@ -105,6 +107,25 @@ sub get_matches {
 	return ($start, $end, @matches);
 }
 
+#####################################################################
+# Shared Resources
+
+sub share () {
+	return File::Spec->catdir( $FindBin::Bin, File::Spec->updir, 'share' ) if $ENV{PADRE_DEV};
+	return File::Spec->catdir( $ENV{PADRE_PAR_PATH}, 'inc', 'share' )      if $ENV{PADRE_PAR_PATH};
+	require File::ShareDir::PAR;
+	return File::ShareDir::PAR::dist_dir('Padre');
+}
+
+sub sharedir {
+	File::Spec->catdir( share(), @_ );
+}
+
+sub sharefile {
+	File::Spec->catfile( share(), @_ );
+}
+
+
 package Px;
 
 use constant {
@@ -115,6 +136,7 @@ use constant {
 	PASM_COMMENT  => 5,
 	PASM_POD      => 6,
 };
+
 
 1;
 

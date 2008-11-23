@@ -1,17 +1,4 @@
 package Padre::PluginManager;
-use strict;
-use warnings;
-
-use Carp         qw(croak);
-use File::Path   ();
-use File::Spec   ();
-use File::Find::Rule;
-
-use Padre::Wx    ();
-use Padre::Util  ();
-use Wx::Locale qw(:default);
-
-our $VERSION = '0.17';
 
 =pod
 
@@ -28,6 +15,18 @@ plugins, as well as providing part of the interface to plugin writers.
 
 =cut
 
+use strict;
+use warnings;
+use Carp        qw(croak);
+use File::Path  ();
+use File::Spec  ();
+use Padre::Util ();
+use Padre::Wx   ();
+
+our $VERSION = '0.18';
+
+=pod
+
 =head2 new
 
 The constructor returns a new Padre::PluginManager object, but
@@ -43,16 +42,15 @@ sub new {
 	my $class = shift;
 	my $padre = shift || Padre->ide;
 
-	if (not $padre or not $padre->isa("Padre")) {
+	if ( not $padre or not $padre->isa("Padre") ) {
 		croak("Creation of a Padre::PluginManager without a Padre not possible");
 	}
 
 	my $self  = bless {
-		plugins => {},
+		plugins    => {},
 		plugin_dir => Padre::Config->default_plugin_dir,
-	  
 		par_loaded => 0,
-		@_
+		@_,
 	}, $class;
 
 	return $self;
@@ -74,8 +72,39 @@ sub plugin_dir { $_[0]->{plugin_dir} }
 
 =head2 plugins
 
-Returns a hash (reference) of plugin names associated with their
-implementing module names.
+Returns a hash (reference) of plugin names associated with a plugin manager
+internal structure describing the state of the plugin in the current
+editor. The contents are somewhat in flux and considered mostly B<PRIVATE>,
+but the following will likely stay:
+
+=over 2
+
+=item module
+
+Full name of the module that implements the plugin, i.e. C<Padre::Plugin::Foo>.
+
+=item status
+
+The status of the plugin. C<failed> indicates failure while trying to load
+the module. C<new> indicates it was detected as a new plugin.
+C<loaded> indicates that the module has been successfully loaded, and
+C<disabled> indicates that it isn't being used as it's been disabled
+in the configuration.
+
+Note that this concerns the status of the module in memory. Whether or
+not to load the plugin is kept in the B<configuration> instead to make
+it persistent. To check whether a given plugin is enabled, do this:
+
+  if (Padre->config->{plugins}{$plugin_name}{enabled}) {...}
+
+=item object
+
+The actual C<Padre::Plugin::Foo> object. Availability depends on the C<status>,
+of course. The other keys are kept separate since the plugin object is the
+sole domain of the plugin writer. We don't want them to wreak havoc on
+our meta data, now do we?
+
+=back
 
 This hash is only populated after C<load_plugins()> was called.
 
@@ -101,7 +130,7 @@ sub plugin_config {
 	my $plugin = shift;
 
 	# infer the plugin name from caller
-	if (not defined $plugin) {
+	if ( not defined $plugin ) {
 		my ($package) = caller();
 		croak("Cannot infer the name of the plugin for which the configuration has been requested")
 			if $package !~ /^Padre::Plugin::/;
@@ -109,13 +138,12 @@ sub plugin_config {
 	}
 
 	$plugin =~ s/^Padre::Plugin:://;
-	my $padre_config = Padre->ide->config;
+	my $padre_config  = Padre->ide->config;
 	my $plugin_config = $padre_config->{plugins};
 	$plugin_config->{$plugin} ||= {};
 	return $plugin_config->{$plugin};
 }
 
-##############
 
 =head2 load_plugins
 
@@ -129,11 +157,18 @@ plugin has changed while Padre was running.
 
 sub load_plugins {
 	my ($self) = @_;
-	$self->_load_plugins_from_inc();
-	$self->_load_plugins_from_par();
+	$self->_load_plugins_from_inc;
+	$self->_load_plugins_from_par;
+	if ( my @failed = $self->failed ) {
+		Padre->ide->wx->main_window->error("Failed to load the following plugin(s):\n" . join "\n", @failed);
+		return;
+	}
+
 	return;
 }
 
+# attempt to load all plugins that sit as .pm files in the
+# .padre/plugins/Padre/Plugin/ folder
 sub _load_plugins_from_inc {
 	my ($self) = @_;
 
@@ -142,19 +177,31 @@ sub _load_plugins_from_inc {
 	unshift @INC, $plugin_dir unless grep {$_ eq $plugin_dir} @INC;
 	
 	my @dirs = grep {-d $_} map {File::Spec->catdir($_, 'Padre', 'Plugin')} @INC;
-	
-	my @files = File::Find::Rule->file()->name('*.pm')->maxdepth(1)->in( @dirs );
+
+	require File::Find::Rule;
+	my @files = File::Find::Rule->file->name('*.pm')->maxdepth(1)->in( @dirs );
 	foreach my $file (@files) {
 		# full path filenames
 		$file =~ s/\.pm$//;
 		$file =~ s{^.*Padre[/\\]Plugin\W*}{};
 		$file =~ s{[/\\]}{::}g;
-		$self->_load_plugin($file); # Foo::Bar names
+
+		# TODO maybe we should report to the user the fact
+		# that we changed the name of the MY plugin and she should
+		# rename the original one and remove the MY.pm from his installation
+		if ($file eq 'MY') {
+			warn "Deprecated Padre::Plugin::MY found. Please remove the upper case MY.pm";
+			return;
+		}
+
+		$self->load_plugin($file); # Foo::Bar names
 	}
 
 	return;
 }
 
+# attempt to load all plugins that sit as .par files in the
+# .padre/plugins/ folder
 sub _load_plugins_from_par {
 	my ($self) = @_;
 	$self->_setup_par();
@@ -163,19 +210,20 @@ sub _load_plugins_from_par {
 	opendir my $dh, $plugin_dir or return;
 	while (my $file = readdir $dh) {
 		if ($file =~ /^\w+\.par$/i) {
-                # only single-level plugins for now.
+		# only single-level plugins for now.
 		#if ($file =~ /^[\w-]+\.par$/i) {
 			my $parfile = File::Spec->catfile($plugin_dir, $file);
 			PAR->import($parfile);
 			$file =~ s/\.par$//i;
-                        $file =~ s/-/::/g;
-			$self->_load_plugin($file);
+			$file =~ s/-/::/g;
+			$self->load_plugin($file);
 		}
 	}
 	closedir($dh);
 	return;
 }
 
+# load the PAR module and setup the cache directory.
 sub _setup_par {
 	my ($self) = @_;
 
@@ -193,109 +241,287 @@ sub _setup_par {
 	return();
 }
 
-# given a plugin name such as Foo or Foo::Bar (the part after Padre::Plugin),
-# load the corresponding module
-sub _load_plugin {
+=head2 load_plugin
+
+Given a plugin name such as C<Foo> (the part after Padre::Plugin),
+load the corresponding module, enable the plugin and update the Plugins
+menu, etc.
+
+=cut
+
+sub load_plugin {
+	my $self = shift;
+	my $ret = $self->_load_plugin_no_refresh(@_);
+	$self->_refresh_plugin_menu();
+	return $ret;
+}
+
+# the guts of load_plugin which don't refresh the menu
+sub _load_plugin_no_refresh {
 	my ($self, $plugin_name) = @_;
 	my $plugins = $self->plugins;
 
+	# normalize to plugin name only
+	$plugin_name =~ s/^Padre::Plugin:://;
+
 	# skip if that plugin was already loaded
-	return if exists $plugins->{$plugin_name};
+	return if exists $plugins->{$plugin_name} 
+			  and defined $plugins->{$plugin_name}{status}
+			  and $plugins->{$plugin_name}{status} eq 'loaded';
 
 	my $module = "Padre::Plugin::$plugin_name";
-	eval "use $module"; ## no critic
-	if ($@) {
-		warn "ERROR while trying to load plugin '$plugin_name': $@";
+	my $config = Padre->ide->config;
+
+	$plugins->{$plugin_name} ||= {};
+	my $plugin_state = $plugins->{$plugin_name};
+
+	$plugin_state->{module} = $module; # TODO: Is caching this really worth the memory?
+
+	if ( not $config->{plugins}{$plugin_name} ) {
+		$config->{plugins}{$plugin_name}{enabled} = 0;
+		$plugin_state->{status} = 'new';
 		return;
 	}
-	$plugins->{$plugin_name} = $module;
+	
+	if (not $config->{plugins}{$plugin_name}{enabled} ) {
+		$plugin_state->{status} = 'disabled';
+		return;
+	}
+	#print "use $module\n";
+	eval "use $module"; ## no critic
+	if ($@) {
+		warn $self->{errstr} = "ERROR while trying to load plugin '$plugin_name': $@";
+		$plugin_state->{status} = 'failed';
+		return;
+	}
+
+	eval {
+		$plugin_state->{object} = $module->new;
+		die "Could not create plugin object for $module"
+			if not ref($plugin_state->{object});
+		$plugin_state->{object}->plugin_enable;
+	};
+	if ($@) {
+		# TODO report error in a nicer way
+		warn $self->{errstr} = $@;
+		$plugin_state->{status} = 'failed';
+		# automatically disable the plugin
+		$config->{plugins}{$plugin_name}{enabled} = 0; # persistent!
+	} else {
+		$plugin_state->{status} = 'loaded';
+	}
+	
 	return 1;
 }
 
-sub reload_plugins {
-    my ( $win ) = @_;
+=head2 unload_plugin
 
-	require Module::Refresh;
-    my $refresher = Module::Refresh->new;
+Given a plugin name such as C<Foo> (the part after Padre::Plugin),
+DISable the plugin, UNload the corresponding module, and update the Plugins
+menu, etc.
 
-    my %plugins = %{ Padre->ide->plugin_manager->plugins };
-    foreach my $name ( sort keys %plugins ) {
-		reload_module( $refresher, $name );
-    }
-    reload_menu($win);
+=cut
+
+sub unload_plugin {
+	my $self = shift;
+	my $ret = $self->_unload_plugin_no_refresh(@_);
+	$self->_refresh_plugin_menu();
+	return $ret;
 }
+
+# the guts of unload_plugin which don't refresh the menu
+sub _unload_plugin_no_refresh {
+	my $self = shift;
+	my $plugin_name = shift;
+
+	# normalize to plugin name only
+	$plugin_name =~ s/^Padre::Plugin:://;
+	my $config = Padre->ide->config;
+	my $plugins = $self->plugins;
+
+	return if not defined $plugins->{$plugin_name}{object};
+
+	eval {
+		$plugins->{$plugin_name}{object}->plugin_disable;
+	};
+	if ($@) {
+		warn $self->{errstr} = $@;
+		$plugins->{$plugin_name}{status} = 'failed';
+		# automatically disable the plugin
+		$config->{plugins}{$plugin_name}{enabled} = 0; # persistent!
+	} else {
+		$plugins->{$plugin_name}{status} = 'disabled';
+	}
+	
+
+	delete $plugins->{$plugin_name};
+
+	require Class::Unload;
+	Class::Unload->unload("Padre::Plugin::$plugin_name");
+
+	return 1;
+}
+
+=head2 reload_plugins
+
+For all registered plugins, unload them if they were loaded
+and then reload them.
+
+=cut
+
+sub reload_plugins {
+	my $self = shift;
+	my $plugins = $self->plugins;
+
+	foreach my $plugin_name (sort keys %$plugins) {
+		# do not use the reload_plugin method since that
+		# refreshes the menu every time
+		$self->_unload_plugin_no_refresh($plugin_name);
+		$self->_load_plugin_no_refresh($plugin_name);
+		$self->enable_editors($plugin_name);
+	}
+	$self->_refresh_plugin_menu();
+	return 1;
+}
+
+sub enable_editors_for_all {
+	my $self = shift;
+	my $plugins = $self->plugins;
+	foreach my $plugin_name (keys %$plugins) {
+		$self->enable_editors($plugin_name);
+	}
+	return 1;
+}
+
+sub enable_editors {
+	my $self        = shift;
+	my $plugin_name = shift;
+	
+	my $plugins = $self->plugins;
+	return if not $plugins->{$plugin_name} or not $plugins->{$plugin_name}{object};
+	foreach my $editor ( Padre->ide->wx->main_window->pages ) {
+		if ($plugins->{$plugin_name}{object}->can('editor_enable')) {
+			$plugins->{$plugin_name}{object}->editor_enable( $editor, $editor->{Document} );
+		}
+	}
+	return 1;
+}
+
+=head2 reload_plugin
+
+Reload a single plugin whose name (without C<Padre::Plugin::)
+is passed in as first argument.
+
+=cut
 
 sub reload_plugin {
-	my ( $win, $name ) = @_;
-	
-	require Module::Refresh;
-	my $refresher = Module::Refresh->new;
-	reload_module( $refresher, $name );
-	reload_menu($win);
-	return;
-}
+	my $self = shift;
+	my $plugin_name = shift;
 
-sub reload_module {
-    my ( $refresher, $name ) = @_;
-	my $file_in_INC = "Padre/Plugin/${name}.pm";
-	$file_in_INC =~ s/\:\:/\//;
-	$refresher->refresh_module($file_in_INC);
-	return;
+	$self->_unload_plugin_no_refresh( $plugin_name );
+	$self->load_plugin( $plugin_name ) or return;
+	$self->enable_editors( $plugin_name ) or return;
+	return 1;
 }
 
 
-sub reload_menu {
-    my ( $win ) = @_;
+# recreate the Plugins menu
+sub _refresh_plugin_menu {
+	my $self = shift;
 
-    # re-create menu,
-    my $plugin_menu = $win->{menu}->menu_plugin( $win );
-    my $plugin_menu_place = $win->{menu}->{wx}->FindMenu( gettext("Pl&ugins") );
-    $win->{menu}->{wx}->Replace( $plugin_menu_place, $plugin_menu, gettext("Pl&ugins") );
-    
-    $win->{menu}->refresh;
-    
-    Wx::MessageBox( 'done', 'done', Wx::wxOK|Wx::wxCENTRE, $win );
+	# re-create menu,
+	my $win = Padre->ide->wx->main_window;
+	my $plugin_menu = $win->{menu}->menu_plugin( $win );
+	my $plugin_menu_place = $win->{menu}->{wx}->FindMenu( Wx::gettext("Pl&ugins") );
+	$win->{menu}->{wx}->Replace( $plugin_menu_place, $plugin_menu, Wx::gettext("Pl&ugins") );
+
+	$win->{menu}->refresh;
+
+	#Wx::MessageBox( 'done', 'done', Wx::wxOK|Wx::wxCENTRE, $win );
 }
 
+=head2 failed
+
+Returns the plugin names (without C<Padre::Plugin::> prefixed) of all plugins
+that the editor attempted to load but failed. Note that after a failed
+attempt, the plugin is usually disabled in the configuration and not loaded
+again when the editor is restarted.
+
+=cut
+
+sub failed {
+	my ($self) = @_;
+	my $plugins = $self->plugins;
+	return grep { $plugins->{$_}{status} eq 'failed' } keys %$plugins;
+}
+
+
+# TODO: document this.
 sub test_a_plugin {
-    my ( $win ) = @_;
+	my ( $self ) = @_;
+        my $win = Padre->ide->wx->main_window;
 
-    my $config = Padre->ide->config;
-    my $last_filename = $config->{last_test_plugin_file};
-    $last_filename  ||= $win->selected_filename;
-    my $default_dir;
-    if ($last_filename) {
-        $default_dir = File::Basename::dirname($last_filename);
-    }
-    my $dialog = Wx::FileDialog->new(
-        $win, gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
-    );
-    unless ( Padre::Util::WIN32 ) {
-        $dialog->SetWildcard("*");
-    }
-    if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-        return;
-    }
-    my $filename = $dialog->GetFilename;
-    $default_dir = $dialog->GetDirectory;
-    
-    my $file = File::Spec->catfile($default_dir, $filename);
-    
-    # save into plugin for next time
-    $config->{last_test_plugin_file} = $file;
-    
-    ( $default_dir, $filename ) = split(/Padre[\\\/]Plugin[\\\/]/, $file, 2);
-    $filename    =~ s/\.pm$//; # remove last .pm
-    $filename    =~ s/[\\\/]/\:\:/;
-    
-    unshift @INC, $default_dir unless ($INC[0] eq $default_dir);
-    my $plugins = Padre->ide->plugin_manager->plugins;
-    $plugins->{$filename} = "Padre::Plugin::$filename";
-    eval { require $file; 1 }; # load for Module::Refresh
-    return $win->error( $@ ) if ( $@ );
-    
-    # reload all means rebuild the 'Plugins' menu
-    reload_plugins( $win );
+	my $config = Padre->ide->config;
+	my $last_filename = $config->{last_test_plugin_file};
+	$last_filename  ||= $win->selected_filename;
+	my $default_dir;
+	if ($last_filename) {
+		$default_dir = File::Basename::dirname($last_filename);
+	}
+	my $dialog = Wx::FileDialog->new(
+		$win, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
+	);
+	unless ( Padre::Util::WIN32 ) {
+		$dialog->SetWildcard("*");
+	}
+	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		return;
+	}
+	my $filename = $dialog->GetFilename;
+	$default_dir = $dialog->GetDirectory;
+	
+	my $file = File::Spec->catfile($default_dir, $filename);
+	
+	# save into plugin for next time
+	$config->{last_test_plugin_file} = $file;
+	
+	( $default_dir, $filename ) = split(/Padre[\\\/]Plugin[\\\/]/, $file, 2);
+	$filename =~ s/\.pm$//; # remove last .pm
+	$filename =~ s/[\\\/]/\:\:/;
+	
+	unshift @INC, $default_dir unless ($INC[0] eq $default_dir);
+	my $plugins = Padre->ide->plugin_manager->plugins;
+
+	# load plugin
+	delete $plugins->{$filename};
+	$config->{plugins}{$filename}{enabled} = 1;
+	my $manager = Padre->ide->plugin_manager;
+	$manager->load_plugin( $filename );
+	if ($manager->plugins->{$filename}->{status} eq 'failed') {
+		Padre->ide->wx->main_window->error("Faild to load the plugin '$filename'");
+		return;
+	}
+
+	$manager->reload_plugins();
+}
+
+sub get_menu {
+	my ($self, $win, $name) = @_;
+
+	my $plugins = $self->plugins;
+
+	my ($label, $items, $menu, @data);
+	if ($plugins->{$name}{module}->can('menu_plugins_simple') ) {
+		($label, $items) = eval { $plugins->{$name}{module}->menu_plugins_simple };
+		if ( $@ ) {
+			warn $self->{errstr} = "Error when calling menu for plugin '$name' $@";
+			return ();
+		}
+		$menu = eval { $plugins->{$name}{module}->menu_plugins($label, $win, $items) };
+	} else {
+		warn $self->{errstr} = "menu_plugins_simple is not implemented in plugin '$name'\n";
+	} 
+	return ($label, $menu);
 }
 
 1;

@@ -11,6 +11,7 @@ lib/Padre/Config.pm
 lib/Padre/DB.pm
 lib/Padre/Document.pm
 lib/Padre/Documents.pm
+lib/Padre/Plugin.pm
 lib/Padre/PluginBuilder.pm
 lib/Padre/PluginManager.pm
 lib/Padre/Project.pm
@@ -25,21 +26,30 @@ lib/Padre/Document/Perl6.pm
 lib/Padre/Document/Pir.pm
 
 lib/Padre/Plugin/Devel.pm
-lib/Padre/Plugin/MY.pm
+lib/Padre/Plugin/My.pm
+lib/Padre/Plugin/Vi.pm
+lib/Padre/Plugin/Vi/Editor.pm
+lib/Padre/Plugin/Vi/CommandLine.pm
+
+lib/Padre/Pod2HTML.pm
+
+lib/Padre/Project/Perl.pm
 
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
-lib/Padre/Wx/Dialog/CommandLine.pm
 lib/Padre/Wx/Dialog/Find.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
+lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
+lib/Padre/Wx/Dialog/Search.pm
+lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/DNDFilesDropTarget.pm
 lib/Padre/Wx/Editor.pm
-lib/Padre/Wx/Editor/Vi.pm
 lib/Padre/Wx/MainWindow.pm
 lib/Padre/Wx/Menu.pm
 lib/Padre/Wx/Output.pm
+lib/Padre/Wx/Pod2HTML.pm
 lib/Padre/Wx/Popup.pm
 lib/Padre/Wx/Project.pm
 lib/Padre/Wx/RightClick.pm
@@ -110,7 +120,10 @@ share/tango/16x16/actions/edit-paste.png
 share/tango/16x16/actions/edit-redo.png
 share/tango/16x16/actions/edit-select-all.png
 share/tango/16x16/actions/edit-undo.png
+share/tango/16x16/actions/go-next.png
+share/tango/16x16/actions/go-previous.png
 share/tango/16x16/emblems/emblem-unreadable.png
+
 
 
 share/locale/de.mo

@@ -10,6 +10,20 @@ if (not $Config{usethreads}) {
 	exit 0;
 }
 
+print <<"END_WARN";
+**********************************************************
+WARNING
+
+We have renamed the MY plugin to be called Padre::Plugin::My 
+If you have Padre::Plugin::MY (in capital letters) installed
+on your system (it came with 0.17 of Padre) Please remove
+it manually before launching Padre.
+
+It can be both in the standard \@INC and in ~/.padre/plugins/
+
+**********************************************************
+END_WARN
+
 my %prereqs = (
 	'perl'                    => '5.008',
 
@@ -22,13 +36,15 @@ my %prereqs = (
 	'File::Basename'          => 0,
 	'FindBin'                 => 0,
 	'Getopt::Long'            => 0,
+	'HTML::Parser'            => '3.58',
+	'HTML::Entities'          => '3.57',
 	'List::Util'              => 0,
 	'IO::Socket'              => 0,
 	'Term::ReadLine'          => 0,
-	'Module::Refresh'		  => 0,
-
+	'Module::Refresh'         => 0,
 	'App::Ack'                => '1.86',
 	'Class::Autouse'          => '1.26',
+	'Class::Unload'           => 0,
 	'DBD::SQLite'             => 0,
 	'DBI'                     => 0,
 	'File::Copy::Recursive'   => 0,
@@ -44,10 +60,11 @@ my %prereqs = (
 	'ORLite'                  => '0.15',
 	'PAR'                     => '0.970',
 	'Pod::POM'                => 0,
-	'Pod::Simple'             => 0,
+	'Pod::Simple'             => '3.07',
 	'Probe::Perl'             => '0.01',
 	'PPI'                     => '1.203',
 	'Text::Diff'              => '0.35',
+	'Text::FindIndent'        => '0.03',
 	'YAML::Tiny'              => '1.32',
 	'Wx'                      => '0.86',
 	'Wx::Perl::Dialog'        => '0.02',
@@ -81,7 +98,7 @@ my $builder = Padre::Install->new(
 			MailingList => 'http://mail.perlide.org/mailman/listinfo/padre-dev',
 		},
 		no_index => {
-			directory => [ qw{ t eg share } ],
+			directory => [ qw{ t xt eg share inc} ],
 		},
 	},
 );

@@ -3,13 +3,10 @@ package Padre::Wx::ToolBar;
 use 5.008;
 use strict;
 use warnings;
-
-use Padre::Wx ();
+use Padre::Wx         ();
 use Padre::Wx::Editor ();
-use Wx::Locale qw(:default);
-use File::Spec::Functions qw(catfile);
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 our @ISA     = 'Wx::ToolBar';
 
 sub new {
@@ -22,27 +19,27 @@ sub new {
 	$self->AddTool(
 		Wx::wxID_NEW, '',
 		Padre::Wx::tango( 'actions', 'document-new.png' ),
-		gettext('New File'),
+		Wx::gettext('New File'),
 	);
 	Wx::Event::EVT_TOOL(
 		$parent,
 		Wx::wxID_NEW,
-		sub { $_[0]->setup_editor; return; },
+		sub { $_[0]->setup_editor; $_[0]->refresh_all; return; },
 	);
 	$self->AddTool(
 		Wx::wxID_OPEN, '',
 		Padre::Wx::tango( 'actions', 'document-open.png' ),
-		gettext('Open File'),
+		Wx::gettext('Open File'),
 	);
 	$self->AddTool(
 		Wx::wxID_SAVE, '',
 		Padre::Wx::tango( 'actions', 'document-save.png' ),
-		gettext('Save File'),
+		Wx::gettext('Save File'),
 	);
 	$self->AddTool(
 		Wx::wxID_CLOSE, '',
 		Padre::Wx::tango( 'emblems', 'emblem-unreadable.png' ),
-		gettext('Close File'),
+		Wx::gettext('Close File'),
 	);
 	Wx::Event::EVT_TOOL(
 		$parent,
@@ -51,11 +48,6 @@ sub new {
 	);
 	$self->AddSeparator;
 
-	# TODO, how can we make sure these numbers are unique?
-	#$self->AddTool( 1000, '', Padre::Wx::tango(catfile('actions', 'bookmark-new.png')), 'Bookmark' );
-	#Wx::Event::EVT_TOOL($parent, 1000, sub { Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]) } );
-
-
 
 
 
@@ -63,12 +55,12 @@ sub new {
 	$self->AddTool(
 		Wx::wxID_UNDO, '',
 		Padre::Wx::tango( 'actions', 'edit-undo.png' ),
-		gettext('Undo'),
+		Wx::gettext('Undo'),
 	);
 	$self->AddTool(
 		Wx::wxID_REDO, '',
 		Padre::Wx::tango( 'actions', 'edit-redo.png' ),
-		gettext('Redo'),
+		Wx::gettext('Redo'),
 	);
 	$self->AddSeparator;
 
@@ -80,37 +72,40 @@ sub new {
 	$self->AddTool(
 		Wx::wxID_CUT, '',
 		Padre::Wx::tango( 'actions', 'edit-cut.png' ),
-		gettext('Cut'),
+		Wx::gettext('Cut'),
 	);
 	Wx::Event::EVT_TOOL(
 		$parent,
 		Wx::wxID_CUT,
-		sub { \&Padre::Wx::Editor::text_cut_to_clipboard(@_) },
+		sub { Padre->ide->wx->main_window->selected_editor->Cut; },
 	);
 	$self->AddTool(
 		Wx::wxID_COPY,  '',
 		Padre::Wx::tango( 'actions', 'edit-copy.png' ),
-		gettext('Copy'),
+		Wx::gettext('Copy'),
 	);
 	Wx::Event::EVT_TOOL(
 		$parent,
 		Wx::wxID_COPY,
-		sub { \&Padre::Wx::Editor::text_copy_to_clipboard(@_) },
+		sub { Padre->ide->wx->main_window->selected_editor->Copy; },
 	);
 	$self->AddTool(
 		Wx::wxID_PASTE, '',
 		Padre::Wx::tango( 'actions', 'edit-paste.png' ),
-		gettext('Paste'),
+		Wx::gettext('Paste'),
 	);
 	Wx::Event::EVT_TOOL(
 		$parent,
 		Wx::wxID_PASTE,
-		sub { Padre::Wx::Editor::text_paste_from_clipboard() },
+        sub { 
+			my $editor = Padre->ide->wx->main_window->selected_editor or return;
+			$editor->Paste;
+		},
 	);
 	$self->AddTool(
 		Wx::wxID_SELECTALL, '',
 		Padre::Wx::tango( 'actions', 'edit-select-all.png' ),
-		gettext('Select all'),
+		Wx::gettext('Select all'),
 	);
 	Wx::Event::EVT_TOOL(
 		$parent,
@@ -124,9 +119,25 @@ sub new {
 sub refresh {
 	my $self    = shift;
 	my $doc     = shift;
-	my $enabled = !!( $doc and $doc->is_modified );
-	$self->EnableTool( Wx::wxID_SAVE, $enabled );
-	$self->EnableTool( Wx::wxID_CLOSE, ( defined Padre::Documents->current ? 1 : 0 ) );
+
+	my $editor  = $doc ? $doc->editor : undef;
+
+	my $selection_exists = 0;
+	if ($editor) {
+		my $txt = $editor->GetSelectedText;
+		if ( defined($txt) && length($txt) > 0 ) {
+			$selection_exists = 1;
+		}
+	}
+
+	$self->EnableTool( Wx::wxID_SAVE,      ( $doc and $doc->is_modified ? 1 : 0 ));
+	$self->EnableTool( Wx::wxID_CLOSE,     ( $editor ? 1 : 0 ));
+	$self->EnableTool( Wx::wxID_UNDO,      ( $editor and $editor->CanUndo  ));
+	$self->EnableTool( Wx::wxID_REDO,      ( $editor and $editor->CanRedo  ));
+	$self->EnableTool( Wx::wxID_CUT,       ( $selection_exists ));
+	$self->EnableTool( Wx::wxID_COPY,      ( $selection_exists ));
+	$self->EnableTool( Wx::wxID_PASTE,     ( $editor and $editor->CanPaste ));
+	$self->EnableTool( Wx::wxID_SELECTALL, ( $editor ? 1 : 0 ));
 	return 1;
 }
 

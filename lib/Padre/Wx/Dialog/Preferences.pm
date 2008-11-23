@@ -8,7 +8,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Wx::Locale        qw(:default);
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 sub get_layout {
 	my ($config, $main_startup, $editor_autoindent) = @_;
@@ -21,6 +21,10 @@ sub get_layout {
 		[
 			[ 'Wx::StaticText', undef,              gettext('TAB display size (in spaces)')],
 			[ 'Wx::TextCtrl',   'editor_tabwidth',	$config->{editor_tabwidth}],
+		],
+		[
+			[ 'Wx::StaticText', undef,              gettext('Guess from current document')],
+			[ 'Wx::Button',     '_guess_',          gettext('Guess')     ],
 		],
 		[
 			[ 'Wx::StaticText', undef,              gettext('Max number of modules')],
@@ -66,11 +70,39 @@ sub dialog {
 	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_ok_},     sub { $dialog->EndModal(Wx::wxID_OK) } );
 	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_}, sub { $dialog->EndModal(Wx::wxID_CANCEL) } );
 
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_guess_},  sub { $class->guess_indentation_settings($dialog) } );
+
 	$dialog->{_widgets_}{_ok_}->SetDefault;
 	
 	return $dialog;
 }
 
+sub guess_indentation_settings {
+	my $class  = shift;
+	my $dialog = shift;
+	my $doc    = Padre::Documents->current;
+
+	require Text::FindIndent;
+	my $indentation = Text::FindIndent->parse($doc->text_get);
+
+	# TODO: Padre can't do mixed tab/space indentation (i.e. tab-compressed indentation) yet
+
+	if ($indentation =~ /^t\d+/) { # we only do ONE tab
+		$dialog->{_widgets_}{editor_use_tabs}->SetValue(1);
+		$dialog->{_widgets_}{editor_tabwidth}->SetValue(8);
+	}
+	elsif ($indentation =~ /^[sm](\d+)/) {
+		# TODO: as mentioned above, the "m"/mixed case needs to eventually be separate
+		$dialog->{_widgets_}{editor_use_tabs}->SetValue(0);
+		$dialog->{_widgets_}{editor_tabwidth}->SetValue($1);
+	}
+	else {
+		# fallback
+		$dialog->{_widgets_}{editor_use_tabs}->SetValue(0);
+		$dialog->{_widgets_}{editor_tabwidth}->SetValue(8);
+	}
+
+}
 
 
 sub run {

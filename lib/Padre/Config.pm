@@ -11,7 +11,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 
 
@@ -62,24 +62,29 @@ sub default_plugin_dir {
 		die "Cannot create plugins dir '$plugins_full_path' $!";
 	}
 
-	# copy the MY Plugin
-	my $file = File::Spec->catfile( $plugins_full_path, 'MY.pm' );
+	# copy the My Plugin if necessary
+	my $file = File::Spec->catfile( $plugins_full_path, 'My.pm' );
 	if (not -e $file) {
-		my $src = File::Spec->catfile( File::Basename::dirname($INC{'Padre/Config.pm'}), 'Plugin', 'MY.pm' );
-		if (not $src) {
-			die "Could not find the original MY plugin";
-		}
-		if (not File::Copy::copy($src, $file) ) {
-			return die "Could not copy the MY plugin ($src) to : $!";
-		}
-		chmod 0644, $file;
+		Padre::Config->copy_original_My_plugin( $file );
 	}
-
 	return $pluginsdir;
 }
 
 
+sub copy_original_My_plugin {
+	my $class = shift;
+	my $target = shift;
+	my $src = File::Spec->catfile( File::Basename::dirname($INC{'Padre/Config.pm'}), 'Plugin', 'My.pm' );
+	if (not $src) {
+		die "Could not find the original My plugin";
+	}
+	if (not File::Copy::copy($src, $target) ) {
+		return die "Could not copy the My plugin ($src) to $target: $!";
+	}
+	chmod 0644, $target;
 
+	return 1;
+}
 
 
 #####################################################################
@@ -90,10 +95,14 @@ sub new {
 	my $self  = bless { @_ }, $class;
 
 	# Main window geometry
-	$self->{host}->{main_height}    ||= Wx::wxDefaultSize()->height;
-	$self->{host}->{main_width}     ||= Wx::wxDefaultSize()->width;
-	$self->{host}->{main_left}      ||= Wx::wxDefaultPosition()->x;
-	$self->{host}->{main_top}       ||= Wx::wxDefaultPosition()->y;
+	$self->{host}->{main_height}    ||= 400;
+	$self->{host}->{main_width}     ||= 600;
+	$self->{host}->{main_left}      ||= 40;
+	$self->{host}->{main_top}       ||= 20;
+#	$self->{host}->{main_height}    ||= Wx::wxDefaultSize()->height;
+#	$self->{host}->{main_width}     ||= Wx::wxDefaultSize()->width;
+#	$self->{host}->{main_left}      ||= Wx::wxDefaultPosition()->x;
+#	$self->{host}->{main_top}       ||= Wx::wxDefaultPosition()->y;
 	$self->{host}->{main_maximized} ||= 0;
 	$self->{host}->{locale}         ||= 'en';
 
@@ -159,15 +168,9 @@ sub new {
 
 		# By default, don't enable experimental features
 		experimental              => 0,
-		vi_mode                   => 0,
-
 	);
 	%$self = (%defaults, %$self);
 
-	if ($self->{vi_mode}) {
-		require Padre::Wx::Editor::Vi;
-		require Padre::Wx::Dialog::CommandLine;
-	}
 	return $self;
 }
 

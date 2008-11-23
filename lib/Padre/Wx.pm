@@ -6,18 +6,21 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use File::Spec          ();
-use File::ShareDir::PAR ();
+use File::Spec ();
 
 # Load every exportable constant into here, so that they come into
 # existance in the Wx:: packages, allowing everywhere else in the code to
 # use them without braces.
 use Wx         ':everything';
+use Wx         'wxTheClipboard';
 use Wx::Event  ':everything';
+use Wx::STC    ();
 use Wx::AUI    ();
 use Wx::Locale ':default';
 
-our $VERSION = '0.17';
+use Padre::Util ();
+
+our $VERSION = '0.18';
 
 
 
@@ -35,21 +38,12 @@ sub MarkWarn  { 2 }
 
 
 #####################################################################
-# Shared Resources
+# Defines for object IDs
 
-sub share () {
-	return File::Spec->catdir( $FindBin::Bin, File::Spec->updir, 'share' ) if $ENV{PADRE_DEV};
-	return File::Spec->catdir( $ENV{PADRE_PAR_PATH}, 'inc', 'share' )      if $ENV{PADRE_PAR_PATH};
-	return File::ShareDir::PAR::dist_dir('Padre');
-}
+sub id_SYNCHK_TIMER  { 30001 }
+sub id_FILECHK_TIMER { 30002 }
 
-sub sharedir {
-	File::Spec->catdir( share, @_ );
-}
 
-sub sharefile {
-	File::Spec->catfile( share, @_ );
-}
 
 
 
@@ -58,24 +52,10 @@ sub sharefile {
 #####################################################################
 # Load Shared Resources
 
-sub bitmap {
-	Wx::Bitmap->new(
-		sharefile( 'docview', "$_[0].xpm" ),
-		Wx::wxBITMAP_TYPE_XPM,
-	);
-}
-
 sub tango {
 	Wx::Bitmap->new(
-		sharefile( 'tango', '16x16', @_ ),
+		Padre::Util::sharefile( 'tango', '16x16', @_ ),
 		Wx::wxBITMAP_TYPE_PNG,
-	);
-}
-
-sub icon {
-	Wx::Icon->new(
-		sharefile( 'docview', "$_[0].xpm" ),
-		Wx::wxBITMAP_TYPE_XPM,
 	);
 }
 

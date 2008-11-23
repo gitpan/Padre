@@ -7,7 +7,7 @@ use Carp            ();
 use Params::Util    '_INSTANCE';
 use Padre::Document ();
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 our @ISA     = 'Padre::Document';
 
 
@@ -44,6 +44,8 @@ sub colourise {
 		}
 	}
 }
+
+sub comment_lines_str { return '#' }
 
 1;
 

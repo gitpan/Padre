@@ -7,7 +7,7 @@ use Carp            ();
 use Padre::Document ();
 use YAML::Tiny      ();
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 our @ISA     = 'Padre::Document';
 
 #####################################################################
@@ -18,7 +18,7 @@ our @ISA     = 'Padre::Document';
 #sub keywords {
 #	unless ( defined $keywords ) {
 #		$keywords = YAML::Tiny::LoadFile(
-#			Padre::Wx::sharefile( 'languages', 'perl5', 'javascript.yml' )
+#			Padre::Util::sharefile( 'languages', 'perl5', 'javascript.yml' )
 #		);
 #	}
 #	return $keywords;
@@ -34,6 +34,9 @@ sub get_function_regex {
 	my ( $self, $sub ) = @_;
 	return qr{(^|\n)function\s+$sub\b};
 }
+
+sub comment_lines_str { return '//' }
+
 
 1;
 

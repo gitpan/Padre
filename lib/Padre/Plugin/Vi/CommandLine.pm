@@ -1,4 +1,4 @@
-package Padre::Wx::Dialog::CommandLine;
+package Padre::Plugin::Vi::CommandLine;
 
 use warnings;
 use strict;
@@ -11,7 +11,7 @@ use File::Basename   ();
 
 =head1 NAME
 
-Padre::Wx::Dialog::CommandLine - vi and emacs in Padre ?
+Padre::Plugin::Vi::CommandLine - vi plugin in Padre ?
 
 =head1 VERSION
 
@@ -19,14 +19,11 @@ Version 0.01
 
 =cut
 
-our $VERSION = '0.17';
+our $VERSION = '0.18';
 
 =head1 SYNOPSIS
 
-Install L<Padre>, install this plug-in. It should automatically 
-add a menu option B<Plugins/CommandLine/Show Prompt>
-with Alt-` (Alt-backtick) as a hot-key. 
-(It will later change or be configurable.)
+Install L<Padre>, install this plug-in. 
 
 =head1 DESCRIPTION
 
@@ -104,11 +101,13 @@ sub show_prompt {
 	if ($cmd =~ /^e\s+(.*)/ and defined $1) {
 		my $file = $1;
 		# try to open file
-		$main->setup_editor($file);
+		$main->setup_editor(File::Spec->catfile(Padre->ide->{original_dir}, $file));
 		$main->refresh_all;
 	} elsif ($cmd eq 'w') {
 		# save file
 		$main->on_save;
+	} elsif ($cmd =~ /^\d+$/) {
+		Padre->ide->wx->main_window->selected_editor->GotoLine($cmd-1);
 	}
 	
 	return;
@@ -142,7 +141,7 @@ sub on_key_pressed {
 			@current_options = @commands;
 		} elsif ($tab_started =~ /^e\s+(.*)$/) {
 			my $prefix = $1;
-			my $path = Cwd::cwd();
+			my $path = Padre->ide->{original_dir};
 			if ($prefix) {
 				if (File::Spec->file_name_is_absolute( $prefix ) ) {
 					$path = $prefix;
