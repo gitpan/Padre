@@ -1,15 +1,22 @@
-package Padre::Project;
+package Padre::Project::Perl;
 
 # This is not usable yet
 
 use strict;
 use warnings;
-use File::Spec        ();
-use Module::Inspector ();
+use base 'Padre::Project';
 
-use base 'Module::Inspector';
+our $VERSION = '0.19';
 
-our $VERSION = '0.18';
+sub inspector {
+	my $self = shift;
+
+	unless ( $self->{inspector} ) {
+		require Module::Inspector;
+		$self->{inspector} = Module::Inspector->new( dist_dir => $self->root );
+	}
+	return $self->{inspector};
+}
 
 sub from_file {
 	my $class = shift;
@@ -39,7 +46,7 @@ sub from_file {
 
 	# Hand off to the regular constructor
 	return $class->new(
-		dist_dir => File::Spec->catpath( $v, $dirs ),
+		root => File::Spec->catpath( $v, $dirs ),
 	);
 }
 

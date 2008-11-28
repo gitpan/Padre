@@ -5,7 +5,7 @@ use warnings;
 
 use base 'Padre::Plugin';
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 use Padre::Wx ();
 
@@ -19,7 +19,7 @@ use Data::Dumper   ();
 use Padre::Util    ();
 
 sub padre_interfaces {
-	'Padre::Plugin' => 0.17,
+	'Padre::Plugin' => 0.18,
 }
 
 

@@ -1,5 +1,19 @@
 Changes for Padre.
 
+0.19 2008.11.28
+
+    Korean translation added (KEEDI)
+    Hungarian translation added (GYU)
+    Hebrew translation added (Omer Zak)
+    Improvement in vi Plugin (SZABGAB)
+    Locale switching no longer needs a restart (HJANSEN)
+    Moved syntax checking out from experimental state (HJANSEN)
+    Prototype of printing support (HJANSEN)
+    Adding support for document type registration (ADAMK)
+    Adding plugin_name to the Padre::Plugin API (ADAMK)
+    Advancing the version numbers of some prereqs (ADAMK)
+    Save files in the same encoding as they were read.
+
 0.18 2008.11.23
 
     Added a few more directories to the no_index list in Build.PL (ADAMK)
@@ -146,7 +160,7 @@ v0.11 2008.10.23
     All Padre.pm DBI code converted to Padre::DB calls (ADAMK)
     Removed minor use of Class::Accessor to reduce memory overhead,
         namespace pollution and dependency count (ADAMK)
-    Removed some superfluous code from the Pir/Pasm/Perl6 documents (ADAMK)
+    Removed some superfluous code from the PIR/PASM/Perl6 documents (ADAMK)
     Cleaned up (and shrunk the code for) the bootstrap sequence (ADAMK)
     Moved the "recent files" internal state into the database (ADAMK)
     Removed index pointers unrelated to the IDE from Padre.pm (ADAMK)
@@ -172,7 +186,7 @@ v0.10 2008.09.22
     Add Search and Replace and global search and replace.
     Setup mapping of file extensions to mime-types and to color coding.
     Clean up the MainWindow module, move code to Document and Document::Perl.
-    Implement an experimental Pasm, Pir and Perl 6 highlighting.
+    Implement an experimental PASM, PIR and Perl 6 highlighting.
     Allow experimental code to allow the user to execute code within Padre.
     Report if file could not be saved and keep it in unsaved state (bug #74).
     Separate the Padre::Install module from Build.PL.

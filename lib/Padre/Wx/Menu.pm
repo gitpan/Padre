@@ -8,7 +8,7 @@ use Padre::Util      ();
 use Padre::Wx        ();
 use Padre::Documents ();
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 
 
@@ -64,6 +64,7 @@ sub new {
 
 	$self->{view_indentation_guide}->Check( $config->{editor_indentationguides} ? 1 : 0 );
 	$self->{view_show_calltips}->Check( $config->{editor_calltips} ? 1 : 0 );
+	$self->{view_show_syntaxcheck}->Check( $config->{editor_syntaxcheck} ? 1 : 0 );
 
 	return $self;
 }
@@ -297,6 +298,14 @@ sub menu_file {
 		$self->{file_save_all},
 		sub { $_[0]->on_save_all },
 	);
+	$menu->AppendSeparator;
+
+#	# Printing
+	$self->{file_print} = $menu->Append( Wx::wxID_PRINT, Wx::gettext('Print File') );
+	Wx::Event::EVT_MENU( $win,
+		$self->{file_print},
+		sub { Padre::Wx::Print::OnPrint(@_) }     
+	);                                                                            
 	$menu->AppendSeparator;
 
 	# Conversions and Transforms
@@ -612,10 +621,17 @@ sub menu_view {
 		$self->{view_indentation_guide},
 		\&Padre::Wx::MainWindow::on_toggle_indentation_guide,
 	);
+	$menu_view->AppendSeparator;	
+
 	$self->{view_show_calltips} = $menu_view->AppendCheckItem( -1, Wx::gettext("Show Call Tips") );
 	Wx::Event::EVT_MENU( $win,
 		$self->{view_show_calltips},
 		sub { $config->{editor_calltips} = $self->{view_show_calltips}->IsChecked },
+	);
+	$self->{view_show_syntaxcheck} = $menu_view->AppendCheckItem( -1, Wx::gettext("Show Syntax Check") );
+	Wx::Event::EVT_MENU( $win,
+		$self->{view_show_syntaxcheck},
+		\&Padre::Wx::MainWindow::on_toggle_synchk,
 	);
 	$menu_view->AppendSeparator;
 	
@@ -662,25 +678,25 @@ sub menu_view {
 	$self->{view_language} = Wx::Menu->new;
 	$menu_view->Append( -1, Wx::gettext("Language"), $self->{view_language} );
 	
-	# TODO horrible, fix this
-	if ($config->{host}->{locale} eq 'en') {
+	Wx::Event::EVT_MENU( $win,
+		$self->{view_language}->AppendRadioItem( -1, Wx::gettext("System Default") ),
+		sub { $_[0]->change_locale() },
+	);
+	$self->{view_language}->AppendSeparator;
+	my %languages = %Padre::Wx::MainWindow::languages;
+	foreach my $name (sort { $languages{$a} cmp $languages{$b} }  keys %languages) {
+		my $label = $languages{$name};
+		if ( $label eq 'English' ) {
+			$label = q{English (Queen's)};
+		}
+		my $item = $self->{view_language}->AppendRadioItem( -1, $label );
 		Wx::Event::EVT_MENU( $win,
-			$self->{view_language}->AppendRadioItem( -1, Wx::gettext("English") ),
-			sub { $_[0]->change_locale('en') },
+			$item,
+			sub { $_[0]->change_locale($name) },
 		);
-		Wx::Event::EVT_MENU( $win,
-			$self->{view_language}->AppendRadioItem( -1, Wx::gettext("German") ),
-			sub { $_[0]->change_locale('de') },
-		);
-	} else {
-		Wx::Event::EVT_MENU( $win,
-			$self->{view_language}->AppendRadioItem( -1, Wx::gettext("German") ),
-			sub { $_[0]->change_locale('de') },
-		);
-		Wx::Event::EVT_MENU( $win,
-			$self->{view_language}->AppendRadioItem( -1, Wx::gettext("English") ),
-			sub { $_[0]->change_locale('en') },
-		);
+		if ($config->{host}->{locale} and $config->{host}->{locale} eq $name) {
+			$item->Check(1);
+		}
 	}
 
 	$menu_view->AppendSeparator;
@@ -762,20 +778,22 @@ sub menu_plugin {
 
 	# Add the Plugin Tools menu
 	my $tools = $self->menu_plugin_tools( $win );
-	$menu->Append( -1, 'Plugin Tools', $tools );
+	Wx::Event::EVT_MENU( $win,
+		$menu->Append( -1, Wx::gettext("Plugin Manager") ),
+		sub { Padre::Wx::Dialog::PluginManager->show(@_) },
+	);
+	$menu->Append( -1, Wx::gettext('Plugin Tools'), $tools );
 	$menu->AppendSeparator;
 
 	foreach my $name ( 'My', @plugins ) {
-		next if not $plugins->{$name};
-		#print "$name - $plugins{$name}{module} - $plugins{$name}{status}\n";
-		next if not $plugins->{$name}{status} or $plugins->{$name}{status} ne 'loaded';
+		next unless $plugins->{$name};
+		next unless $plugins->{$name}->{status};
+		next unless $plugins->{$name}->{status} eq 'loaded';
 
-		#my $label = $manager->get_label($name);
-		#my @menu  = $manager->get_menu($name);
-		my ($label, $items) = $manager->get_menu($self->win, $name);
-		
-		#my $items = $self->add_plugin_menu_items(\@menu);
-		$menu->Append( -1, $label, $items );
+		my @plugin = $manager->get_menu($self->win, $name);
+		next unless @plugin;
+
+		$menu->Append( -1, @plugin );
 		if ( $name eq 'My' ) {
 			$menu->AppendSeparator;
 		}
@@ -810,7 +828,10 @@ sub menu_plugin_tools {
 		$menu->Append( -1, Wx::gettext("Reset My Plugin") ),
 		sub  {
 			my $ret = Wx::MessageBox(
-				Wx::gettext("Reset My Plugin"), Wx::gettext("Reset My Plugin"), Wx::wxOK | Wx::wxCANCEL | Wx::wxCENTRE, $win
+				Wx::gettext("Reset My Plugin"),
+				Wx::gettext("Reset My Plugin"),
+				Wx::wxOK | Wx::wxCANCEL | Wx::wxCENTRE,
+				$win
 			);
 			if ( $ret == Wx::wxOK) {
 				my $manager = Padre->ide->plugin_manager;
@@ -825,10 +846,6 @@ sub menu_plugin_tools {
 	);
 	$menu->AppendSeparator;
 
-	Wx::Event::EVT_MENU( $win,
-		$menu->Append( -1, Wx::gettext("Plugin Manager") ),
-		sub { Padre::Wx::Dialog::PluginManager->show(@_) },
-	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->Append( -1, Wx::gettext("Reload All Plugins") ),
 		sub { Padre->ide->plugin_manager->reload_plugins; },
@@ -864,7 +881,7 @@ sub menu_window {
  		\&Padre::Wx::MainWindow::on_last_visited_pane,
 	);
  	Wx::Event::EVT_MENU( $win,
- 		$menu->Append(-1, Wx::gettext("Right Click\tCtrl-/")),
+ 		$menu->Append(-1, Wx::gettext("Right Click\tAlt-/")),
  		sub {
 			my $editor = $_[0]->selected_editor;
 			if ($editor) {
@@ -890,17 +907,14 @@ sub menu_window {
 			$_[0]->{output}->SetFocus;
 		},
 	);
-#	$self->{window_goto_synchk} = $menu->Append( -1, Wx::gettext("GoTo Syntax Check Window\tAlt-C") );
-#	Wx::Event::EVT_MENU( $win,
-#		$self->{window_goto_synchk},
-#		sub {
-#			$_[0]->show_syntaxbar(1);
-#			$_[0]->{syntaxbar}->SetFocus;
-#		},
-#	);
-#	unless ( $_[0]->{experimental_syntaxcheck}->IsChecked ) {
-#		$self->{window_goto_synchk}->Enable(0);
-#	}
+	$self->{window_goto_synchk} = $menu->Append( -1, Wx::gettext("GoTo Syntax Check Window\tAlt-C") );
+	Wx::Event::EVT_MENU( $win,
+		$self->{window_goto_synchk},
+		sub {
+			$_[0]->show_syntaxbar(1);
+			$_[0]->{syntaxbar}->SetFocus;
+		},
+	);
 	Wx::Event::EVT_MENU( $win,
 		$menu->Append( -1, Wx::gettext("GoTo Main Window\tAlt-M") ),
 		sub {
@@ -985,11 +999,6 @@ sub menu_experimental {
 			}
 			return;
 		},
-	);
-	$self->{experimental_syntaxcheck} = $menu_exp->AppendCheckItem( -1, Wx::gettext("Show Syntax Check") );
-	Wx::Event::EVT_MENU( $win,
-		$self->{experimental_syntaxcheck},
-		\&Padre::Wx::MainWindow::on_toggle_synchk,
 	);
 
 	

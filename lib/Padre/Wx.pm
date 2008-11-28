@@ -16,11 +16,11 @@ use Wx         'wxTheClipboard';
 use Wx::Event  ':everything';
 use Wx::STC    ();
 use Wx::AUI    ();
-use Wx::Locale ':default';
+use Wx::Locale ();
 
 use Padre::Util ();
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 
 
 

@@ -1,12 +1,12 @@
-package Padre::Document::Pasm;
+package Padre::Document::PASM;
 
 use 5.008;
 use strict;
 use warnings;
 use Padre::Document ();
-use Padre::Util     (); # Px::
+use Padre::Util     ();
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 our @ISA     = 'Padre::Document';
 
 # Slightly less naive way to parse and colourise pasm files

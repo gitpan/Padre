@@ -8,7 +8,7 @@ use Padre::Wx ();
 use Padre::Util;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.18';
+our $VERSION = '0.19';
 #our @ISA     = 'Wx::Menu';
 sub new { return bless {}, shift };
 
@@ -44,11 +44,24 @@ sub about {
 	if ( Padre::Util::UNIX ) {
 		$about->SetWebSite("http://padre.perlide.org/");
 	}
-	$about->AddDeveloper("Gabor Szabo");
 	$about->AddDeveloper("Adam Kennedy");
-	$about->AddDeveloper("Steffen Mueller");
+	$about->AddDeveloper("Brian Cassidy");
 	$about->AddDeveloper("Fayland Lam");
+	$about->AddDeveloper("Gabor Szabo");
 	$about->AddDeveloper("Heiko Jansen");
+	$about->AddDeveloper("Jerome Quelin");
+	$about->AddDeveloper("Kaare Rasmussen");
+	$about->AddDeveloper("Keedi Kim");
+	$about->AddDeveloper("Max Maischein");
+	$about->AddDeveloper("Patrick Donelan");
+	$about->AddDeveloper("Steffen Mueller");
+
+	$about->AddTranslator("German - Heiko Jansen");
+	$about->AddTranslator("Korean - Keedi Kim");
+	$about->AddTranslator("Hungarian = Gyorgy Pasztor");
+	$about->AddTranslator("Hebrew - Omer Zak");
+
+
 	Wx::AboutBox( $about );
 	return;
 }
