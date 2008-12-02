@@ -11,7 +11,7 @@ my $default_dir;
 use Padre::Wx  ();
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 
 sub on_new_project {
@@ -23,7 +23,7 @@ sub on_new_project {
 	# run
 	Wx::MessageBox(
 		Wx::gettext("Not implemented yet"),
-		Wx::gettext("Not Yes"),
+		Wx::gettext("Not Yet"),
 		Wx::wxOK,
 		$self,
 	);

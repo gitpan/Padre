@@ -10,7 +10,7 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 sub get_layout {
 	my ($text, $shortcuts) = @_;
@@ -35,7 +35,7 @@ sub get_layout {
 		push @{ $layout[-1] }, 
 			['Wx::Button',     'delete', Wx::wxID_DELETE];
 		push @{ $layout[-1] }, 
-			['Wx::Button',     'delete_all', 'Delete &All'];
+			['Wx::Button',     'delete_all', gettext('Delete &All')];
 	}
 	return \@layout;
 }

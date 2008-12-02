@@ -34,14 +34,15 @@ use warnings;
 use Pod::Simple::XHTML ();
 
 use vars qw{@ISA};
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 BEGIN {
 	@ISA     = 'Pod::Simple::XHTML';
 }
 
-
-
-
+use Class::XSAccessor
+	getters => {
+		html => 'scratch', # Method to fetch out the scratch
+	};
 
 #####################################################################
 # One-Shot Method
@@ -77,12 +78,6 @@ sub new {
 sub emit {
 	return;
 }
-
-# Method to fetch out the scratch
-sub html {
-	return $_[0]->{scratch};
-}
-
 
 
 

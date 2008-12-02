@@ -14,7 +14,7 @@ use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -51,7 +51,18 @@ use Class::Autouse qw{
 	Padre::Wx::History::TextDialog
 	Padre::Wx::MainWindow
 	Padre::Wx::Print
+	Padre::Wx::SyntaxChecker
 };
+
+# generate fast accessors
+use Class::XSAccessor
+	getters => {
+		config         => 'config',
+		config_dir     => 'config_dir',
+		config_yaml    => 'config_yaml',
+		plugin_manager => 'plugin_manager',
+	};
+
 
 # Globally shared Perl detection object
 sub perl_interpreter {
@@ -114,22 +125,6 @@ sub wx {
 	my $self = shift;
 	$self->{wx} or
 	$self->{wx} = Padre::Wx::App->new;
-}
-
-sub config {
-	$_[0]->{config};
-}
-
-sub config_dir {
-	$_[0]->{config_dir};
-}
-
-sub config_yaml {
-	$_[0]->{config_yaml};
-}
-
-sub plugin_manager {
-	$_[0]->{plugin_manager};
 }
 
 sub run {
@@ -881,10 +876,12 @@ The developers of Padre:
 
 Adam Kennedy (ADAMK),
 Brian Cassidy (BRICAS),
+Chris Dolan (CHRISDOLAN),
 Fayland Lam (FAYLAND),
 Heiko Jansen (HJANSEN),
 Jerome Quelin (JQUELIN),
 Kaare Rasmussen (KAARE),
+Keedi Kim (KEEDI),
 Max Maischein (CORION)
 Patrick Donelan (PATSPAM),
 Steffen Mueller (TSEE), 
@@ -898,13 +895,15 @@ To Octavian Rasnita for early testing and bug reports.
 
 English - everyone on the team
 
+French - Jerome Quelin (JQUELIN)
+
 German - Heiko Jansen (HJANSEN)
 
-Korean - Keedi Kim (KEEDI)
+Hebrew - Omer Zak
 
 Hungarian = Gyorgy Pasztor (GYU)
 
-Hebrew - Omer Zak
+Korean - Keedi Kim (KEEDI)
 
 
 

@@ -12,7 +12,7 @@ use PPI;
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 our @ISA     = 'Padre::Document';
 
 
@@ -122,7 +122,7 @@ sub get_command {
 	return qq{"$perl" "$filename"};
 }
 
-sub colourise {
+sub colorize {
 	my ($self) = @_;
 	
 	$self->remove_color;
@@ -137,7 +137,7 @@ sub colourise {
 		return;
 	}
 
-    my %colors = (
+	my %colors = (
 		keyword         => 4, # dark green
 		structure       => 6,
 		core            => 1, # red
@@ -249,7 +249,7 @@ sub _css_class {
 		}
 	}
 
-	# Normal colouring
+	# Normal coloring
 	my $css = ref $Token;
 	$css =~ s/^.+:://;
 	$css;
@@ -296,8 +296,8 @@ sub check_syntax {
 		$nlchar = "\r\n";
 	}
 	elsif ( $self->get_newline_type eq 'MAC' ) {
-        $nlchar = "\r";
-    }
+		$nlchar = "\r";
+	}
 
 	return [] if $report =~ /\A[^\n]+syntax OK$nlchar\z/o;
 

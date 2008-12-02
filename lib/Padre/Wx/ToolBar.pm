@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx         ();
 use Padre::Wx::Editor ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 our @ISA     = 'Wx::ToolBar';
 
 sub new {
@@ -102,7 +102,7 @@ sub new {
 	Wx::Event::EVT_TOOL(
 		$parent,
 		Wx::wxID_PASTE,
-        sub { 
+		sub { 
 			my $editor = Padre->ide->wx->main_window->selected_editor or return;
 			$editor->Paste;
 		},

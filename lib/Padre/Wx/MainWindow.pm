@@ -1,6 +1,18 @@
 package Padre::Wx::MainWindow;
 
 use 5.008;
+
+# This is somewhat disturbing but necessary to prevent
+# Test::Compile from breaking. The compile tests run
+# perl -v lib/Padre/Wx/MainWindow.pm which first compiles
+# the module as a script (i.e. no %INC entry created)
+# and then again when Padre::Wx::MainWindow is required
+# from another module down the dependency chain.
+# This used to break with subroutine redefinitions.
+# So to prevent this, we force the creating of the correct
+# %INC entry when the file is first compiled. -- Steffen
+BEGIN {$INC{"Padre/Wx/MainWindow.pm"} ||= __FILE__}
+
 use strict;
 use warnings;
 use FindBin;
@@ -24,7 +36,7 @@ use Padre::Wx::DNDFilesDropTarget ();
 
 use base qw{Wx::Frame};
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 my $default_dir = Cwd::cwd();
 
@@ -36,18 +48,20 @@ use constant DEFAULT_LOCALE => 'en';
 # used in Menu.pm
 our %languages = (
 	de => Wx::gettext('German'),
-	en => Wx::gettext('English (London.pm)'),
-	ko => Wx::gettext('Korean'),
-	hu => Wx::gettext('Hungarian'),
+	en => Wx::gettext('English'),
+	fr => Wx::gettext('French'),
 	he => Wx::gettext('Hebrew'),
+	hu => Wx::gettext('Hungarian'),
+	ko => Wx::gettext('Korean'),
 );
 
 my %shortname_of = (
-	Wx::wxLANGUAGE_ENGLISH_US() => 'en',  
-	Wx::wxLANGUAGE_GERMAN()     => 'de', 
-	Wx::wxLANGUAGE_KOREAN()     => 'ko',
-	Wx::wxLANGUAGE_HUNGARIAN()  => 'hu',
+	Wx::wxLANGUAGE_GERMAN()     => 'de',
+	Wx::wxLANGUAGE_ENGLISH_US() => 'en',
+	Wx::wxLANGUAGE_FRENCH()     => 'fr',
 	Wx::wxLANGUAGE_HEBREW()     => 'he',
+	Wx::wxLANGUAGE_HUNGARIAN()  => 'hu',
+	Wx::wxLANGUAGE_KOREAN()     => 'ko',
 );
 
 my %number_of = reverse %shortname_of;
@@ -58,6 +72,14 @@ my %number_of = reverse %shortname_of;
 
 #####################################################################
 # Constructor and Accessors
+
+use Class::XSAccessor
+	getters => {
+		manager        => 'manager',
+		no_refresh     => '_no_refresh',
+		syntax_checker => 'syntax_checker',
+	};
+
 
 sub new {
 	my $class  = shift;
@@ -186,8 +208,8 @@ sub new {
 		\&on_function_selected,
 	);
 
-	# Create the sidebar for syntax check messages
-	$self->create_syntaxbar;
+	# Create the syntax checker and sidebar for syntax check messages
+	$self->{syntax_checker} = Padre::Wx::SyntaxChecker->new($self);
 
 	# Create the bottom-of-screen output textarea
 	$self->{output} = Padre::Wx::Output->new(
@@ -259,6 +281,10 @@ sub new {
 	);
 	$timer->Start( 1, 1 );
 
+	if ( defined $config->{host}->{aui_manager_layout} ) {
+		$self->manager->LoadPerspective( $config->{host}->{aui_manager_layout} );
+	}
+
 	return $self;
 }
 
@@ -286,43 +312,6 @@ sub create_main_components {
 	return;
 }
 
-sub create_syntaxbar {
-	my $self = shift;
-
-	$self->{syntaxbar} = Wx::ListView->new(
-		$self,
-		Wx::wxID_ANY,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxLC_REPORT | Wx::wxLC_SINGLE_SEL
-	);
-	$self->{syntaxbar}->InsertColumn( 0, Wx::gettext('Line') );
-	$self->{syntaxbar}->InsertColumn( 1, Wx::gettext('Type') );
-	$self->{syntaxbar}->InsertColumn( 2, Wx::gettext('Description') );
-	$self->manager->AddPane($self->{syntaxbar},
-		Wx::AuiPaneInfo->new->Name( "syntaxbar" )
-			->CenterPane->Resizable(1)->PaneBorder(1)->Movable(1)
-			->CaptionVisible(1)->CloseButton(1)->DestroyOnClose(0)
-			->MaximizeButton(1)->Floatable(1)->Dockable(1)
-			->Caption( Wx::gettext("Syntax") )->Position(3)->Bottom->Layer(2)
-	);
-	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
-		$self,
-		$self->{syntaxbar},
-		\&on_synchkmsg_selected,
-	);
-	if ( $self->{menu}->{view_show_syntaxcheck}->IsChecked ) {
-		$self->manager->GetPane('syntaxbar')->Show();
-	}
-	else {
-		$self->manager->GetPane('syntaxbar')->Hide();
-	}
-	return;
-}
-
-sub manager {
-	$_[0]->{manager};
-}
 
 # Load any default files
 sub load_files {
@@ -330,21 +319,15 @@ sub load_files {
 	my $config = Padre->ide->config;
 	my $files  = Padre->inst->{ARGV};
 	if ( Params::Util::_ARRAY($files) ) {
-		$self->Freeze;
-		foreach my $f ( @$files ) {
-		    $self->setup_editor($f);
-		}
-		$self->Thaw;
+		$self->setup_editors( @$files );
 	} elsif ( $config->{main_startup} eq 'new' ) {
-		$self->Freeze;
-		$self->setup_editor;
-		$self->Thaw;
+		$self->setup_editors();
 	} elsif ( $config->{main_startup} eq 'nothing' ) {
 		# nothing
 	} elsif ( $config->{main_startup} eq 'last' ) {
 		if ( $config->{host}->{main_files} ) {
 			$self->Freeze;
-			my @main_files	   = @{$config->{host}->{main_files}};
+			my @main_files     = @{$config->{host}->{main_files}};
 			my @main_files_pos = @{$config->{host}->{main_files_pos}};
 			foreach my $i ( 0 .. $#main_files ) {
 				my $file = $main_files[$i];
@@ -385,7 +368,7 @@ sub post_init {
 	$self->show_output($output) if not $output;
 
 	if ( $self->{menu}->{view_show_syntaxcheck}->IsChecked ) {
-		$self->enable_syntax_checker(1);
+		$self->syntax_checker->enable(1);
 	}
 
 	# Check for new plugins and alert if so
@@ -398,142 +381,6 @@ sub post_init {
 
 	return;
 }
-
-sub _idle_timer {
-	my ( $self, $event ) = @_;
-
-	$self->{synCheckTimer}->Stop if $self->{synCheckTimer}->IsRunning;
-	$self->{synCheckTimer}->Start(500, 1);
-
-	$event->Skip(0);
-	return;
-}
-
-sub enable_syntax_checker {
-	my $self = shift;
-	my $on   = shift;
-
-	if ($on) {
-		if (   defined( $self->{synCheckTimer} )
-			&& ref $self->{synCheckTimer} eq 'Wx::Timer'
-		) {
-			Wx::Event::EVT_IDLE( $self, \&_idle_timer );
-			$self->on_synchk_timer( undef, 1 );
-		}
-		else {
-			$self->{synCheckTimer} = Wx::Timer->new($self, Padre::Wx::id_SYNCHK_TIMER);
-			Wx::Event::EVT_TIMER( $self, Padre::Wx::id_SYNCHK_TIMER, \&on_synchk_timer );
-			Wx::Event::EVT_IDLE( $self, \&_idle_timer );
-		}
-		$self->show_syntaxbar(1);
-	}
-	else {
-		if (   defined($self->{synCheckTimer})
-			&& ref $self->{synCheckTimer} eq 'Wx::Timer'
-		) {
-			$self->{synCheckTimer}->Stop;
-			Wx::Event::EVT_IDLE( $self, sub { return } );
-		}
-		my $id   = $self->{notebook}->GetSelection;
-		my $page = $self->{notebook}->GetPage($id);
-		if ( defined($page) ) {
-			$page->MarkerDeleteAll(Padre::Wx::MarkError);
-			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
-		}
-		$self->{syntaxbar}->DeleteAllItems;
-		$self->show_syntaxbar(0);
-	}
-
-	# Setup a margin to hold fold markers
-	foreach my $editor ($self->pages) {
-		if ($on) {
-			$editor->SetMarginType(1, Wx::wxSTC_MARGIN_SYMBOL); # margin number 1 for symbols
-			$editor->SetMarginWidth(1, 16);                     # set margin 1 16 px wide
-		} else {
-			$editor->SetMarginWidth(1, 0);
-		}
-	}
-
-	return;
-}
-
-sub on_synchk_timer {
-	my ( $win, $event, $force ) = @_;
-
-	my $id = $win->{notebook}->GetSelection;
-	if ( defined $id ) {
-		my $page = $win->{notebook}->GetPage($id);
-
-		unless (   defined( $page->{Document} )
-				&& $page->{Document}->can_check_syntax
-		) {
-			if ( ref $page eq 'Padre::Wx::Editor' ) {
-				$page->MarkerDeleteAll(Padre::Wx::MarkError);
-				$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
-			}
-			$win->{syntaxbar}->DeleteAllItems;
-			return;
-		}
-
-		my $messages = $page->{Document}->check_syntax($force);
-		return unless defined $messages;
-
-		if ( scalar(@{$messages}) > 0 ) {
-			$page->MarkerDeleteAll(Padre::Wx::MarkError);
-			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
-
-			my $red = Wx::Colour->new("red");
-			my $orange = Wx::Colour->new("orange");
-			$page->MarkerDefine(Padre::Wx::MarkError, Wx::wxSTC_MARK_SMALLRECT, $red, $red);
-			$page->MarkerDefine(Padre::Wx::MarkWarn,  Wx::wxSTC_MARK_SMALLRECT, $orange, $orange);
-
-			my $i = 0;
-			$win->{syntaxbar}->DeleteAllItems;
-			delete $page->{synchk_calltips};
-			my $last_hint = '';
-			foreach my $hint ( sort { $a->{line} <=> $b->{line} } @{$messages} ) {
-				my $l = $hint->{line} - 1;
-				if ( $hint->{severity} eq 'W' ) {
-					$page->MarkerAdd( $l, 2);
-				}
-				else {
-					$page->MarkerAdd( $l, 1);
-				}
-				my $idx = $win->{syntaxbar}->InsertStringItem( $i++, $l + 1 );
-				$win->{syntaxbar}->SetItem( $idx, 1, $hint->{severity} );
-				$win->{syntaxbar}->SetItem( $idx, 2, $hint->{msg} );
-
-				if ( exists $page->{synchk_calltips}->{$l} ) {
-					$page->{synchk_calltips}->{$l} .= "\n--\n" . $hint->{msg};
-				}
-				else {
-					$page->{synchk_calltips}->{$l} = $hint->{msg};
-				}
-				$last_hint = $hint;
-			}
-
-			my $width0_default = $page->TextWidth( Wx::wxSTC_STYLE_DEFAULT, Wx::gettext("Line") . ' ' );
-			my $width0 = $page->TextWidth( Wx::wxSTC_STYLE_DEFAULT, $last_hint->{line} x 2 );
-			my $width1 = $page->TextWidth( Wx::wxSTC_STYLE_DEFAULT, Wx::gettext("Type") x 2 );
-			my $width2 = $win->{syntaxbar}->GetSize->GetWidth - $width0 - $width1 - $win->{syntaxbar}->GetCharWidth * 2;
-			$win->{syntaxbar}->SetColumnWidth( 0, ( $width0_default > $width0 ? $width0_default : $width0 ) );
-			$win->{syntaxbar}->SetColumnWidth( 1, $width1 );
-			$win->{syntaxbar}->SetColumnWidth( 2, $width2 );
-		}
-		else {
-			$page->MarkerDeleteAll(Padre::Wx::MarkError);
-			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
-			$win->{syntaxbar}->DeleteAllItems;
-		}
-	}
-
-	if ( defined($event) ) {
-		$event->Skip(0);
-	}
-
-	return;
-}
-
 
 
 #####################################################################
@@ -559,10 +406,6 @@ sub window_top {
 #####################################################################
 # Refresh Methods
 
-sub no_refresh {
-	$_[0]->{_no_refresh};
-}
-
 sub refresh_all {
 	my ($self) = @_;
 
@@ -582,13 +425,13 @@ sub refresh_all {
 
 	# force update of list of opened files in window menu
 	# TODO: shouldn't this be in Padre::Wx::Menu::refresh()?
-    if ( defined $self->{menu}->{alt} ) {
-	    foreach my $i ( 0 .. @{ $self->{menu}->{alt} } - 1 ) {
-		    my $doc = Padre::Documents->by_id($i) or return;
-		    my $file = $doc->filename || $self->{notebook}->GetPageText($i);
-    		$self->{menu}->update_alt_n_menu($file, $i);
-	    }
-    }
+	if ( defined $self->{menu}->{alt} ) {
+		foreach my $i ( 0 .. @{ $self->{menu}->{alt} } - 1 ) {
+			my $doc = Padre::Documents->by_id($i) or return;
+			my $file = $doc->filename || $self->{notebook}->GetPageText($i);
+			$self->{menu}->update_alt_n_menu($file, $i);
+		}
+	}
 
 	return;
 }
@@ -644,7 +487,7 @@ sub refresh_syntaxcheck {
 	return if not Padre->ide->config->{experimental};
 	return if not $self->{menu}->{view_show_syntaxcheck}->IsChecked;
 
-	$self->on_synchk_timer(undef, 1);
+	Padre::Wx::SyntaxChecker::on_syntax_check_timer( $self, undef, 1 );
 
 	return;
 }
@@ -653,7 +496,7 @@ sub refresh_menu {
 	my $self = shift;
 	return if $self->no_refresh;
 
-	$self->{menu}->refresh;	
+	$self->{menu}->refresh;
 }
 
 sub refresh_toolbar {
@@ -691,9 +534,22 @@ sub refresh_status {
 	my $char  = $pos-$start;
 
 	$self->SetStatusText("$modified $filename",             0);
-	$self->SetStatusText($doc->mimetype,                    1);
-	$self->SetStatusText($newline_type,                     2);
-	$self->SetStatusText("L: " . ($line +1) . " Ch: $char", 3);
+
+	my $charWidth = $self->{statusbar}->GetCharWidth;
+	my $mt = $doc->get_mimetype;
+	my $curPos = Wx::gettext('L:') . ($line + 1) . ' ' . Wx::gettext('Ch:') . $char;
+
+	$self->SetStatusText($mt,           1);
+	$self->SetStatusText($newline_type, 2);
+	$self->SetStatusText($curPos,       3);
+
+    # since charWidth is an average we adjust the values a little
+	$self->{statusbar}->SetStatusWidths(
+		-1,
+		(length($mt)           - 1) * $charWidth,
+		(length($newline_type) + 2) * $charWidth,
+		(length($curPos)       + 1) * $charWidth
+	); 
 
 	return;
 }
@@ -705,7 +561,7 @@ sub refresh_status {
 sub refresh_methods {
 	my ($self) = @_;
 	return if $self->no_refresh;
-    return unless ( $self->{menu}->{view_functions}->IsChecked );
+	return unless ( $self->{menu}->{view_functions}->IsChecked );
 
 	my $doc = $self->selected_document;
 	if (not $doc) {
@@ -961,7 +817,16 @@ sub error {
 	$self->message( shift, Wx::gettext('Error') );
 }
 
+sub find {
+	my $self = shift;
 
+	if ( not defined $self->{fast_find_panel} ) {
+		require Padre::Wx::Dialog::Search;
+		$self->{fast_find_panel} = Padre::Wx::Dialog::Search->new;
+	}
+
+	return $self->{fast_find_panel};
+}
 
 
 
@@ -1075,7 +940,7 @@ sub on_close_window {
 	];
 	# Save all Pos for open files
 	$config->{host}->{main_files_pos} = [
-        map  { $_->editor->GetCurrentPos }
+		map  { $_->editor->GetCurrentPos }
 		grep { $_ } 
 		map  { Padre::Documents->by_id($_) }
 		$self->pageids
@@ -1116,6 +981,9 @@ sub on_close_window {
 			$config->{host}->{main_top},
 		) = $self->GetPositionXY;
 	}
+
+	$config->{host}->{aui_manager_layout} = $self->manager->SavePerspective;
+
 	Padre->ide->save_config;
 
 	# Clean up secondary windows
@@ -1152,6 +1020,21 @@ sub on_split_window {
 	return;
 }
 
+sub setup_editors {
+	my ($self, @files) = @_;
+	$self->Freeze;
+	if (@files) {
+		foreach my $f ( @files ) {
+			$self->setup_editor($f);
+		}
+	} else {
+		$self->setup_editor;
+	}
+	$self->Thaw;
+	return;
+}
+
+
 # if the current buffer is empty then fill that with the content of the
 # current file otherwise open a new buffer and open the file there.
 sub setup_editor {
@@ -1168,12 +1051,19 @@ sub setup_editor {
 	local $self->{_no_refresh} = 1;
 
 	my $config = Padre->ide->config;
-	my $editor = Padre::Wx::Editor->new( $self->{notebook} );
 	
-	$editor->{Document} = Padre::Document->new(
-		editor   => $editor,
+	my $doc = Padre::Document->new(
 		filename => $file,
 	);
+	if ($doc->errstr) {
+		warn $doc->errstr;
+		return;
+	}
+
+	my $editor = Padre::Wx::Editor->new( $self->{notebook} );
+	$editor->{Document} = $doc;
+	$doc->set_editor( $editor );
+	$editor->configure_editor($doc);
 	
 	Padre->ide->plugin_manager->editor_enable($editor);
 
@@ -1269,7 +1159,7 @@ sub on_open_selection {
 	}
 
 	Padre::DB->add_recent_files($file);
-	$self->setup_editor($file);
+	$self->setup_editors($file);
 	$self->refresh_all;
 
 	return;
@@ -1279,9 +1169,7 @@ sub on_open_all_recent_files {
 	my ( $self ) = @_;
 	
 	my $files = Padre::DB->get_recent_files;
-	foreach my $file ( @$files ) {
-		$self->setup_editor($file);
-	}
+	$self->setup_editors( @$files );
 	$self->refresh_all;
 }
 
@@ -1317,14 +1205,10 @@ sub on_open {
 		}
 	}
 
-	$self->Freeze;
-	foreach my $filename ( @filenames ) {
-		my $file = File::Spec->catfile($default_dir, $filename);
-		Padre::DB->add_recent_files($file);
-		$self->setup_editor($file);
-	}
+	my @files = map { File::Spec->catfile($default_dir, $_) } @filenames;
+	Padre::DB->add_recent_files($_) for @files;
+	$self->setup_editors(@files);
 	$self->refresh_all;
-	$self->Thaw;
 
 	return;
 }
@@ -1333,8 +1217,12 @@ sub on_reload_file {
 	my ($self) = @_;
 
 	my $doc     = $self->selected_document or return;
-	$doc->reload;
-	
+	if (not $doc->reload) {
+		$self->error(sprintf(Wx::gettext("Could not reload file: %s"), $doc->errstr));
+	} else {
+		$doc->editor->configure_editor($doc);
+	}
+
 	return;
 }
 
@@ -1423,7 +1311,7 @@ sub _save_buffer {
 	my ($self, $id) = @_;
 
 	my $page         = $self->{notebook}->GetPage($id);
-    my $doc          = Padre::Documents->by_id($id) or return;
+	my $doc          = Padre::Documents->by_id($id) or return;
 
 	if ($doc->has_changed_on_disk) {
 		my $ret = Wx::MessageBox(
@@ -1691,15 +1579,15 @@ sub on_toggle_current_line_background {
 	return;
 }
 
-sub on_toggle_synchk {
+sub on_toggle_syntax_check {
 	my ($self, $event) = @_;
 
 	my $config = Padre->ide->config;
 	$config->{editor_syntaxcheck} = $event->IsChecked ? 1 : 0;
 
-	$self->enable_syntax_checker( $config->{editor_syntaxcheck} ? 1 : 0 );
+	$self->syntax_checker->enable( $config->{editor_syntaxcheck} ? 1 : 0 );
 
-    $self->{menu}->{window_goto_synchk}->Enable( $config->{editor_syntaxcheck} ? 1 : 0 );
+	$self->{menu}->{window_goto_syntax_check}->Enable( $config->{editor_syntaxcheck} ? 1 : 0 );
 
 	return;
 }
@@ -1836,7 +1724,7 @@ sub on_ppi_highlight {
 		#my $editor = $self->selected_editor;
 		next if not $editor->{Document}->isa('Padre::Document::Perl');
 		if ($config->{ppi_highlight}) {
-			$editor->{Document}->colourise;
+			$editor->{Document}->colorize;
 		} else {
 			$editor->{Document}->remove_color;
 			$editor->Colourise(0, $editor->GetLength);
@@ -1877,33 +1765,33 @@ sub on_insert_from_file {
 	
 	# popup the window
 	my $last_filename = $win->selected_filename;
-    my $default_dir;
-    if ($last_filename) {
-        $default_dir = File::Basename::dirname($last_filename);
-    }
-    my $dialog = Wx::FileDialog->new(
-        $win, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
-    );
-    unless ( Padre::Util::WIN32 ) {
-        $dialog->SetWildcard("*");
-    }
-    if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-        return;
-    }
-    my $filename = $dialog->GetFilename;
-    $default_dir = $dialog->GetDirectory;
+	my $default_dir;
+	if ($last_filename) {
+		$default_dir = File::Basename::dirname($last_filename);
+	}
+	my $dialog = Wx::FileDialog->new(
+		$win, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
+	);
+	unless ( Padre::Util::WIN32 ) {
+		$dialog->SetWildcard("*");
+	}
+	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		return;
+	}
+	my $filename = $dialog->GetFilename;
+	$default_dir = $dialog->GetDirectory;
     
-    my $file = File::Spec->catfile($default_dir, $filename);
+	my $file = File::Spec->catfile($default_dir, $filename);
     
-    my $text = eval { File::Slurp::read_file($file, binmode => ':raw') };
+	my $text = eval { File::Slurp::read_file($file, binmode => ':raw') };
 	if ($@) {
 		$win->error($@);
 		return;
 	}
 	
-    my $data = Wx::TextDataObject->new;
-    $data->SetText($text);
-    my $length = $data->GetTextLength;
+	my $data = Wx::TextDataObject->new;
+	$data->SetText($text);
+	my $length = $data->GetTextLength;
 	
 	my $editor = $win->{notebook}->GetPage($id);
 	$editor->ReplaceSelection('');
@@ -1933,7 +1821,7 @@ sub convert_to {
 sub find_editor_of_file {
 	my ($self, $file) = @_;
 	foreach my $id (0 .. $self->{notebook}->GetPageCount -1) {
-        my $doc = Padre::Documents->by_id($id) or return;
+	my $doc = Padre::Documents->by_id($id) or return;
 		my $filename = $doc->filename;
 		next if not $filename;
 		return $id if $filename eq $file;
@@ -1964,26 +1852,6 @@ sub on_function_selected {
 	return;
 }
 
-sub on_synchkmsg_selected {
-	my ($self, $event) = @_;
-
-	my $id   = $self->{notebook}->GetSelection;
-	my $page = $self->{notebook}->GetPage($id);
-
-	my $line_number = $event->GetItem->GetText;
-	return if  not defined($line_number)
-			or $line_number !~ /^\d+$/o
-			or $page->GetLineCount < $line_number;
-
-	$line_number--;
-	$page->EnsureVisible($line_number);
-	$page->GotoPos( $page->GetLineIndentPosition($line_number) );
-	$page->SetFocus;
-
-	return;
-}
-
-
 
 ## STC related functions
 
@@ -1991,7 +1859,7 @@ sub on_stc_style_needed {
 	my ( $self, $event ) = @_;
 
 	my $doc = Padre::Documents->current or return;
-	if ($doc->can('colourise')) {
+	if ($doc->can('colorize')) {
 
 		# workaround something that seems like a Scintilla bug
 		# when the cursor is close to the end of the document
@@ -2001,7 +1869,7 @@ sub on_stc_style_needed {
 		return if defined $doc->{_text} and $doc->{_text} eq $text;
 		$doc->{_text} = $text;
 
-		$doc->colourise;
+		$doc->colorize;
 	}
 
 }
@@ -2009,7 +1877,11 @@ sub on_stc_style_needed {
 
 sub on_stc_update_ui {
 	my ($self, $event) = @_;
-    
+
+	# avoid recursion
+	return if $self->{_in_stc_update_ui};
+	local $self->{_in_stc_update_ui} = 1;
+
 	# check for brace, on current position, higlight the matching brace
 	my $editor = $self->selected_editor;
 	$editor->highlight_braces;
@@ -2040,9 +1912,14 @@ sub on_stc_change {
 sub on_stc_char_added {
 	my ($self, $event) = @_;
 
-	if ($event->GetKey == 10) { # ENTER
+	my $key = $event->GetKey;
+	if ($key == 10) { # ENTER
 		my $editor = $self->selected_editor;
-		$editor->autoindent;
+		$editor->autoindent("indent");
+	}
+	elsif ($key == 125) { # Closing brace }
+		my $editor = $self->selected_editor;
+		$editor->autoindent("deindent");
 	}
 	return;
 }
@@ -2061,17 +1938,20 @@ sub on_stc_dwell_start {
 }
 
 sub on_close_pane {
-    my ( $self, $event ) = @_;
-    my $pane = $event->GetPane();
+	my ( $self, $event ) = @_;
+	my $pane = $event->GetPane();
 
-    # it's ugly, but it works
-    if ( Data::Dumper::Dumper(\$pane) eq 
-         Data::Dumper::Dumper(\$self->manager->GetPane('output')) ) {
-    	$self->{menu}->{view_output}->Check(0);
-    } elsif ( Data::Dumper::Dumper(\$pane) eq
-              Data::Dumper::Dumper(\$self->manager->GetPane('rightbar')) ) {
+	# it's ugly, but it works
+	if ( Data::Dumper::Dumper(\$pane) eq 
+	     Data::Dumper::Dumper(\$self->manager->GetPane('output')) )
+	{
+		$self->{menu}->{view_output}->Check(0);
+	}
+	elsif ( Data::Dumper::Dumper(\$pane) eq
+	        Data::Dumper::Dumper(\$self->manager->GetPane('rightbar')) )
+	{
 		$self->{menu}->{view_functions}->Check(0);
-    }
+	}
 }
 
 sub on_quick_find {
@@ -2088,13 +1968,13 @@ sub on_quick_find {
 sub on_doc_stats {
 	my ($self, $event) = @_;
 
-    my $doc = $self->selected_document;
-   	if (not $doc) {
+	my $doc = $self->selected_document;
+	if (not $doc) {
 		$self->message( 'No file is open', 'Stats' );
 		return;
 	}
 
-    my ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly,
+	my ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly,
 		$filename, $newline_type, $encoding)
 		= $doc->stats;
 
@@ -2253,7 +2133,11 @@ sub on_timer_check_overwrite {
 	);
 
 	if ( $ret == Wx::wxYES ) {
-		$doc->reload;
+		if (not $doc->reload) {
+			$self->error(sprintf(Wx::gettext("Could not reload file: %s"), $doc->errstr));
+		} else {
+			$doc->editor->configure_editor($doc);
+		}
 	} else {
 		$doc->{_timestamp} = $doc->time_on_file;
 	}

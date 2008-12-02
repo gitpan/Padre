@@ -24,7 +24,8 @@ Padre::Plugin - Padre Plugin API
   # The plugin name to show in the Plugins menu
   # The command structure to show in the Plugins menu
   sub menu_plugins_simple {
-  	  'My Plugin' => [
+      my $self = shift;
+      'My Plugin' => [
           About => sub { $self->show_about },
           Deep  => [
               'Do Something' => sub { $self->do_something },
@@ -43,7 +44,7 @@ use warnings;
 use Scalar::Util ();
 use Padre::Wx    ();
 
-our $VERSION    = '0.19';
+our $VERSION    = '0.20';
 our $COMPATIBLE = '0.18';
 
 

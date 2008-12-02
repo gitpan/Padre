@@ -11,7 +11,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 
 
@@ -43,7 +43,7 @@ sub default_yaml {
 }
 
 sub default_db {
-   File::Spec->catfile(
+	File::Spec->catfile(
 		$_[0]->default_dir,
 		'config.db',
 	);
@@ -137,7 +137,8 @@ sub new {
 		main_output               => 0,
 		main_rightbar             => 1,
 		editor_use_tabs           => 1,
-		editor_tabwidth           => 4,
+		editor_tabwidth           => 8,
+		editor_indentwidth        => 4,
 		editor_linenumbers        => 0,
 		editor_eol                => 0,
 		editor_indentationguides  => 0,

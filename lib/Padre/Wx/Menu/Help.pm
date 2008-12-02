@@ -8,7 +8,7 @@ use Padre::Wx ();
 use Padre::Util;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 #our @ISA     = 'Wx::Menu';
 sub new { return bless {}, shift };
 
@@ -46,6 +46,7 @@ sub about {
 	}
 	$about->AddDeveloper("Adam Kennedy");
 	$about->AddDeveloper("Brian Cassidy");
+	$about->AddDeveloper("Chris Dolan");
 	$about->AddDeveloper("Fayland Lam");
 	$about->AddDeveloper("Gabor Szabo");
 	$about->AddDeveloper("Heiko Jansen");
@@ -57,9 +58,10 @@ sub about {
 	$about->AddDeveloper("Steffen Mueller");
 
 	$about->AddTranslator("German - Heiko Jansen");
-	$about->AddTranslator("Korean - Keedi Kim");
-	$about->AddTranslator("Hungarian = Gyorgy Pasztor");
+	$about->AddTranslator("French - Jerome Quelin");
 	$about->AddTranslator("Hebrew - Omer Zak");
+	$about->AddTranslator("Hungarian - Gyorgy Pasztor");
+	$about->AddTranslator("Korean - Keedi Kim");
 
 
 	Wx::AboutBox( $about );

@@ -26,20 +26,15 @@ use strict;
 use warnings;
 use Carp        ();
 use File::Spec  ();
+use POSIX       qw(LC_CTYPE);
 use Encode::Guess ();
 use Padre::Util ();
 use Padre::Wx   ();
 use Padre;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 my $unsaved_number = 0;
-
-our %mode = (
-	WIN  => Wx::wxSTC_EOL_CRLF,
-	MAC  => Wx::wxSTC_EOL_CR,
-	UNIX => Wx::wxSTC_EOL_LF,
-);
 
 # see Wx-0.86/ext/stc/cpp/st_constants.cpp for extension
 # There might be some constants are defined in 
@@ -147,35 +142,48 @@ our $DEFAULT_LEXER = Wx::wxSTC_LEX_AUTOMATIC;
 #####################################################################
 # Constructor and Accessors
 
+use Class::XSAccessor
+	getters => {
+		editor           => 'editor',
+		filename         => 'filename', # TODO is this read_only or what?
+		get_mimetype     => 'mimetype',
+		get_newline_type => 'newline_type',
+		errstr           => 'errstr',
+	},
+	setters => {
+		_set_filename    => 'filename', # TODO temporary hack
+		set_newline_type => 'newline_type',
+		set_mimetype     => 'mimetype',
+		set_errstr       => 'errstr',
+		set_editor       => 'editor',
+	};
+
 =pod
 
 =head2 new
 
   my $doc = Padre::Document->new(
-      editor   => $editor,
       filename => $file,
   );
  
-$editor is required and is a Padre::Wx::Editor object
 
 $file is optional and if given it will be loaded in the document
 
 mime-type is defined by the guess_mimetype function
+
+TODO describe
+
+ $editor is required and is a Padre::Wx::Editor object
 
 =cut
 
 sub new {
 	my $class = shift;
 	my $self  = bless { @_ }, $class;
-	
-	# Check and derive params
-	unless ( $self->editor ) {
-		die "Missing or invalid editor";
-	}
 
 	$self->setup;
 
-	unless ( $self->mimetype ) {
+	unless ( $self->get_mimetype ) {
 		$self->set_mimetype( $self->guess_mimetype );
 	}
 	$self->rebless;
@@ -190,9 +198,9 @@ sub rebless {
 	# to the the base class, 
 	# This isn't exactly the most elegant way to do this, but will
 	# do for a first implementation.
-	my $subclass = $MIME_CLASS{$self->mimetype} || __PACKAGE__;
+	my $subclass = $MIME_CLASS{$self->get_mimetype} || __PACKAGE__;
 	if ( $subclass ) {
-                require Class::Autouse;
+		require Class::Autouse;
 		Class::Autouse->autouse($subclass);
 		bless $self, $subclass;
 	}
@@ -216,7 +224,7 @@ sub guess_mimetype {
 
 	# Fall back on deriving the type from the content
 	# Hardcode this for now for the special cases we care about.
-	my $text = $self->text_get;
+	my $text = $self->{original_content};
 	if ( $text =~ /\A#!/m ) {
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl\b/m ) {
@@ -231,7 +239,7 @@ sub guess_mimetype {
 sub setup {
 	my $self = shift;
 	if ( $self->{filename} ) {
-		$self->{newline_type} = $self->load_file($self->{filename}, $self->editor);
+		$self->load_file;
 	} else {
 		$unsaved_number++;
 		$self->{newline_type} = $self->_get_default_newline_type;
@@ -243,7 +251,8 @@ sub get_title {
 	if ( $self->{filename} ) {
 		return File::Basename::basename( $self->{filename} );
 	} else {
-		return " Unsaved $unsaved_number";
+		my $str = sprintf(Wx::gettext(" Unsaved %d"), $unsaved_number);
+		return $str;
 	}
 }
 
@@ -270,58 +279,164 @@ sub _auto_convert {
 	return 0;
 }
 
-sub load_file {
-	my ($self, $file, $editor) = @_;
+sub _get_system_default_encoding {
+	my $encoding;
 
-	my $newline_type = $self->_get_default_newline_type;
-	my $convert_to;
+	if ($^O =~ m/^MacOS/i) {
+		# In mac system Wx::locale::GetSystemEncodingName() couldn't
+		# return the name of encoding directly.
+		# Use LC_CTYPE to guess system default encoding.
+		my $loc = POSIX::setlocale(LC_CTYPE);
+		if ($loc =~ m/^(C|POSIX)/i) {
+			$encoding = 'ascii';
+		}
+		elsif ($loc =~ /\./) {
+			my ($language, $codeset) = split /\./, $loc;
+			$encoding = $codeset;
+		}
+	}
+	elsif ($^O =~ m/^MSWin32/i) {
+		# In windows system Wx::locale::GetSystemEncodingName() returns
+		# like ``windows-1257'' and it matches as ``cp1257''
+		# refer to src/common/intl.cpp
+		$encoding = Wx::Locale::GetSystemEncodingName();
+		$encoding =~ s/^windows-/cp/i;
+	}
+	elsif ($^O =~ m/^linux/i) {
+		$encoding = Wx::Locale::GetSystemEncodingName();
+		if (!$encoding) {
+			# this is not a usual case, but...
+			my $loc = POSIX::setlocale(LC_CTYPE);
+			if ($loc =~ m/^(C|POSIX)/i) {
+				$encoding = 'ascii';
+			}
+			elsif ($loc =~ /\./) {
+				my ($language, $codeset) = split /\./, $loc;
+				$encoding = $codeset;
+			}
+		}
+	}
+	else {
+		$encoding = Wx::Locale::GetSystemEncodingName();
+	}
+
+	if (!$encoding) {
+		# fail to get system default encoding
+		warn "Could not find system($^O) default encoding. "
+			. "Please check it manually and report your environment to the Padre development team.";
+		return;
+	}
+
+	return $encoding;
+}
+
+sub _get_encoding_from_contents {
+	my ($content) = @_;
+
+	#
+	# FIXME
+	# This is a just heuristic approach. Maybe there is a better way. :)
+	# Japanese and Chinese have to be tested. Only Korean is tested.
+	#
+	# If locale of config is one of CJK, then we could guess more correctly.
+	# Any type of locale which is supported by Encode::Guesss could be added.
+	# Or, we'll use system default encode setting
+	# If we cannot get system default, then forced it to set 'utf-8'
+	#
+
+	my $encoding;
+	my $lang_shortname = Padre::Wx::MainWindow::shortname(); # TODO clean this up
+
+	my $system_default = _get_system_default_encoding();
+
+	my @guess_list = ();
+	if ($lang_shortname eq 'ko') {      # Korean
+		@guess_list = qw/utf-8 euc-kr/;
+	} elsif ($lang_shortname eq 'ja') { # Japan (not yet tested)
+		@guess_list = qw/utf-8 iso8859-1 euc-jp shiftjis 7bit-jis/;
+	} elsif ($lang_shortname eq 'cn') { # Chinese (not yet tested)
+		@guess_list = qw/utf-8 iso8859-1 euc-cn/;
+	} else {
+		@guess_list = ($system_default) if $system_default;
+	}
+
+	my $guess = Encode::Guess::guess_encoding($content, @guess_list);
+	if (not defined $guess) {
+		$guess = ''; # to avoid warnings
+	}	
+	if (ref($guess) and ref($guess) =~ m/^Encode::/) {       # Wow, nice!
+		$encoding = $guess->name;
+	} elsif ($guess =~ m/utf8/) {            # utf-8 is in suggestion
+		$encoding = 'utf-8';
+	} elsif ($guess =~ m/or/) {              # choose from suggestion
+		my @suggest_encodings = split /\sor\s/, "$guess";
+		$encoding = $suggest_encodings[0];
+	}
+	else {                                 # use system default
+		$encoding = $system_default;
+	}
+
+	if (!$encoding) {
+		# fail to guess encoding from contents
+		warn "Could not find encoding. Defaulting to 'utf-8'. "
+			. "Please check it manually and report to the Padre development team.";
+		$encoding = 'utf-8';
+	}
+
+	return $encoding;
+}
+
+=pod
+
+=head2 load_file
+
+ $doc->load_file;
+ 
+Loads the current file.
+
+Sets the B<Encoding> bit using L<Encode::Guess> and tries to figure
+out what kind of newlines are in the file. Defaults to utf-8 if
+could not figure out the encoding.
+
+Currently it autoconverts files with mixed newlines. TODO we should stop autoconverting.
+
+Returns true on success false on failure. Sets $doc->errstr;
+
+=cut
+
+sub load_file {
+	my ($self) = @_;
+
+	my $file = $self->{filename};
+	$self->set_errstr('');
 	my $content;
 	if (open my $fh, '<', $file) {
 		binmode($fh);
 		local $/ = undef;
 		$content = <$fh>;
 	} else {
-		warn $!;
+		$self->set_errstr($!);
 		return;
 	}
 	$self->{_timestamp} = $self->time_on_file;
 
-	#
-	# Maybe we can support specific CJK character-set at least
-	# Japanese and Chinese have to be tested.
-	# Only Korean is tested
-	#
-	# Refer to language setting from config,
-	# since Encode::Guess is not always correct, it's juest guess
-	#
-	my $config = Padre->ide->config;
-	my $lang_shortname = Padre::Wx::MainWindow::shortname(); # TODO clean this up
-	my @guess_encoding = ();
-	if ($lang_shortname eq 'ko') {
-		@guess_encoding = qw/euc-kr/;
-	} elsif ($lang_shortname eq 'ja') {
-		@guess_encoding = qw/euc-jp shiftjis 7bit-jis/;
-	} elsif ($lang_shortname eq 'cn') {
-		@guess_encoding = qw/euc-cn/;
-	} # another language and @guess_encoding list is needed
-
-	my $encoding = Encode::Guess::guess_encoding($content, @guess_encoding);
-	if (ref($encoding) =~ m/^Encode::/) {		# Wow, nice!
-		$self->{encoding} = $encoding->name;
-	} elsif ($encoding =~ m/utf8/) {
-		$self->{encoding} = 'utf-8';
-	} elsif ($encoding =~ m/or/) {				# choose between suggestion
-		my @suggest_encodings = split /\sor\s/, "$encoding";
-		$self->{encoding} = $suggest_encodings[0];
-	} else {									# use utf-8 as default
-		warn "Could not find encoding of file '$file'. Defaulting to utf-8"
-			. "Please check it manually and report to the Padre development team.";
-		$self->{encoding} = 'utf-8';
-	}
+	# if guess encoding fails then use 'utf-8'
+	$self->{encoding} = _get_encoding_from_contents($content);
 	$content = Encode::decode($self->{encoding}, $content);
-	#print "DEBUG: $lang_shortname:$self->{encoding}   $file\n";
+	#print "DEBUG: SystemDefault($system_default), $lang_shortname:$self->{encoding}, $file\n";
 
-	my $current_type = Padre::Util::newline_type($content);
+	$self->{original_content} = $content;
+
+	return 1;
+}
+
+sub newline_type {
+	my ($self) = @_;
+
+	my $file = $self->{filename};
+	my $newline_type = $self->_get_default_newline_type;
+	my $convert_to;
+	my $current_type = Padre::Util::newline_type( $self->{original_content} );
 	if ($current_type eq 'None') {
 		# keep default
 	} elsif ($current_type eq 'Mixed') {
@@ -344,16 +459,7 @@ sub load_file {
 			$newline_type = $current_type;
 		}
 	}
-	$editor->SetEOLMode( $mode{$newline_type} );
-
-	$editor->SetText( $content );
-	$editor->EmptyUndoBuffer;
-	if ($convert_to) {
-		warn "Converting $file to $convert_to";
-		$editor->ConvertEOLs( $mode{$newline_type} );
-	}
-
-	return ($newline_type);
+	return ($newline_type, $convert_to);
 }
 
 sub save_file {
@@ -361,8 +467,15 @@ sub save_file {
 	my $content  = $self->text_get;
 	my $filename = $self->filename;
 
-	if (open my $fh, ">:raw:encoding($self->{encoding})", $filename) {
-		print {$fh} $content;
+	# not set when first time to save
+	$self->{encoding} ||= _get_encoding_from_contents($content);
+
+	my $fh;
+	if ($self->{encoding} && open $fh,  ">:raw:encoding($self->{encoding})", $filename ) {
+	  print {$fh} $content;
+	} elsif (open $fh, ">$filename" ) {
+	  warn "encoding is not set, (couldn't get from contents) when saving file $filename\n";
+	  print {$fh} $content;
 	} else {
 		return "Could not save: $!";
 	}
@@ -371,40 +484,13 @@ sub save_file {
 	return;
 }
 
-sub set_newline_type {
-	$_[0]->{newline_type} = $_[1];
-}
 
-sub get_newline_type {
-	$_[0]->{newline_type};
-}
-
-sub filename {
-	$_[0]->{filename};
-}
-
-# Temporary hack
-sub _set_filename {
-	$_[0]->{filename} = $_[1];
-}
-
-sub mimetype {
-	$_[0]->{mimetype};
-}
-sub set_mimetype {
-	$_[0]->{mimetype} = $_[1];
-}
 
 sub lexer {
 	my $self = shift;
-	return $DEFAULT_LEXER unless $self->mimetype;
-	return $DEFAULT_LEXER unless defined $MIME_LEXER{$self->mimetype};
-	return $MIME_LEXER{$self->mimetype};
-}
-
-# Cache for speed reasons
-sub editor {
-	$_[0]->{editor};
+	return $DEFAULT_LEXER unless $self->get_mimetype;
+	return $DEFAULT_LEXER unless defined $MIME_LEXER{$self->get_mimetype};
+	return $MIME_LEXER{$self->get_mimetype};
 }
 
 sub is_new {
@@ -452,12 +538,23 @@ sub is_saved {
 	return !! ( defined $_[0]->filename and not $_[0]->is_modified );
 }
 
+=pod
+
+=head2 reload
+
+Reload the current file discarding changes in the editor.
+
+Returns true on success false on failure. Error message will be in $doc->errstr;
+
+TODO: In the future it should backup the changes in case the user regrets the action.
+
+=cut
+
 sub reload {
 	my ($self) = @_;
 
 	my $filename = $self->filename or return;
-	$self->load_file($filename, $self->editor);
-	return 1;
+	return $self->load_file;
 }
 
 =pod
@@ -660,7 +757,7 @@ sub stats {
 		$lines = 1; # by default
 		$lines++ while ( $code2 =~ /[\r\n]/g );
 		$chars_with_space = length($code);
-    } else {
+	} else {
 		$code = $self->text_get;
 
 		# I trust editor more

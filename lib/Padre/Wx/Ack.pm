@@ -8,7 +8,7 @@ use Padre::Wx ();
 my $iter;
 my %opts;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 my $DONE_EVENT : shared = Wx::NewEventType;
 
 my $ack_loaded = 0;
@@ -161,11 +161,11 @@ sub on_pick_dir {
 sub ack_done {
 	my( $self, $event ) = @_;
 
-   my $data = $event->GetData;
-   #print "Data: $data\n";
-   $self->{output}->AppendText("$data\n");
+	my $data = $event->GetData;
+	#print "Data: $data\n";
+	$self->{output}->AppendText("$data\n");
 
-   return;
+	return;
 }
 
 sub on_ack_thread {

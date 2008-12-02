@@ -30,6 +30,7 @@ my %prereqs = (
 	'perl'                    => '5.008001',
 	'Carp'                    => 0,
 	'Class::Adapter'          => '1.05',
+	'Class::XSAccessor'       => '0.09',
 	'Cwd'                     => '3.2701',
 	'Data::Dumper'            => 0,
 	'Encode'                  => '2.12',
@@ -115,7 +116,7 @@ $builder->create_build_script();
 
 sub check_wx_version {
 
-	require Wx;
+	eval {require Wx};
 	return if $@;  # missing Wx should be dealt by the standard prereq system
 
 	my $version = Wx::wxVERSION_STRING();

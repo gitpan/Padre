@@ -27,9 +27,8 @@ use strict;
 use warnings;
 
 use Wx::App ();
-use Padre::Wx::MainWindow ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 our @ISA     = 'Wx::App';
 
 

@@ -8,7 +8,7 @@ use List::Util   ();
 use Padre::Wx    ();
 use Padre::Plugin::Vi::CommandLine;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 sub new {
 	my ($class, $editor) = @_;
@@ -505,7 +505,7 @@ sub word_left {
 	my ($self, $count) = @_;
 	$self->{editor}->WordLeft for 1..$count;
 }
-	
+
 
 1;
 

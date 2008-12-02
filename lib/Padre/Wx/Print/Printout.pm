@@ -6,7 +6,7 @@ use warnings;
 use Wx::Print;
 use base qw(Wx::Printout);
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 sub new {
 	my $class  = shift;
@@ -80,16 +80,16 @@ sub GetPageInfo {
 
 	while ( $self->HasPage($maxPage) ) {
 		$self->{PRINTED} = $self->{EDITOR}->FormatRange(
-	        0,
-	        $self->{PRINTED},
-	        $self->{EDITOR}->GetLength(),
-	        $dc,
-	        $dc,
-	        $self->{printRect},
-	        $self->{pageRect}
-	    );
+			0,
+			$self->{PRINTED},
+			$self->{EDITOR}->GetLength(),
+			$dc,
+			$dc,
+			$self->{printRect},
+			$self->{pageRect}
+		);
 
-	    $maxPage += 1;
+		$maxPage += 1;
 	}
 	$self->{PRINTED} = 0;
 

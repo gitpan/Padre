@@ -23,7 +23,7 @@ use File::Spec  ();
 use Padre::Util ();
 use Padre::Wx   ();
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 
 
@@ -70,27 +70,11 @@ sub new {
 
 Stores a reference back to the parent IDE object.
 
-=cut
-
-sub parent {
-	$_[0]->{parent}
-}
-
-=pod
-
 =head2 plugin_dir
 
 Returns the user plugin directory (below the Padre configuration directory).
 This directory was added to the C<@INC> module search path and may contain
 packaged plugins as PAR files.
-
-=cut
-
-sub plugin_dir {
-	$_[0]->{plugin_dir}
-}
-
-=pod
 
 =head2 plugins
 
@@ -132,12 +116,12 @@ This hash is only populated after C<load_plugins()> was called.
 
 =cut
 
-sub plugins {
-	$_[0]->{plugins}
-}
-
-
-
+use Class::XSAccessor
+	getters => {
+		parent     => 'parent',
+		plugin_dir => 'plugin_dir',
+                plugins    => 'plugins',
+	};
 
 
 #####################################################################
@@ -193,6 +177,7 @@ sub load_plugins {
 	my $self = shift;
 	$self->_load_plugins_from_inc;
 	$self->_load_plugins_from_par;
+	$self->_refresh_plugin_menu;
 	if ( my @failed = $self->failed ) {
 		$self->parent->wx->main_window->error(
 			"Failed to load the following plugin(s):\n"
@@ -231,7 +216,8 @@ sub _load_plugins_from_inc {
 			return;
 		}
 
-		$self->load_plugin($module);
+		# caller must refresh plugin menu
+		$self->_load_plugin_norefresh_menu($module);
 	}
 
 	return;
@@ -252,7 +238,9 @@ sub _load_plugins_from_par {
 			PAR->import($parfile);
 			$file =~ s/\.par$//i;
 			$file =~ s/-/::/g;
-			$self->load_plugin($file);
+
+			# caller must refresh plugin menu
+			$self->_load_plugin_norefresh_menu($file);
 		}
 	}
 	closedir($dh);
@@ -289,13 +277,13 @@ menu, etc.
 
 sub load_plugin {
 	my $self = shift;
-	my $ret = $self->_load_plugin(@_);
+	my $ret = $self->_load_plugin_norefresh_menu(@_);
 	$self->_refresh_plugin_menu;
 	return $ret;
 }
 
 # The guts of load_plugin which don't refresh the menu
-sub _load_plugin {
+sub _load_plugin_norefresh_menu {
 	my $self    = shift;
 	my $name    = shift;
 	my $config  = $self->parent->config;
@@ -441,7 +429,7 @@ sub reload_plugins {
 		# do not use the reload_plugin method since that
 		# refreshes the menu every time
 		$self->_unload_plugin($name);
-		$self->_load_plugin($name);
+		$self->_load_plugin_norefresh_menu($name);
 		$self->enable_editors($name);
 	}
 	$self->_refresh_plugin_menu();

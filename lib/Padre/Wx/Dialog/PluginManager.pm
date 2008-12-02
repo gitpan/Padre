@@ -7,7 +7,7 @@ use Padre::Wx::Dialog ();
 use Wx::Locale        qw(:default);
 use Data::Dumper qw(Dumper);
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 sub get_layout {
 	my ($plugins) = @_;
@@ -17,8 +17,8 @@ sub get_layout {
 	foreach my $module (sort keys %$plugins) {
 		push @layout,
 			[
-				['Wx::StaticText', undef, $module],
-				['Wx::Button',    "able_$module", 'na'					 ],
+				['Wx::StaticText', undef, $module ],
+				['Wx::Button',    "able_$module", 'na' ],
 				['Wx::Button',    "pref_$module", gettext('Preferences') ],
 			];
 	}
