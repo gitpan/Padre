@@ -4,11 +4,14 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Wx ();
+use Padre::Wx::Dialog;
+use Wx::Locale qw(:default);
 
 my $iter;
 my %opts;
+my %stats;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 my $DONE_EVENT : shared = Wx::NewEventType;
 
 my $ack_loaded = 0;
@@ -18,7 +21,7 @@ sub load_ack {
 
 	# try to load app::ack - we don't require $minver in the eval to
 	# provide a meaningful error message if needed.
-	eval "use App::Ack";
+	eval "use App::Ack"; ## no critic
 	return "$error (module not installed)" if $@;
 	return "$error (you have $App::Ack::VERSION installed)"
 		if $App::Ack::VERSION < $minver;
@@ -38,27 +41,44 @@ sub load_ack {
 
 
 sub on_ack {
-	my ($self) = @_;
+	my ($mainwindow) = @_;
 
 	# delay App::Ack loading till first use, to reduce memory
 	# usage and init time.
 	if ( ! $ack_loaded ) {
 		my $error = load_ack();
 		if ( $error ) {
-			$self->error($error);
+			$mainwindow->error($error);
 			return;
 		}
 		$ack_loaded = 1;
 	}
+
+	# clear %stats; for every request
+	%stats = ();
 	
-	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
+	my $text   = $mainwindow->selected_text;
+	$text = '' if not defined $text;
+	
+	my $dialog = dialog($mainwindow, $text);
+	$dialog->Show(1);
 
-	# TODO kill the thread before closing the application
+	return;
+}
 
-	my $search = dialog();
+sub find_clicked {
+	my ($dialog, $event) = @_;
+
+	my $search = _get_data_from( $dialog );
 
 	$search->{dir} ||= '.';
 	return if not $search->{term};
+	
+	my $mainwindow = Padre->ide->wx->main_window;
+
+	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
+
+	# TODO kill the thread before closing the application
 
 	$opts{regex} = $search->{term};
 	if (-f $search->{dir}) {
@@ -69,101 +89,117 @@ sub on_ack {
 	$iter = App::Ack::get_iterator( $what, \%opts );
 	App::Ack::filetype_setup();
 
-	$self->show_output(1);
-	$self->{output}->clear;
+	$mainwindow->show_output(1);
+	$mainwindow->{gui}->{output_panel}->clear;
 
-	Wx::Event::EVT_COMMAND( $self, -1, $DONE_EVENT, \&ack_done );
+	Wx::Event::EVT_COMMAND( $mainwindow, -1, $DONE_EVENT, \&ack_done );
 
 	my $worker = threads->create( \&on_ack_thread );
 
 	return;
 }
 
+sub _get_data_from {
+	my ( $dialog ) = @_;
 
-sub dialog {
-	my ( $win, $config ) = @_;
-	my $id     = -1;
-	my $title  = "Ack";
-	my $pos    = Wx::wxDefaultPosition;
-	my $size   = Wx::wxDefaultSize;
-	my $name   = "";
-	my $style = Wx::wxDEFAULT_FRAME_STYLE;
-
-	my $dialog        = Wx::Dialog->new( $win, $id, $title, $pos, $size, $style, $name );
-	my $label_1       = Wx::StaticText->new($dialog, -1, Wx::gettext("Term: "), Wx::wxDefaultPosition, Wx::wxDefaultSize, );
-	my $term          = Wx::ComboBox->new($dialog, -1, "", Wx::wxDefaultPosition, Wx::wxDefaultSize, [], Wx::wxCB_DROPDOWN);
-	my $button_search = Wx::Button->new($dialog, Wx::wxID_FIND, '');
-	my $label_2       = Wx::StaticText->new($dialog, -1, Wx::gettext("Dir: "), Wx::wxDefaultPosition, Wx::wxDefaultSize, );
-	my $dir           = Wx::ComboBox->new($dialog, -1, "", Wx::wxDefaultPosition, Wx::wxDefaultSize, [], Wx::wxCB_DROPDOWN);
-	my $button_cancel = Wx::Button->new($dialog, Wx::wxID_CANCEL, '');
-	my $nothing_1     = Wx::StaticText->new($dialog, -1, "", Wx::wxDefaultPosition, Wx::wxDefaultSize, );
-	my $nothing_2     = Wx::StaticText->new($dialog, -1, "", Wx::wxDefaultPosition, Wx::wxDefaultSize, );
-	my $button_dir    = Wx::Button->new($dialog, -1, Wx::gettext("Pick &directory"));
-
-	Wx::Event::EVT_BUTTON( $dialog, $button_search, sub { $dialog->EndModal(Wx::wxID_FIND) } );
-	Wx::Event::EVT_BUTTON( $dialog, $button_dir,    sub { on_pick_dir($dir, @_) } );
-	Wx::Event::EVT_BUTTON( $dialog, $button_cancel, sub { $dialog->EndModal(Wx::wxID_CANCEL) } );
-
-	#$dialog->SetTitle("frame_1");
-	$term->SetSelection(-1);
-	$dir->SetSelection(-1);
-	$button_search->SetDefault;
-
-	# layout
-	my $sizer_1 = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	my $grid_sizer_1 = Wx::GridSizer->new(4, 3, 0, 0);
-	$grid_sizer_1->Add($label_1, 0, 0, 0);
-	$grid_sizer_1->Add($term, 0, 0, 0);
-	$grid_sizer_1->Add($button_search, 0, 0, 0);
-	$grid_sizer_1->Add($label_2, 0, 0, 0);
-	$grid_sizer_1->Add($dir, 0, 0, 0);
-	$grid_sizer_1->Add($button_dir, 0, 0, 0);
-	$grid_sizer_1->Add($nothing_1, 0, 0, 0);
-	$grid_sizer_1->Add($nothing_2, 0, 0, 0);
-	$grid_sizer_1->Add($button_cancel, 0, 0, 0);
-
-	$sizer_1->Add($grid_sizer_1, 1, Wx::wxEXPAND, 0);
-
-	$dialog->SetSizer($sizer_1);
-	$sizer_1->Fit($dialog);
-	$dialog->Layout();
-
-	$term->SetFocus;
-	my $ret = $dialog->ShowModal;
-
-	if ($ret == Wx::wxID_CANCEL) {
-		 $dialog->Destroy;
-		return;
+	my $data = $dialog->get_data;
+	
+	my $term = $data->{_ack_term_};
+	my $dir  = $data->{_ack_dir_};
+	
+	$dialog->Destroy;
+	
+	my $config = Padre->ide->config;
+	if ( $term ) {
+		unshift @{$config->{ack_terms}}, $term;
+		my %seen;
+		@{$config->{ack_terms}} = grep {!$seen{$_}++} @{$config->{ack_terms}};
+	}
+	if ( $dir ) {
+		unshift @{$config->{ack_dirs}}, $dir;
+		my %seen;
+		@{$config->{ack_dirs}} = grep {!$seen{$_}++} @{$config->{ack_dirs}};
 	}
 	
-	my %search;
-	$search{term}  = $term->GetValue;
-	$search{dir}   = $dir->GetValue;
-	$dialog->Destroy;
- 
-	return \%search;
+	return {
+		term => $term,
+		dir  => $dir,
+	}
+}
+
+sub get_layout {
+	my ( $term ) = shift;
+	
+	my $config = Padre->ide->config;
+	
+	my @layout = (
+		[
+			[ 'Wx::StaticText', undef,              gettext('Term:')],
+			[ 'Wx::ComboBox',   '_ack_term_',       $term, $config->{ack_terms} ],
+			[ 'Wx::Button',     '_find_',           Wx::wxID_FIND ],
+		],
+		[
+			[ 'Wx::StaticText', undef,              gettext('Dir:')],
+			[ 'Wx::ComboBox',   '_ack_dir_',        '', $config->{ack_dirs} ],
+			[ 'Wx::Button',     '_pick_dir_',        gettext('Pick &directory')],
+		],
+		[
+			[],
+			[],
+			[ 'Wx::Button',     '_cancel_',    Wx::wxID_CANCEL],
+		],
+	);
+	return \@layout;
+}
+
+sub dialog {
+	my ( $win, $term ) = @_;
+	
+	my $layout = get_layout($term);
+	my $dialog = Padre::Wx::Dialog->new(
+		parent => $win,
+		title  => gettext("Ack"),
+		layout => $layout,
+		width  => [150, 200],
+		size   => Wx::wxDefaultSize,
+		pos    => Wx::wxDefaultPosition,
+	);
+	
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_find_},        \&find_clicked);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_pick_dir_},    \&on_pick_dir);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},      \&cancel_clicked      );
+	
+	$dialog->{_widgets_}{_ack_term_}->SetFocus;
+
+	return $dialog;
 }
 
 sub on_pick_dir {
-	my ($dir, $self, $event) = @_;
+	my ($dialog, $event) = @_;
 
-	my $dir_dialog = Wx::DirDialog->new( $self, Wx::gettext("Select directory"), '');
+	my $win = Padre->ide->wx->main_window;
+	my $dir_dialog = Wx::DirDialog->new( $win, Wx::gettext("Select directory"), '');
 	if ($dir_dialog->ShowModal == Wx::wxID_CANCEL) {
 		return;
 	}
-	$dir->SetValue($dir_dialog->GetPath);
+	$dialog->{_widgets_}{_ack_dir_}->SetValue($dir_dialog->GetPath);
 
 	return;
 }
 
+sub cancel_clicked {
+	my ($dialog, $event) = @_;
 
+	$dialog->Destroy;
+
+	return;
+}
 
 sub ack_done {
-	my( $self, $event ) = @_;
+	my( $mainwindow, $event ) = @_;
 
 	my $data = $event->GetData;
-	#print "Data: $data\n";
-	$self->{output}->AppendText("$data\n");
+	$mainwindow->{gui}->{output_panel}->AppendText($data);
 
 	return;
 }
@@ -174,7 +210,25 @@ sub on_ack_thread {
 
 sub print_results {
 	my ($text) = @_;
-#print $text;
+	
+	#print "$text\n";
+	
+	# the first is filename, the second is line number, the third is matched line text
+	$stats{printed_lines}++;
+	# don't print filename again if it's just printed
+	return if ( $stats{printed_lines} % 3 == 1 and
+				$stats{last_matched_filename} and
+				$stats{last_matched_filename} eq $text );
+	$stats{last_matched_filename} = $text if ( $stats{printed_lines} % 3 == 1 );
+	# new \n rules
+	# 1, add \n before $filename expect the first filename
+	if ( $stats{printed_lines} % 3 == 1 ) {
+		$text .= "\n";
+		$text = "\n$text" if ($stats{printed_lines} != 1);
+	}
+	# an extra space for line number
+	$text .= ' ' if ( $stats{printed_lines} % 3 == 2 );
+
 	#my $end = $result->get_end_iter;
 	#$result->insert($end, $text);
 

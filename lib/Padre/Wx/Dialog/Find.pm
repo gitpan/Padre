@@ -10,7 +10,7 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 my @cbs = qw(case_insensitive use_regex backwards close_on_hit);
 
@@ -106,7 +106,7 @@ sub find_next {
 	# for Quick Find
 	if ( $config->{experimental} ) {
 		# check if is checked
-		if ( $main->{menu}->{experimental_quick_find}->IsChecked ) {
+		if ( $main->menu->experimental->{quick_find}->IsChecked ) {
 			my $text = $main->selected_text;
 			if ( $text and $text ne $term ) {
 				unshift @{$config->{search_terms}}, $text;
@@ -153,8 +153,7 @@ sub replace_all_clicked {
 	my $config      = Padre->ide->config;
 	my $main_window = Padre->ide->wx->main_window;
 
-	my $id   = $main_window->{notebook}->GetSelection;
-	my $page = $main_window->{notebook}->GetPage($id);
+	my $page = $main_window->selected_editor;
 	my $last = $page->GetLength();
 	my $str  = $page->GetTextRange(0, $last);
 
@@ -189,8 +188,7 @@ sub replace_clicked {
 
 	# if they do, replace it
 	if (defined $start and $start == 0 and $end == length($str)) {
-		my $id   = $main_window->{notebook}->GetSelection;
-		my $page = $main_window->{notebook}->GetPage($id);
+		my $page = $main_window->selected_editor;
 		#my ($from, $to) = $page->GetSelection;
 	
 		my $replace_term = $config->{replace_terms}->[0];
@@ -283,8 +281,7 @@ sub search {
 	my $regex = _get_regex(%args);
 	return if not defined $regex;
 
-	my $id   = $main_window->{notebook}->GetSelection;
-	my $page = $main_window->{notebook}->GetPage($id);
+	my $page = $main_window->selected_editor;
 	my ($from, $to) = $page->GetSelection;
 	my $last = $page->GetLength();
 	my $str  = $page->GetTextRange(0, $last);

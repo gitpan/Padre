@@ -11,7 +11,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 
 
@@ -136,15 +136,19 @@ sub new {
 		main_statusbar            => 1,
 		main_output               => 0,
 		main_rightbar             => 1,
-		editor_use_tabs           => 1,
-		editor_tabwidth           => 8,
-		editor_indentwidth        => 4,
 		editor_linenumbers        => 0,
 		editor_eol                => 0,
 		editor_indentationguides  => 0,
 		editor_calltips           => 1,
 		editor_autoindent         => 'deep',
 		editor_whitespaces        => 0,
+		editor_methods            => 'alphabetical',
+		
+		# Indentation settings
+		editor_auto_indentation_style => 0,
+		editor_use_tabs               => 1,
+		editor_tabwidth               => 8,
+		editor_indentwidth            => 4,
 
 		# When running a script from the application some of the files might have not been saved yet.
 		# There are several option what to do before running the script
@@ -157,6 +161,8 @@ sub new {
 		# Search and replace recent values
 		search_terms              => [],
 		replace_terms             => [],
+        ack_terms                 => [],
+        ack_dirs                  => [],
 
 		# Various things that should probably be in the database
 		bookmarks                 => {},
@@ -165,6 +171,9 @@ sub new {
 
 		# By default we have an empty plugins configuration
 		plugins                   => {},
+
+		# By default, use background threads unless profiling
+		use_worker_threads        => 1,
 
 		# By default, don't enable experimental features
 		experimental              => 0,
@@ -236,8 +245,10 @@ sub write {
 	$copy->{host}->{main_files_pos} = join( "\n", grep { defined } @{$copy->{host}->{main_files_pos}} );
 	
 	# Limit the search_terms/replace_terms
-	@{$copy->{search_terms}}  = splice(@{$copy->{search_terms}},  0, 30);
-	@{$copy->{replace_terms}} = splice(@{$copy->{replace_terms}}, 0, 30);
+	@{$copy->{search_terms}}  = splice(@{$copy->{search_terms}},  0, 20);
+	@{$copy->{replace_terms}} = splice(@{$copy->{replace_terms}}, 0, 20);
+	@{$copy->{ack_terms}}     = splice(@{$copy->{ack_terms}},  0, 20);
+	@{$copy->{ack_dirs}}      = splice(@{$copy->{ack_dirs}}, 0, 20);
 
 	# Save the host configuration
 	Padre::DB->hostconf_write( delete $copy->{host} );

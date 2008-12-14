@@ -3,15 +3,14 @@ package Padre::Wx::Editor;
 use 5.008;
 use strict;
 use warnings;
-use YAML::Tiny       ();
-use Padre::Util      ();
-use Padre::Wx        ();
-use Padre::Documents ();
-use Wx::DND;
+use YAML::Tiny                ();
+use Padre::Util               ();
+use Padre::Wx                 ();
+use Padre::Documents          ();
+use Padre::Wx::FileDropTarget ();
 
-use base 'Wx::StyledTextCtrl';
-
-our $VERSION = '0.20';
+our $VERSION = '0.21';
+our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
 	WIN  => Wx::wxSTC_EOL_CRLF,
@@ -40,7 +39,11 @@ sub new {
 	if ( Padre->ide->config->{editor_use_wordwrap} ) {
 		$self->SetWrapMode( Wx::wxSTC_WRAP_WORD );
 	}
-	$self->SetDropTarget(Padre::Wx::DNDFilesDropTarget->new(Padre->ide->wx->main_window));	
+	$self->SetDropTarget(
+		Padre::Wx::FileDropTarget->new(
+			Padre->ide->wx->main_window
+		)
+	);
 	return $self;
 }
 
@@ -98,7 +101,7 @@ sub padre_setup_plain {
 
 	$self->StyleClearAll();
 
-	foreach my $k (keys %{ $data->{plain}{forgrounds} }) {
+	foreach my $k (keys %{ $data->{plain}{foregrounds} }) {
 		$self->StyleSetForeground( $k, _color( $data->{plain}{foregrounds}{$k} ) );
 	}
 	
@@ -119,9 +122,9 @@ sub padre_setup_style {
 
 	$self->padre_setup_plain;
 
-	no strict "refs";
 	foreach my $k ( keys %{ $data->{$name}{colors} }) {
 		my $f = 'Wx::' . $k;
+		no strict "refs"; ## no critic
 		my $v = eval {$f->()};
 		if ($@) {
 			$f = 'Px::' . $k;
@@ -275,20 +278,16 @@ sub set_preferences {
 	$self->SetViewWhiteSpace(    $config->{editor_whitespaces}       );
 	$self->show_currentlinebackground( $config->{editor_currentlinebackground} );
 
-	# The display width of literal tab characters (ne "indentation width"!)
-	$self->SetTabWidth( $config->{editor_tabwidth} );
-	# The actual indentation width in COLUMNS!
-	$self->SetIndent( $config->{editor_indentwidth} );
-	# Use tabs for indentation where possible?
-	$self->SetUseTabs(  $config->{editor_use_tabs} );
+	$self->{Document}->set_indentation_style;
 
 	return;
 }
 
+
 sub show_currentlinebackground {
 	my ($self, $on) = (@_);
 
-	$self->SetCaretLineBackground( Wx::Colour->new(238, 238, 238, 255) );
+	$self->SetCaretLineBackground( Wx::Colour->new(255, 255, 64, 255) );
 	$self->SetCaretLineVisible( ( defined($on) && $on ) ? 1 : 0 );
 
 	return;
@@ -358,13 +357,15 @@ sub _auto_indent {
 	my $prev_line = $self->LineFromPosition($pos) -1;
 	return if $prev_line < 0;
 
+	my $indent_style = $self->{Document}->get_indentation_style;
+
 	my $content = $self->_get_line_by_number($prev_line);
 	my $indent  = ($content =~ /^(\s+)/ ? $1 : '');
 
 	if ($config->{editor_autoindent} eq 'deep' and $content =~ /\{\s*$/) {
-		my $indent_width = $config->{editor_indentwidth};
-		my $tab_width    = $config->{editor_tabwidth};
-		if ($config->{editor_use_tabs} and $indent_width != $tab_width) {
+		my $indent_width = $indent_style->{indentwidth};
+		my $tab_width    = $indent_style->{tabwidth};
+		if ($indent_style->{use_tabs} and $indent_width != $tab_width) {
 			# do tab compression if necessary
 			# - First, convert all to spaces (aka columns)
 			# - Then, add an indentation level
@@ -374,7 +375,7 @@ sub _auto_indent {
 			$indent .= $tab_equivalent;
 			$indent =~ s/$tab_equivalent/\t/g;
 		}
-		elsif ($config->{editor_use_tabs}) {
+		elsif ($indent_style->{use_tabs}) {
 			# use tabs only
 			$indent .= "\t";
 		}
@@ -396,6 +397,8 @@ sub _auto_deindent {
 	my $pos       = $self->GetCurrentPos;
 	my $line      = $self->LineFromPosition($pos);
 
+	my $indent_style = $self->{Document}->get_indentation_style;
+
 	my $content   = $self->_get_line_by_number($line);
 	my $indent    = ($content =~ /^(\s+)/ ? $1 : '');
 
@@ -409,11 +412,11 @@ sub _auto_deindent {
 		# - same indentation level as prev. line and not a brace on prev line
 		# - higher indentation than pr. l. and a brace on pr. line
 		if ($prev_indent eq $indent && $prev_content !~ /^\s*{/
-		    or length($prev_indent) < length($indent) && $prev_content =~ /^\s*{/
+		    or length($prev_indent) < length($indent) && $prev_content =~ /{\s*$/
 		   ) {
-			my $indent_width = $config->{editor_indentwidth};
-			my $tab_width    = $config->{editor_tabwidth};
-			if ($config->{editor_use_tabs} and $indent_width != $tab_width) {
+			my $indent_width = $indent_style->{indentwidth};
+			my $tab_width    = $indent_style->{tabwidth};
+			if ($indent_style->{use_tabs} and $indent_width != $tab_width) {
 				# do tab compression if necessary
 				# - First, convert all to spaces (aka columns)
 				# - Then, add an indentation level
@@ -423,7 +426,7 @@ sub _auto_deindent {
 				$indent =~ s/$tab_equivalent$//;
 				$indent =~ s/$tab_equivalent/\t/g;
 			}
-			elsif ($config->{editor_use_tabs}) {
+			elsif ($indent_style->{use_tabs}) {
 				# use tabs only
 				$indent =~ s/\t$//;
 			}
@@ -504,16 +507,16 @@ sub on_right_down {
 	$menu->AppendSeparator;
 
 	my $selection_exists = 0;
-	my $id = $win->{notebook}->GetSelection;
+	my $id = $win->nb->GetSelection;
 	if ( $id != -1 ) {
-		my $txt = $win->{notebook}->GetPage($id)->GetSelectedText;
+		my $txt = $win->nb->GetPage($id)->GetSelectedText;
 		if ( defined($txt) && length($txt) > 0 ) {
 			$selection_exists = 1;
 		}
 	}
 
 	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
-	if ( not $win->{notebook}->GetPage($id)->GetTextLength > 0 ) {
+	if ( not $win->nb->GetPage($id)->GetTextLength > 0 ) {
 		$sel_all->Enable(0);
 	}
 	Wx::Event::EVT_MENU( $win, # Ctrl-A
@@ -543,7 +546,7 @@ sub on_right_down {
 	my $paste = $menu->Append( Wx::wxID_PASTE, '' );
 	my $text  = get_text_from_clipboard();
 
-	if ( length($text) && $win->{notebook}->GetPage($id)->CanPaste ) {
+	if ( length($text) && $win->nb->GetPage($id)->CanPaste ) {
 		Wx::Event::EVT_MENU( $win, # Ctrl-V
 			$paste,
 			sub { Padre->ide->wx->main_window->selected_editor->Paste },
@@ -616,9 +619,9 @@ sub on_mouse_motion {
 sub text_select_all {
 	my ( $win, $event ) = @_;
 
-	my $id = $win->{notebook}->GetSelection;
+	my $id = $win->nb->GetSelection;
 	return if $id == -1;
-	$win->{notebook}->GetPage($id)->SelectAll;
+	$win->nb->GetPage($id)->SelectAll;
 	return;
 }
 
@@ -650,10 +653,7 @@ sub text_selection_mark_end {
 sub text_selection_clear_marks {
 	my ($win) = @_;
 
-	# find positions
-	my $notebook = $win->{notebook};
-	my $id   = $notebook->GetSelection;
-	my $page = $notebook->GetPage($id);
+	my $page = $win->selected_editor;
 
 	undef $page->{selection_mark_start};
 	undef $page->{selection_mark_end};

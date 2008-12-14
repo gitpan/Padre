@@ -17,13 +17,15 @@ plugins, as well as providing part of the interface to plugin writers.
 
 use strict;
 use warnings;
-use Carp        qw(croak);
-use File::Path  ();
-use File::Spec  ();
-use Padre::Util ();
-use Padre::Wx   ();
+use Carp                     qw(croak);
+use File::Path               ();
+use File::Spec               ();
+use Params::Util             qw{_INSTANCE};
+use Padre::Util              ();
+use Padre::Wx                ();
+use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 
 
@@ -49,7 +51,7 @@ sub new {
 	my $class  = shift;
 	my $parent = shift || Padre->ide;
 
-	if ( not $parent or not $parent->isa("Padre") ) {
+	unless ( _INSTANCE($parent, 'Padre') ) {
 		croak("Creation of a Padre::PluginManager without a Padre not possible");
 	}
 
@@ -147,7 +149,7 @@ sub plugin_config {
 	my $plugin = shift;
 
 	# infer the plugin name from caller
-	if ( not defined $plugin ) {
+	unless ( defined $plugin ) {
 		my ($package) = caller();
 		croak("Cannot infer the name of the plugin for which the configuration has been requested")
 			if $package !~ /^Padre::Plugin::/;
@@ -256,7 +258,7 @@ sub _setup_par {
 	require PAR;
 	# setup the PAR environment:
 	my $plugin_dir = $self->plugin_dir;
-	my $cache_dir = File::Spec->catdir($plugin_dir, 'cache');
+	my $cache_dir  = File::Spec->catdir($plugin_dir, 'cache');
 	$ENV{PAR_GLOBAL_TEMP} = $cache_dir;
 	File::Path::mkpath($cache_dir) if not -e $cache_dir;
 	$ENV{PAR_TEMP} = $cache_dir;
@@ -311,9 +313,17 @@ sub _load_plugin_norefresh_menu {
 		return;
 	}
 
+	# Does the plugin load without error
 	eval "use $module"; ## no critic
 	if ( $@ ) {
-		warn $self->{errstr} = "ERROR while trying to load plugin '$name': $@";
+		warn $self->{errstr} = "Plugin:$name - Failed to load module: $@";
+		$state->{status} = 'failed';
+		return;
+	}
+
+	# Does the plugin advertise its compatibility
+	unless ( $module->can('new') and $module->can('padre_interfaces') ) {
+		warn $self->{errstr} = "Plugin:$name - Not compatible with Padre::Plugin API";
 		$state->{status} = 'failed';
 		return;
 	}
@@ -539,19 +549,19 @@ sub reload_plugin {
 	return 1;
 }
 
-
 # recreate the Plugins menu
+### TODO - Reimplement this in Padre::Wx::Menu::Plugins
 sub _refresh_plugin_menu {
 	my $self = shift;
 	my $main = $self->parent->wx->main_window;
 
 	# Regenerate the menu
-	my $menu    = $main->{menu};
-	my $submenu = $menu->menu_plugin($main);
+	my $menu    = $main->menu;
+	my $submenu = Padre::Wx::Menu::Plugins->new($main);
 	my $place   = $menu->{wx}->FindMenu( Wx::gettext("Pl&ugins") );
 
 	# Update the menu
-	$menu->{wx}->Replace( $place, $submenu, Wx::gettext("Pl&ugins") );
+	$menu->{wx}->Replace( $place, $submenu->wx, Wx::gettext("Pl&ugins") );
 	$menu->refresh;
 }
 

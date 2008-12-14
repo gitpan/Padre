@@ -26,10 +26,11 @@ use strict;
 use warnings;
 
 use Exporter     ();
+use FindBin      ();
 use File::Spec   ();
 use List::Util   qw(first);
 
-our $VERSION   = '0.20';
+our $VERSION   = '0.21';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches);
 
@@ -40,10 +41,11 @@ our @EXPORT_OK = qw(newline_type get_matches);
 # The following defined reusable constants for these platforms,
 # suitable for use in platform-specific adaptation code.
 
-use constant WIN32   => !! ( $^O eq 'MSWin32' );
-use constant MAC     => !! ( $^O eq 'darwin'  );
+use constant WIN32   => !! ( $^O eq 'MSWin32'  );
+use constant MAC     => !! ( $^O eq 'darwin'   );
+use constant LINUX   => !! ( $^O =~ m/^linux/i ); # TODO Is an insensitive regex really needed?
 use constant UNIX    => !  ( WIN32 or MAC );
-use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAX' : 'UNIX';
+use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAC' : 'UNIX';
 
 =pod
 
@@ -77,9 +79,32 @@ sub newline_type {
 	return "Mixed"
 }
 
+=pod
+
+=head2 get_matches
+
+Paramters:
+
+* The text in which we need to search
+
+* The regular expression
+
+* The offset within the text where we the last match started
+  so the next forward match must start after this.
+
+* The offset within the text where we the last match ended
+  so the next backward match must end before this.
+
+* backward bit (1 = search backward, 0 = search forward)
+
+=cut
+
 sub get_matches {
 	my ($text, $regex, $from, $to, $backward) = @_;
 	die "missing parameters" if @_ < 4;
+
+	use Encode;
+	$text = Encode::encode('utf-8', $text);
 
 	my @matches;
 
@@ -111,7 +136,7 @@ sub get_matches {
 #####################################################################
 # Shared Resources
 
-sub share () {
+sub share {
 	return File::Spec->catdir( $FindBin::Bin, File::Spec->updir, 'share' ) if $ENV{PADRE_DEV};
 	return File::Spec->catdir( $ENV{PADRE_PAR_PATH}, 'inc', 'share' )      if $ENV{PADRE_PAR_PATH};
 	require File::ShareDir::PAR;
@@ -137,7 +162,6 @@ use constant {
 	PASM_COMMENT  => 5,
 	PASM_POD      => 6,
 };
-
 
 1;
 

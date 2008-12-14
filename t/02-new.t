@@ -4,12 +4,8 @@ use strict;
 use warnings;
 
 use Test::NeedsDisplay;
-use Test::More tests => 5; # + 16;
-use Test::Exception;
+use Test::More tests => 14;
 use Test::NoWarnings;
-
-use File::Temp   qw(tempdir);
-use Data::Dumper qw(Dumper);
 
 use t::lib::Padre;
 use Padre;
@@ -17,14 +13,15 @@ use Padre;
 my $app = Padre->new;
 isa_ok($app, 'Padre');
 
-diag "Wx Version: $Wx::VERSION " . Wx::wxVERSION_STRING();
-
 SCOPE: {
-	my $same = Padre->inst;
-	isa_ok($same, 'Padre');
-	is $same, $app, 'Same';
-}
+	my $inst = Padre->inst;
+	isa_ok($inst, 'Padre');
+	refis( $inst, $app, '->inst matches ->new' );
 
+	my $ide = Padre->ide;
+	isa_ok($ide, 'Padre');
+	refis( $ide, $app, '->ide matches ->new' );
+}
 
 SCOPE: {
 	my $config = $app->config;
@@ -36,16 +33,21 @@ SCOPE: {
 
 		editor_linenumbers => 0,
 		editor_eol         => 0,
-		editor_tabwidth    => 8,
 		editor_indentationguides => 0,
-		editor_indentwidth => 4,
 		editor_calltips    => 1,
-		editor_use_tabs    => 1,
 		editor_autoindent  => 'deep',
+		editor_methods     => 'alphabetical',
 		editor_whitespaces => 0,
+
+		editor_auto_indentation_style => 0,
+		editor_tabwidth               => 8,
+		editor_indentwidth            => 4,
+		editor_use_tabs               => 1,
 
 		search_terms       => [],
 		replace_terms      => [],
+		ack_terms		   => [],
+		ack_dirs		   => [],
 		main_startup       => 'new',
 		main_statusbar     => 1,
 		main_output        => 0,
@@ -65,11 +67,43 @@ SCOPE: {
 			main_files     => [],
 			main_files_pos => [],
 		},
+		main_subs_panel   => 0,
+		main_output_panel => 0,
 
 		plugins => {},
+		use_worker_threads        => 1,
 	},
 	'defaults';
 }
 
-__END__
 
+
+
+
+#####################################################################
+# Internal Structure Tests
+
+# These test that the internal structure of the application matches
+# expected normals, and that structure navigation methods works normally.
+SCOPE: {
+	my $padre = Padre->ide;
+	isa_ok( $padre, 'Padre' );
+
+	# The Wx::App(lication)
+	my $app = $padre->wx;
+	isa_ok( $app, 'Padre::Wx::App' );
+
+	# The main window
+	my $main = $app->main_window;
+	isa_ok( $main, 'Padre::Wx::MainWindow' );
+
+	# The main menu
+	my $menu = $main->menu;
+	isa_ok( $menu, 'Padre::Wx::Menu' );
+	refis( $menu->win,  $main, 'Menu ->win gets the main window' );
+	refis( $menu->main, $main, 'Menu ->main gets the main window' );
+
+	# A typical submenu
+	my $file = $menu->file;
+	isa_ok( $file, 'Padre::Wx::Submenu' );
+}

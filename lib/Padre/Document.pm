@@ -24,15 +24,15 @@ Currently there are still interdependencies that need to be cleaned.
 use 5.008;
 use strict;
 use warnings;
-use Carp        ();
-use File::Spec  ();
-use POSIX       qw(LC_CTYPE);
-use Encode::Guess ();
-use Padre::Util ();
-use Padre::Wx   ();
+use Carp           ();
+use File::Spec     ();
+use Class::Autouse ();
+use POSIX          qw(LC_CTYPE);
+use Padre::Util    ();
+use Padre::Wx      ();
 use Padre;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 my $unsaved_number = 0;
 
@@ -133,8 +133,6 @@ our %MIME_LEXER = (
 	'application/x-perl6'    => Wx::wxSTC_LEX_CONTAINER, # CONFIRMED
 );
 
-our $DEFAULT_LEXER = Wx::wxSTC_LEX_AUTOMATIC;
-
 
 
 
@@ -186,6 +184,7 @@ sub new {
 	unless ( $self->get_mimetype ) {
 		$self->set_mimetype( $self->guess_mimetype );
 	}
+
 	$self->rebless;
 
 	return $self;
@@ -200,11 +199,10 @@ sub rebless {
 	# do for a first implementation.
 	my $subclass = $MIME_CLASS{$self->get_mimetype} || __PACKAGE__;
 	if ( $subclass ) {
-		require Class::Autouse;
 		Class::Autouse->autouse($subclass);
 		bless $self, $subclass;
 	}
-	
+
 	return;
 }
 
@@ -225,7 +223,7 @@ sub guess_mimetype {
 	# Fall back on deriving the type from the content
 	# Hardcode this for now for the special cases we care about.
 	my $text = $self->{original_content};
-	if ( $text =~ /\A#!/m ) {
+	if ( $text and $text =~ /\A#!/m ) {
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl\b/m ) {
 			return 'application/x-perl';
@@ -251,8 +249,11 @@ sub get_title {
 	if ( $self->{filename} ) {
 		return File::Basename::basename( $self->{filename} );
 	} else {
-		my $str = sprintf(Wx::gettext(" Unsaved %d"), $unsaved_number);
-		return $str;
+		my $str = sprintf(Wx::gettext("Unsaved %d"), $unsaved_number);
+
+		# A bug in Wx requires a space at the front of the title
+		# (For reasons I don't understand yet)
+		return ' ' . $str;
 	}
 }
 
@@ -277,113 +278,6 @@ sub _auto_convert {
 	my ($self) = @_;
 	# TODO get from config
 	return 0;
-}
-
-sub _get_system_default_encoding {
-	my $encoding;
-
-	if ($^O =~ m/^MacOS/i) {
-		# In mac system Wx::locale::GetSystemEncodingName() couldn't
-		# return the name of encoding directly.
-		# Use LC_CTYPE to guess system default encoding.
-		my $loc = POSIX::setlocale(LC_CTYPE);
-		if ($loc =~ m/^(C|POSIX)/i) {
-			$encoding = 'ascii';
-		}
-		elsif ($loc =~ /\./) {
-			my ($language, $codeset) = split /\./, $loc;
-			$encoding = $codeset;
-		}
-	}
-	elsif ($^O =~ m/^MSWin32/i) {
-		# In windows system Wx::locale::GetSystemEncodingName() returns
-		# like ``windows-1257'' and it matches as ``cp1257''
-		# refer to src/common/intl.cpp
-		$encoding = Wx::Locale::GetSystemEncodingName();
-		$encoding =~ s/^windows-/cp/i;
-	}
-	elsif ($^O =~ m/^linux/i) {
-		$encoding = Wx::Locale::GetSystemEncodingName();
-		if (!$encoding) {
-			# this is not a usual case, but...
-			my $loc = POSIX::setlocale(LC_CTYPE);
-			if ($loc =~ m/^(C|POSIX)/i) {
-				$encoding = 'ascii';
-			}
-			elsif ($loc =~ /\./) {
-				my ($language, $codeset) = split /\./, $loc;
-				$encoding = $codeset;
-			}
-		}
-	}
-	else {
-		$encoding = Wx::Locale::GetSystemEncodingName();
-	}
-
-	if (!$encoding) {
-		# fail to get system default encoding
-		warn "Could not find system($^O) default encoding. "
-			. "Please check it manually and report your environment to the Padre development team.";
-		return;
-	}
-
-	return $encoding;
-}
-
-sub _get_encoding_from_contents {
-	my ($content) = @_;
-
-	#
-	# FIXME
-	# This is a just heuristic approach. Maybe there is a better way. :)
-	# Japanese and Chinese have to be tested. Only Korean is tested.
-	#
-	# If locale of config is one of CJK, then we could guess more correctly.
-	# Any type of locale which is supported by Encode::Guesss could be added.
-	# Or, we'll use system default encode setting
-	# If we cannot get system default, then forced it to set 'utf-8'
-	#
-
-	my $encoding;
-	my $lang_shortname = Padre::Wx::MainWindow::shortname(); # TODO clean this up
-
-	my $system_default = _get_system_default_encoding();
-
-	my @guess_list = ();
-	if ($lang_shortname eq 'ko') {      # Korean
-		@guess_list = qw/utf-8 euc-kr/;
-	} elsif ($lang_shortname eq 'ja') { # Japan (not yet tested)
-		@guess_list = qw/utf-8 iso8859-1 euc-jp shiftjis 7bit-jis/;
-	} elsif ($lang_shortname eq 'cn') { # Chinese (not yet tested)
-		@guess_list = qw/utf-8 iso8859-1 euc-cn/;
-	} else {
-		@guess_list = ($system_default) if $system_default;
-	}
-
-	my $guess = Encode::Guess::guess_encoding($content, @guess_list);
-	if (not defined $guess) {
-		$guess = ''; # to avoid warnings
-	}	
-	if (ref($guess) and ref($guess) =~ m/^Encode::/) {       # Wow, nice!
-		$encoding = $guess->name;
-	} elsif ($guess =~ m/utf8/) {            # utf-8 is in suggestion
-		$encoding = 'utf-8';
-	} elsif ($guess =~ m/or/) {              # choose from suggestion
-		my @suggest_encodings = split /\sor\s/, "$guess";
-		$encoding = $suggest_encodings[0];
-	}
-	else {                                 # use system default
-		$encoding = $system_default;
-	}
-
-	if (!$encoding) {
-		# fail to guess encoding from contents
-		warn "Could not find encoding. Defaulting to 'utf-8'. "
-			. "Please check it manually and report to the Padre development team.";
-		$encoding = 'utf-8';
-	}
-
-	return $encoding;
 }
 
 =pod
@@ -421,7 +315,8 @@ sub load_file {
 	$self->{_timestamp} = $self->time_on_file;
 
 	# if guess encoding fails then use 'utf-8'
-	$self->{encoding} = _get_encoding_from_contents($content);
+	require Padre::Locale;
+	$self->{encoding} = Padre::Locale::encoding_from_string($content);
 	$content = Encode::decode($self->{encoding}, $content);
 	#print "DEBUG: SystemDefault($system_default), $lang_shortname:$self->{encoding}, $file\n";
 
@@ -464,32 +359,36 @@ sub newline_type {
 
 sub save_file {
 	my ($self) = @_;
+	$self->set_errstr('');
+
 	my $content  = $self->text_get;
 	my $filename = $self->filename;
 
 	# not set when first time to save
-	$self->{encoding} ||= _get_encoding_from_contents($content);
+	require Padre::Locale;
+	$self->{encoding} ||= Padre::Locale::encoding_from_string($content);
 
-	my $fh;
-	if ($self->{encoding} && open $fh,  ">:raw:encoding($self->{encoding})", $filename ) {
-	  print {$fh} $content;
-	} elsif (open $fh, ">$filename" ) {
-	  warn "encoding is not set, (couldn't get from contents) when saving file $filename\n";
-	  print {$fh} $content;
+	my $encode = '';
+	if (defined $self->{encoding}) {
+		$encode = ":raw:encoding($self->{encoding})";
 	} else {
-		return "Could not save: $!";
+		warn "encoding is not set, (couldn't get from contents) when saving file $filename\n";
+	}
+	
+	if (open my $fh,  ">$encode", $filename ) {
+		print {$fh} $content;
+	} else {
+		$self->set_errstr($!);
+		return;
 	}
 	$self->{_timestamp} = $self->time_on_file;
-
-	return;
+	return 1;
 }
-
-
 
 sub lexer {
 	my $self = shift;
-	return $DEFAULT_LEXER unless $self->get_mimetype;
-	return $DEFAULT_LEXER unless defined $MIME_LEXER{$self->get_mimetype};
+	return Wx::wxSTC_LEX_AUTOMATIC unless $self->get_mimetype;
+	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{$self->get_mimetype};
 	return $MIME_LEXER{$self->get_mimetype};
 }
 
@@ -559,28 +458,41 @@ sub reload {
 
 =pod
 
-=head2 can_check_syntax
+=head2 check_syntax_in_background
 
-Returns a B<true> value if the class provides a method C<check_syntax>
-for retrieving information on syntax errors and warnings in the 
-current document.
+NOT IMPLEMENTED IN THE BASE CLASS
 
-The method in this base class returns B<false>.
+Checking the syntax of documents can take a long time.
+Therefore, this method essentially works the same as
+C<check_syntax>, but works its magic in a background task
+instead. That means it cannot return the syntax-check
+structure but instead optionally calls a callback
+you pass in as the C<on_finish> parameter.
 
-=cut
+If you don't specify that parameter, the default
+syntax-check-pane updating code will be run after finishing
+the check. If you do specify a callback, the first parameter
+will be the task object. You can
+run the default updating code by executing the
+C<update_gui()> method of the task object.
 
-sub can_check_syntax {
-	return 0;
-}
+By default, this method will only check the syntax if
+the document has changed since the last check. Specify
+the C<force =E<gt> 1> parameter to override this.
 
-=pod
+=head2 check_syntax
 
-=head2 check_syntax ( [ FORCE ] )
+NOT IMPLEMENTED IN THE BASE CLASS
 
-NOT IMPLEMENTED IN THIS BASE CLASS
+See also: C<check_syntax_in_background>!
+
+By default, this method will only check the syntax if
+the document has changed since the last check. Specify
+the C<force =E<gt> 1> parameter to override this.
 
 An implementation in a derived class needs to return an arrayref of
 syntax problems.
+
 Each entry in the array has to be an anonymous hash with the 
 following keys:
 
@@ -613,7 +525,6 @@ Must return the problem list even if nothing has changed when a
 param is present which evaluates to B<true>.
 
 =cut
-
 
 
 
@@ -666,7 +577,7 @@ sub find_project {
 		-f File::Spec->catpath( $v, $_, 'Build.PL' )
 		or
 		# Some notional Padre project file
-		-f File::Spec->catpath( $v, $_, 'padre.proj' )
+		-f File::Spec->catpath( $v, $_, 'padre.yml' )
 	} map {
 		File::Spec->catdir(@d[0 .. $_])
 	} reverse ( 0 .. $#d );
@@ -738,6 +649,8 @@ sub remove_color {
 # order for padre not to crash if user wants to un/comment lines with
 # a document type that did not define those methods.
 #
+# TODO Remove this base method, and compensate by disabling the menu entries
+# if the document class does not define this method.
 sub comment_lines_str {}
 
 sub stats {
@@ -773,6 +686,109 @@ sub stats {
 	
 	return ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly, 
 			$filename, $self->{newline_type}, $self->{encoding} );
+}
+
+
+# TODO: experimental
+sub get_indentation_style {
+	my $self = shift;
+	my $config = Padre->ide->config;
+
+	# TODO: (document >) project > config
+
+	my $style;
+	if ($config->{editor_auto_indentation_style}) {
+		# TODO: This should be cached? What's with newish documents then?
+		$style = $self->guess_indentation_style;
+	}
+	else {
+		$style = {
+			use_tabs    => $config->{editor_use_tabs},
+			tabwidth    => $config->{editor_tabwidth},
+			indentwidth => $config->{editor_indentwidth},
+		};
+	}
+	
+	return $style;
+}
+
+
+=head2 set_indentation_style
+
+Given a hash reference with the keys C<use_tabs>,
+C<tabwidth>, and C<indentwidth>, set the document's editor's
+indentation style.
+
+Without an argument, falls back to what C<get_indentation_style>
+returns.
+
+=cut
+
+sub set_indentation_style {
+	my $self = shift;
+
+	my $style  = shift || $self->get_indentation_style;
+	my $editor = $self->editor;
+	# The display width of literal tab characters (ne "indentation width"!)
+	$editor->SetTabWidth( $style->{tabwidth} );
+	# The actual indentation width in COLUMNS!
+	$editor->SetIndent( $style->{indentwidth} );
+	# Use tabs for indentation where possible?
+	$editor->SetUseTabs(  $style->{use_tabs} );
+	return();
+}
+
+
+=head2 guess_indentation_style
+
+Automatically infer the indentation style of the document using
+L<Text::FindIndent>.
+
+Returns a hash reference containing the keys C<use_tabs>,
+C<tabwidth>, and C<indentwidth>. It is suitable for passing
+to C<set_indendentation_style>.
+
+=cut
+
+sub guess_indentation_style {
+	my $self  = shift;
+
+	require Text::FindIndent;
+	my $indentation = Text::FindIndent->parse($self->text_get);
+
+	my $style;
+	if ($indentation =~ /^t\d+/) { # we only do ONE tab
+		$style = {
+			use_tabs    => 1,
+			tabwidth    => 8,
+			indentwidth => 8,
+		};
+	}
+	elsif ($indentation =~ /^s(\d+)/) {
+		$style = {
+			use_tabs    => 0,
+			tabwidth    => 8,
+			indentwidth => $1,
+		};
+	}
+	elsif ($indentation =~ /^m(\d+)/) {
+		$style = {
+			use_tabs    => 1,
+			tabwidth    => 8,
+			indentwidth => $1,
+		};
+	}
+	else {
+		# fallback
+		my $config = Padre->ide->config;
+		$style = {
+			use_tabs    => $config->{editor_use_tabs},
+			tabwidth    => $config->{editor_tabwidth},
+			indentwidth => $config->{editor_indentwidth},
+		};
+	}
+	
+	return $style;
 }
 
 1;

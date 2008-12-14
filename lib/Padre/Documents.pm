@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
 
 =head1 NAME
 
@@ -43,7 +43,7 @@ sub by_id {
 
 
 sub _notebook {
-	Padre->ide->wx->main_window->{notebook};
+	Padre->ide->wx->main_window->nb;
 }
 
 1;

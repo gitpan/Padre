@@ -3,13 +3,25 @@ package Padre::Plugin::My;
 use 5.008;
 use strict;
 use warnings;
-
-our $VERSION = '0.20';
+use Padre::Wx ();
 
 use base 'Padre::Plugin';
 
+our $VERSION = '0.21';
+
+
+
+
+
+#####################################################################
+# Padre::Plugin Methods
+
+sub padre_interfaces {
+	'Padre::Plugin' => 0.19
+}
+
 sub plugin_name {
-	return 'My Plugin';
+	'My Plugin';
 }
 
 sub menu_plugins_simple {
@@ -22,6 +34,13 @@ sub menu_plugins_simple {
 		# ],
 	];
 }
+
+
+
+
+
+#####################################################################
+# Custom Methods
 
 sub about {
 	my $self = shift;

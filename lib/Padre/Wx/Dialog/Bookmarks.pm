@@ -10,7 +10,11 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.20';
+our $VERSION = '0.21';
+
+# workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
+my $dialog;
+sub get_dialog { return $dialog };
 
 sub get_layout {
 	my ($text, $shortcuts) = @_;
@@ -49,7 +53,7 @@ sub dialog {
 	my @shortcuts = sort keys %{ $config->{bookmarks} };
 
 	my $layout = get_layout($text, \@shortcuts);
-	my $dialog = Padre::Wx::Dialog->new(
+	$dialog = Padre::Wx::Dialog->new(
 		parent   => $main,
 		title    => $title,
 		layout   => $layout,
@@ -88,14 +92,15 @@ sub _get_data {
 	$shortcut =~ s/:/ /g; # YAML::Tiny limitation
 	$data{shortcut} = $shortcut;
 	$dialog->Destroy;
+	$dialog = undef;
 	return ($dialog, \%data);
 }
 
 sub set_bookmark {
 	my ($class, $main) = @_;
 
-	my $pageid   = $main->{notebook}->GetSelection();
-	my $editor   = $main->{notebook}->GetPage($pageid);
+	my $editor   = $main->selected_editor;
+	return if not $editor;
 	my $line     = $editor->GetCurrentLine;
 	my $path     = $main->selected_filename;
 	my $file     = File::Basename::basename($path || '');
@@ -113,7 +118,7 @@ sub set_bookmark {
 
 	$data->{file}   = $path;
 	$data->{line}   = $line;
-	$data->{pageid} = $pageid;
+	#$data->{pageid} = $pageid;
 	$config->{bookmarks}{$shortcut} = $data;
 
 	return;
@@ -149,7 +154,7 @@ sub goto_bookmark {
 	# go to the relevant editor and row
 	if (defined $pageid) {
 	   $main->on_nth_pane($pageid);
-	   my $page = $main->{notebook}->GetPage($pageid);
+	   my $page = $main->nb->GetPage($pageid);
 	   $page->GotoLine($line);
 	}
 
