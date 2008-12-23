@@ -6,8 +6,10 @@
 plain:
  foregrounds:
   0: 00007f
+ current_line_background: FFFF04
 perl:
  brace_highlight: 00FF00
+ background: ffffff
  colors:
   wxSTC_PL_DEFAULT:        000000
   wxSTC_PL_ERROR:          ff0000
@@ -45,12 +47,15 @@ perl:
 #define SCE_PL_SUB_PROTOTYPE 40
 #define SCE_PL_FORMAT_IDENT 41
 #define SCE_PL_FORMAT 42
-pasm:
- brace_highlight: 00ffff
+padre:
+ brace_highlight: 00FF00
+ background: ffffff
  colors:
-  PASM_KEYWORD:     7f0000
-  PASM_REGISTER:    7f0044
-  PASM_LABEL:       aa007f
-  PASM_STRING:      00aa7f
-  PASM_COMMENT:     0000aa
-  PASM_POD:         0000ff
+  PADRE_BLACK:          000000
+  PADRE_BLUE:           003300
+  PADRE_RED:      8b0000
+  PADRE_GREEN:    006400
+  PADRE_MAGENTA:  8b008b
+  PADRE_ORANGE:   ff8c00
+  PADRE_CRIMSON:        dc143c
+  PADRE_BROWN:          a52a2a

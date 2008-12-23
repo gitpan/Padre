@@ -9,7 +9,7 @@ use Padre::Wx                 ();
 use Padre::Documents          ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -19,6 +19,7 @@ our %mode = (
 );
 
 my $data;
+my $data_name;
 my $width;
 
 sub new {
@@ -26,7 +27,7 @@ sub new {
 
 	my $self = $class->SUPER::new( $parent );
 #	$self->UsePopUp(0);
-	$data = data();
+	$data = data('default');
 #	$self->SetMouseDwellTime(1000); # off: Wx::SC_TIME_FOREVER
 
 	$self->SetMarginWidth(0, 0);
@@ -48,11 +49,21 @@ sub new {
 }
 
 sub data {
-	unless ( defined $data ) {
-		$data = YAML::Tiny::LoadFile(
-			Padre::Util::sharefile( 'styles', 'default.yml' )
-		);
+	my $name = shift;
+
+	return $data if not defined $name;
+	return $data if defined $data and $name eq $data_name;
+
+	$data = YAML::Tiny::LoadFile(
+		Padre::Util::sharefile( 'styles', "$name.yml" )
+	);
+	$data_name = $name;
+
+	my $config = Padre->ide->config;
+	if (defined $config->{editor_current_line_background_color}) {
+		$data->{plain}{current_line_background} = $config->{editor_current_line_background_color};
 	}
+
 	return $data;
 }
 
@@ -75,12 +86,12 @@ sub padre_setup {
 	my $mimetype = $self->{Document}->get_mimetype;
 	if ($mimetype eq 'application/x-perl') {
 		$self->padre_setup_style('perl');
-	} elsif ( $mimetype eq 'application/x-pasm' ) {
-		$self->padre_setup_style('pasm');
+	#} elsif ( $mimetype eq 'application/x-pasm' ) {
+	#	$self->padre_setup_style('pasm');
 	} elsif ($mimetype) {
 		# setup some default coloring
 		# for the time being it is the same as for Perl
-		$self->padre_setup_style('perl');
+		$self->padre_setup_style('padre');
 	} else {
 		# if mimetype is not known, then no coloring for now
 		# but mimimal conifuration should apply here too
@@ -93,22 +104,32 @@ sub padre_setup {
 sub padre_setup_plain {
 	my $self = shift;
 
-	my $font = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
-
-	$self->SetFont( $font );
-
-	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
+	$self->set_font;
 
 	$self->StyleClearAll();
+
+	my $config = Padre->ide->config;
+
+	if ( defined $data->{plain}{current_line_background} ) {
+		if ( defined $config->{editor_current_line_background_color} ) {
+			if (   $data->{plain}{current_line_background}
+				ne $config->{editor_current_line_background_color}
+			) {
+				$data->{plain}{current_line_background} = $config->{editor_current_line_background_color};
+			}
+		}
+		$self->SetCaretLineBackground( _color( $data->{plain}{current_line_background} ) );
+	}
+	elsif ( defined $config->{editor_current_line_background_color} ) {
+		$self->SetCaretLineBackground( _color( $config->{editor_current_line_background_color} ) );
+	}
 
 	foreach my $k (keys %{ $data->{plain}{foregrounds} }) {
 		$self->StyleSetForeground( $k, _color( $data->{plain}{foregrounds}{$k} ) );
 	}
-	
-	#$self->StyleSetBold(12,  1);
 
 	# Apply tag style for selected lexer (blue)
-	$self->StyleSetSpec( Wx::wxSTC_H_TAG, "fore:#0000ff" );
+	#$self->StyleSetSpec( Wx::wxSTC_H_TAG, "fore:#0000ff" );
 
 	if ( $self->can('SetLayoutDirection') ) {
 		$self->SetLayoutDirection( Wx::wxLayout_LeftToRight );
@@ -139,6 +160,7 @@ sub padre_setup_style {
 	}
 
 	$self->StyleSetBackground(34, _color($data->{$name}{brace_highlight}));
+	$self->StyleSetBackground($_, _color($data->{$name}{background})) for (0..32);
 
 	return;
 }
@@ -266,6 +288,23 @@ sub show_folding {
 	return;
 }
 
+
+sub set_font {
+	my ($self) = @_;
+
+	my $config = Padre->ide->config;
+
+	my $font = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
+	if ( defined $config->{editor_font} ) {
+		$font->SetNativeFontInfoUserDesc( $config->{editor_font} );
+	}
+	$self->SetFont($font);
+	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
+
+	return;
+}
+
+
 sub set_preferences {
 	my ($self) = @_;
 
@@ -276,22 +315,15 @@ sub set_preferences {
 	$self->SetIndentationGuides( $config->{editor_indentationguides} );
 	$self->SetViewEOL(           $config->{editor_eol}               );
 	$self->SetViewWhiteSpace(    $config->{editor_whitespaces}       );
-	$self->show_currentlinebackground( $config->{editor_currentlinebackground} );
+	$self->SetCaretLineVisible(  $config->{editor_current_line_background} ? 1 : 0 );
+
+	$self->padre_setup;
 
 	$self->{Document}->set_indentation_style;
 
 	return;
 }
 
-
-sub show_currentlinebackground {
-	my ($self, $on) = (@_);
-
-	$self->SetCaretLineBackground( Wx::Colour->new(255, 255, 64, 255) );
-	$self->SetCaretLineVisible( ( defined($on) && $on ) ? 1 : 0 );
-
-	return;
-}
 
 sub show_calltip {
 	my ($self) = @_;
@@ -466,8 +498,6 @@ sub on_right_down {
 	
 	my $win = Padre->ide->wx->main_window;
 	
-# Popup Was: Undo, Redo | Cut, Copy, Paste, Delete | Select All
-
 	my $pos       = $self->GetCurrentPos;
 	#my $line      = $self->LineFromPosition($pos);
 	#print "right down: $pos\n"; # this is the position of the cursor and not that of the mouse!
@@ -568,7 +598,32 @@ sub on_right_down {
 
 	$menu->AppendSeparator;
 
-#	$menu->Append( Wx::wxID_NEW, '' );
+	if ( Padre->ide->config->{editor_codefolding} eq 1 ) {
+		my $mousePos = $event->GetPosition;
+		my $line = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
+		my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
+
+		if (   $mousePos->x <   $firstPointInLine->x
+			&& $mousePos->x > ( $firstPointInLine->x - 18 )
+		) {
+			my $fold = $menu->Append( -1, Wx::gettext("Fold all") );
+			Wx::Event::EVT_MENU( $win, $fold,
+				sub {
+					my $main = shift;
+					$main->selected_editor->fold_all;
+				},
+			);
+			my $unfold = $menu->Append( -1, Wx::gettext("Unfold all") );
+			Wx::Event::EVT_MENU( $win, $unfold,
+				sub {
+					my $main = shift;
+					$main->selected_editor->unfold_all;
+				},
+			);
+			$menu->AppendSeparator;
+		}
+	}
+
 	Wx::Event::EVT_MENU( $win,
 		$menu->Append( -1, Wx::gettext("&Split window") ),
 		\&Padre::Wx::MainWindow::on_split_window,
@@ -578,6 +633,46 @@ sub on_right_down {
 	} else { #Wx::CommandEvent
 		$self->PopupMenu( $menu, 50, 50); # TODO better location
 	}
+}
+
+sub fold_all {
+	my ($self) = @_;
+
+	my $lineCount = $self->GetLineCount;
+	my $currentLine = $lineCount;
+
+	while ( $currentLine >= 0 ) {
+		if ( ( my $parentLine = $self->GetFoldParent($currentLine) ) > 0 ) {
+			if ( $self->GetFoldExpanded($parentLine) ) {
+				$self->ToggleFold($parentLine);
+				$currentLine = $parentLine;
+			}
+			else {
+				$currentLine--;
+			}
+		}
+		else {
+			$currentLine--;
+		}
+	}
+
+	return;
+}
+
+sub unfold_all {
+	my ($self) = @_;
+
+	my $lineCount = $self->GetLineCount;
+    my $currentLine = 0;
+
+	while ( $currentLine <= $lineCount ) {
+		if ( ! $self->GetFoldExpanded($currentLine) ) {
+			$self->ToggleFold($currentLine);
+		}
+		$currentLine++;
+	}
+
+	return;
 }
 
 sub on_left_up {
@@ -603,8 +698,14 @@ sub on_mouse_motion {
 	my $line = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
 	my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
 
-	if (   $mousePos->x < ( $firstPointInLine->x - 18 )
-		&& $mousePos->x > ( $firstPointInLine->x - 36 )
+	my ( $offset1, $offset2 ) = ( 0, 18 );
+	if ( Padre->ide->config->{editor_codefolding} ) {
+		$offset1 += 18;
+		$offset2 += 18;
+	}
+
+	if (   $mousePos->x < ( $firstPointInLine->x - $offset1 )
+		&& $mousePos->x > ( $firstPointInLine->x - $offset2 )
 	) {
 		$self->CallTipCancel, return unless $self->MarkerGet($line);
 		$self->CallTipShow( $self->PositionFromLine($line), $self->{synchk_calltips}->{$line} );
@@ -685,14 +786,22 @@ sub get_text_from_clipboard {
 
 # $editor->comment_lines($begin, $end, $str);
 # $str is either # for perl or // for Javascript, etc.
+# $str might be ['<--', '-->] for html
 sub comment_lines {
 	my ($self, $begin, $end, $str) = @_;
 
 	$self->BeginUndoAction;
-	for my $line ($begin .. $end) {
-		# insert $str (# or //)
-		my $pos = $self->PositionFromLine($line);
-		$self->InsertText($pos, $str);
+	if ( ref $str eq 'ARRAY' ) {
+		my $pos = $self->PositionFromLine($begin);
+		$self->InsertText($pos, $str->[0]);
+		$pos = $self->GetLineEndPosition($end);
+		$self->InsertText($pos, $str->[1]);
+	} else {
+		for my $line ($begin .. $end) {
+			# insert $str (# or //)
+			my $pos = $self->PositionFromLine($line);
+			$self->InsertText($pos, $str);
+		}
 	}
 	$self->EndUndoAction;
 	return;
@@ -706,15 +815,32 @@ sub comment_lines {
 sub uncomment_lines {
 	my ($self, $begin, $end, $str) = @_;
 
-	my $length = length $str;
 	$self->BeginUndoAction;
-	for my $line ($begin .. $end) {
-		my $first = $self->PositionFromLine($line);
-		my $last  = $first + $length;
+	if ( ref $str eq 'ARRAY' ) {
+		my $first = $self->PositionFromLine($begin);
+		my $last  = $first + length( $str->[0] );
 		my $text  = $self->GetTextRange($first, $last);
-		if ($text eq $str) {
+		if ($text eq $str->[0]) {
 			$self->SetSelection($first, $last);
 			$self->ReplaceSelection('');
+		}
+		$last  = $self->GetLineEndPosition($end);
+		$first = $last - length( $str->[1] );
+		$text  = $self->GetTextRange($first, $last);
+		if ($text eq $str->[1]) {
+			$self->SetSelection($first, $last);
+			$self->ReplaceSelection('');
+		}
+	} else {
+		my $length = length $str;
+		for my $line ($begin .. $end) {
+			my $first = $self->PositionFromLine($line);
+			my $last  = $first + $length;
+			my $text  = $self->GetTextRange($first, $last);
+			if ($text eq $str) {
+				$self->SetSelection($first, $last);
+				$self->ReplaceSelection('');
+			}
 		}
 	}
 	$self->EndUndoAction;

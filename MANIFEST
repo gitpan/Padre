@@ -32,11 +32,10 @@ lib/Padre.pm
 lib/Padre/Autosave.pm
 lib/Padre/Config.pm
 lib/Padre/DB.pm
+lib/Padre/DB/Patch.pm
 lib/Padre/Document.pm
-lib/Padre/Document/PASM.pm
 lib/Padre/Document/Perl.pm
-lib/Padre/Document/Perl6.pm
-lib/Padre/Document/PIR.pm
+lib/Padre/Document/POD.pm
 lib/Padre/Documents.pm
 lib/Padre/Locale.pm
 lib/Padre/Plugin.pm
@@ -52,11 +51,13 @@ lib/Padre/PPI.pm
 lib/Padre/Project.pm
 lib/Padre/Project/Perl.pm
 lib/Padre/Task.pm
+lib/Padre/Task/Examples/WxEvent.pm
 lib/Padre/Task/PPI.pm
 lib/Padre/Task/PPI/FindUnmatchedBrace.pm
 lib/Padre/Task/PPI/FindVariableDeclaration.pm
 lib/Padre/Task/PPI/LexicalReplaceVariable.pm
 lib/Padre/Task/SyntaxChecker.pm
+lib/Padre/Task/SyntaxChecker/Perl.pm
 lib/Padre/TaskManager.pm
 lib/Padre/Util.pm
 lib/Padre/Wx.pm
@@ -71,6 +72,7 @@ lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Editor.pm
+lib/Padre/Wx/ErrorList.pm
 lib/Padre/Wx/FileDropTarget.pm
 lib/Padre/Wx/History/ComboBox.pm
 lib/Padre/Wx/History/TextDialog.pm
@@ -102,6 +104,9 @@ privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
 share/languages/perl5/perl5.yml
+share/languages/perl6/perl6.yml
+share/locale/ar.mo
+share/locale/ar.po
 share/locale/de.mo
 share/locale/de.po
 share/locale/fr.mo
@@ -120,6 +125,7 @@ share/locale/nl.po
 share/locale/ru.mo
 share/locale/ru.po
 share/styles/default.yml
+share/styles/night.yml
 share/tango/16x16/actions/bookmark-new.png
 share/tango/16x16/actions/document-new.png
 share/tango/16x16/actions/document-open.png
@@ -139,6 +145,7 @@ share/tango/16x16/status/dialog-warning.png
 share/templates/template.pl
 share/templates/template.pm
 share/templates/template.t
+share/timeline/migrate-1.pl
 t/00-compile.t
 t/01-load.t
 t/02-new.t
@@ -154,6 +161,7 @@ t/84-task.t
 t/85-task-manager.t
 t/91-vi.t
 t/files/find_variable_declaration_1.pm
+t/files/hello_with_warn.pl
 t/files/missing_brace_1.pl
 t/files/one_char.pl
 t/lib/Padre.pm

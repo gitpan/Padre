@@ -3,7 +3,7 @@ package Padre::Task::PPI::LexicalReplaceVariable;
 use strict;
 use warnings;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 use base 'Padre::Task::PPI';
 
@@ -45,7 +45,7 @@ sub prepare {
 		Carp::croak("Missing Padre::Document::Perl object as {document} attribute of the brace-finder task");
 	}
 	
-        if (not defined $self->{replacement}) {
+	if (not defined $self->{replacement}) {
 		require Carp;
 		Carp::croak("Need a {replacement}!");
 	}
@@ -81,7 +81,7 @@ sub process_ppi {
 	while ( not $scope->isa('Padre::Document') and not $scope->isa('PPI::Structure::Block') ) {
 		$scope = $scope->parent;
 	}
-        
+
 	my $token_str = $token->content;
 	my $varname = $token->canonical;
 

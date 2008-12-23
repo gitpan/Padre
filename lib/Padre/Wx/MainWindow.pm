@@ -34,11 +34,12 @@ use Padre::Wx                 ();
 use Padre::Wx::Editor         ();
 use Padre::Wx::ToolBar        ();
 use Padre::Wx::Output         ();
+use Padre::Wx::ErrorList      ();
 use Padre::Document           ();
 use Padre::Documents          ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Wx::Frame';
 
 my $default_dir = Cwd::cwd();
@@ -58,6 +59,7 @@ use Class::XSAccessor
 		manager        => 'manager',
 		no_refresh     => '_no_refresh',
 		syntax_checker => 'syntax_checker',
+		errorlist      => 'errorlist',
 	};
 
 sub new {
@@ -89,12 +91,12 @@ sub new {
 		-1,
 		$title,
 		[
-		    $config->{host}->{main_left},
-		    $config->{host}->{main_top},
+			$config->{host}->{main_left},
+			$config->{host}->{main_top},
 		],
 		[
-		    $config->{host}->{main_width},
-		    $config->{host}->{main_height},
+			$config->{host}->{main_width},
+			$config->{host}->{main_height},
 		],
 		$wx_frame_style,
 	);
@@ -134,6 +136,11 @@ sub new {
 	# create it AFTER the bottom pane!
 	$self->{syntax_checker} = Padre::Wx::SyntaxChecker->new($self);
 	$self->show_syntaxbar( $self->menu->view->{show_syntaxcheck}->IsChecked );
+
+	# Create the error list
+	# create it AFTER the bottom pane!
+	$self->{errorlist} = Padre::Wx::ErrorList->new($self);
+
 
 	# on close pane
 	Wx::Event::EVT_AUI_PANE_CLOSE(
@@ -369,18 +376,17 @@ sub create_bottom_pane {
 	return;
 }
 
-
 # Load any default files
 sub load_files {
 	my $self   = shift;
 	my $config = Padre->ide->config;
 	my $files  = Padre->inst->{ARGV};
 	if ( Params::Util::_ARRAY($files) ) {
-		$self->setup_editors( @$files );
+		$self->setup_editors(@$files);
 	} elsif ( $config->{main_startup} eq 'new' ) {
-		$self->setup_editors();
+		$self->setup_editors;
 	} elsif ( $config->{main_startup} eq 'nothing' ) {
-		# nothing
+		# Nothing
 	} elsif ( $config->{main_startup} eq 'last' ) {
 		if ( $config->{host}->{main_files} ) {
 			$self->Freeze;
@@ -423,13 +429,17 @@ sub timer_post_init {
 	if ( $self->menu->view->{show_syntaxcheck}->IsChecked ) {
 		$self->syntax_checker->enable(1);
 	}
+
+	if ( $self->menu->view->{show_errorlist}->IsChecked ) {
+		$self->errorlist->enable;
+	}
 	
 	$self->refresh;
 	# Now we are fully loaded and can paint continuously
 	$self->Thaw;
 
 	# Check for new plugins and alert the user to them
-	my $plugins = Padre->ide->plugin_manager->alert_new;
+	Padre->ide->plugin_manager->alert_new;
 
 	# Start the change detection timer
 	my $timer = Wx::Timer->new( $self, Padre::Wx::id_FILECHK_TIMER );
@@ -492,6 +502,19 @@ sub refresh {
 	}
 
 	$self->Thaw;
+	return;
+}
+
+sub change_style {
+	my $self = shift;
+	my $name = shift;
+
+	warn "Style: $name\n";
+	Padre::Wx::Editor::data($name);
+	foreach my $editor ( $self->pages ) {
+		$editor->padre_setup;
+	}
+	
 	return;
 }
 
@@ -734,6 +757,9 @@ sub run_command {
 
 	# Disable access to the run menus
 	$self->menu->run->disable;
+	
+	# Clear the error list
+	$self->errorlist->clear;
 
 	# Prepare the output window for the output
 	$self->show_output(1);
@@ -749,7 +775,7 @@ sub run_command {
 				$_[1]->Skip(1);
 				my $outpanel = $_[0]->{gui}->{output_panel};
 				$outpanel->style_neutral;
-				$outpanel->AppendText( $_[1]->GetLine . "\n" );
+				$outpanel->AppendText( $_[1]->GetLine . "\n" );			
 				return;
 			},
 		);
@@ -760,6 +786,9 @@ sub run_command {
 				my $outpanel = $_[0]->{gui}->{output_panel};
 				$outpanel->style_bad;
 				$outpanel->AppendText( $_[1]->GetLine . "\n" );
+				
+				$_[0]->errorlist->collect_data($_[1]->GetLine);
+				
 				return;
 			},
 		);
@@ -769,6 +798,7 @@ sub run_command {
 				$_[1]->Skip(1);
 				$_[1]->GetProcess->Destroy;
 				$self->menu->run->enable;
+				$_[0]->errorlist->populate;
 			},
 		);
 	}
@@ -1587,7 +1617,8 @@ sub zoom {
 sub on_preferences {
 	my $self = shift;
 
-	if (Padre::Wx::Dialog::Preferences->run( $self )) {
+	require Padre::Wx::Dialog::Preferences;
+	if ( Padre::Wx::Dialog::Preferences->run( $self )) {
 		foreach my $editor ( $self->pages ) {
 			$editor->set_preferences;
 		}
@@ -1618,6 +1649,9 @@ sub on_toggle_code_folding {
 
 	foreach my $editor ( $self->pages ) {
 		$editor->show_folding( $config->{editor_codefolding} );
+		if ( $config->{editor_codefolding} == 0 ) {
+			$editor->unfold_all;
+		}
 	}
 
 	return;
@@ -1627,10 +1661,10 @@ sub on_toggle_current_line_background {
 	my ($self, $event) = @_;
 
 	my $config = Padre->ide->config;
-	$config->{editor_currentlinebackground} = $event->IsChecked ? 1 : 0;
+	$config->{editor_current_line_background} = $event->IsChecked ? 1 : 0;
 
 	foreach my $editor ( $self->pages ) {
-		$editor->show_currentlinebackground( $config->{editor_currentlinebackground} ? 1 : 0 );
+		$editor->SetCaretLineVisible( $config->{editor_current_line_background} ? 1 : 0 );
 	}
 
 	return;
@@ -1643,6 +1677,17 @@ sub on_toggle_syntax_check {
 	$config->{editor_syntaxcheck} = $event->IsChecked ? 1 : 0;
 
 	$self->syntax_checker->enable( $config->{editor_syntaxcheck} ? 1 : 0 );
+
+	return;
+}
+
+sub on_toggle_errorlist {
+	my ($self, $event) = @_;
+
+	my $config = Padre->ide->config;
+	$config->{editor_errorlist} = $event->IsChecked ? 1 : 0;
+
+	$config->{editor_errorlist} ? $self->errorlist->enable : $self->errorlist->disable;
 
 	return;
 }
@@ -1839,10 +1884,17 @@ sub check_pane_needed {
 	my $cnt = $self->{gui}->{$pane}->GetPageCount;
 
 	foreach my $num ( 0 .. $cnt ) {
+		# ignore 'Ack' pane
+		if ( $pane eq 'bottompane' ) {
+    		my $ack_page_idx = $self->{gui}->{$pane}->GetPageIndex( $self->{gui}->{ack_panel} );
+    		next if ( defined $ack_page_idx and $ack_page_idx == $num );
+		}
+		
 		my $p = undef;
 		eval {
 			$p = $self->{gui}->{$pane}->GetPage($num)
 		};
+
 		if ( defined($p) && $p->IsShown ) {
 			$visible++;
 		}
@@ -2067,18 +2119,7 @@ sub on_close_pane {
 	my ( $self, $event ) = @_;
 	my $pane = $event->GetPane();
 
-	# it's ugly, but it works
-	# TODO: This needs to be fixed. Data::Dumper is damn slow and this is just... wrong.
-	if ( Data::Dumper::Dumper(\$pane) eq 
-	     Data::Dumper::Dumper(\$self->{gui}->{output_panel}) )
-	{
-		$self->menu->view->{output}->Check(0);
-	}
-	elsif ( Data::Dumper::Dumper(\$pane) eq
-	        Data::Dumper::Dumper(\$self->{gui}->{subs_panel}) )
-	{
-		$self->menu->view->{functions}->Check(0);
-	}
+
 }
 
 sub on_doc_stats {
@@ -2101,6 +2142,7 @@ sub on_doc_stats {
 		sprintf(Wx::gettext("Chars with spaces: %d"),    $chars_with_space   ),
 		sprintf(Wx::gettext("Newline type: %s"),         $newline_type       ),
 		sprintf(Wx::gettext("Encoding: %s"),             $encoding           ),
+		sprintf(Wx::gettext("Document type: %s"),        (defined ref($doc) ? ref($doc) : Wx::gettext("none"))),
 		defined $filename
 			? sprintf(Wx::gettext("Filename: %s"),       $filename)
 			: Wx::gettext("No filename"),
@@ -2119,15 +2161,12 @@ sub on_tab_and_space {
 	my ( $self, $type ) = @_;
 	
 	my $doc = $self->selected_document;
-	if (not $doc) {
-		$self->message( 'No file is open' );
-		return;
-	}
+	return if not $doc;
 
-	my $title = $type eq 'Space_to_Tab' ? 'Space to Tab' : 'Tab to Space';
+	my $title = $type eq 'Space_to_Tab' ? Wx::gettext('Space to Tab') : Wx::gettext('Tab to Space');
 	
 	my $dialog = Padre::Wx::History::TextDialog->new(
-		$self, 'How many spaces for each tab:', $title, $type,
+		$self, Wx::gettext('How many spaces for each tab:'), $title, $type,
 	);
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 		return;
@@ -2145,9 +2184,9 @@ sub on_tab_and_space {
 	
 	my $to_space = ' ' x $space_num;
 	if ( $type eq 'Space_to_Tab' ) {
-		$code =~ s/$to_space/\t/isg;
+		$code =~ s/^(\s+)/my $s = $1; $s =~ s{$to_space}{\t}g; $s/mge;
 	} else {
-		$code =~ s/\t/$to_space/isg;
+		$code =~ s/^(\s+)/my $s = $1; $s =~ s{\t}{$to_space}g; $s/mge;
 	}
 	
 	if ( $src ) {
@@ -2162,10 +2201,7 @@ sub on_delete_ending_space {
 	my ( $self ) = @_;
 	
 	my $doc = $self->selected_document;
-	if (not $doc) {
-		$self->message( 'No file is open' );
-		return;
-	}
+	return if not $doc;
 	
 	my $src = $self->selected_text;
 	my $code = ( $src ) ? $src : $doc->text_get;
@@ -2287,7 +2323,7 @@ sub on_notebook_page_changed {
 			Scalar::Util::refaddr($_) ne Scalar::Util::refaddr($editor)
 		} @{ $_[0]->{page_history} };
 		push @{ $_[0]->{page_history} }, $editor;
-		$editor->{Document}->set_indentation_style(); #  update indentation in case auto-update is on; TODO: encasulation?
+		$editor->{Document}->set_indentation_style(); #  update indentation in case auto-update is on; TODO: encapsulation?
 	}
 	$_[0]->refresh;
 }

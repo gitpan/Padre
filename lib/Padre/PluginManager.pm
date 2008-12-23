@@ -25,7 +25,7 @@ use Padre::Util              ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 
 
@@ -122,8 +122,11 @@ use Class::XSAccessor
 	getters => {
 		parent     => 'parent',
 		plugin_dir => 'plugin_dir',
-                plugins    => 'plugins',
+		plugins    => 'plugins',
 	};
+
+
+
 
 
 #####################################################################
@@ -181,10 +184,17 @@ sub load_plugins {
 	$self->_load_plugins_from_par;
 	$self->_refresh_plugin_menu;
 	if ( my @failed = $self->failed ) {
-		$self->parent->wx->main_window->error(
-			"Failed to load the following plugin(s):\n"
-			. join "\n", @failed
-		);
+		# Until such time as we can show an error message
+		# in a smarter way, this gets annoying.
+		# Every time you start the editor, we tell you what
+		# we DIDN'T do...
+		# Turn this back on once we can track these over time
+		# and only report on plugins that USED to work but now
+		# have started to fail.
+		#$self->parent->wx->main_window->error(
+		#	Wx::gettext("Failed to load the following plugin(s):\n")
+		#	. join "\n", @failed
+		#) unless $ENV{HARNESS_ACTIVE};
 		return;
 	}
 	return;
@@ -293,17 +303,89 @@ sub _load_plugin_norefresh_menu {
 
 	# Skip if that plugin was already loaded
 	$name =~ s/^Padre::Plugin:://;
-	if ( $plugins->{$name} and $plugins->{$name}->{status} eq 'loaded' ) {
+	if ( $plugins->{$name} and $plugins->{$name}->{status} eq 'enabled' ) {
 		return;
 	}
 
 	$plugins->{$name} ||= {};
-	my $state = $plugins->{$name};
+	my $state  = $plugins->{$name};
+	my $module = $state->{module} = "Padre::Plugin::$name";
 
-	my $module = "Padre::Plugin::$name";
-	$state->{module} = $module;
+	# Does the plugin load without error
+	eval "use $module"; ## no critic
+	if ( $@ ) {
+		$self->{errstr} = sprintf(
+			Wx::gettext(
+				"Plugin:%s - Failed to load module: %s"
+			),
+			$name,
+			$@,
+		);
+		$state->{status} = 'failed';
+		return;
+	}
 
+	# Plugin must be a Padre::Plugin subclass
+	unless ( $module->isa('Padre::Plugin') ) {
+		$self->{errstr} = sprintf(
+			Wx::gettext(
+				"Plugin:%s - Not compatible with Padre::Plugin API. "
+				. "Need to be subclass of Padre::Plugin"
+			), $name,
+		);
+		$state->{status} = 'failed';
+		return;
+	}
+
+	# Does the plugin have new method?
+	unless ( $module->can('new') ) {
+		$self->{errstr} = sprintf(
+			Wx::gettext(
+				"Plugin:%s - Not compatible with Padre::Plugin API. "
+				. "Plugin is not instantiable"
+			), $name,
+		);
+		$state->{status} = 'failed';
+		return;
+	}
+
+	# This will not check anything as padre_interfaces is defined in Padre::Plugin
+	unless ( $module->can('padre_interfaces') ) {
+		$self->{errstr} = sprintf(
+			Wx::gettext(
+				"Plugin:%s - Not compatible with Padre::Plugin API. "
+				. "Need to have sub padre_interfaces"
+			),
+			$name,
+		);
+		$state->{status} = 'failed';
+		return;
+	}
+
+	# Attempt to instantiate the plugin
+	my $object = eval { $module->new };
+	if ( $@ ) {
+		# TODO report error in a nicer way
+		$self->{errstr} = $@;
+		$state->{status} = 'failed';
+		return;
+	}
+	unless ( _INSTANCE($object, 'Padre::Plugin') ) {
+		$self->{errstr} = sprintf(
+			Wx::gettext(
+				"Plugin:%s - Not compatible with Padre::Plugin API. "
+				. "Need to have sub padre_interfaces"
+			),
+			$name,
+		);
+		$state->{status} = 'failed';
+		return;
+	}
+	$state->{object} = $object;
+
+	# Should we try to enable the plugin
 	unless ( $config->{plugins}->{$name} ) {
+		# Do not enable by default
 		$config->{plugins}->{$name}->{enabled} = 0;
 		$state->{status} = 'new';
 		return;
@@ -313,43 +395,13 @@ sub _load_plugin_norefresh_menu {
 		return;
 	}
 
-	# Does the plugin load without error
-	eval "use $module"; ## no critic
-	if ( $@ ) {
-		warn $self->{errstr} = "Plugin:$name - Failed to load module: $@";
-		$state->{status} = 'failed';
-		return;
-	}
+	# FINALLY we are clear to enable the plugin
+	$self->_plugin_enable($name);
 
-	# Does the plugin advertise its compatibility
-	unless ( $module->can('new') and $module->can('padre_interfaces') ) {
-		warn $self->{errstr} = "Plugin:$name - Not compatible with Padre::Plugin API";
-		$state->{status} = 'failed';
-		return;
-	}
-
-	eval {
-		$state->{object} = $module->new;
-		unless ( ref($state->{object}) ) {
-			die "Could not create plugin object for $module";
-		}
-		$self->_plugin_enable($name);
-	};
-	if ( $@ ) {
-		# TODO report error in a nicer way
-		warn $self->{errstr} = $@;
-		$state->{status} = 'failed';
-
-		# Automatically disable the plugin
-		$config->{plugins}->{$name}->{enabled} = 0; # persistent!
-	} else {
-		$state->{status} = 'loaded';
-	}
-	
 	return 1;
 }
 
-# Assume the named plugin exists, load it
+# Assume the named plugin exists, enable it
 sub _plugin_enable {
 	my $self   = shift;
 	my $name   = shift;
@@ -358,7 +410,7 @@ sub _plugin_enable {
 	# Call the plugin's own enable method
 	$plugin->plugin_enable;
 
-	# If the plugin defines document types, enable them
+	# If the plugin defines document types, register them
 	my @documents = $plugin->registered_documents;
 	if ( @documents ) {
 		Class::Autouse->load('Padre::Document');
@@ -368,6 +420,32 @@ sub _plugin_enable {
 		my $class = shift @documents;
 		$Padre::Document::MIME_CLASS{$type} = $class;
 	}
+
+	# Update the status
+	$self->plugins->{$name}->{status} = 'enabled';
+
+	return 1;
+}
+
+# Assume the named plugin exists, disable it
+sub _plugin_disable {
+	my $self = shift;
+	my $name = shift;
+	my $plugin = $self->plugins->{$name}->{object};
+
+	# If the plugin defines document types, deregister them
+	my @documents = $plugin->registered_documents;
+	while ( @documents ) {
+		my $type  = shift @documents;
+		my $class = shift @documents;
+		delete $Padre::Document::MIME_CLASS{$type};
+	}
+
+	# Call the plugin's own disable method
+	$plugin->plugin_disable;
+
+	# Update the status
+	$self->plugins->{$name}->{status} = 'disabled';
 
 	return 1;
 }
@@ -466,18 +544,18 @@ sub alert_new {
 			$new_plugins .= "$name\n";
 		}
 	}
-	if ( $new_plugins ) {
-		my $msg = <<"END_MSG";
+	if ( $new_plugins and not $ENV{HARNESS_ACTIVE} ) {
+		my $msg = Wx::gettext(<<"END_MSG");
 We found several new plugins.
 In order to configure and enable them go to
 Plugins -> Plugin Manager
 
 List of new plugins:
 
-$new_plugins
 END_MSG
+		$msg .= $new_plugins;
 
-		$self->parent->wx->main_window->message($msg, 'New plugins detected');
+		$self->parent->wx->main_window->message($msg, Wx::gettext('New plugins detected'));
 	}
 
 	return 1;
@@ -493,14 +571,16 @@ END_MSG
 # enable all the plugins for a single editor
 sub editor_enable {
 	my ($self, $editor) = @_;
-	foreach my $plugin ( keys %{ $self->{plugins} } ) {
+	foreach my $name ( keys %{ $self->{plugins} } ) {
+		my $plugin = $self->{plugins}->{$name} or return;
+		my $object = $plugin->{object}         or return;
+		next unless $plugin->{status};
+		next unless $plugin->{status} eq 'enabled';
 		eval {
-			if ( my $object = $self->{plugins}->{$plugin}->{object} ) {
-				return if not $object->can('editor_enable');
-				$object->editor_enable( $editor, $editor->{Document} );
-			}
+			return if not $object->can('editor_enable');
+			$object->editor_enable( $editor, $editor->{Document} );
 		};
-		if ($@) {
+		if ( $@ ) {
 			warn $@;
 			# TODO: report the plugin error!
 		}
@@ -518,14 +598,14 @@ sub enable_editors_for_all {
 }
 
 sub enable_editors {
-	my $self = shift;
-	my $name = shift;
-	
-	my $plugins = $self->plugins;
-	return if not $plugins->{$name} or not $plugins->{$name}->{object};
+	my $self   = shift;
+	my $name   = shift;
+	my $plugin = $self->plugins->{$name} or return;
+	my $object = $plugin->{object}       or return;
+	return unless ( $plugin->{status} and $plugin->{status} eq 'enabled' );
 	foreach my $editor ( $self->parent->wx->main_window->pages ) {
-		if ( $plugins->{$name}->{object}->can('editor_enable') ) {
-			$plugins->{$name}->{object}->editor_enable( $editor, $editor->{Document} );
+		if ( $object->can('editor_enable') ) {
+			$object->editor_enable( $editor, $editor->{Document} );
 		}
 	}
 	return 1;
@@ -549,20 +629,11 @@ sub reload_plugin {
 	return 1;
 }
 
-# recreate the Plugins menu
-### TODO - Reimplement this in Padre::Wx::Menu::Plugins
+# refresh the Plugins menu
 sub _refresh_plugin_menu {
 	my $self = shift;
-	my $main = $self->parent->wx->main_window;
-
-	# Regenerate the menu
-	my $menu    = $main->menu;
-	my $submenu = Padre::Wx::Menu::Plugins->new($main);
-	my $place   = $menu->{wx}->FindMenu( Wx::gettext("Pl&ugins") );
-
-	# Update the menu
-	$menu->{wx}->Replace( $place, $submenu->wx, Wx::gettext("Pl&ugins") );
-	$menu->refresh;
+	
+        $self->parent->wx->main_window->menu->plugins->refresh;
 }
 
 =pod
@@ -587,13 +658,13 @@ sub failed {
 # TODO: document this.
 sub test_a_plugin {
 	my $self    = shift;
-        my $main    = $self->parent->wx->main_window;
+	my $main    = $self->parent->wx->main_window;
 	my $config  = $self->parent->config;
 	my $plugins = $self->plugins;
 
 	my $last_filename = $config->{last_test_plugin_file};
 	$last_filename  ||= $main->selected_filename;
-	my $default_dir;
+	my $default_dir = '';
 	if ( $last_filename ) {
 		$default_dir = File::Basename::dirname($last_filename);
 	}
@@ -625,11 +696,11 @@ sub test_a_plugin {
 	$config->{plugins}->{$filename}->{enabled} = 1;
 	$self->load_plugin($filename);
 	if ( $self->plugins->{$filename}->{status} eq 'failed' ) {
-		$main->error("Faild to load the plugin '$filename'");
+		$main->error(sprintf(Wx::gettext("Failed to load the plugin '%s'"), $filename));
 		return;
 	}
 
-	$self->reload_plugins;
+	#$self->reload_plugins;
 }
 
 sub get_menu {
@@ -637,7 +708,7 @@ sub get_menu {
 	my $main    = shift;
 	my $name    = shift;
 	my $plugin  = $self->plugins->{$name};
-	unless ( $plugin and $plugin->{status} eq 'loaded' ) {
+	unless ( $plugin and $plugin->{status} eq 'enabled' ) {
 		return ();
 	}
 	unless ( $plugin->{object}->can('menu_plugins') ) {
@@ -646,6 +717,9 @@ sub get_menu {
 	my ($label, $menu) = eval { $plugin->{object}->menu_plugins($main) };
 	if ( $@ ) {
 		$self->{errstr} = "Error when calling menu for plugin '$name' $@";
+		return ();
+	}
+	unless ( defined $label and defined $menu ) {
 		return ();
 	}
 	return ($label, $menu);

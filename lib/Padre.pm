@@ -13,8 +13,11 @@ use Getopt::Long   ();
 use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
+# load this before things are messed up to produce versions like '0,76'! 
+# TODO: Bug report dispatched. Likely to be fixed in 0.77.
+use version        ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -33,7 +36,6 @@ use Class::Autouse qw{
 	Padre::Project
 	Padre::PluginManager
 	Padre::Pod::Frame
-	Padre::Pod::Indexer
 	Padre::Pod::Viewer
 	Padre::Task
 	Padre::Task::PPI
@@ -48,8 +50,6 @@ use Class::Autouse qw{
 	Padre::Wx::App
 	Padre::Wx::Dialog::Bookmarks
 	Padre::Wx::Dialog::Find
-	Padre::Wx::Dialog::PluginManager
-	Padre::Wx::Dialog::Preferences
 	Padre::Wx::Dialog::Search
 	Padre::Wx::Dialog::Snippets
 	Padre::Wx::History::TextDialog
@@ -1049,7 +1049,9 @@ Keedi Kim (KEEDI),
 Max Maischein (CORION),
 Patrick Donelan (PATSPAM),
 Paweł Murias (PMURIAS),
+Petar Shangov (PSHANGOV),
 Steffen Mueller (TSEE)
+
 
 
 To Herbert Breunung for letting me work on Kephra.
@@ -1057,6 +1059,8 @@ To Herbert Breunung for letting me work on Kephra.
 To Octavian Rasnita for early testing and bug reports.
 
 =head2 Translations
+
+Arabic - Ahmad M. Zawawi (AZAWAWI)
 
 Dutch - Dirk De Nijs (ddn123456)
 
@@ -1066,7 +1070,7 @@ French - Jerome Quelin (JQUELIN)
 
 German - Heiko Jansen (HJANSEN)
 
-Hebrew - Omer Zak
+Hebrew - Omer Zak and Shlomi Fish (SHLOMIF)
 
 Hungarian - Gyorgy Pasztor (GYU)
 

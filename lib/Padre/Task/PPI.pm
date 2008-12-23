@@ -3,7 +3,7 @@ package Padre::Task::PPI;
 use strict;
 use warnings;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 use base 'Padre::Task';
 
@@ -69,7 +69,7 @@ sub new {
 	if (not defined $self->{text}) {
 		$self->{text} = Padre::Documents->current->text_get();
 	}
-        return $self;
+	return $self;
 }
 
 sub run {

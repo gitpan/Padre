@@ -7,9 +7,9 @@ use warnings;
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
-sub get_layout {
+sub get_layout_for_behaviour {
 	my ($config, $main_startup, $editor_autoindent, $editor_methods) = @_;
 
 	return [
@@ -55,8 +55,29 @@ sub get_layout {
 				($config->{editor_use_wordwrap} ? 1 : 0) ],
 		],
 		[
-			[ 'Wx::Button',     '_ok_',           Wx::wxID_OK     ],
-			[ 'Wx::Button',     '_cancel_',       Wx::wxID_CANCEL ],
+			[ 'Wx::StaticText', undef,              Wx::gettext('Preferred language for error diagnostics:')],
+			[ 'Wx::TextCtrl',     'diagnostics_lang', $config->{diagnostics_lang}||''],
+		],
+	];
+}
+
+sub get_layout_for_appearance {
+	my $config = shift;
+
+	return [
+		[
+			[ 'Wx::StaticText', undef, Wx::gettext('Editor Font:') ],
+			[ 'Wx::FontPickerCtrl', 'editor_font',
+				( defined $config->{editor_font}
+				    ? $config->{editor_font}
+				    : Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL )->GetNativeFontInfoUserDesc
+				)
+			] 
+		],
+		[
+			[ 'Wx::StaticText', undef, Wx::gettext('Editor Current Line Background Colour:') ],
+			[ 'Wx::ColourPickerCtrl', 'editor_current_line_background_color',
+				(defined $config->{editor_current_line_background_color} ? '#' . $config->{editor_current_line_background_color} : '#ffff04') ]
 		],
 	];
 }
@@ -65,12 +86,19 @@ sub dialog {
 	my ($class, $win, $main_startup, $editor_autoindent, $editor_methods) = @_;
 
 	my $config = Padre->ide->config;
-	my $layout = get_layout($config, $main_startup, $editor_autoindent, $editor_methods);
+	my $behaviour  = get_layout_for_behaviour($config, $main_startup, $editor_autoindent, $editor_methods);
+	my $appearance = get_layout_for_appearance($config);
 	my $dialog = Padre::Wx::Dialog->new(
 		parent => $win,
 		title  => Wx::gettext("Preferences"),
-		layout => $layout,
+		layout => [ $behaviour, $appearance, ],
 		width  => [280, 200],
+		multipage => {
+			auto_ok_cancel  => 1,
+			ok_widgetid     => '_ok_',
+			cancel_widgetid => '_cancel_',
+			pagenames       => [ 'Behaviour', 'Appearance' ]
+		},
 	);
 
 	$dialog->{_widgets_}{editor_tabwidth}->SetFocus;
@@ -89,7 +117,7 @@ sub dialog {
 	);
 
 	$dialog->{_widgets_}{_ok_}->SetDefault;
-	
+
 	return $dialog;
 }
 
@@ -129,11 +157,22 @@ sub run {
 
 	my $data = $dialog->get_data;
 
-	foreach my $f (qw(pod_maxlist pod_minlist editor_tabwidth editor_indentwidth)) {
+	foreach my $f (
+		qw( pod_maxlist
+			pod_minlist
+			editor_tabwidth
+			editor_indentwidth
+			editor_font
+			editor_current_line_background_color
+			diagnostics_lang
+		)
+	) {
 		$config->{$f} = $data->{$f};
 	}
+	$config->{editor_current_line_background_color} =~ s/#//;
+
 	foreach my $f (qw(editor_use_tabs editor_use_wordwrap editor_auto_indentation_style)) {
-		$config->{$f} = $data->{$f} ? 1 :0;
+		$config->{$f} = $data->{$f} ? 1 : 0;
 	}
 
 	$config->{main_startup}        = $main_startup[ $data->{main_startup} ];

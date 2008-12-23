@@ -9,6 +9,7 @@ build_requires:
   Test::More: 0.47
   Test::NeedsDisplay: 1.05
   Test::NoWarnings: 0.084
+  Test::Script: 1.03
 distribution_type: module
 generated_by: 'Module::Install version 0.77'
 license: perl
@@ -18,13 +19,12 @@ meta-spec:
 name: Padre
 no_index:
   directory:
-    -
-      - t
-      - xt
-      - eg
-      - share
-      - inc
-      - privinc
+    - t
+    - xt
+    - eg
+    - share
+    - inc
+    - privinc
     - share
     - share
     - inc
@@ -41,7 +41,7 @@ requires:
   DBI: 1.58
   Data::Dumper: 0
   Digest::MD5: 0
-  Encode: 2.12
+  Encode: 2.26
   File::Basename: 0
   File::Copy::Recursive: 0.37
   File::Find::Rule: 0.30
@@ -57,15 +57,18 @@ requires:
   HTML::Parser: 3.58
   IO::Socket: 1.30
   IO::String: 1.08
-  IPC::Run3: 0.035
+  IPC::Cmd: 0.42
+  IPC::Open3: 0
   List::Util: 1.18
   Module::Inspector: 0.04
   Module::Refresh: 0.13
   Module::Starter: 1.50
   ORLite: 0.15
+  ORLite::Migrate: 0.01
   PAR: 0.970
   PPI: 1.203
   Params::Util: 0.33
+  Parse::ErrorString::Perl: 0.06
   Pod::POM: 0.17
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
@@ -76,12 +79,15 @@ requires:
   Text::FindIndent: 0.03
   Thread::Queue: 2.11
   Wx: 0.89
-  Wx::Perl::Dialog: 0.03
+  Wx::Perl::Dialog: 0.04
   Wx::Perl::ProcessStream: 0.11
   YAML::Tiny: 1.32
   perl: 5.008001
   threads: 1.71
   threads::shared: 1.26
 resources:
+  bugtracker: http://padre.perlide.org/
+  homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
-version: 0.21
+  repository: http://svn.perlide.org/padre/trunk/Padre/
+version: 0.22

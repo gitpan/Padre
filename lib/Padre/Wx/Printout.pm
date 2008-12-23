@@ -6,7 +6,7 @@ use warnings;
 use Wx::Print;
 use base qw(Wx::Printout);
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 sub new {
 	my $class  = shift;
@@ -72,10 +72,10 @@ sub GetPageInfo {
 	$right  = int( $right  * $ppiScr->GetWidth  / 25.4 );
 
 	$self->{printRect} = Wx::Rect->new(
-	    int( $left * $dc->GetUserScale ),
-	    int( $top * $dc->GetUserScale ),
-	    $right,
-	    ( $pageSize->GetHeight - int( ( $top + $bottom ) * $dc->GetUserScale ) )
+		int( $left * $dc->GetUserScale ),
+		int( $top * $dc->GetUserScale ),
+		$right,
+		( $pageSize->GetHeight - int( ( $top + $bottom ) * $dc->GetUserScale ) )
 	);
 
 	while ( $self->HasPage($maxPage) ) {

@@ -6,12 +6,14 @@ use warnings;
 use Padre::Wx ();
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
+use File::Basename ();
 
 my $iter;
 my %opts;
 my %stats;
+my $panel_string_index = 9999999;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 my $DONE_EVENT : shared = Wx::NewEventType;
 
 my $ack_loaded = 0;
@@ -54,14 +56,103 @@ sub on_ack {
 		$ack_loaded = 1;
 	}
 
-	# clear %stats; for every request
-	%stats = ();
-	
 	my $text   = $mainwindow->selected_text;
 	$text = '' if not defined $text;
 	
 	my $dialog = dialog($mainwindow, $text);
 	$dialog->Show(1);
+
+	return;
+}
+
+################################
+# Dialog related
+
+sub get_layout {
+	my ( $term ) = shift;
+	
+	my $config = Padre->ide->config;
+	$config->{ack_terms}      ||= [];
+	$config->{ack_dirs}       ||= [];
+	$config->{ack_file_types} ||= [];
+	# default value is 1 for ignore_hidden_subdirs
+	$config->{ack}->{ignore_hidden_subdirs} = 1 unless ( exists $config->{ack}->{ignore_hidden_subdirs} );
+
+	my @layout = (
+		[
+			[ 'Wx::StaticText', undef,              gettext('Term:')],
+			[ 'Wx::ComboBox',   '_ack_term_',       $term, $config->{ack_terms} ],
+			[ 'Wx::Button',     '_find_',           Wx::wxID_FIND ],
+		],
+		[
+			[ 'Wx::StaticText', undef,              gettext('Dir:')],
+			[ 'Wx::ComboBox',   '_ack_dir_',        '', $config->{ack_dirs} ],
+			[ 'Wx::Button',     '_pick_dir_',        gettext('Pick &directory')],
+		],
+		[
+			[ 'Wx::StaticText', undef,              gettext('In Files/Types:')],
+			[ 'Wx::ComboBox',   '_file_types_',     '', $config->{ack_file_types} ],
+			[ 'Wx::Button',     '_cancel_',         Wx::wxID_CANCEL],
+		],
+		[
+			['Wx::CheckBox',    'case_insensitive', gettext('Case &Insensitive'),    ($config->{ack}->{case_insensitive} ? 1 : 0) ],
+		],
+		[
+			['Wx::CheckBox',    'ignore_hidden_subdirs', gettext('I&gnore hidden Subdirectories'),    ($config->{ack}->{ignore_hidden_subdirs} ? 1 : 0) ],
+		],
+		
+	);
+	return \@layout;
+}
+
+sub dialog {
+	my ( $win, $term ) = @_;
+	
+	my $layout = get_layout($term);
+	my $dialog = Padre::Wx::Dialog->new(
+		parent => $win,
+		title  => gettext("Ack (Find in Files)"),
+		layout => $layout,
+		width  => [190, 210],
+		size   => Wx::wxDefaultSize,
+		pos    => Wx::wxDefaultPosition,
+	);
+	
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_find_},     \&find_clicked);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_pick_dir_}, \&on_pick_dir);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},   \&cancel_clicked);
+	
+	$dialog->{_widgets_}{_ack_term_}->SetFocus;
+
+	return $dialog;
+}
+
+sub on_pick_dir {
+	my ($dialog, $event) = @_;
+
+	my $win = Padre->ide->wx->main_window;
+
+	my $default_dir = $dialog->{_widgets_}{_ack_dir_}->GetValue();
+	unless ( $default_dir ) { # we use currect editor
+		my $filename = $win->selected_filename();
+		if ( $filename ) {
+			$default_dir = File::Basename::dirname($filename);
+		}
+	}
+
+	my $dir_dialog = Wx::DirDialog->new( $win, Wx::gettext("Select directory"), $default_dir);
+	if ($dir_dialog->ShowModal == Wx::wxID_CANCEL) {
+		return;
+	}
+	$dialog->{_widgets_}{_ack_dir_}->SetValue($dir_dialog->GetPath);
+
+	return;
+}
+
+sub cancel_clicked {
+	my ($dialog, $event) = @_;
+
+	$dialog->Destroy;
 
 	return;
 }
@@ -80,17 +171,42 @@ sub find_clicked {
 
 	# TODO kill the thread before closing the application
 
+	# prepare \%opts
+	%opts = ();
 	$opts{regex} = $search->{term};
-	if (-f $search->{dir}) {
+	# ignore_hidden_subdirs
+	if ( $search->{ignore_hidden_subdirs} ) {
 		$opts{all} = 1;
+	} else {
+		$opts{u} = 1; # unrestricted
 	}
-	my $what = App::Ack::get_starting_points( [$search->{dir}], \%opts );
+	# file_type
 	fill_type_wanted();
+	if ( my $file_types = $search->{file_types} ) {
+		my $is_regex = 1;
+		my $wanted = ($file_types =~ s/^no//) ? 0 : 1;
+		for my $i ( App::Ack::filetypes_supported() ) {
+			if ( $i eq $file_types ) {
+				$App::Ack::type_wanted{ $i } = $wanted;
+				$is_regex = 0;
+				last;
+			}
+		}
+		$opts{G} = quotemeta $file_types if ( $is_regex );
+	}
+	# case_insensitive
+	$opts{i} = $search->{case_insensitive} if $search->{case_insensitive};
+
+	my $what = App::Ack::get_starting_points( [$search->{dir}], \%opts );
 	$iter = App::Ack::get_iterator( $what, \%opts );
 	App::Ack::filetype_setup();
 
+	unless ( $mainwindow->{gui}->{ack_panel} ) {
+		create_ack_pane( $mainwindow );
+	}
 	$mainwindow->show_output(1);
-	$mainwindow->{gui}->{output_panel}->clear;
+	show_ack_output($mainwindow, 1);
+	$mainwindow->{gui}->{ack_panel}->DeleteAllItems;
 
 	Wx::Event::EVT_COMMAND( $mainwindow, -1, $DONE_EVENT, \&ack_done );
 
@@ -106,6 +222,9 @@ sub _get_data_from {
 	
 	my $term = $data->{_ack_term_};
 	my $dir  = $data->{_ack_dir_};
+	my $file_types = $data->{_file_types_};
+	my $case_insensitive      = $data->{case_insensitive};
+	my $ignore_hidden_subdirs = $data->{ignore_hidden_subdirs};
 	
 	$dialog->Destroy;
 	
@@ -114,98 +233,129 @@ sub _get_data_from {
 		unshift @{$config->{ack_terms}}, $term;
 		my %seen;
 		@{$config->{ack_terms}} = grep {!$seen{$_}++} @{$config->{ack_terms}};
+		@{$config->{ack_terms}} = splice(@{$config->{ack_terms}},  0, 20);
 	}
 	if ( $dir ) {
 		unshift @{$config->{ack_dirs}}, $dir;
 		my %seen;
 		@{$config->{ack_dirs}} = grep {!$seen{$_}++} @{$config->{ack_dirs}};
+		@{$config->{ack_dirs}} = splice(@{$config->{ack_dirs}},  0, 20);
 	}
+	if ( $file_types ) {
+		unshift @{$config->{ack_file_types}}, $dir;
+		my %seen;
+		@{$config->{ack_file_types}} = grep {!$seen{$_}++} @{$config->{ack_file_types}};
+		@{$config->{ack_file_types}} = splice(@{$config->{ack_file_types}},  0, 20);
+	}
+	$config->{ack}->{case_insensitive}      = $case_insensitive;
+	$config->{ack}->{ignore_hidden_subdirs} = $ignore_hidden_subdirs;
 	
 	return {
 		term => $term,
 		dir  => $dir,
+		file_types => $file_types,
+		case_insensitive      => $case_insensitive,
+		ignore_hidden_subdirs => $ignore_hidden_subdirs,
 	}
 }
 
-sub get_layout {
-	my ( $term ) = shift;
-	
-	my $config = Padre->ide->config;
-	
-	my @layout = (
-		[
-			[ 'Wx::StaticText', undef,              gettext('Term:')],
-			[ 'Wx::ComboBox',   '_ack_term_',       $term, $config->{ack_terms} ],
-			[ 'Wx::Button',     '_find_',           Wx::wxID_FIND ],
-		],
-		[
-			[ 'Wx::StaticText', undef,              gettext('Dir:')],
-			[ 'Wx::ComboBox',   '_ack_dir_',        '', $config->{ack_dirs} ],
-			[ 'Wx::Button',     '_pick_dir_',        gettext('Pick &directory')],
-		],
-		[
-			[],
-			[],
-			[ 'Wx::Button',     '_cancel_',    Wx::wxID_CANCEL],
-		],
-	);
-	return \@layout;
-}
+################################
+# Ack pane related
 
-sub dialog {
-	my ( $win, $term ) = @_;
+sub create_ack_pane {
+	my ( $main ) = @_;
 	
-	my $layout = get_layout($term);
-	my $dialog = Padre::Wx::Dialog->new(
-		parent => $win,
-		title  => gettext("Ack"),
-		layout => $layout,
-		width  => [150, 200],
-		size   => Wx::wxDefaultSize,
-		pos    => Wx::wxDefaultPosition,
+	$main->{gui}->{ack_panel} = Wx::ListCtrl->new(
+		$main->{gui}->{bottompane},
+		Wx::wxID_ANY,
+		Wx::wxDefaultPosition,
+		Wx::wxDefaultSize,
+		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
 	);
 	
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_find_},        \&find_clicked);
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_pick_dir_},    \&on_pick_dir);
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},      \&cancel_clicked      );
+	$main->{gui}->{ack_panel}->InsertColumn(0, Wx::gettext('Ack'));
+	$main->{gui}->{ack_panel}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
 	
-	$dialog->{_widgets_}{_ack_term_}->SetFocus;
-
-	return $dialog;
+	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
+		$main,
+		$main->{gui}->{ack_panel},
+		\&on_ack_result_selected,
+	);
 }
 
-sub on_pick_dir {
-	my ($dialog, $event) = @_;
+sub show_ack_output {
+	my $main = shift;
+	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
+	
+	my $bp = \$main->{gui}->{bottompane};
+	my $op = \$main->{gui}->{ack_panel};
 
-	my $win = Padre->ide->wx->main_window;
-	my $dir_dialog = Wx::DirDialog->new( $win, Wx::gettext("Select directory"), '');
-	if ($dir_dialog->ShowModal == Wx::wxID_CANCEL) {
-		return;
+	my $idx = ${$bp}->GetPageIndex(${$op});
+	if ( $idx >= 0 ) {
+		${$bp}->SetSelection($idx);
 	}
-	$dialog->{_widgets_}{_ack_dir_}->SetValue($dir_dialog->GetPath);
+	else {
+		${$bp}->InsertPage(
+			0,
+			${$op},
+			Wx::gettext("Ack"),
+			1,
+		);
+		${$op}->Show;
+	}
+	$main->manager->GetPane('bottompane')->Show;
+	$main->manager->Update;
 
 	return;
 }
 
-sub cancel_clicked {
-	my ($dialog, $event) = @_;
+sub on_ack_result_selected {
+	my ($self, $event) = @_;
+	
+	my $text = $event->GetItem->GetText;
+	return if not defined $text;
+	
+	my ($file, $line) = ($text =~ /^(.*?)\((\d+)\)\:/);
+	return unless $line;
 
-	$dialog->Destroy;
-
-	return;
+	my $mainwindow = Padre->ide->wx->main_window;
+	
+	my $id = $mainwindow->setup_editor($file);
+	$mainwindow->on_nth_pane($id) if ($id);
+	
+	my $page = $mainwindow->selected_editor;
+	$line--;
+	$page->GotoLine($line);
 }
+
+######################################
+# Ack related
 
 sub ack_done {
 	my( $mainwindow, $event ) = @_;
 
 	my $data = $event->GetData;
-	$mainwindow->{gui}->{output_panel}->AppendText($data);
+
+	$mainwindow = Padre->ide->wx->main_window;
+	$mainwindow->{gui}->{ack_panel}->InsertStringItem( $panel_string_index--, $data);
+	$mainwindow->{gui}->{ack_panel}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
 
 	return;
 }
 
 sub on_ack_thread {
+
+	# clear %stats; for every request
+	%stats = (
+		cnt_files   => 0,
+		cnt_matches => 0,
+	);
+
 	App::Ack::print_matches( $iter, \%opts );
+
+	# summary
+	_send_text('-' x 39 . "\n") if ( $stats{cnt_files} );
+	_send_text("Found $stats{cnt_files} files and $stats{cnt_matches} matches\n");
 }
 
 sub print_results {
@@ -214,33 +364,57 @@ sub print_results {
 	#print "$text\n";
 	
 	# the first is filename, the second is line number, the third is matched line text
+	# while 'Binary file', there is ONLY filename
 	$stats{printed_lines}++;
 	# don't print filename again if it's just printed
 	return if ( $stats{printed_lines} % 3 == 1 and
 				$stats{last_matched_filename} and
 				$stats{last_matched_filename} eq $text );
-	$stats{last_matched_filename} = $text if ( $stats{printed_lines} % 3 == 1 );
-	# new \n rules
-	# 1, add \n before $filename expect the first filename
 	if ( $stats{printed_lines} % 3 == 1 ) {
-		$text .= "\n";
-		$text = "\n$text" if ($stats{printed_lines} != 1);
+		if ( $text =~ /^Binary file/ ) {
+			$stats{printed_lines} = $stats{printed_lines} + 2;
+		}
+		
+		$stats{last_matched_filename} = $text;
+		$stats{cnt_files}++;
+		
+		# chop last ':', add \n after $filename
+		chop($text);
+		$text = "Found '$opts{regex}' in '$text':\n";
+		# new line between different files
+		_send_text('-' x 39 . "\n");
+	} elsif ( $stats{printed_lines} % 3 == 2 ) {
+		$stats{cnt_matches}++;
+		# use () to wrap the number, an extra space for line number
+		$text =~ s/(\d+)/\($1\)/;
+		$text .= ' ';
 	}
-	# an extra space for line number
-	$text .= ' ' if ( $stats{printed_lines} % 3 == 2 );
 
 	#my $end = $result->get_end_iter;
 	#$result->insert($end, $text);
+	
+	# just print it when we have \n
+	if ( $text =~ /[\r\n]/ ) {
+		my $filename = $stats{last_matched_filename};
+		chop($filename);
+		$text = $filename . $stats{last_text} . $text if $stats{last_text};
+		delete $stats{last_text};
+	} else {
+		$stats{last_text} .= $text;
+		return;
+	}
 
-	my $frame = Padre->ide->wx->main_window;
-	my $threvent = Wx::PlThreadEvent->new( -1, $DONE_EVENT, $text );
-	Wx::PostEvent( $frame, $threvent );
-
+	_send_text($text);
 
 	return;
 }
 
-
+sub _send_text {
+	my $text = shift;
+	my $frame = Padre->ide->wx->main_window;
+	my $threvent = Wx::PlThreadEvent->new( -1, $DONE_EVENT, $text );
+	Wx::PostEvent( $frame, $threvent );
+}
 
 # see t/module.t in ack distro
 sub fill_type_wanted {

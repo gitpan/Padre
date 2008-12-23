@@ -7,7 +7,16 @@ use FindBin      qw($Bin);
 use File::Spec   ();
 use Data::Dumper qw(Dumper);
 
-use Test::More tests => 25;
+use Test::More;
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+
+plan tests => 25;
+
 use Test::NoWarnings;
 
 use t::lib::Padre;
@@ -44,9 +53,9 @@ is keys %{$plugin_m1->plugins}, 1;
 is( $plugin_m1->plugins->{My}{status}, 'disabled' );
 $padre->config->{plugins}{My}{enabled} = 1;
 ok($plugin_m1->load_plugin('My'));
-is( $plugin_m1->plugins->{My}{status}, 'loaded' );
+is( $plugin_m1->plugins->{My}{status}, 'enabled' );
 ok($plugin_m1->reload_plugin('My'));
-is( $plugin_m1->plugins->{My}{status}, 'loaded' );
+is( $plugin_m1->plugins->{My}{status}, 'enabled' );
 ok($plugin_m1->unload_plugin('My'));
 ok( !defined($plugin_m1->plugins->{My}) );
 

@@ -4,9 +4,14 @@ use strict;
 use warnings;
 
 use Test::More;
+
 BEGIN {
-	plan skip_all => 'This test needs an overhaul as its success depends on the speed of the host';
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
 }
+
 
 BEGIN {
 	if ( $^O eq 'MSWin32' ) {
@@ -18,7 +23,7 @@ BEGIN {
 use File::Basename        qw(basename);
 use File::Copy            qw(copy);
 use File::Spec::Functions qw(catfile);
-use Test::NeedsDisplay;
+#use Test::NeedsDisplay;
 use Test::NoWarnings;
 use Test::Builder;
 use t::lib::Padre;
@@ -39,7 +44,7 @@ my $frame = $ide->wx->main_window;
 
 my @events = (
 	{
-		delay => 200,
+		delay => 100,
 		code  => sub {
 			my $main = $ide->wx->main_window;
 			my $T = Test::Builder->new;
@@ -57,7 +62,7 @@ my @events = (
 		},
 	},
 	{
-		delay => 200,
+		delay => 100,
 		code  => sub {
 			my $main = $ide->wx->main_window;
 			my $doc  = $main->selected_document;
@@ -113,15 +118,15 @@ my @events = (
 				$T->is_num($start, 56, 'start is 56');
 				$T->is_num($end,   60, 'end is 60');
 			}
-			if (0) { # TODO: These tests fail due to encoding bug. Commented out for release only
+			{
 				Padre::Wx::Dialog::Find->search( search_term => qr/test/ );
-				$T->is_eq($main->selected_text,    'test', 'selected_text');
-				my ($start, $end) = $editor->GetSelection;
-				$T->is_num($start, 211, 'start is 211');
-				$T->is_num($end,   215, 'end is 215');
-			}
-			else {
-				$T->ok(1, "Skipping tests that fail due to known encoding bug") for 1..3;
+				SKIP: {
+					skip "Tests known to fail", 3;
+					$T->is_eq($main->selected_text,    'test', 'selected_text');
+					my ($start, $end) = $editor->GetSelection;
+					$T->is_num($start, 211, 'start is 211');
+					$T->is_num($end,   215, 'end is 215');
+				}
 			}
 
 			$main->on_close_all_but_current;
@@ -135,20 +140,22 @@ my @events = (
 
 			BEGIN { $main::tests += 9; }
 		},
-	},
-	{
-		delay => 1000,
-		code  => sub {
-			my $main = $ide->wx->main_window;
-			my $T = Test::Builder->new;
-			my $dialog = Padre::Wx::Dialog::Bookmarks::get_dialog();
-			my $event = Wx::CommandEvent->new( &Wx::wxEVT_COMMAND_BUTTON_CLICKED, $dialog->{_widgets_}{cancel}->GetId );
-			#$dialog->{_widgets_}{cancel}->GetEventHandler->ProcessEvent( $event );
-			#$dialog->GetEventHandler->ProcessEvent( $event );
-			$dialog->GetEventHandler->AddPendingEvent( $event );
-			#$dialog->EndModal(Wx::wxID_CANCEL);
-			BEGIN { $main::tests += 0; }
+		subevents => [
+			{
+			delay => 1000,
+			code  => sub {
+				my $main = $ide->wx->main_window;
+				my $T = Test::Builder->new;
+				my $dialog = Padre::Wx::Dialog::Bookmarks::get_dialog();
+				my $event = Wx::CommandEvent->new( &Wx::wxEVT_COMMAND_BUTTON_CLICKED, $dialog->{_widgets_}{cancel}->GetId );
+				#$dialog->{_widgets_}{cancel}->GetEventHandler->ProcessEvent( $event );
+				$dialog->GetEventHandler->ProcessEvent( $event );
+				#$dialog->GetEventHandler->AddPendingEvent( $event );
+				#$dialog->EndModal(Wx::wxID_CANCEL);
+				BEGIN { $main::tests += 0; }
+			},
 		},
+		],
 	},
 	{
 		delay => 200,
@@ -229,7 +236,7 @@ my @events = (
 	},
 );
 
-t::lib::Padre::setup_events($frame, \@events);
+t::lib::Padre::setup_event($frame, \@events, 0);
 
 
 $ide->wx->MainLoop;

@@ -3,7 +3,7 @@ package Padre::Task;
 use strict;
 use warnings;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 require Padre;
 
@@ -38,9 +38,13 @@ task:
   # This is run in the main thread before being handed
   # off to a worker (background) thread. The Wx GUI can be
   # polled for information here.
-  # If you don't need it, just inherit this default no-op.
+  # If you don't need it, just inherit the default no-op.
   sub prepare {
           my $self = shift;
+          if ( condition_for_not_running_the_task ) {
+                  return "BREAK";
+          }
+          
           return 1;
   }
 
@@ -91,6 +95,9 @@ thread for your task, the following steps happen:
 =over 2
 
 =item The scheduler calls C<prepare> on your object.
+
+=item If your prepare method returns the string 'break', all further processing
+is stopped immediately.
 
 =item The scheduler serializes your object with C<Storable>.
 
@@ -166,6 +173,11 @@ In case you need to set up things in the main thread,
 you can implement a C<prepare> method which will be called
 right before serialization for transfer to the assigned
 worker thread.
+
+If C<prepare> returns the string C<break> (case insensitive),
+all further processing of the task will be stopped and neither
+C<run> nor C<finish> will be called. Any other return values
+are generally ignored.
 
 You do not have to implement this method in the subclass.
 
@@ -364,6 +376,56 @@ sub _deserialize {
 
 	# We don't support anything else
 	undef;
+}
+
+=pod
+
+=head2 post_event
+
+This method allows you to easily post a Wx event to the main
+thread. First argument must be the event ID, second argument
+the data you want to pass to the event handler.
+
+For a complete example, please check the code of
+C<Padre::Task::Example::WxEvent>.
+
+You can set up a new event ID in your Padre::Task subclass
+like this:
+
+  our $FUN_EVENT_TYPE =  : shared = Wx::NewEventType();
+
+Then you have to setup the event handler (for example in the
+C<prepare()> method. This should happen in the main thread!
+
+(TODO: Check the effect of declaring the same
+handler multiple times)
+
+  Wx::Event::EVT_COMMAND(
+      Padre->ide->wx->main_window,
+      -1,
+      $FUN_EVENT,
+      \&update_gui_with_fun
+  );
+  
+  sub update_gui_with_fun {
+      my ($main, $event) = @_; @_=(); # hack to avoid "Scalars leaked"
+      my $data = $event->GetData();
+  }
+  
+After that, you can dispatch events of type C<$FUN_EVENT_TYPE>
+by simply running:
+
+  $self->post_event($FUN_EVENT_TYPE, $data);
+
+=cut
+
+sub post_event {
+	my $self = shift;
+	my $event_id = shift;
+	my $data = shift;
+	my $thread_event = Wx::PlThreadEvent->new( -1, $event_id, $data );
+	Wx::PostEvent($Padre::TaskManager::_main_window, $thread_event);
+	return 1;
 }
 
 

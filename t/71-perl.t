@@ -2,8 +2,15 @@
 
 use strict;
 use warnings;
-use Test::NeedsDisplay;
+#use Test::NeedsDisplay;
 use Test::More;
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+
 use Test::NoWarnings;
 use Data::Dumper qw(Dumper);
 use File::Spec   ();
@@ -114,9 +121,9 @@ $editor_2->configure_editor($doc_2);
 
 SCOPE: {
 	my $msgs = $doc_2->check_syntax;
-	#diag Dumper $msgs;
+	my $end  = $msgs->[-1];
 	is_deeply(
-		$msgs->[-1],
+		$end,
 		{
 			'msg'      => 'Useless use of a constant in void context',
 			'severity' => 'W',

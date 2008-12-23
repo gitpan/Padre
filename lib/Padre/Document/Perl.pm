@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Padre::Document';
 
 
@@ -96,12 +96,20 @@ sub keywords {
 sub get_functions {
 	my $self = shift;
 	my $text = $self->text_get;
-	return $text =~ m{^sub\s+(\w+(?:::\w+)*)}gm;
+
+	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
+	my $nlchar = $nlCharTable{ $self->get_newline_type };
+
+	return $text =~ m/${nlchar}sub\s+(\w+(?:::\w+)*)/g;
 }
 
 sub get_function_regex {
 	my ( $self, $sub ) = @_;
-	return qr{(^|\n)sub\s+$sub\b};
+
+	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
+	my $nlchar = $nlCharTable{ $self->get_newline_type };
+
+	return qr!(?:^|${nlchar})sub\s+$sub\b!;
 }
 
 sub get_command {
@@ -174,7 +182,7 @@ sub colorize {
 		'ArrayIndex'    => 0,
 		'Cast'          => 0,
 		'Magic'         => 0,
-    );
+	);
 
 	my @tokens = $ppi_doc->tokens;
 	$ppi_doc->index_locations;
@@ -257,19 +265,35 @@ sub _css_class {
 
 # Checks the syntax of a Perl document.
 # Documented in Padre::Document!
+# Implemented as a task. See Padre::Task::SyntaxChecker::Perl
 sub check_syntax {
 	my $self  = shift;
 	my %args  = @_;
+	$args{background} = 0;
+	return $self->_check_syntax_internals(\%args);
+}
 
+sub check_syntax_in_background {
+	my $self  = shift;
+	my %args  = @_;
+	$args{background} = 1;
+	return $self->_check_syntax_internals(\%args);
+}
+
+sub _check_syntax_internals {
+	my $self = shift;
+	my $args = shift;
+	
 	my $text = $self->text_get;
 	unless ( defined $text and $text ne '' ) {
 		return [];
 	}
 
+	# Do we really need an update?
 	require Digest::MD5;
 	use Encode qw(encode_utf8);
 	my $md5 = Digest::MD5::md5(encode_utf8($text));
-	unless ( $args{force} ) {
+	unless ( $args->{force} ) {
 		if ( defined( $self->{last_checked_md5} )
 		     && $self->{last_checked_md5} eq $md5
 		) {
@@ -278,6 +302,7 @@ sub check_syntax {
 	}
 	$self->{last_checked_md5} = $md5;
 
+	
 	my $nlchar = "\n";
 	if ( $self->get_newline_type eq 'WIN' ) {
 		$nlchar = "\r\n";
@@ -285,101 +310,25 @@ sub check_syntax {
 	elsif ( $self->get_newline_type eq 'MAC' ) {
 		$nlchar = "\r";
 	}
-	$text =~ s/$nlchar/\n/g;
-
-	# Execute the syntax check
-	my $stderr = '';
-	SCOPE: {
-		require File::Temp;
-		my $file = File::Temp->new;
-		$file->print( $text );
-		$file->close;
-		require IPC::Run3;
-		my @cmd = (
-			Padre->perl_interpreter,
-			'-Mdiagnostics',
-			'-c',
-			$file->filename,
-		);
-		IPC::Run3::run3( \@cmd, \undef, \undef, \$stderr );
+	
+	require Padre::Task::SyntaxChecker::Perl;
+	my $task = Padre::Task::SyntaxChecker::Perl->new(
+		notebook_page => $self->editor,
+		text => $text,
+		newlines => $nlchar,
+		( exists $args->{on_finish} ? (on_finish => $args->{on_finish}) : () ),
+	);
+	if ($args->{background}) {
+		# asynchroneous execution (see on_finish hook)
+		$task->schedule();
+		return();
 	}
-
-	# Don't really know where that comes from...
-	my $i = index( $stderr, 'Uncaught exception from user code' );
-	if ( $i > 0 ) {
-		$stderr = substr( $stderr, 0, $i );
+	else {
+		# serial execution, returning the result
+		return() if $task->prepare() =~ /^break$/;
+		$task->run();
+		return $task->{syntax_check};
 	}
-
-	# Handle the "no errors or warnings" case
-	if ( $stderr =~ /^\s+syntax OK\s+$/s ) {
-		return [];
-	}
-
-	# Split into message paragraphs
-	$stderr =~ s/\n\n/\n/go;
-	$stderr =~ s/\n\s/\x1F /go;
-	my @messages = split(/\n/, $stderr);
-
-	my $issues = [];
-	my @diag   = ();
-	foreach my $message ( @messages ) {
-		if (   index( $message, 'has too many errors' )    > 0
-			or index( $message, 'had compilation errors' ) > 0
-			or index( $message, 'syntax OK' ) > 0
-		) {
-			last;
-		}
-
-		my $cur = {};
-		my $tmp = '';
-
-		if ( $message =~ s/\s\(\#(\d+)\)\s*\Z//o ) {
-			$cur->{diag} = $1 - 1;
-		}
-
-		if ( $message =~ m/\)\s*\Z/o ) {
-			my $pos = rindex( $message, '(' );
-			$tmp = substr( $message, $pos, length($message) - $pos, '' );
-		}
-
-		if ( $message =~ s/\s\(\#(\d+)\)(.+)//o ) {
-			$cur->{diag} = $1 - 1;
-			my $diagtext = $2;
-			$diagtext =~ s/\x1F//go;
-			push @diag, join( ' ', split( ' ', $diagtext ) );
-		}
-
-		if ( $message =~ s/\sat(?:\s|\x1F)+.+?(?:\s|\x1F)line(?:\s|\x1F)(\d+)//o ) {
-			$cur->{line} = $1;
-			$cur->{msg}  = $message;
-		}
-
-		if ($tmp) {
-			$cur->{msg} .= "\n" . $tmp;
-		}
-
-		if (defined $cur->{msg}) {
-			$cur->{msg} =~ s/\x1F/\n/go;
-		}
-
-		if ( defined $cur->{diag} ) {
-			$cur->{desc} = $diag[ $cur->{diag} ];
-			delete $cur->{diag};
-		}
-		if (   defined( $cur->{desc} )
-			&& $cur->{desc} =~ /^\s*\([WD]/o
-		) {
-			$cur->{severity} = 'W';
-		}
-		else {
-			$cur->{severity} = 'E';
-		}
-		delete $cur->{desc};
-
-		push @{$issues}, $cur;
-	}
-
-	return $issues;
 }
 
 sub comment_lines_str { return '#' }
@@ -411,7 +360,7 @@ sub _get_current_symbol {
 	my $line_end     = $editor->GetLineEndPosition($line);
 	my $line_content = $editor->GetTextRange($line_start, $line_end);
 	my $col          = $cursor_col;
-        
+
 	# find start of symbol TODO: This could be more robust, no?
 	while (1) {
 		if ($col == 0 or substr($line_content, $col, 1) =~ /^[^\w:\']$/) {
@@ -466,11 +415,46 @@ sub lexical_variable_replacement {
 	Padre::Task::PPI::LexicalReplaceVariable->new(
 		document => $self,
 		location => $location,
-                replacement => $replacement,
+		replacement => $replacement,
 	)->schedule;
 
 	return ();
 }
+
+sub autocomplete {
+	my $self   = shift;
+
+	my $editor = $self->editor;
+	my $pos    = $editor->GetCurrentPos;
+	my $line   = $editor->LineFromPosition($pos);
+	my $first  = $editor->PositionFromLine($line);
+
+	# line from beginning to current position
+	my $prefix = $editor->GetTextRange($first, $pos);
+	   $prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
+	my $last   = $editor->GetLength();
+	my $text   = $editor->GetTextRange(0, $last);
+	my $pre_text  = $editor->GetTextRange(0, $first+length($prefix)); 
+	my $post_text = $editor->GetTextRange($first, $last); 
+
+	my $regex;
+	eval { $regex = qr{\b($prefix\w+(?:::\w+)*)\b} };
+	if ($@) {
+		return ("Cannot build regex for '$prefix'");
+	}
+
+	my %seen;
+	my @words;
+	push @words ,grep { ! $seen{$_}++ } reverse ($pre_text =~ /$regex/g);
+	push @words , grep { ! $seen{$_}++ } ($post_text =~ /$regex/g);
+
+	if (@words > 20) {
+		@words = @words[0..19];
+	}
+
+	return (length($prefix), @words);
+}
+
 
 1;
 

@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 use Padre::Documents   ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -67,6 +67,16 @@ sub new {
 		},
 	);
 
+	$self->{show_errorlist} = $self->AppendCheckItem( -1,
+		Wx::gettext("Show Error List")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{show_errorlist},
+		sub {
+			$_[0]->on_toggle_errorlist($_[1]);
+		},
+	);
+
 	# On Windows disabling the status bar is broken, so don't allow it
 	unless ( Padre::Util::WIN32 ) {
 		$self->{statusbar} = $self->AppendCheckItem( -1,
@@ -117,11 +127,11 @@ sub new {
 		},
 	);
 
-	$self->{currentlinebackground} = $self->AppendCheckItem( -1,
+	$self->{current_line_background} = $self->AppendCheckItem( -1,
 		Wx::gettext("Show Current Line")
 	);
 	Wx::Event::EVT_MENU( $main,
-		$self->{currentlinebackground},
+		$self->{current_line_background},
 		sub {
 			$_[0]->on_toggle_current_line_background($_[1]);
 		},
@@ -234,8 +244,28 @@ sub new {
 
 	$self->AppendSeparator;
 
+	my $config    = Padre->ide->config;
 
-
+	# Styles (temporary location?)
+	$self->{style} = Wx::Menu->new;
+	$self->Append( -1,
+		Wx::gettext("Style"),
+		$self->{style}
+	);
+	my %styles    = (default => 'Default', night => 'Night');
+	foreach my $name ( sort { $styles{$a} cmp $styles{$b} }  keys %styles) {
+		my $label = $styles{$name};
+		my $radio = $self->{style}->AppendRadioItem( -1, $label );
+		if ( $config->{host}->{style} and $config->{host}->{style} eq $name ) {
+			$radio->Check(1);
+		}
+		Wx::Event::EVT_MENU( $main,
+			$radio,
+			sub {
+				$_[0]->change_style($name);
+			},
+		);
+	}
 
 
 	# Language Support
@@ -253,7 +283,6 @@ sub new {
 
 	$self->{language}->AppendSeparator;
 
-	my $config    = Padre->ide->config;
 	my %languages = Padre::Locale::languages();
 	foreach my $name ( sort { $languages{$a} cmp $languages{$b} }  keys %languages) {
 		my $label = $languages{$name};
@@ -299,7 +328,7 @@ sub refresh {
 	# Simple check state cases from configuration
 	$self->{lines}->Check( $config->{editor_linenumbers} ? 1 : 0 );
 	$self->{folding}->Check( $config->{editor_codefolding} ? 1 : 0 );
-	$self->{currentlinebackground}->Check( $config->{editor_currentlinebackground} ? 1 : 0 );
+	$self->{current_line_background}->Check( $config->{editor_current_line_background} ? 1 : 0 );
 	$self->{eol}->Check( $config->{editor_eol} ? 1 : 0 );
 	$self->{whitespaces}->Check( $config->{editor_whitespaces} ? 1 : 0 );
 	unless ( Padre::Util::WIN32 ) {
@@ -310,6 +339,7 @@ sub refresh {
 	$self->{indentation_guide}->Check( $config->{editor_indentationguides} ? 1 : 0 );
 	$self->{show_calltips}->Check( $config->{editor_calltips} ? 1 : 0 );
 	$self->{show_syntaxcheck}->Check( $config->{editor_syntaxcheck} ? 1 : 0 );
+	$self->{show_errorlist}->Check( $config->{editor_errorlist} ? 1 : 0 );
 
 	# Check state for word wrap is document-specific
 	my $document = Padre::Documents->current;

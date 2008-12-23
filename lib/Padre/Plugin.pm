@@ -44,7 +44,7 @@ use warnings;
 use Scalar::Util ();
 use Padre::Wx    ();
 
-our $VERSION    = '0.21';
+our $VERSION    = '0.22';
 our $COMPATIBLE = '0.18';
 
 
@@ -246,10 +246,27 @@ sub plugin_disable {
 
 =pod
 
+=head2 plugin_preferences
+
+  $plugin->plugin_preferences($wx_parent);
+
+The C<plugin_preferences> method allows a plugin to define an entry point
+for the Plugin Manager dialog to trigger to show a preferences or
+configuration dialog for the plugin.
+
+The method is passed a wx object that should be used as the wx parent.
+
+=cut
+
+# To be implemented in the child class
+
+=pod
+
 =head2 menu_plugins_simple
 
   sub menu_plugins_simple {
       'My Plugin' => [
+          '---' => undef,    # menu separator
           About => sub { $self->show_about },
           Deep  => [
               'Do Something' => sub { $self->do_something },
@@ -331,8 +348,12 @@ sub _menu_plugins_submenu {
 			my $submenu = $self->_menu_plugins_submenu( $win, $value );
 			$menu->Append( -1, $label, $submenu );
 		} else {
-			Wx::Event::EVT_MENU( $win, $menu->Append( -1, $label), $value );
-		}
+            if($label =~ /^---/) {
+                $menu->AppendSeparator;
+            } else {
+                Wx::Event::EVT_MENU( $win, $menu->Append( -1, $label), $value );
+            }
+        }
 	}
 	return $menu;
 }

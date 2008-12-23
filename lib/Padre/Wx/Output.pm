@@ -12,7 +12,7 @@ use Padre::Wx    ();
 
 use base 'Wx::TextCtrl';
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 sub new {
 	my $class  = shift;
@@ -28,9 +28,29 @@ sub new {
 
 	# Do custom startup stuff here
 	$self->clear;
+	my $stdFontSize = Wx::wxNORMAL_FONT->GetPointSize;
+	my $font = Wx::Font->new( $stdFontSize, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
+	$self->SetFont($font);
 	$self->AppendText(Wx::gettext('No output'));
 
 	return $self;
+}
+
+# from Sean Healy on wxPerl mailing list
+use Encode;
+sub AppendText {
+	my ($self, $text) = @_;
+	my $string = decode("utf8", $text);
+	$self->SUPER::AppendText($string);
+}
+
+sub select {
+	my $self = shift;
+
+	my $idx = $self->GetParent->GetPageIndex($self);
+	$self->GetParent->SetSelection($idx);
+
+	return;
 }
 
 # A convenience not provided by the original version

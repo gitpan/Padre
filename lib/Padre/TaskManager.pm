@@ -79,7 +79,7 @@ BEGIN {
 	$INC{"Padre/TaskManager.pm"} ||= __FILE__;
 }
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 use threads;
 # According to Wx docs, this MUST be loaded before Wx, so this also happens in the script
@@ -105,9 +105,12 @@ our $REAP_TIMER;
 # You can instantiate this class only once.
 our $SINGLETON;
 
+# This is set in the worker threads only!
+our $_main_window;
+
 sub new {
 	my $class = shift;
-        
+
 	return $SINGLETON if defined $SINGLETON;
 
 	my $self = $SINGLETON = bless {
@@ -166,7 +169,12 @@ sub schedule {
 
 	# cleanup old threads and refill the pool
 	$self->reap();
-	$process->prepare();
+	
+	# prepare and stop if vetoes
+	my $return = $process->prepare();
+	if ($return and $return =~ /^break$/) {
+		return;
+	}
 
 	my $string;
 	$process->serialize(\$string);
@@ -189,7 +197,7 @@ sub schedule {
 		# as a non-threading, non-queued, fake worker loop
 		$self->task_queue->enqueue( $string );
 		$self->task_queue->enqueue( "STOP" );
-		worker_loop( Padre->ide->wx->main_window, $self );
+		worker_loop( Padre->ide->wx->main_window, $self->task_queue );
 	}
 
 	return 1;
@@ -237,7 +245,7 @@ sub _make_worker_thread {
 
 	@_=(); # avoid "Scalars leaked"
 	my $worker = threads->create(
-	  {'exit' => 'thread_only'}, \&worker_loop, $main, $self
+	  {'exit' => 'thread_only'}, \&worker_loop, $main, $self->task_queue
 	);
 	push @{$self->{workers}}, $worker;
 }
@@ -414,9 +422,11 @@ sub on_task_done_event {
 ##########################
 # Worker thread main loop
 sub worker_loop {
-	my ($main, $taskmanager) = @_;  @_ = (); # hack to avoid "Scalars leaked"
-	my $queue = $taskmanager->task_queue;
+	my ($main, $queue) = @_;  @_ = (); # hack to avoid "Scalars leaked"
 	require Storable;
+
+	# Set the thread-specific main-window pointer
+	$_main_window = $main;
 
 	#warn threads->tid() . " -- Hi, I'm a thread.";
 
@@ -433,14 +443,18 @@ sub worker_loop {
 		$process->run();
 
 		# FREEZE THE PROCESS AND PASS IT BACK
-                undef $task;
-                $process->serialize( \$task );
+		undef $task;
+		$process->serialize( \$task );
 		my $thread_event = Wx::PlThreadEvent->new( -1, $TASK_DONE_EVENT, $task );
 		Wx::PostEvent($main, $thread_event);
 
 		#warn threads->tid() . " -- done with task.";
 	}
+	
+	# clean up
+	undef $_main_window;
 }
+
 
 1;
 
@@ -452,9 +466,6 @@ What if the computer can't keep up with the queued jobs? This needs
 some consideration and probably, the schedule() call needs to block once
 the queue is "full". However, it's not clear how this can work if the
 Wx MainLoop isn't reached for processing finish events.
-
-There needs to be a way to flag data in the task that doesn't have to be
-passed to the worker but is necessary in the finish routine.
 
 =head1 SEE ALSO
 

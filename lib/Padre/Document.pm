@@ -32,7 +32,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre;
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 
 my $unsaved_number = 0;
 
@@ -92,9 +92,6 @@ our %EXT_MIME = (
 
 our %MIME_CLASS = (
 	'application/x-perl'     => 'Padre::Document::Perl',
-	'application/x-perl6'    => 'Padre::Document::Perl6',
-	'application/x-pasm'     => 'Padre::Document::PASM',
-	'application/x-pir'      => 'Padre::Document::PIR',
 );
 
 # Document types marked here with CONFIRMED have be checked to confirm that
@@ -610,17 +607,23 @@ sub autocomplete {
 
 	# line from beginning to current position
 	my $prefix = $editor->GetTextRange($first, $pos);
-	   $prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
+	   $prefix =~ s{^.*?(\w+)$}{$1};
 	my $last   = $editor->GetLength();
 	my $text   = $editor->GetTextRange(0, $last);
+	my $pre_text  = $editor->GetTextRange(0, $first+length($prefix)); 
+	my $post_text = $editor->GetTextRange($first, $last); 
 
 	my $regex;
-	eval { $regex = qr{\b($prefix\w*(?:::\w+)*)\b} };
+	eval { $regex = qr{\b($prefix\w+)\b} };
 	if ($@) {
 		return ("Cannot build regex for '$prefix'");
 	}
+
 	my %seen;
-	my @words = grep { ! $seen{$_}++ } sort ($text =~ /$regex/g);
+	my @words;
+	push @words ,grep { ! $seen{$_}++ } reverse ($pre_text =~ /$regex/g);
+	push @words , grep { ! $seen{$_}++ } ($post_text =~ /$regex/g);
+
 	if (@words > 20) {
 		@words = @words[0..19];
 	}
@@ -678,7 +681,7 @@ sub stats {
 		$chars_with_space = $editor->GetTextLength();
 		$is_readonly = $editor->GetReadOnly();
 	}
-    
+
 	$words++ while ( $code =~ /\b\w+\b/g );
 	$chars_without_space++ while ( $code =~ /\S/g );
 

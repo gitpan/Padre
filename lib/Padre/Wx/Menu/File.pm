@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -257,8 +257,8 @@ sub new {
 			my $menu_place = $_[0]->menu->wx->FindMenu(
 				Wx::gettext("&File")
 			);
-			$_[0]->{menu}->wx->Replace(
-				$menu_place => $self,
+			$_[0]->menu->wx->Replace(
+				$menu_place => $menu->wx,
 				Wx::gettext("&File")
 			);
 		},

@@ -3,10 +3,18 @@
 use strict;
 use warnings;
 
-use Test::NeedsDisplay;
-use Test::More tests => 14;
-use Test::NoWarnings;
+#use Test::NeedsDisplay;
+use Test::More;
 
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+
+plan tests => 14;
+use Test::NoWarnings;
 use t::lib::Padre;
 use Padre;
 
@@ -38,6 +46,7 @@ SCOPE: {
 		editor_autoindent  => 'deep',
 		editor_methods     => 'alphabetical',
 		editor_whitespaces => 0,
+		editor_codefolding => 0,
 
 		editor_auto_indentation_style => 0,
 		editor_tabwidth               => 8,
@@ -46,8 +55,6 @@ SCOPE: {
 
 		search_terms       => [],
 		replace_terms      => [],
-		ack_terms		   => [],
-		ack_dirs		   => [],
 		main_startup       => 'new',
 		main_statusbar     => 1,
 		main_output        => 0,

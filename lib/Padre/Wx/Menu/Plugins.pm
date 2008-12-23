@@ -9,7 +9,7 @@ use Params::Util       ();
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -20,8 +20,8 @@ our @ISA     = 'Padre::Wx::Submenu';
 # Padre::Wx::Submenu Methods
 
 sub new {
-	my $class = shift;
-	my $main  = shift;
+	my $class   = shift;
+	my $main    = shift;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
@@ -30,7 +30,10 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1, Wx::gettext("Plugin Manager") ),
 		sub {
-			Padre::Wx::Dialog::PluginManager->show(@_);
+			require Padre::Wx::Dialog::PluginManager;
+			Padre::Wx::Dialog::PluginManager->new( $_[0],
+				Padre->ide->plugin_manager,
+			)->show;
 		},
 	);
 
@@ -94,33 +97,66 @@ sub new {
 	# Add the tools submenu
 	$self->Append( -1, Wx::gettext('Plugin Tools'), $tools );
 
+	$self->add_plugin_specific_entries();
+
+	return $self;
+}
+
+sub add_plugin_specific_entries {
+	my $self = shift;
+	
 	# Get the list of plugins
 	my $manager = Padre->ide->plugin_manager;
 	my $plugins = $manager->plugins;
 	my @plugins = grep { $_ ne 'My' } sort keys %$plugins;
+
+	my $entries = $self->{plugin_menus} || [];
+	$self->remove_plugin_specific_entries() if @$entries;
 
 	# Add the enabled plugins that want a menu
 	my $need_seperator = 1;
 	foreach my $name ( 'My', @plugins ) {
 		next unless $plugins->{$name};
 		next unless $plugins->{$name}->{status};
-		next unless $plugins->{$name}->{status} eq 'loaded';
+		next unless $plugins->{$name}->{status} eq 'enabled';
 
-		my @menu = $manager->get_menu( $main, $name );
+		my @menu = $manager->get_menu( Padre->ide->wx->main_window, $name );
 		next unless @menu;
 
 		if ( $need_seperator ) {
-			$self->AppendSeparator;
+			push @$entries, $self->AppendSeparator;
 			$need_seperator = 0;
 		}
 
-		$self->Append( -1, @menu );
+		push @$entries, $self->Append( -1, @menu );
 		if ( $name eq 'My' ) {
 			$need_seperator = 1;
 		}
 	}
+	
+	$self->{plugin_menus} = $entries;
+	
+	return 1;
+}
 
-	return $self;
+sub remove_plugin_specific_entries {
+	my $self = shift;
+	my $entries = $self->{plugin_menus} || [];
+	
+	while (@$entries) {
+		$self->Destroy(pop @$entries);
+	}
+	$self->{plugin_menus} = $entries;
+	return 1;
+}
+
+sub refresh {
+	my $self    = shift;
+
+	$self->remove_plugin_specific_entries();
+	$self->add_plugin_specific_entries();
+
+	return 1;
 }
 
 1;

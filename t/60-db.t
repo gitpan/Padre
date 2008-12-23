@@ -3,7 +3,16 @@
 use strict;
 use warnings;
 
-use Test::More tests => 20;
+use Test::More;
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+
+plan tests => 20;
+
 use Test::NoWarnings;
 
 use Data::Dumper qw(Dumper);
@@ -49,10 +58,10 @@ SCOPE: {
 	@files = Padre::DB->get_recent_files;
 	is_deeply \@files, [], 'no files after delete_recent files';
 
-# TODO next, previous,
-# TODO limit number of items and see what happens
-# TODO whne setting an element that was already in the list as recent
-# it should become the last one!
+	# TODO next, previous,
+	# TODO limit number of items and see what happens
+	# TODO whne setting an element that was already in the list as recent
+	# it should become the last one!
 }
 
 SCOPE: {
@@ -64,5 +73,6 @@ SCOPE: {
 	is_deeply \@pods, [reverse @words], 'pods';
 	is( Padre::DB->get_last_pod, 'Six', 'current is Six' );
 }
+
 
 1;

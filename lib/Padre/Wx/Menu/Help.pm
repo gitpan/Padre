@@ -13,7 +13,7 @@ use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.21';
+our $VERSION = '0.22';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -107,6 +107,7 @@ sub about {
 		$about->SetWebSite("http://padre.perlide.org/");
 	}
 	$about->AddDeveloper("Adam Kennedy");
+	$about->AddDeveloper("Ahmad Zawawi");
 	$about->AddDeveloper("Brian Cassidy");
 	$about->AddDeveloper("Chris Dolan");
 	$about->AddDeveloper("Fayland Lam");
@@ -117,12 +118,15 @@ sub about {
 	$about->AddDeveloper("Keedi Kim");
 	$about->AddDeveloper("Max Maischein");
 	$about->AddDeveloper("Patrick Donelan");
-	$about->AddDeveloper("Steffen Mueller");
 	$about->AddDeveloper("Paweł Murias");
+	$about->AddDeveloper("Petar Shangov");
+	$about->AddDeveloper("Steffen Mueller");
 
+ 	$about->AddTranslator("Arabic - Ahmad Zawawi");
 	$about->AddTranslator("German - Heiko Jansen");
 	$about->AddTranslator("French - Jerome Quelin");
 	$about->AddTranslator("Hebrew - Omer Zak");
+	$about->AddTranslator("Hebrew - Shlomi Fish");
 	$about->AddTranslator("Hungarian - Gyorgy Pasztor");
 	$about->AddTranslator("Italian - Simone Blandino");
 	$about->AddTranslator("Korean - Keedi Kim");
