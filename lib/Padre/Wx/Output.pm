@@ -12,7 +12,7 @@ use Padre::Wx    ();
 
 use base 'Wx::TextCtrl';
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 sub new {
 	my $class  = shift;
@@ -40,7 +40,7 @@ sub new {
 use Encode;
 sub AppendText {
 	my ($self, $text) = @_;
-	my $string = decode("utf8", $text);
+	my $string = utf8::is_utf8($text) ? $text : decode('utf8', $text);
 	$self->SUPER::AppendText($string);
 }
 

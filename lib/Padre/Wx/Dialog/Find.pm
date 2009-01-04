@@ -10,7 +10,7 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 my @cbs = qw(case_insensitive use_regex backwards close_on_hit);
 
@@ -104,13 +104,11 @@ sub find_next {
 	my $term = $config->{search_terms}->[0];
 
 	# for Quick Find
-	if ( $config->{experimental} ) {
-		# check if is checked
-		if ( $main->menu->experimental->{quick_find}->IsChecked ) {
-			my $text = $main->selected_text;
-			if ( $text and $text ne $term ) {
-				unshift @{$config->{search_terms}}, $text;
-			}
+	# check if is checked
+	if ( $main->menu->search->{quick_find}->IsChecked ) {
+		my $text = $main->selected_text;
+		if ( $text and $text ne $term ) {
+			unshift @{$config->{search_terms}}, $text;
 		}
 	}
 

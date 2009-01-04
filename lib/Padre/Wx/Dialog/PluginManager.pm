@@ -7,7 +7,7 @@ use Params::Util      qw{_INSTANCE};
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 sub new {
 	my $class   = shift;
@@ -36,20 +36,13 @@ sub show {
 	my @layout  = ();
 	foreach my $name ( @names ) {
 		my $object = $plugins->{$name}->{object};
-		my $text   = ($object and $object->can('plugin_name'))
-			? $object->plugin_name
-			: $name;
+		my $text   = $plugins->{$name}->plugin_name;
 		push @layout, [
 			[ 'Wx::StaticText', undef,       $text                       ],
 			[ 'Wx::Button',    "able_$name", Wx::gettext('Incompatible') ],
 			[ 'Wx::Button',    "pref_$name", Wx::gettext('Preferences')  ],
 		];
 	}
-	push @layout, [
-		[ 'Wx::Button', 'ok', Wx::wxID_OK ],
-		[ ],
-		[ ],
-	];
 
 	# Create the dialog frame
 	my $dialog = $self->{dialog} = Padre::Wx::Dialog->new(
@@ -89,8 +82,6 @@ sub show {
 			$dialog->EndModal(Wx::wxID_OK);
 		},
 	);
-	$dialog->{_widgets_}->{ok}->SetDefault;
-	$dialog->{_widgets_}->{ok}->SetFocus;
 
 	# Show the dialog frame
 	$dialog->show_modal;
@@ -111,7 +102,6 @@ sub plugin_preferences {
 }
 
 sub toggle_enabled {
-	$DB::single = 1;
 	my $self    = shift;
 	my $name    = shift;
 	my $manager = $self->{manager};

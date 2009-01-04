@@ -7,7 +7,7 @@ use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 use Padre::Documents   ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -70,76 +70,7 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append( -1, Wx::gettext('Run in &Padre') ),
-		sub {
-			my $self = shift;
-			my $code = Padre::Documents->current->text_get;
-			eval $code; ## no critic
-			Wx::MessageBox(
-				Wx::gettext("Error: ") . "$@",
-				Wx::gettext("Self error"),
-				Wx::wxOK,
-				$main,
-			) if $@;
-			return;
-		},
-	);
-
-	# Experimental PPI-based highlighting
-	$self->{ppi_highlight} = $self->AppendCheckItem( -1,
-		Wx::gettext("Use PPI for Perl5 syntax highlighting")
-	);
-	Wx::Event::EVT_MENU( $main,
-		$self->{ppi_highlight},
-		sub {
-			# Update the saved config setting
-			my $config = Padre->ide->config;
-			$config->{ppi_highlight} = $_[1]->IsChecked ? 1 : 0;
-
-			# Refresh the menu (and MIME_LEXER hook)
-			$self->refresh;
-
-			# Update the colourise for each Perl editor
-			foreach my $editor ( $_[0]->pages ) {
-				my $doc = $editor->{Document};
-				next unless $doc->isa('Padre::Document::Perl');
-				if ( $config->{ppi_highlight} ) {
-					$doc->colorize;
-				} else {
-					$doc->remove_color;
-					$editor->Colourise( 0, $editor->GetLength );
-				}
-			}
-
-			return;
-		}
-	);
-
-	$self->AppendSeparator;
-
-	# Quick Find: Press F3 to start search with selected text
-	$self->{quick_find} = $self->AppendCheckItem( -1,
-		Wx::gettext("Quick Find")
-	);
-	Wx::Event::EVT_MENU( $main,
-		$self->{quick_find},
-		sub {
-			Padre->ide->config->{is_quick_find} = $_[1]->IsChecked ? 1 : 0;
-			return;
-		},
-	);
-
-	# Incremental find (#60)
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1, Wx::gettext("Find Next\tF4") ),
-		sub {
-			$_[0]->find->search('next');
-		},
-	);
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1, Wx::gettext("Find Previous\tShift-F4") ),
-		sub {
-			$_[0]->find->search('previous');
-		}
+		\&Padre::Wx::MainWindow::run_in_padre,
 	);
 
 	return $self;
@@ -155,16 +86,6 @@ sub refresh {
 	$self->{refresh_count}->SetText( 
 		Wx::gettext('Refresh Counter: ') . $self->{refresh_counter}
 	);
-
-	# Simple QuickFind check update
-	$self->{quick_find}->Check( $config->{is_quick_find} ? 1 : 0 );
-
-	# Check update and enable/disable the PPI lexer hook
-	$self->{ppi_highlight}->Check( $config->{ppi_highlight} ? 1 : 0 );
-	$Padre::Document::MIME_LEXER{'application/x-perl'} = 
-		$config->{ppi_highlight}
-			? Wx::wxSTC_LEX_CONTAINER
-			: Wx::wxSTC_LEX_PERL;
 
 	return;
 }

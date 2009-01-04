@@ -13,7 +13,7 @@ BEGIN {
 	}
 }
 
-plan tests => 14;
+plan tests => 15;
 use Test::NoWarnings;
 use t::lib::Padre;
 use Padre;
@@ -52,6 +52,10 @@ SCOPE: {
 		editor_tabwidth               => 8,
 		editor_indentwidth            => 4,
 		editor_use_tabs               => 1,
+		editor_perl5_beginner         => 1,
+
+		ppi_highlight                 => 0,
+		ppi_highlight_limit           => 10_000,
 
 		search_terms       => [],
 		replace_terms      => [],
@@ -113,4 +117,8 @@ SCOPE: {
 	# A typical submenu
 	my $file = $menu->file;
 	isa_ok( $file, 'Padre::Wx::Submenu' );
+
+	# The notebook
+	my $notebook = $main->nb;
+	isa_ok( $notebook, 'Padre::Wx::Notebook' );
 }

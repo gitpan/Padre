@@ -9,7 +9,7 @@ use Padre::Wx                 ();
 use Padre::Documents          ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -20,6 +20,7 @@ our %mode = (
 
 my $data;
 my $data_name;
+my $data_private;
 my $width;
 
 sub new {
@@ -49,21 +50,27 @@ sub new {
 }
 
 sub data {
-	my $name = shift;
+	my $name    = shift;
+	my $private = shift;
 
 	return $data if not defined $name;
 	return $data if defined $data and $name eq $data_name;
 
-	$data = YAML::Tiny::LoadFile(
-		Padre::Util::sharefile( 'styles', "$name.yml" )
-	);
-	$data_name = $name;
-
-	my $config = Padre->ide->config;
-	if (defined $config->{editor_current_line_background_color}) {
-		$data->{plain}{current_line_background} = $config->{editor_current_line_background_color};
+	my $file =
+		$private 
+		? File::Spec->catfile( Padre::Config->default_dir , 'styles', "$name.yml" )
+		: Padre::Util::sharefile( 'styles', "$name.yml" );
+	my $tdata;
+	eval {
+		$tdata = YAML::Tiny::LoadFile($file);
+	};
+	if ($@) {
+		warn $@;
+	} else {
+		$data_name = $name;
+		$data_private = $private;
+		$data = $tdata;
 	}
-
 	return $data;
 }
 
@@ -110,6 +117,9 @@ sub padre_setup_plain {
 
 	my $config = Padre->ide->config;
 
+	if ( defined $data->{plain}{current_line_foreground} ) {
+		$self->SetCaretForeground( _color( $data->{plain}{current_line_foreground} ) );
+	}
 	if ( defined $data->{plain}{current_line_background} ) {
 		if ( defined $config->{editor_current_line_background_color} ) {
 			if (   $data->{plain}{current_line_background}
@@ -167,8 +177,16 @@ sub padre_setup_style {
 
 sub _color {
 	my $rgb = shift;
-	my @c = map {hex($_)} $rgb =~ /(..)(..)(..)/;
-	return Wx::Colour->new(@c)
+	my @c = (0xFF, 0xFF, 0xFF); # some default
+	if (not defined $rgb) {
+		#Carp::cluck("undefined color");
+	} elsif ( $rgb =~ /^(..)(..)(..)$/) {
+		@c = map {hex($_)} ($1, $2, $3);
+	} else {
+		#Carp::cluck("invalid color '$rgb'");
+	}
+	#print "@c\n";
+	return Wx::Colour->new(@c);
 }
 
 sub highlight_braces {
@@ -347,7 +365,7 @@ sub show_calltip {
 	my $regex = join '|', sort {length $a <=> length $b} keys %$keywords;
 
 	my $tip;
-	if ( $prefix =~ /($regex)[ (]?$/ ) {
+	if ( $prefix =~ /(?:^|[^\w\$\@\%\&])($regex)[ (]?$/ ) {
 		my $z = $keywords->{$1};
 		return if not $z or not ref($z) or ref($z) ne 'HASH';
 		$tip = "$z->{cmd}\n$z->{exp}";
@@ -663,7 +681,7 @@ sub unfold_all {
 	my ($self) = @_;
 
 	my $lineCount = $self->GetLineCount;
-    my $currentLine = 0;
+	my $currentLine = 0;
 
 	while ( $currentLine <= $lineCount ) {
 		if ( ! $self->GetFoldExpanded($currentLine) ) {

@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -143,42 +143,7 @@ sub new {
 
 
 
-	# Search and Replace
-	Wx::Event::EVT_MENU( $main,
-		$self->Append(
-			Wx::wxID_FIND,
-			Wx::gettext("&Find\tCtrl-F")
-		),
-		sub {
-			Padre::Wx::Dialog::Find->find(@_)
-		},
-	);
-
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
-			Wx::gettext("Find Next\tF3")
-		),
-		sub {
-			Padre::Wx::Dialog::Find->find_next(@_);
-		},
-	);
-
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
-			Wx::gettext("Find Previous\tShift-F3")
-		),
-		sub {
-			Padre::Wx::Dialog::Find->find_previous(@_);
-		},
-	);
-
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
-			Wx::gettext("Ac&k")
-		),
-		\&Padre::Wx::Ack::on_ack,
-	);
-
+	# Miscellaneous Actions
 	$self->{goto} = $self->Append( -1,
 		Wx::gettext("&Goto\tCtrl-G")
 	);

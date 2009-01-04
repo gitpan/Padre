@@ -3,7 +3,7 @@ package Padre::Pod::Indexer;
 use strict;
 use warnings;
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 use File::Find::Rule;
 use Padre::DB;
@@ -19,8 +19,8 @@ use Padre::DB;
 
 =head1 SYNOPIS
 
- my $indexer = Padre::Pod::Indexer->new;
- my @files = $indexer->list_all_files(@INC);
+  my $indexer = Padre::Pod::Indexer->new;
+  my @files = $indexer->list_all_files(@INC);
 
 =cut
 
@@ -30,8 +30,12 @@ sub run {
 
 	# Save to the database
 	Padre::DB->begin;
-	Padre::DB->delete_modules;
-	Padre::DB->add_modules(@files);
+	Padre::DB::Modules->truncate;
+	foreach my $file ( @files ) {
+		Padre::DB::Modules->create(
+			name => $file,
+		);
+	}
 	Padre::DB->commit;
 
 	return 1;

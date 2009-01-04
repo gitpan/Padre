@@ -3,7 +3,7 @@ package Padre::Task;
 use strict;
 use warnings;
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 require Padre;
 
@@ -19,6 +19,9 @@ BEGIN {
 		@IO::String::ISA = qw{IO::Handle IO::Seekable};
 	}
 }
+
+use Class::XSAccessor
+	constructor => 'new';
 
 =pod
 
@@ -142,13 +145,6 @@ sub schedule {
 C<Padre::Task> provides a basic constructor for you to
 inherit. It simply stores all provided data in the internal
 hash reference.
-
-=cut
-
-sub new {
-	my $class = shift;
-	bless { @_ }, $class;
-}
 
 =head2 run
 

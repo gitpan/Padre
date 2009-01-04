@@ -11,7 +11,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 my %defaults = (
 	# Number of modules to display when searching for documentation
@@ -36,12 +36,16 @@ my %defaults = (
 	editor_whitespaces        => 0,
 	editor_methods            => 'alphabetical',
 	editor_codefolding        => 0,
+	editor_perl5_beginner     => 1,
 
 	# Indentation settings
 	editor_auto_indentation_style => 0,
 	editor_use_tabs               => 1,
 	editor_tabwidth               => 8,
 	editor_indentwidth            => 4,
+	
+	ppi_highlight                 => 0,
+	ppi_highlight_limit           => 10_000,
 
 	# When running a script from the application some of the files might have not been saved yet.
 	# There are several option what to do before running the script
@@ -55,7 +59,7 @@ my %defaults = (
 	search_terms              => [],
 	replace_terms             => [],
 
-	# Various things that should probably be in the database
+	# Various things that should be in the database
 	bookmarks                 => {},
 	projects                  => {},
 	current_project           => '',
@@ -172,7 +176,9 @@ sub new {
 	];
 
 	# When they want to run an arbitrary command
-	$self->{host}->{run_command}    ||= '';
+	$self->{host}->{run_command} ||= '';
+
+	# Default the locale to the system locale
 
 
 	%$self = (%defaults, %$self);

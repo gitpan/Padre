@@ -32,14 +32,18 @@ use Padre::Util               ();
 use Padre::Locale             ();
 use Padre::Wx                 ();
 use Padre::Wx::Editor         ();
-use Padre::Wx::ToolBar        ();
 use Padre::Wx::Output         ();
+use Padre::Wx::Bottom         ();
+use Padre::Wx::ToolBar        ();
+use Padre::Wx::Notebook       ();
+use Padre::Wx::StatusBar      ();
 use Padre::Wx::ErrorList      ();
+use Padre::Wx::AuiManager     ();
+use Padre::Wx::FileDropTarget ();
 use Padre::Document           ();
 use Padre::Documents          ();
-use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Wx::Frame';
 
 my $default_dir = Cwd::cwd();
@@ -62,6 +66,12 @@ use Class::XSAccessor
 		errorlist      => 'errorlist',
 	};
 
+# NOTE: Yes this method does get a little large, but that's fine.
+#       It's better to have one bigger method that is easily
+#       understandable rather than scattering tightly-related code
+#       all over the place in unrelated places.
+#       If you feel the need to make this smaller, try to make each
+#       individual step tighter and better abstracted.
 sub new {
 	my $class  = shift;
 	my $config = Padre->ide->config;
@@ -104,43 +114,60 @@ sub new {
 	# Set the locale
 	$self->{locale} = Padre::Locale::object();
 
-	$self->SetDropTarget(
-		Padre::Wx::FileDropTarget->new($self)
-	);
+	# Drag and drop support
+	Padre::Wx::FileDropTarget->set($self);
 
-	$self->{manager} = Wx::AuiManager->new;
-	$self->{manager}->SetManagedWindow($self);
+	# Temporary store for the function list.
+	# TODO: Storing this here violates encapsulation.
 	$self->{_methods} = [];
 
-	# do NOT use hints other than Rectangle or the app will crash on Linux/GTK
-	my $flags = $self->{manager}->GetFlags;
-	$flags &= ~Wx::wxAUI_MGR_TRANSPARENT_HINT;
-	$flags &= ~Wx::wxAUI_MGR_VENETIAN_BLINDS_HINT;
-	$self->{manager}->SetFlags( $flags ^ Wx::wxAUI_MGR_RECTANGLE_HINT );
+	# Temporary store for the notebook tab history
+	# TODO: Storing this here (might) violate encapsulation.
+	#       It should probably be in the notebook object.
+	$self->{page_history} = [];
+
+	# Set the window manager
+	$self->{manager} = Padre::Wx::AuiManager->new($self);
 
 	# Add some additional attribute slots
 	$self->{marker} = {};
 
-	$self->{page_history} = [];
+	# Create the menu bar
+	$self->{menu} = Padre::Wx::Menu->new($self);
+	$self->SetMenuBar( $self->menu->wx );
 
-	# create basic window components
-	$self->create_main_components;
+	# Create the tool bar
+	$self->SetToolBar(
+		Padre::Wx::ToolBar->new($self)
+	);
+	$self->GetToolBar->Realize;
 
-	$self->create_editor_pane;
+	# Create the status bar
+	$self->{gui}->{statusbar} = Padre::Wx::StatusBar->new($self);
+
+	# Create the main notebook for the documents
+	$self->{gui}->{notebook} = Padre::Wx::Notebook->new($self);
 
 	$self->create_side_pane;
 
-	$self->create_bottom_pane;
+	# Create the bottom pane
+	$self->{gui}->{bottompane} = Padre::Wx::Bottom->new($self);
+
+	# Create the output textarea
+	$self->{gui}->{output_panel} = Padre::Wx::Output->new(
+		$self->{gui}->{bottompane}
+	);
+
+	$self->show_output( Padre->ide->config->{main_output_panel} );
 
 	# Create the syntax checker and sidebar for syntax check messages
-	# create it AFTER the bottom pane!
+	# Must be created after the bottom pane!
 	$self->{syntax_checker} = Padre::Wx::SyntaxChecker->new($self);
 	$self->show_syntaxbar( $self->menu->view->{show_syntaxcheck}->IsChecked );
 
 	# Create the error list
-	# create it AFTER the bottom pane!
+	# Must be created after the bottom pane!
 	$self->{errorlist} = Padre::Wx::ErrorList->new($self);
-
 
 	# on close pane
 	Wx::Event::EVT_AUI_PANE_CLOSE(
@@ -155,7 +182,7 @@ sub new {
 		my ($self, $event) = @_;
 		my $mod  = $event->GetModifiers || 0;
 		my $code = $event->GetKeyCode;
-		
+
 		# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
 		$mod = $mod & (Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT());
 		if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
@@ -170,16 +197,22 @@ sub new {
 	} );
 
 	# Deal with someone closing the window
-	Wx::Event::EVT_CLOSE(           $self,     \&on_close_window     );
+	Wx::Event::EVT_CLOSE( $self, sub {
+		shift->on_close_window(@_);
+	} );
+
+	# Scintilla Event Hooks
 	Wx::Event::EVT_STC_UPDATEUI(    $self, -1, \&on_stc_update_ui    );
 	Wx::Event::EVT_STC_CHANGE(      $self, -1, \&on_stc_change       );
 	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
 	Wx::Event::EVT_STC_CHARADDED(   $self, -1, \&on_stc_char_added   );
 	Wx::Event::EVT_STC_DWELLSTART(  $self, -1, \&on_stc_dwell_start  );
 
-	# As ugly as the WxPerl icon is, the new file toolbar image is uglier
+	# As ugly as the WxPerl icon is, the new file toolbar image we
+	# used to use was far uglier
 	$self->SetIcon( Wx::GetWxPerlIcon() );
 
+	# Load the saved pane layout from last time (if any)
 	if ( defined $config->{host}->{aui_manager_layout} ) {
 		$self->manager->LoadPerspective( $config->{host}->{aui_manager_layout} );
 	}
@@ -200,71 +233,6 @@ sub new {
 	$timer->Start( 1, 1 );
 
 	return $self;
-}
-
-sub create_main_components {
-	my $self = shift;
-
-	# Create the menu bar
-	delete $self->{menu} if defined $self->{menu};
-	$self->{menu} = Padre::Wx::Menu->new($self);
-	$self->SetMenuBar( $self->menu->wx );
-
-	# Create the tool bar
-	$self->SetToolBar(
-		Padre::Wx::ToolBar->new($self)
-	);
-	$self->GetToolBar->Realize;
-
-	# Create the status bar
-	unless ( defined $self->{gui}->{statusbar} ) {
-		$self->{gui}->{statusbar} = $self->CreateStatusBar( 1, Wx::wxST_SIZEGRIP|Wx::wxFULL_REPAINT_ON_RESIZE );
-		$self->{gui}->{statusbar}->SetFieldsCount(4);
-		$self->{gui}->{statusbar}->SetStatusWidths(-1, 100, 50, 100);
-	}
-
-	return;
-}
-
-
-sub create_editor_pane {
-	my $self = shift;
-
-	# Create the main notebook for the documents
-	$self->{gui}->{notebook} = Wx::AuiNotebook->new(
-		$self,
-		Wx::wxID_ANY,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxAUI_NB_DEFAULT_STYLE | Wx::wxAUI_NB_WINDOWLIST_BUTTON,
-	);
-
-	$self->manager->AddPane(
-		$self->nb,
-		Wx::AuiPaneInfo->new->Name('editorpane')
-			->CenterPane->Resizable->PaneBorder->Dockable
-			->Caption( Wx::gettext('Files') )->Position(1)
-	);
-
-	Wx::Event::EVT_AUINOTEBOOK_PAGE_CHANGED(
-		$self,
-		$self->{gui}->{notebook},
-		\&on_notebook_page_changed,
-	);
-
-	Wx::Event::EVT_AUINOTEBOOK_PAGE_CLOSE(
-		$self,
-		$self->nb,
-		\&on_close,
-	);
-
-#	Wx::Event::EVT_DESTROY(
-#	   $self,
-#	   $self->nb,
-#	   sub {print "destroy @_\n"; },
-#	);
-
-	return;
 }
 
 sub create_side_pane {
@@ -291,7 +259,7 @@ sub create_side_pane {
 	Wx::Event::EVT_KILL_FOCUS( $self->{gui}->{subs_panel}, \&on_subs_panel_left );
 
 	# find-as-you-type in functions tab
-	# TODO: should the whole subs_panel stuff be in its own class?
+	# TODO: should the whole subs_panel stuff be in its own class? (Yes)
 	Wx::Event::EVT_CHAR( $self->{gui}->{subs_panel}, sub {
 		my ($self, $event) = @_;
 		my $mod  = $event->GetModifiers || 0;
@@ -344,50 +312,33 @@ sub create_side_pane {
 	return;
 }
 
-sub create_bottom_pane {
-	my $self = shift;
-
-	$self->{gui}->{bottompane} = Wx::AuiNotebook->new(
-		$self,
-		Wx::wxID_ANY,
-		Wx::wxDefaultPosition,
-		Wx::Size->new(350, 300), # used when pane is floated
-		Wx::wxAUI_NB_SCROLL_BUTTONS|Wx::wxAUI_NB_WINDOWLIST_BUTTON|Wx::wxAUI_NB_TOP
-		# |Wx::wxAUI_NB_TAB_EXTERNAL_MOVE crashes on Linux/GTK
-	);
-
-	# Create the bottom-of-screen output textarea
-	$self->{gui}->{output_panel} = Padre::Wx::Output->new(
-		$self->{gui}->{bottompane}
-	);
-
-	$self->manager->AddPane(
-		$self->{gui}->{bottompane},
-		Wx::AuiPaneInfo->new->Name('bottompane')
-			->CenterPane->Resizable(1)->PaneBorder(0)->Movable(1)
-			->CaptionVisible(1)->CloseButton(0)->DestroyOnClose(0)
-			->MaximizeButton(1)->Floatable(1)->Dockable(1)
-			->Caption( Wx::gettext("Output View") )->Position(2)->Bottom->Layer(4)
-			->Hide
-	);
-
-	$self->show_output( Padre->ide->config->{main_output_panel} );
-
-	return;
-}
-
 # Load any default files
 sub load_files {
 	my $self   = shift;
-	my $config = Padre->ide->config;
+
+	# An explicit list on the command line overrides configuration
 	my $files  = Padre->inst->{ARGV};
 	if ( Params::Util::_ARRAY($files) ) {
 		$self->setup_editors(@$files);
-	} elsif ( $config->{main_startup} eq 'new' ) {
+		return;
+	}
+
+	# Config setting 'nothing' means startup with nothing open
+	my $config  = Padre->ide->config;
+	my $startup = $config->{main_startup};
+	if ( $startup eq 'nothing' ) {
+		return;
+	}
+
+	# Config setting 'new' means startup with a single new file open
+	if ( $startup eq 'new' ) {
 		$self->setup_editors;
-	} elsif ( $config->{main_startup} eq 'nothing' ) {
-		# Nothing
-	} elsif ( $config->{main_startup} eq 'last' ) {
+		return;
+	}
+
+	# Config setting 'last' means startup with all the files from the
+	# previous time we used Padre open (if they still exist)
+	if ( $startup eq 'last' ) {
 		if ( $config->{host}->{main_files} ) {
 			$self->Freeze;
 			my @main_files     = @{$config->{host}->{main_files}};
@@ -402,13 +353,16 @@ sub load_files {
 			}
 			if ( $config->{host}->{main_file} ) {
 				my $id = $self->find_editor_of_file( $config->{host}->{main_file} );
-				$self->on_nth_pane($id) if (defined $id);
+				$self->on_nth_pane($id) if defined $id;
 			}
 			$self->Thaw;
 		}
-	} else {
-		# should never happen
+		return;
 	}
+
+	# Configuration has an entry we don't know about
+	# TODO: Once we have a warning system more useful than STDERR
+	# add a warning. For now though, just do nothing and ignore.
 	return;
 }
 
@@ -418,6 +372,8 @@ sub timer_post_init {
 	# Do an initial Show/paint of the complete-looking main window
 	# without any files loaded. Then immediately Freeze so that the
 	# loading of the files is done in a single render pass.
+	# This gives us an optimum compromise between being PERCEIVED
+	# to startup quickly, and ACTUALLY starting up quickly.
 	$self->Show(1);
 	$self->Freeze;
 
@@ -484,9 +440,13 @@ sub window_top {
 #####################################################################
 # Refresh Methods
 
+# The term and method "refresh" is reserved for fast, blocking,
+# real-time updates to the GUI. Enabling and disabling menu entries,
+# updating dynamic titles and status bars, and other rapid changes.
 sub refresh {
 	my $self = shift;
 	return if $self->no_refresh;
+
 	$self->Freeze;
 
 	# Freeze during the subtle parts of the refresh
@@ -494,7 +454,12 @@ sub refresh {
 	$self->refresh_toolbar;
 	$self->refresh_status;
 	$self->refresh_methods;
-	$self->refresh_syntaxcheck;
+
+	# Fix ticket #185: Padre crash when closing files
+	if ( ! $self->{no_syntax_check_refresh} ) {
+		$self->refresh_syntaxcheck;
+	}
+	$self->{no_syntax_check_refresh} = 0;
 
 	my $id = $self->nb->GetSelection;
 	if ( defined $id and $id >= 0 ) {
@@ -502,40 +467,6 @@ sub refresh {
 	}
 
 	$self->Thaw;
-	return;
-}
-
-sub change_style {
-	my $self = shift;
-	my $name = shift;
-
-	warn "Style: $name\n";
-	Padre::Wx::Editor::data($name);
-	foreach my $editor ( $self->pages ) {
-		$editor->padre_setup;
-	}
-	
-	return;
-}
-
-sub change_locale {
-	my $self = shift;
-	my $name = shift;
-
-	# Save the locale to the config
-	Padre->ide->config->{host}->{locale} = $name;
-
-	# Reset the locale
-	delete $self->{locale};
-	$self->{locale} = Padre::Locale::object();
-
-	# Refresh the interface with the new labels
-	$self->create_main_components;
-	$self->refresh;
-
-	# Replace the AUI component captions
-	$self->manager->GetPane('sidepane')->Caption( Wx::gettext("Subs") );
-	$self->manager->GetPane('bottompane')->Caption( Wx::gettext("Output") );
 
 	return;
 }
@@ -544,9 +475,7 @@ sub refresh_syntaxcheck {
 	my $self = shift;
 	return if $self->no_refresh;
 	return if not $self->menu->view->{show_syntaxcheck}->IsChecked;
-
 	Padre::Wx::SyntaxChecker::on_syntax_check_timer( $self, undef, 1 );
-
 	return;
 }
 
@@ -563,57 +492,14 @@ sub refresh_toolbar {
 }
 
 sub refresh_status {
-	my ($self) = @_;
+	my $self = shift;
 	return if $self->no_refresh;
-
-	my $pageid = $self->nb->GetSelection();
-	if (not defined $pageid or $pageid == -1) {
-		$self->SetStatusText("", $_) for (0..3);
-		return;
-	}
-	my $editor       = $self->nb->GetPage($pageid);
-	my $doc          = Padre::Documents->current or return;
-	my $line         = $editor->GetCurrentLine;
-	my $filename     = $doc->filename || '';
-	my $newline_type = $doc->get_newline_type || Padre::Util::NEWLINE;
-	my $modified     = $editor->GetModify ? '*' : ' ';
-
-	if ($filename) {
-		$self->nb->SetPageText($pageid, $modified . File::Basename::basename $filename);
-	} else {
-		my $text = substr($self->nb->GetPageText($pageid), 1);
-		$self->nb->SetPageText($pageid, $modified . $text);
-	}
-
-	my $pos   = $editor->GetCurrentPos;
-	my $start = $editor->PositionFromLine($line);
-	my $char  = $pos-$start;
-
-	$self->SetStatusText("$modified $filename",             0);
-
-	my $charWidth = $self->{gui}->{statusbar}->GetCharWidth;
-	my $mt = $doc->get_mimetype;
-	my $curPos = Wx::gettext('L:') . ($line + 1) . ' ' . Wx::gettext('Ch:') . $char;
-
-	$self->SetStatusText($mt,           1);
-	$self->SetStatusText($newline_type, 2);
-	$self->SetStatusText($curPos,       3);
-
-	# since charWidth is an average we adjust the values a little
-	$self->{gui}->{statusbar}->SetStatusWidths(
-		-1,
-		(length($mt)           - 1) * $charWidth,
-		(length($newline_type) + 2) * $charWidth,
-		(length($curPos)       + 1) * $charWidth
-	); 
-
-	return;
+	$self->GetStatusBar->refresh;
 }
 
 # TODO now on every ui chnage (move of the mouse)
 # we refresh this even though that should not be
-# necessary 
-# can that be eliminated ?
+# necessary can that be eliminated ?
 sub refresh_methods {
 	my $self = shift;
 	return if $self->no_refresh;
@@ -661,6 +547,68 @@ sub refresh_methods {
 
 
 #####################################################################
+# Interface Rebuilding Methods
+
+sub change_style {
+	my $self    = shift;
+	my $name    = shift;
+	my $private = shift;
+	Padre::Wx::Editor::data($name, $private);
+	foreach my $editor ( $self->pages ) {
+		$editor->padre_setup;
+	}
+	return;
+}
+
+sub change_locale {
+	my $self = shift;
+	my $name = shift;
+
+	# Save the locale to the config
+	Padre->ide->config->{host}->{locale} = $name;
+
+	# Reset the locale
+	delete $self->{locale};
+	$self->{locale} = Padre::Locale::object();
+
+	# Run the "relocale" process to update the GUI
+	$self->relocale;
+
+	# With language stuff updated, do a full refresh
+	# sweep to clean everything up.
+	$self->refresh;
+
+	return;
+}
+
+# The term and method "relocale" is reserved for functionality
+# intended to run when the application wishes to change locale
+# (and wishes to do so without restarting).
+sub relocale {
+	my $self = shift;
+
+	# The menu doesn't support relocale, replace it
+	delete $self->{menu};
+	$self->{menu} = Padre::Wx::Menu->new($self);
+	$self->SetMenuBar( $self->menu->wx );
+
+	# The toolbar doesn't support relocale, replace it
+	$self->SetToolBar(
+		Padre::Wx::ToolBar->new($self)
+	);
+	$self->GetToolBar->Realize;
+
+	# Update window manager captions
+	$self->manager->relocale;
+
+	return;
+}
+
+
+
+
+
+#####################################################################
 # Introspection
 
 sub selected_document {
@@ -685,7 +633,6 @@ your editing a atomic in the Undo stack.
 
  $editor->BeginUndoAction;
  $editor->EndUndoAction;
-
 
 =cut
 
@@ -843,7 +790,11 @@ sub run_script {
 		return;
 	}
 	if ($cmd) {
-		$self->run_command( $cmd );
+		if ($document->pre_process) {
+			$self->run_command( $cmd );
+		} else {
+			$self->error( $document->errstr );
+		}
 	}
 	return;
 }
@@ -1012,24 +963,26 @@ sub on_goto {
 sub on_close_window {
 	my $self   = shift;
 	my $event  = shift;
-	my $config = Padre->ide->config;
+	my $padre  = Padre->ide;
+	my $config = $padre->config;
 
-	# Save the list of open files
-	$config->{host}->{main_files} = [
+	# Capture the current session, before we start the interactive
+	# part of the shutdown which will mess it up. Don't save it to
+	# the config yet, because we haven't committed to the shutdown
+	# until we get past the interactive phase.
+	my $main_file  = $self->selected_filename;
+	my $main_files = [
 		map  { $_->filename }
 		grep { $_ } 
 		map  { Padre::Documents->by_id($_) }
 		$self->pageids
 	];
-	# Save all Pos for open files
-	$config->{host}->{main_files_pos} = [
+	my $main_files_pos = [
 		map  { $_->editor->GetCurrentPos }
 		grep { $_ } 
 		map  { Padre::Documents->by_id($_) }
 		$self->pageids
 	];
-	# Save selected tab
-	$config->{host}->{main_file} = $self->selected_filename;
 
 	# Check that all files have been saved
 	if ( $event->CanVeto ) {
@@ -1057,8 +1010,14 @@ sub on_close_window {
 	# at which Padre appears to close.
 	$self->Show(0);
 
-	# Discover and save the state we want to memorize
-	$config->{host}->{main_maximized} = $self->IsMaximized ? 1 : 0;
+	# Now it's safe to save the session
+	$config->{host}->{main_file}      = $main_file;
+	$config->{host}->{main_files}     = $main_files;
+	$config->{host}->{main_files_pos} = $main_files_pos;
+
+	# Save the window geometry
+	$config->{host}->{aui_manager_layout} = $self->manager->SavePerspective;
+	$config->{host}->{main_maximized}     = $self->IsMaximized ? 1 : 0;
 	unless ( $self->IsMaximized ) {
 		# Don't save the maximized window size
 		(
@@ -1071,14 +1030,17 @@ sub on_close_window {
 		) = $self->GetPositionXY;
 	}
 
-	$config->{host}->{aui_manager_layout} = $self->manager->SavePerspective;
-
-	Padre->ide->save_config;
-
-	# Clean up secondary windows
+	# Clean up our secondary windows
 	if ( $self->{help} ) {
 		$self->{help}->Destroy;
 	}
+
+	# Shut down all the plugins before saving the configuration
+	# so that plugins have a change to save their configuration.
+	$padre->plugin_manager->shutdown;
+
+	# Write the configuration to disk
+	$padre->save_config;
 
 	$event->Skip;
 
@@ -1114,14 +1076,16 @@ sub setup_editors {
 	$self->Freeze;
 
 	# If and only if there is only one current file,
-	# and it is unused, close it.
+	# and it is unused, close it. This is a somewhat
+	# subtle interface DWIM trick, but it's one that
+	# clearly looks wrong when we DON'T do it.
 	if ( $self->nb->GetPageCount == 1 ) {
 		if ( Padre::Documents->current->is_unused ) {
 			$self->on_close($self);
 		}
 	}
 
-	if (@files) {
+	if ( @files ) {
 		foreach my $f ( @files ) {
 			Padre::DB->add_recent_files($f);
 			$self->setup_editor($f);
@@ -1129,6 +1093,7 @@ sub setup_editors {
 	} else {
 		$self->setup_editor;
 	}
+
 	$self->Thaw;
 	$self->refresh;
 	return;
@@ -1163,7 +1128,7 @@ sub setup_editor {
 		filename => $file,
 	);
 	if ($doc->errstr) {
-		warn $doc->errstr;
+		warn $doc->errstr . " when trying to open '$file'";
 		return;
 	}
 
@@ -1446,6 +1411,7 @@ sub on_close {
 		$event->Veto;
 	}
 	$self->close;
+    $self->{no_syntax_check_refresh} = 1;
 	$self->refresh;
 }
 
@@ -1886,8 +1852,8 @@ sub check_pane_needed {
 	foreach my $num ( 0 .. $cnt ) {
 		# ignore 'Ack' pane
 		if ( $pane eq 'bottompane' ) {
-    		my $ack_page_idx = $self->{gui}->{$pane}->GetPageIndex( $self->{gui}->{ack_panel} );
-    		next if ( defined $ack_page_idx and $ack_page_idx == $num );
+			my $ack_page_idx = $self->{gui}->{$pane}->GetPageIndex( $self->{gui}->{ack_panel} );
+			next if ( defined $ack_page_idx and $ack_page_idx == $num );
 		}
 		
 		my $p = undef;
@@ -1980,7 +1946,6 @@ sub convert_to {
 	my ($self, $newline_type) = @_;
 
 	my $editor = $self->selected_editor;
-	#$editor->SetEOLMode( $mode{$newline_type} );
 	$editor->ConvertEOLs( $Padre::Wx::Editor::mode{$newline_type} );
 
 	# TODO: include the changing of file type in the undo/redo actions
@@ -2012,7 +1977,7 @@ sub run_in_padre {
 	if ( $@ ) {
 		Wx::MessageBox(
 			sprintf(Wx::gettext("Error: %s"), $@),
-			Wx::gettext("Self error"),
+			Wx::gettext("Internal error"),
 			Wx::wxOK,
 			$self,
 		);
@@ -2318,12 +2283,16 @@ sub on_last_visited_pane {
 
 sub on_notebook_page_changed {
 	my $editor = $_[0]->selected_editor;
-	if ($editor) {
-		@{ $_[0]->{page_history} } = grep {
+	if ( $editor ) {
+		my $history = $_[0]->{page_history};
+		@$history = grep {
 			Scalar::Util::refaddr($_) ne Scalar::Util::refaddr($editor)
-		} @{ $_[0]->{page_history} };
-		push @{ $_[0]->{page_history} }, $editor;
-		$editor->{Document}->set_indentation_style(); #  update indentation in case auto-update is on; TODO: encapsulation?
+		} @$history;
+		push @$history, $editor;
+
+		# Update indentation in case auto-update is on
+		# TODO: encapsulation?
+		$editor->{Document}->set_indentation_style;
 	}
 	$_[0]->refresh;
 }

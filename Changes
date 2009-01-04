@@ -1,4 +1,28 @@
-Changes for Padre.
+Changes for Perl Application Development and Refactoring Environment 
+
+v0.23 2009.01.04
+
+    Updated Italian transation.
+    Refactored the plugin state hash out into a standalone
+        Padre::PluginHandle class (ADAMK)
+    Add naive way to locate some of the annoying errors beginners
+        might make that perl does not catch. (SZABGAB)
+    Makefile.PL tricks EU:MM into not loading every single dependency,
+        making our dependency-heavy Makefile.PL far saner (ADAMK)
+    Portuguese (Brazilian) translation added (GARU)
+    Spanish translation added (PacoLinux)
+    Shutdown process now delays saving the session until after the
+        interface phase (ADAMK)
+    Shutdown process now disables all the plugins, so they have a
+        change to shut down elegantly too (ADAMK)
+    Plugins now reload correctly (ADAMK)
+    Created a basic stub Padre::Manual and moved the information in
+        HACKING.txt into Padre::Manual::Hacking and
+	Padre::Manual::Translation (ADAMK)
+    Moved more bits of GUI code out of MainWindow and into their own
+        classes (ADAMK)
+
+v0.22 2008.12.23
 
     Various Perl6 and Parrot related snippets of code and
         functionality have been moved to the respective
@@ -104,8 +128,7 @@ v0.20 2008.12.02
     Hungarian updates. (GYU)
     Fix the "cannot save new file bug". (TEEJAY)
     Save files under Mac. #160 (ChrisDolan)
-    Restor inner window layout through restart. (HJANSEN)
-
+    Restore inner window layout through restart. (HJANSEN)
 
 v0.19 2008.11.28
 

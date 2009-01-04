@@ -11,7 +11,7 @@ my $default_dir;
 use Padre::Wx  ();
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 
 sub on_new_project {
@@ -103,7 +103,7 @@ sub on_select_project {
 	if ($config->{projects}->{$project}) {
 		#is changing allowed? how do we notice that it is not one of the already existing names?
 	} else {
-	   $config->{projects}->{$project}->{dir} = $dir;
+		$config->{projects}->{$project}->{dir} = $dir;
 	}
 
 	$config->{current_project} = $project;

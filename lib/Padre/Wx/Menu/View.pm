@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 use Padre::Documents   ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -20,8 +20,9 @@ our @ISA     = 'Padre::Wx::Submenu';
 # Padre::Wx::Submenu Methods
 
 sub new {
-	my $class = shift;
-	my $main  = shift;
+	my $class  = shift;
+	my $main   = shift;
+	my $config = Padre->ide->config;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
@@ -189,6 +190,7 @@ sub new {
 
 
 
+
 	# Font Size
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1,
@@ -244,7 +246,9 @@ sub new {
 
 	$self->AppendSeparator;
 
-	my $config    = Padre->ide->config;
+
+
+
 
 	# Styles (temporary location?)
 	$self->{style} = Wx::Menu->new;
@@ -252,7 +256,10 @@ sub new {
 		Wx::gettext("Style"),
 		$self->{style}
 	);
-	my %styles    = (default => 'Default', night => 'Night');
+	
+	# TODO: name should be localized
+	my %styles = ( default => 'Default', night => 'Night' );
+	
 	foreach my $name ( sort { $styles{$a} cmp $styles{$b} }  keys %styles) {
 		my $label = $styles{$name};
 		my $radio = $self->{style}->AppendRadioItem( -1, $label );
@@ -266,6 +273,30 @@ sub new {
 			},
 		);
 	}
+
+	my $dir = File::Spec->catdir( Padre::Config->default_dir , 'styles' );
+	my @private_styles =
+		map { substr File::Basename::basename($_), 0, -4 }
+		glob File::Spec->catdir( $dir, '*.yml' );
+	if (@private_styles) {
+		$self->AppendSeparator;
+		foreach my $name (@private_styles) {
+			my $label = $name;
+			my $radio = $self->{style}->AppendRadioItem( -1, $label );
+			if ( $config->{host}->{style} and $config->{host}->{style} eq $name ) {
+				$radio->Check(1);
+			}
+			Wx::Event::EVT_MENU( $main,
+				$radio,
+				sub {
+					$_[0]->change_style($name, 1);
+				},
+			);
+		}
+	}
+
+
+
 
 
 	# Language Support
@@ -283,23 +314,30 @@ sub new {
 
 	$self->{language}->AppendSeparator;
 
-	my %languages = Padre::Locale::languages();
+	my %languages = Padre::Locale::menu_view_languages();
 	foreach my $name ( sort { $languages{$a} cmp $languages{$b} }  keys %languages) {
 		my $label = $languages{$name};
 		if ( $label eq 'English' ) {
-			$label = "English (The Queen's)";
+			# NOTE: A dose of fun in a mostly boring application.
+			# With more Padre developers, more countries, and more
+			# people in total British English instead of American
+			# English CLEARLY it is a FAR better default for us to
+			# use.
+			# Because it's something of an in joke to English
+			# speakers, non-English localisations do NOT show this.
+			$label = "English (New Britstralian)";
 		}
 
 		my $radio = $self->{language}->AppendRadioItem( -1, $label );
-		if ( $config->{host}->{locale} and $config->{host}->{locale} eq $name ) {
-			$radio->Check(1);
-		}
 		Wx::Event::EVT_MENU( $main,
 			$radio,
 			sub {
 				$_[0]->change_locale($name);
 			},
 		);
+		if ( $config->{host}->{locale} and $config->{host}->{locale} eq $name ) {
+			$radio->Check(1);
+		}
 	}
 
 	$self->AppendSeparator;
@@ -311,7 +349,7 @@ sub new {
 	# Window Effects
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1,
-			Wx::gettext("&Full screen\tF11")
+			Wx::gettext("&Full Screen\tF11")
 		),
 		sub {
 			$_[0]->on_full_screen($_[1]);

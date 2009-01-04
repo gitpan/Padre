@@ -63,12 +63,12 @@ requires:
   Module::Inspector: 0.04
   Module::Refresh: 0.13
   Module::Starter: 1.50
-  ORLite: 0.15
+  ORLite: 1.17
   ORLite::Migrate: 0.01
   PAR: 0.970
   PPI: 1.203
   Params::Util: 0.33
-  Parse::ErrorString::Perl: 0.06
+  Parse::ErrorString::Perl: 0.08
   Pod::POM: 0.17
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
@@ -90,4 +90,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.22
+version: 0.23

@@ -3,14 +3,13 @@ package Padre::Document::Perl;
 use 5.008;
 use strict;
 use warnings;
-
 use Carp            ();
 use Params::Util    '_INSTANCE';
 use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Padre::Document';
 
 
@@ -21,7 +20,7 @@ our @ISA     = 'Padre::Document';
 # Padre::Document::Perl Methods
 
 # TODO watch out! These PPI methods may be VERY expensive!
-# (Ballpark: Around 1 second of *BLOCKING* CPU per 1000 lines)
+# (Ballpark: Around 1 Gigahertz-second of *BLOCKING* CPU per 1000 lines)
 # Check out Padre::Task::PPI and its subclasses instead!
 sub ppi_get {
 	my $self = shift;
@@ -82,53 +81,20 @@ sub ppi_select {
 	$editor->SetSelection( $start, $start + 1 );
 }
 
-my $keywords;
 
-sub keywords {
-	unless ( defined $keywords ) {
-		$keywords = YAML::Tiny::LoadFile(
-			Padre::Util::sharefile( 'languages', 'perl5', 'perl5.yml' )
-		);
-	}
-	return $keywords;
-}
-
-sub get_functions {
+sub lexer {
 	my $self = shift;
-	my $text = $self->text_get;
+	my $config = Padre->ide->config;
 
-	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
-	my $nlchar = $nlCharTable{ $self->get_newline_type };
-
-	return $text =~ m/${nlchar}sub\s+(\w+(?:::\w+)*)/g;
+	if ( $config->{ppi_highlight} and $self->editor->GetTextLength < $config->{ppi_highlight_limit} ) {
+		return Wx::wxSTC_LEX_CONTAINER;
+	} else {
+		return $self->SUPER::lexer();
+	}
 }
 
-sub get_function_regex {
-	my ( $self, $sub ) = @_;
-
-	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
-	my $nlchar = $nlCharTable{ $self->get_newline_type };
-
-	return qr!(?:^|${nlchar})sub\s+$sub\b!;
-}
-
-sub get_command {
-	my $self     = shift;
-
-	# Check the file name
-	my $filename = $self->filename;
-#	unless ( $filename and $filename =~ /\.pl$/i ) {
-#		die "Only .pl files can be executed\n";
-#	}
-
-	# Run with the same Perl that launched Padre
-	# TODO: get preferred Perl from configuration
-	my $perl = Padre->perl_interpreter;
-
-	my $dir = File::Basename::dirname($filename);
-	chdir $dir;
-	return qq{"$perl" "$filename"};
-}
+#####################################################################
+# Padre::Document GUI Integration
 
 sub colorize {
 	my ($self) = @_;
@@ -137,6 +103,7 @@ sub colorize {
 
 	my $editor = $self->editor;
 	my $text   = $self->text_get;
+	return unless $text;
 
 	require PPI::Document;
 	my $ppi_doc = PPI::Document->new( \$text );
@@ -182,6 +149,10 @@ sub colorize {
 		'ArrayIndex'    => 0,
 		'Cast'          => 0,
 		'Magic'         => 0,
+		'Octal'         => 0,
+		'Hex'           => 0,
+		'Literal'       => 0,
+		'Version'       => 0,
 	);
 
 	my @tokens = $ppi_doc->tokens;
@@ -201,7 +172,7 @@ sub colorize {
 #		last if $row > 10;
 		my $color = $colors{$css};
 		if (not defined $color) {
-			Wx::LogMessage("Missing definition fir '$css'\n");
+			Wx::LogMessage("Missing definition for '$css'\n");
 			next;
 		}
 		next if not $color;
@@ -261,6 +232,81 @@ sub _css_class {
 	my $css = ref $Token;
 	$css =~ s/^.+:://;
 	$css;
+}
+
+
+
+
+
+#####################################################################
+# Padre::Document Document Analysis
+
+my $keywords;
+
+sub keywords {
+	unless ( defined $keywords ) {
+		$keywords = YAML::Tiny::LoadFile(
+			Padre::Util::sharefile( 'languages', 'perl5', 'perl5.yml' )
+		);
+	}
+	return $keywords;
+}
+
+sub get_functions {
+	my $self = shift;
+	my $text = $self->text_get;
+
+	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
+	my $nlchar = $nlCharTable{ $self->get_newline_type };
+
+	return $text =~ m/${nlchar}sub\s+(\w+(?:::\w+)*)/g;
+}
+
+sub get_function_regex {
+	my ( $self, $sub ) = @_;
+
+	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
+	my $nlchar = $nlCharTable{ $self->get_newline_type };
+
+	return qr!(?:^|${nlchar})sub\s+$sub\b!;
+}
+
+sub get_command {
+	my $self     = shift;
+
+	# Check the file name
+	my $filename = $self->filename;
+#	unless ( $filename and $filename =~ /\.pl$/i ) {
+#		die "Only .pl files can be executed\n";
+#	}
+
+	# Run with the same Perl that launched Padre
+	# TODO: get preferred Perl from configuration
+	my $perl = Padre->perl_interpreter;
+
+	my $dir = File::Basename::dirname($filename);
+	chdir $dir;
+	my $config = Padre->ide->config;
+	return $config->{run_with_stack_trace} ? 
+		qq{"$perl" -Mdiagnostics(-traceonly) "$filename"} : qq{"$perl" "$filename"};
+}
+
+sub pre_process {
+	my ( $self ) = @_;
+	my $config = Padre->ide->config;
+
+	if ($config->{editor_perl5_beginner}) {
+		require Padre::Document::Perl::Beginner;
+		my $b = Padre::Document::Perl::Beginner->new;
+		if ($b->check( $self->text_get )) {
+			return 1;
+		} else {
+			$self->set_errstr( $b->error );
+			return;
+		}
+	}
+
+	return 1;
 }
 
 # Checks the syntax of a Perl document.
@@ -398,6 +444,13 @@ sub find_variable_declaration {
 	return ();
 }
 
+
+
+
+
+#####################################################################
+# Padre::Document Document Manipulation
+
 sub lexical_variable_replacement {
 	my ($self, $replacement) = @_;
 
@@ -446,7 +499,7 @@ sub autocomplete {
 	my %seen;
 	my @words;
 	push @words ,grep { ! $seen{$_}++ } reverse ($pre_text =~ /$regex/g);
-	push @words , grep { ! $seen{$_}++ } ($post_text =~ /$regex/g);
+	push @words ,grep { ! $seen{$_}++ } ($post_text =~ /$regex/g);
 
 	if (@words > 20) {
 		@words = @words[0..19];
@@ -454,7 +507,6 @@ sub autocomplete {
 
 	return (length($prefix), @words);
 }
-
 
 1;
 

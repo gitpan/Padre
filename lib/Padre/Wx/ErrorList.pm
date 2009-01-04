@@ -3,10 +3,11 @@ package Padre::Wx::ErrorList;
 use strict;
 use warnings;
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 require Padre;
 use Padre::Wx;
+use Padre::Task::ErrorParser;
 use Parse::ErrorString::Perl;
 use Wx::Locale qw(:default);
 use Encode qw(encode);
@@ -20,8 +21,9 @@ use Class::XSAccessor
 		data     => 'data',
 		enabled  => 'enabled',
 		index    => 'index',
-		parser   => 'parser',
 		config   => 'config',
+		lang     => 'lang',
+		parser   => 'parser',
 	};
 
 sub new {
@@ -41,6 +43,9 @@ sub new {
 
 	my $root = $self->AddRoot( 'Root', -1, -1, Wx::TreeItemData->new( 'Data' ) );
 	$self->{root} = $root;	
+
+	Wx::Event::EVT_TREE_ITEM_ACTIVATED($self, $self, \&on_activate);
+	#Wx::Event::EVT_TREE_KEY_DOWN($self, $self, \&on_f1);
 	
 	$self->{mw} = $mw;
 	$self->{config} = $config;
@@ -59,14 +64,8 @@ sub enable {
 	$self->{mw}->{gui}->{bottompane}->InsertPage( $index, $self, Wx::gettext("Error List"), 0 );
 	$self->Show;
 	$self->{mw}->{gui}->{bottompane}->SetSelection($index);
-	my $lang = $self->config->{diagnostics_lang};
-	if ($lang) {
-		$lang =~ s/^\s*//;
-		$lang =~ s/\s*$//;
-		$self->{parser} = Parse::ErrorString::Perl->new(lang => $lang);
-	} else {
-		$self->{parser} = Parse::ErrorString::Perl->new;
-	}
+	$self->mw->check_pane_needed('bottompane');
+	$self->mw->manager->Update;
 	$self->{enabled} = 1;
 }
 
@@ -75,53 +74,64 @@ sub disable {
 	my $index = $self->{mw}->{gui}->{bottompane}->GetPageIndex($self);
 	$self->Hide;
 	$self->{mw}->{gui}->{bottompane}->RemovePage($index);
+	$self->mw->check_pane_needed('bottompane');
+	$self->mw->manager->Update;
 	$self->{enabled} = 0;
 }
 
 sub populate {
 	my $self = shift;
 	return unless $self->enabled;
-	my $root = $self->root;
 	
+	my $cur_lang = $self->config->{diagnostics_lang};
+	$cur_lang =~ s/^\s*//;
+	$cur_lang =~ s/\s*$//;
+	my $old_lang = $self->lang;
+	$self->{lang} = $cur_lang;
+
 	my $data = $self->data;
-	my $parser = $self->parser;
-	my @errors = defined $data && $data ne '' ? $parser->parse_string($data) : ();
 	$self->{data} = "";
-	Wx::Event::EVT_TREE_KEY_DOWN($self, $self, \&on_f1);
+	return unless $data;
 	
-	foreach my $err (@errors) {
-		my $message = $err->message . " at " . $err->file_msgpath . " line " . $err->line;
-		my $err_tree_item = $self->AppendItem( $root, $message, -1, -1, Wx::TreeItemData->new( $err ) );
-		
-		Wx::Event::EVT_TREE_ITEM_ACTIVATED($self, $self, \&on_activate);
-	}
+
+	my $parser_task = Padre::Task::ErrorParser->new(
+		parser    => $self->parser,
+		cur_lang  => $cur_lang,
+		old_lang  => $old_lang,
+		data      => $data,
+	);
+	
+	$parser_task->schedule;
 }
 
 sub on_f1 {
-	my ($self, $event) = @_;
-	$event->Skip(0);
-	my $key_code = $event->GetKeyCode;
-	if ($key_code == Wx::WXK_F1) {
-		#my $item = $event->GetItem;
-		my $item = $self->GetSelection;
-		my $err = $self->GetPlData($item);
-		my $diagnostics = gettext("No diagnostics available for this error!");
-		if ($err->diagnostics) {
-			$diagnostics = $err->diagnostics;
-			$diagnostics =~ s/[A-Z]<(.*?)>/$1/sg;
-		}
-		$diagnostics = $^O eq 'MSWin32' ? $diagnostics : encode('utf8', $diagnostics);
-		my $dialog = Wx::MessageDialog->new($self->mw, $diagnostics, "Diagnostics", Wx::wxOK);
-		$dialog->ShowModal;
+	my $self = shift;
+	my $item = $self->GetSelection;
+	return unless $item;
+	my $err = $self->GetPlData($item);
+	return if $err->isa('Parse::ErrorString::Perl::StackItem');
+	my $diagnostics = gettext("No diagnostics available for this error!");
+	if ($err->diagnostics) {
+		$diagnostics = $err->diagnostics;
+		$diagnostics =~ s/[A-Z]<(.*?)>/$1/sg;
 	}
+	$diagnostics = $^O eq 'MSWin32' ? $diagnostics : encode('utf8', $diagnostics);
+	my $dialog_title = gettext("Diagnostics");
+	if ($err->type_description) {
+		$dialog_title .= (": " . gettext($err->type_description));
+	}
+	my $dialog = Wx::MessageDialog->new($self->mw, $diagnostics, $dialog_title, Wx::wxOK);
+	$dialog->ShowModal;
 }
 
 sub on_activate {
 	my $self = shift;
 	my $event = shift;
 	my $item = $event->GetItem;
+	return unless $item;
 	my $err = $self->GetPlData($item);
 	my $mw = $self->mw;
+	return if $err->file eq 'eval';
 	$mw->setup_editor($err->file_abspath);
 	my $editor = $mw->selected_editor;
 	my $line_number = $err->line;
@@ -153,3 +163,4 @@ sub clear {
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
+

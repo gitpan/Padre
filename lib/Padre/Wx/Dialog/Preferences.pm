@@ -7,7 +7,7 @@ use warnings;
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 sub get_layout_for_behaviour {
 	my ($config, $main_startup, $editor_autoindent, $editor_methods) = @_;
@@ -55,6 +55,11 @@ sub get_layout_for_behaviour {
 				($config->{editor_use_wordwrap} ? 1 : 0) ],
 		],
 		[
+			[ 'Wx::StaticText', undef,              Wx::gettext('Perl beginner mode')],
+			['Wx::CheckBox',    'editor_perl5_beginner', '',
+				($config->{editor_perl5_beginner} ? 1 : 0) ],
+		],
+		[
 			[ 'Wx::StaticText', undef,              Wx::gettext('Preferred language for error diagnostics:')],
 			[ 'Wx::TextCtrl',     'diagnostics_lang', $config->{diagnostics_lang}||''],
 		],
@@ -97,7 +102,7 @@ sub dialog {
 			auto_ok_cancel  => 1,
 			ok_widgetid     => '_ok_',
 			cancel_widgetid => '_cancel_',
-			pagenames       => [ 'Behaviour', 'Appearance' ]
+			pagenames       => [ Wx::gettext('Behaviour'), Wx::gettext('Appearance') ]
 		},
 	);
 
@@ -139,20 +144,39 @@ sub run {
 
 	my $config = Padre->ide->config;
 
+	#Keep this in order for tools/update_pot_messages.pl to pick these messages up.
+	my @keep_me = (
+		Wx::gettext('new'),
+		Wx::gettext('nothing'),
+		Wx::gettext('last'),
+		Wx::gettext('no'),
+		Wx::gettext('same_level'),
+		Wx::gettext('deep'),
+		Wx::gettext('alphabetical'),
+		Wx::gettext('original'),
+		Wx::gettext('alphabetical_private_last'),
+	);
+	my @main_startup_items = qw(new nothing last);
 	my @main_startup = (
 		$config->{main_startup},
-		grep { $_ ne $config->{main_startup} } qw( new nothing last )
+		grep { $_ ne $config->{main_startup} } @main_startup_items
 	);
+	my @main_startup_localized = map{Wx::gettext($_)} @main_startup;
+	my @editor_autoindent_items = qw(no same_level deep);
 	my @editor_autoindent = (
 		$config->{editor_autoindent},
-		grep { $_ ne $config->{editor_autoindent} } qw( no same_level deep )
+		grep { $_ ne $config->{editor_autoindent} } @editor_autoindent_items 
 	);
+	my @editor_autoindent_localized = map{Wx::gettext($_)} @editor_autoindent;
+	my @editor_methods_items = qw(alphabetical original alphabetical_private_last);
 	my @editor_methods = (
 		$config->{editor_methods},
-		grep { $_ ne $config->{editor_methods} } qw( alphabetical original alphabetical_private_last )
+		grep { $_ ne $config->{editor_methods} } @editor_methods_items
 	);
+	my @editor_methods_localized = map{Wx::gettext($_)} @editor_methods;
 
-	my $dialog = $class->dialog( $win, \@main_startup, \@editor_autoindent, \@editor_methods );
+	my $dialog = $class->dialog( $win, 
+		\@main_startup_localized, \@editor_autoindent_localized, \@editor_methods_localized );
 	return if not $dialog->show_modal;
 
 	my $data = $dialog->get_data;
@@ -171,7 +195,7 @@ sub run {
 	}
 	$config->{editor_current_line_background_color} =~ s/#//;
 
-	foreach my $f (qw(editor_use_tabs editor_use_wordwrap editor_auto_indentation_style)) {
+	foreach my $f (qw(editor_use_tabs editor_use_wordwrap editor_auto_indentation_style editor_perl5_beginner)) {
 		$config->{$f} = $data->{$f} ? 1 : 0;
 	}
 

@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -138,7 +138,7 @@ sub new {
 	);
 	$self->{save_as} = $self->Append(
 		Wx::wxID_SAVEAS,
-		Wx::gettext('Save &As...')
+		Wx::gettext("Save &As...\tF12")
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{save_as},
@@ -250,7 +250,7 @@ sub new {
 			Wx::gettext("Clean Recent Files List")
 		),
 		sub {
-			Padre::DB->delete_recent( 'files' );
+			Padre::DB::History->delete('where type = ?', 'files');
 
 			# Replace the whole File menu
 			my $menu       = Padre::Wx::Menu::File->new($_[0]);

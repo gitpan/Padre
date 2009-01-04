@@ -10,10 +10,11 @@ package Padre::Wx::Menu::Help;
 use 5.008;
 use strict;
 use warnings;
+use utf8;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -38,16 +39,22 @@ sub new {
 		},
 	);
 	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1, Wx::gettext("Context Help\tCtrl-Shift-H") ),
+		$self->Append( -1, Wx::gettext("Context Help\tF1") ),
 		sub {
-			# TODO This feels wrong, the help menu code shouldn't
-			# populate the mainwindow hash.
-			my $selection = $_[0]->selected_text;
-			$_[0]->menu->help->help($_[0]);
-			if ( $selection ) {
-				$_[0]->{help}->show( $selection );
+			my $current = Wx::Window::FindFocus();
+			if ( $current->isa('Padre::Wx::ErrorList') ) {
+				$_[0]->errorlist->on_f1;
+			} else {
+			
+				# TODO This feels wrong, the help menu code shouldn't
+				# populate the mainwindow hash.
+				my $selection = $_[0]->selected_text;
+				$_[0]->menu->help->help($_[0]);
+				if ( $selection ) {
+					$_[0]->{help}->show( $selection );
+				}
+				return;
 			}
-			return;
 		},
 	);
 
@@ -107,31 +114,33 @@ sub about {
 		$about->SetWebSite("http://padre.perlide.org/");
 	}
 	$about->AddDeveloper("Adam Kennedy");
-	$about->AddDeveloper("Ahmad Zawawi");
+	$about->AddDeveloper("Ahmad Zawawi - أحمد محمد زواوي");
 	$about->AddDeveloper("Brian Cassidy");
 	$about->AddDeveloper("Chris Dolan");
 	$about->AddDeveloper("Fayland Lam");
-	$about->AddDeveloper("Gabor Szabo");
+	$about->AddDeveloper("Gábor Szabó - גאבור סבו ");
 	$about->AddDeveloper("Heiko Jansen");
-	$about->AddDeveloper("Jerome Quelin");
+	$about->AddDeveloper("Jérôme Quelin");
 	$about->AddDeveloper("Kaare Rasmussen");
-	$about->AddDeveloper("Keedi Kim");
+	$about->AddDeveloper("Keedi Kim - 김도형");
 	$about->AddDeveloper("Max Maischein");
 	$about->AddDeveloper("Patrick Donelan");
 	$about->AddDeveloper("Paweł Murias");
 	$about->AddDeveloper("Petar Shangov");
-	$about->AddDeveloper("Steffen Mueller");
+	$about->AddDeveloper("Steffen Müller");
 
- 	$about->AddTranslator("Arabic - Ahmad Zawawi");
+ 	$about->AddTranslator("Arabic - Ahmad Zawawi - أحمد محمد زواوي");
 	$about->AddTranslator("German - Heiko Jansen");
-	$about->AddTranslator("French - Jerome Quelin");
-	$about->AddTranslator("Hebrew - Omer Zak");
-	$about->AddTranslator("Hebrew - Shlomi Fish");
-	$about->AddTranslator("Hungarian - Gyorgy Pasztor");
+	$about->AddTranslator("French - Jérôme Quelin");
+	$about->AddTranslator("Hebrew - Omer Zak - עומר זק");
+	$about->AddTranslator("Hebrew - Shlomi Fish - שלומי פיש");
+	$about->AddTranslator("Hungarian - György Pásztor");
 	$about->AddTranslator("Italian - Simone Blandino");
-	$about->AddTranslator("Korean - Keedi Kim");
+	$about->AddTranslator("Korean - Keedi Kim - 김도형");
 	$about->AddTranslator("Russian - Andrew Shitov");
 	$about->AddTranslator("Dutch - Dirk De Nijs");
+	$about->AddTranslator("Portuguese (BR) - Breno G. de Oliveira");
+	$about->AddTranslator("Spanish - Paco Alguacil");
 
 	Wx::AboutBox( $about );
 	return;

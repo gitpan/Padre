@@ -2,9 +2,13 @@ package Padre;
 
 # See POD at end for documentation
 
-use 5.008001;
+use 5.008005;
 use strict;
 use warnings;
+use utf8;
+
+# Non-Padre modules we need just to show the initial
+# window should be loaded early and normally.
 use Carp           ();
 use Cwd            ();
 use File::Spec     ();
@@ -17,7 +21,7 @@ use Class::Autouse ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version        ();
 
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -284,14 +288,13 @@ directory called F<.padre>.
 B<File/New> creates a new empty file. By default Padre assumes this is a perl script.
 (TODO later this default will be configurable).
 
-B<File/Open>  allows you to select brows for a file and select it for opening.
+B<File/Open> allows you to browse for a file and select it for opening.
 
 B<File/Open Selection>, (Ctrl-Shift-O) if there is a selected text this will
-try to locate files that match the selction. If the selection looks like a path
+try to locate files that match the selection. If the selection looks like a path
 Padre will try to open that path either absolute or relative.
-If it looks like a module name (Some::Thing) it will try to find the appropriate file
-Some/Thing.pm in @INC and open it.
-currently this feature opens the firs file encountered.
+If it looks like a module name (Some::Thing) it will try to find the appropriate file Some/Thing.pm in @INC and open it.
+currently this feature opens the first file encountered.
 (TODO it should find all the possibilities and if there are multiple hits
 offer the user to choose. This will be especially important if we are
 working on a module that is also already installed. Padre might
@@ -302,18 +305,17 @@ development version.)
 files from internal naming and have pathes to search. Surprise, not every
 language uses @INC.)
 
-B<File/Close> checks if the file is saved, if it is closes the current tab.
+B<File/Close> - checks if the file is saved, if it is closes the current tab.
 
-B<File/Close All> closes all the file (in case they are not saved yet ask for instructions).
+B<File/Close All> - closes all opened files (in case they are not saved yet ask for instructions).
 
-B<File/Close All but Current>.
+B<File/Close All but Current> - closes all opened files except for the currently being edited.
 
-B<File/Reload File> is interesting if you either made changes and want to discard them
+B<File/Reload File> - Reloads the file. This is interesting if you either made changes and want to discard them
 and/or if the file has changed on the disk. If there are unsaved changes Padre will ask
 you if you really want to throw them away. (TODO: make a backup of the file before discarding it)
 
-B<File/Save> Ctrl-S - save the current file. If the buffer has not yet save and has no filename
-associated with it, Padre will ask you for a filename.
+B<File/Save> Ctrl-S - save the current file. If the buffer is not yet saved and has no filename associated with it, Padre will ask you for a filename.
 
 B<File/Save As> - Offer the user to select a new filename and save the content under that name.
 
@@ -329,7 +331,7 @@ B<Files/Recent Files> - a list of recently opened files to open them easily.
 B<File/Doc Stats> - just random statistics about the current document.
 (TODO: If you miss anything important let us know!)
 
-B<File/Quit> also called exit.
+B<File/Quit> - Exits Padre.
 
 
 =head2 Simple editing
@@ -367,7 +369,7 @@ and we think the distribution methods used for CPAN module are
 a good way to handle any project Padre will understand a project
 as a CPAN module. This does not mean that you project needs to end
 up on CPAN of course. But if your projects directory structure
-follows that of the modules on CPAN, Padre will be automtically
+follows that of the modules on CPAN, Padre will be automatically
 recognize it.
 
 
@@ -1038,19 +1040,21 @@ Part of the code was copied from his Wx::Demo application.
 The developers of Padre in alphabetical order:
 
 Aaron Trevena (TEEJAY),
+Ahmad Zawawi أحمد محمد زواوي (AZAWAWI),
 Adam Kennedy (ADAMK),
 Brian Cassidy (BRICAS),
 Chris Dolan (CHRISDOLAN),
 Fayland Lam (FAYLAND),
+Gábor Szabó - גאבור סבו (SZABGAB),
 Heiko Jansen (HJANSEN),
-Jerome Quelin (JQUELIN),
+Jérôme Quelin (JQUELIN),
 Kaare Rasmussen (KAARE),
-Keedi Kim (KEEDI),
+Keedi Kim  - 김도형  (KEEDI),
 Max Maischein (CORION),
 Patrick Donelan (PATSPAM),
 Paweł Murias (PMURIAS),
 Petar Shangov (PSHANGOV),
-Steffen Mueller (TSEE)
+Steffen Müller (TSEE)
 
 
 
@@ -1060,25 +1064,29 @@ To Octavian Rasnita for early testing and bug reports.
 
 =head2 Translations
 
-Arabic - Ahmad M. Zawawi (AZAWAWI)
+Arabic - Ahmad M. Zawawi - أحمد محمد زواوي (AZAWAWI)
 
 Dutch - Dirk De Nijs (ddn123456)
 
 English - everyone on the team
 
-French - Jerome Quelin (JQUELIN)
+French - Jérôme Quelin (JQUELIN)
 
 German - Heiko Jansen (HJANSEN)
 
-Hebrew - Omer Zak and Shlomi Fish (SHLOMIF)
+Hebrew - Omer Zak  - עומר זק and Shlomi Fish  - שלומי פיש (SHLOMIF)
 
-Hungarian - Gyorgy Pasztor (GYU)
+Hungarian - György Pásztor (GYU)
 
 Italian - Simone Blandino (SBLANDIN)
 
-Korean - Keedi Kim (KEEDI)
+Korean - Keedi Kim - 김도형 (KEEDI)
 
 Russian - Andrew Shitov
+
+Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
+
+Spanish - Paco Alguacil (PacoLinux)
 
 =cut
 
