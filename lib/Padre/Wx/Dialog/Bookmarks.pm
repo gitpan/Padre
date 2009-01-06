@@ -10,7 +10,7 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 my $dialog;
@@ -97,29 +97,26 @@ sub _get_data {
 }
 
 sub set_bookmark {
-	my ($class, $main) = @_;
-
-	my $editor   = $main->selected_editor;
-	return if not $editor;
+	my $class    = shift;
+	my $main     = shift;
+	my $current  = $main->current;
+	my $editor   = $current->editor or return;
+	my $path     = $current->filename;
 	my $line     = $editor->GetCurrentLine;
-	my $path     = $main->selected_filename;
 	my $file     = File::Basename::basename($path || '');
+	my $dialog   = $class->dialog(
+		$main,
+		sprintf(gettext("%s line %s"), $file, $line)
+	);
+	$dialog->show_modal or return;
 
-	my $dialog   = $class->dialog($main, sprintf(gettext("%s line %s"), $file, $line));
-	return if not $dialog->show_modal;
-	
 	my $data     = _get_data($dialog);
-
 	my $config   = Padre->ide->config;
-	my $shortcut = delete $data->{shortcut};
-	#my $text     = delete $data->{text};
+	my $shortcut = delete $data->{shortcut} or return;
 	
-	return if not $shortcut;
-
 	$data->{file}   = $path;
 	$data->{line}   = $line;
-	#$data->{pageid} = $pageid;
-	$config->{bookmarks}{$shortcut} = $data;
+	$config->{bookmarks}->{$shortcut} = $data;
 
 	return;
 }
@@ -155,7 +152,7 @@ sub goto_bookmark {
 	if (defined $pageid) {
 	   $main->on_nth_pane($pageid);
 	   my $page = $main->nb->GetPage($pageid);
-	   $page->GotoLine($line);
+	   $page->goto_line_centerize($line);
 	}
 
 	return;

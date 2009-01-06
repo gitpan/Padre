@@ -5,10 +5,11 @@ package Padre::Wx::Menu::Edit;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Current     qw{_CURRENT};
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -33,7 +34,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main, # Ctrl-Z
 		$self->{undo},
 		sub {
-			Padre::Documents->current->editor->Undo;
+			Padre::Current->editor->Undo;
 		},
 	);
 
@@ -44,7 +45,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main, # Ctrl-Y
 		$self->{redo},
 		sub {
-			Padre::Documents->current->editor->Redo;
+			Padre::Current->editor->Redo;
 		},
 	);
 
@@ -76,7 +77,7 @@ sub new {
 			Wx::gettext("Mark selection start\tCtrl-[")
 		),
 		sub {
-			my $editor = Padre->ide->wx->main_window->selected_editor or return;
+			my $editor = Padre::Current->editor or return;
 			$editor->text_selection_mark_start;
 		},
 	);
@@ -86,7 +87,7 @@ sub new {
 			Wx::gettext("Mark selection end\tCtrl-]")
 		),
 		sub {
-			my $editor = Padre->ide->wx->main_window->selected_editor or return;
+			my $editor = Padre::Current->editor or return;
 			$editor->text_selection_mark_end;
 		},
 	);
@@ -110,7 +111,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{copy},
 		sub {
-			Padre->ide->wx->main_window->selected_editor->Copy;
+			Padre::Current->editor->Copy;
 		}
 	);
 
@@ -121,7 +122,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{cut},
 		sub {
-			Padre->ide->wx->main_window->selected_editor->Cut;
+			Padre::Current->editor->Cut;
 		}
 	);
 
@@ -132,7 +133,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{paste},
 		sub { 
-			my $editor = Padre->ide->wx->main_window->selected_editor or return;
+			my $editor = Padre::Current->editor or return;
 			$editor->Paste;
 		},
 	);
@@ -258,26 +259,29 @@ sub new {
 
 
 	# Upper and Lower Case
-	my $edit_case = Wx::Menu->new;
+	$self->{case} = Wx::Menu->new;
 	$self->Append( -1,
 		Wx::gettext("Upper/Lower Case"),
-		$edit_case
+		$self->{case},
+	);
+
+	$self->{case_upper} = $self->{case}->Append( -1,
+		Wx::gettext("Upper All\tCtrl-Shift-U"),
 	);
 	Wx::Event::EVT_MENU( $main,
-		$edit_case->Append( -1,
-			Wx::gettext("Upper All\tCtrl-Shift-U")
-		),
+		$self->{case_upper},
 		sub {
-			Padre::Documents->current->editor->UpperCase;
+			$_[0]->current->editor->UpperCase;
 		},
 	);
 
+	$self->{case_lower} = $self->{case}->Append( -1,
+		Wx::gettext("Lower All\tCtrl-U"),
+	);
 	Wx::Event::EVT_MENU( $main,
-		$edit_case->Append( -1,
-			Wx::gettext("Lower All\tCtrl-U")
-		),
+		$self->{case_lower},
 		sub {
-			Padre::Documents->current->editor->LowerCase;
+			$_[0]->current->editor->LowerCase;
 		},
 	);
 
@@ -327,10 +331,13 @@ sub new {
 
 sub refresh {
 	my $self     = shift;
-	my $document = Padre::Documents->current;
-	my $doc      = $document ? 1 : 0;
+	my $current  = _CURRENT(@_);
+	my $document = $current->document;
+	my $editor   = $current->editor || 0;
+	my $text     = $current->text;
 
 	# Handle the simple cases
+	my $doc = $document ? 1 : 0;
 	$self->{ goto             }->Enable($doc);
 	$self->{ autocomp         }->Enable($doc);
 	$self->{ brace_match      }->Enable($doc);
@@ -340,11 +347,11 @@ sub refresh {
 	$self->{ uncomment        }->Enable($doc);
 	$self->{ diff             }->Enable($doc);
 	$self->{ insert_from_file }->Enable($doc);
+	$self->{ case_upper       }->Enable($doc);
+	$self->{ case_lower       }->Enable($doc);
 
 	# Handle the complex cases
-	my $editor    = $document ? $document->editor : 0;
-	my $selected  = $editor ? $editor->GetSelectedText : '';
-	my $selection = !! ( defined $selected and $selected ne '' );
+	my $selection = !! ( defined $text and $text ne '' );
 	$self->{undo}->Enable( $editor and $editor->CanUndo );
 	$self->{redo}->Enable( $editor and $editor->CanRedo );
 	$self->{cut}->Enable( $selection );

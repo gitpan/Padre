@@ -11,7 +11,7 @@ use File::HomeDir ();
 use Params::Util  qw{ _STRING _ARRAY };
 use YAML::Tiny    ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 my %defaults = (
 	# Number of modules to display when searching for documentation
@@ -179,7 +179,7 @@ sub new {
 	$self->{host}->{run_command} ||= '';
 
 	# Default the locale to the system locale
-
+	$self->{host}->{style} ||= 'default';
 
 	%$self = (%defaults, %$self);
 

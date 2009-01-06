@@ -3,11 +3,11 @@ package Padre::Wx::Dialog::Preferences;
 use 5.008;
 use strict;
 use warnings;
-
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
+use Padre::Current    ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 sub get_layout_for_behaviour {
 	my ($config, $main_startup, $editor_autoindent, $editor_methods) = @_;
@@ -129,7 +129,7 @@ sub dialog {
 sub guess_indentation_settings {
 	my $class  = shift;
 	my $dialog = shift;
-	my $doc    = Padre::Documents->current;
+	my $doc    = Padre::Current->document;
 
 	my $indent_style = $doc->guess_indentation_style();
 	

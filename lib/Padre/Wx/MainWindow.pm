@@ -41,9 +41,9 @@ use Padre::Wx::ErrorList      ();
 use Padre::Wx::AuiManager     ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Document           ();
-use Padre::Documents          ();
+use Padre::Current            qw{_CURRENT};
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Wx::Frame';
 
 my $default_dir = Cwd::cwd();
@@ -290,11 +290,22 @@ sub create_side_pane {
 
 	$self->manager->AddPane(
 		$self->{gui}->{sidepane},
-		Wx::AuiPaneInfo->new->Name('sidepane')
-			->CenterPane->Resizable(1)->PaneBorder(0)->Movable(1)
-			->CaptionVisible(1)->CloseButton(0)->DestroyOnClose(0)
-			->MaximizeButton(0)->Floatable(1)->Dockable(1)
-			->Caption( Wx::gettext("Workspace View") )->Position(3)->Right->Layer(3)
+		Wx::AuiPaneInfo->new
+			->Name('sidepane')
+			->CenterPane
+			->Resizable(1)
+			->PaneBorder(0)
+			->Movable(1)
+			->CaptionVisible(1)
+			->CloseButton(0)
+			->DestroyOnClose(0)
+			->MaximizeButton(0)
+			->Floatable(1)
+			->Dockable(1)
+			->Caption( Wx::gettext("Workspace View") )
+			->Position(3)
+			->Right
+			->Layer(3)
 			->Hide
 	);
 
@@ -347,8 +358,7 @@ sub load_files {
 				my $file = $main_files[$i];
 				my $id   = $self->setup_editor($file);
 				if ( $id and $main_files_pos[$i] ) {
-					my $doc  = Padre::Documents->by_id($id);
-					$doc->editor->GotoPos( $main_files_pos[$i] );
+					$self->notebook->GetPage($id)->GotoPos( $main_files_pos[$i] );
 				}
 			}
 			if ( $config->{host}->{main_file} ) {
@@ -447,23 +457,24 @@ sub refresh {
 	my $self = shift;
 	return if $self->no_refresh;
 
+	# Freeze during the refresh
 	$self->Freeze;
 
-	# Freeze during the subtle parts of the refresh
-	$self->refresh_menu;
-	$self->refresh_toolbar;
-	$self->refresh_status;
-	$self->refresh_methods;
+	my $current = $self->current;
+	$self->refresh_menu($current);
+	$self->refresh_toolbar($current);
+	$self->refresh_status($current);
+	$self->refresh_methods($current);
 
 	# Fix ticket #185: Padre crash when closing files
 	if ( ! $self->{no_syntax_check_refresh} ) {
-		$self->refresh_syntaxcheck;
+		$self->refresh_syntaxcheck($current);
 	}
 	$self->{no_syntax_check_refresh} = 0;
 
-	my $id = $self->nb->GetSelection;
+	my $id = $self->notebook->GetSelection;
 	if ( defined $id and $id >= 0 ) {
-		$self->nb->GetPage($id)->SetFocus;
+		$self->notebook->GetPage($id)->SetFocus;
 	}
 
 	$self->Thaw;
@@ -482,19 +493,19 @@ sub refresh_syntaxcheck {
 sub refresh_menu {
 	my $self = shift;
 	return if $self->no_refresh;
-	$self->menu->refresh;
+	$self->menu->refresh($_[0] or $self->current);
 }
 
 sub refresh_toolbar {
 	my $self = shift;
 	return if $self->no_refresh;
-	$self->GetToolBar->refresh($self->selected_document);
+	$self->GetToolBar->refresh($_[0] or $self->current);
 }
 
 sub refresh_status {
 	my $self = shift;
 	return if $self->no_refresh;
-	$self->GetStatusBar->refresh;
+	$self->GetStatusBar->refresh($_[0] or $self->current);
 }
 
 # TODO now on every ui chnage (move of the mouse)
@@ -505,19 +516,20 @@ sub refresh_methods {
 	return if $self->no_refresh;
 	return unless $self->menu->view->{functions}->IsChecked;
 
-	my $subs_panel = $self->{gui}->{subs_panel};
-
-	my $doc = $self->selected_document;
-	unless ( $doc ) {
-		$subs_panel->DeleteAllItems;
+	# Flush the list if there is no active document
+	my $current    = _CURRENT(@_);
+	my $document   = $current->document;
+	my $subs = $self->{gui}->{subs_panel};
+	unless ( $document ) {
+		$subs->DeleteAllItems;
 		return;
 	}
 
-	my @methods = $doc->get_functions;
 	my $config  = Padre->ide->config;
-	if ($config->{editor_methods} eq 'original') {
-		# that should be the one we got from get_functions
-	} elsif ($config->{editor_methods} eq 'alphabetical_private_last') {
+	my @methods = $document->get_functions;
+	if ( $config->{editor_methods} eq 'original' ) {
+		# That should be the one we got from get_functions
+	} elsif ( $config->{editor_methods} eq 'alphabetical_private_last' ) {
 		# ~ comes after \w
 		@methods = map { tr/~/_/; $_ } ## no critic
 			sort
@@ -528,15 +540,17 @@ sub refresh_methods {
 		@methods = sort @methods;
 	}
 
-	my $new = join ';', @methods;
-	my $old = join ';', @{ $self->{_methods} };
-	return if $old eq $new;
-
-	$subs_panel->DeleteAllItems;
-	foreach my $method ( reverse @methods ) {
-		$subs_panel->InsertStringItem(0, $method);
+	if ( scalar(@methods) == scalar(@{$self->{_methods}}) ) {
+		my $new = join ';', @methods;
+		my $old = join ';', @{ $self->{_methods} };
+		return if $old eq $new;	
 	}
-	$subs_panel->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
+
+	$subs->DeleteAllItems;
+	foreach my $method ( reverse @methods ) {
+		$subs->InsertStringItem(0, $method);
+	}
+	$subs->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
 	$self->{_methods} = \@methods;
 
 	return;
@@ -561,8 +575,12 @@ sub change_style {
 }
 
 sub change_locale {
+	$DB::single = 1;
 	my $self = shift;
 	my $name = shift;
+	unless ( defined $name ) {
+		$name = Padre::Locale::system_rfc4646();
+	}
 
 	# Save the locale to the config
 	Padre->ide->config->{host}->{locale} = $name;
@@ -611,61 +629,42 @@ sub relocale {
 #####################################################################
 # Introspection
 
-sub selected_document {
-	Padre::Documents->current;
-}
-
 sub nb {
 	return $_[0]->{gui}->{notebook};
 }
 
-=head2 selected_editor
+sub notebook {
+	return $_[0]->{gui}->{notebook};
+}
 
- my $editor = $self->selected_editor;
- my $text   = $editor->GetText;
+=pod
 
- ... do your stuff with the $text
+=head2 current
 
- $editor->SetText($text);
+  $self->current->document
+  $self->current->editor
+  $self->current->filename
+  $self->current->title
+  $self->current->text
 
-You can also use the following two methods to make
-your editing a atomic in the Undo stack.
+Creates a L<Padre::Current> object for the main window, giving you quick
+and cacheing access to the current various whatevers.
 
- $editor->BeginUndoAction;
- $editor->EndUndoAction;
+See L<Padre::Current> for more information (once we've actually written
+the POD for it).
 
 =cut
 
-sub selected_editor {
-	my $nb = $_[0]->nb;
-	return $nb->GetPage( $nb->GetSelection );
-}
-
-=head2 selected_filename
-
-Returns the name filename of the current buffer.
-
-=cut
-
-sub selected_filename {
-	my $self = shift;
-	my $doc = $self->selected_document or return;
-	return $doc->filename;
-}
-
-sub selected_text {
-	my $self = shift;
-	my $id   = $self->nb->GetSelection;
-	return if $id == -1;
-	return $self->selected_editor->GetSelectedText;
+sub current {
+	Padre::Current->new( main => $_[0] );
 }
 
 sub pageids {
-	return ( 0 .. $_[0]->nb->GetPageCount - 1 );
+	return ( 0 .. $_[0]->notebook->GetPageCount - 1 );
 }
 
 sub pages {
-	my $notebook = $_[0]->nb;
+	my $notebook = $_[0]->notebook;
 	return map { $notebook->GetPage($_) } $_[0]->pageids;
 }
 
@@ -763,7 +762,7 @@ sub run_command {
 # This should really be somewhere else, but can stay here for now
 sub run_script {
 	my $self     = shift;
-	my $document = Padre::Documents->current;
+	my $document = $self->current->document;
 	unless ( $document ) {
 		return $self->error(Wx::gettext("No open document"));
 	}
@@ -801,7 +800,7 @@ sub run_script {
 
 sub debug_perl {
 	my $self     = shift;
-	my $document = $self->selected_document;
+	my $document = $self->current->document;
 	unless ( $document->isa('Perl::Document::Perl') ) {
 		return $self->error(Wx::gettext("Not a Perl document"));
 	}
@@ -851,14 +850,13 @@ sub message {
 }
 
 sub error {
-	my $self = shift;
-	$self->message( shift, Wx::gettext('Error') );
+	$_[0]->message( $_[1], Wx::gettext('Error') );
 }
 
 sub find {
 	my $self = shift;
 
-	if ( not defined $self->{fast_find_panel} ) {
+	unless ( defined $self->{fast_find_panel} ) {
 		require Padre::Wx::Dialog::Search;
 		$self->{fast_find_panel} = Padre::Wx::Dialog::Search->new;
 	}
@@ -868,82 +866,82 @@ sub find {
 
 
 
+
+
 #####################################################################
 # Event Handlers
 
 sub on_brace_matching {
-	my ($self, $event) = @_;
-
-	my $page  = $self->selected_editor;
+	my $self  = shift;
+	my $page  = $self->current->editor;
 	my $pos1  = $page->GetCurrentPos;
 	my $pos2  = $page->BraceMatch($pos1);
-	if ($pos2 == -1 ) {   #Wx::wxSTC_INVALID_POSITION
-		if ($pos1 > 0) {
+	if ( $pos2 == -1 ) {   #Wx::wxSTC_INVALID_POSITION
+		if ( $pos1 > 0 ) {
 			$pos1--;
 			$pos2 = $page->BraceMatch($pos1);
 		}
 	}
 
-	if ($pos2 != -1 ) {   #Wx::wxSTC_INVALID_POSITION
-		#print "$pos1 $pos2\n";
-		#$page->BraceHighlight($pos1, $pos2);
-		#$page->SetCurrentPos($pos2);
+	if ( $pos2 != -1 ) {   #Wx::wxSTC_INVALID_POSITION
 		$page->GotoPos($pos2);
-		#$page->MoveCaretInsideView;
 	}
 	# TODO: or any nearby position.
 
 	return;
 }
 
-
 sub on_comment_out_block {
-	my ($self, $event) = @_;
-
-	my $page   = $self->selected_editor;
-	my $begin  = $page->LineFromPosition($page->GetSelectionStart);
-	my $end    = $page->LineFromPosition($page->GetSelectionEnd);
-	my $doc    = $self->selected_document;
-
-	my $str = $doc->comment_lines_str;
-	return if not defined $str;
-	$page->comment_lines($begin, $end, $str);
-
+	my $self     = shift;
+	my $current  = $self->current;
+	my $editor   = $current->editor;
+	my $document = $current->document;
+	my $begin    = $editor->LineFromPosition($editor->GetSelectionStart);
+	my $end      = $editor->LineFromPosition($editor->GetSelectionEnd);
+	my $string   = $document->comment_lines_str;
+	return unless defined $string;
+	$editor->comment_lines($begin, $end, $string);
 	return;
 }
 
 sub on_uncomment_block {
-	my ($self, $event) = @_;
-
-	my $page   = $self->selected_editor;
-	my $begin  = $page->LineFromPosition($page->GetSelectionStart);
-	my $end    = $page->LineFromPosition($page->GetSelectionEnd);
-	my $doc    = $self->selected_document;
-
-	my $str = $doc->comment_lines_str;
-	return if not defined $str;
-	$page->uncomment_lines($begin, $end, $str);
-
+	my $self     = shift;
+	my $current  = $self->current;
+	my $editor   = $current->editor;
+	my $document = $current->document;
+	my $begin    = $editor->LineFromPosition($editor->GetSelectionStart);
+	my $end      = $editor->LineFromPosition($editor->GetSelectionEnd);
+	my $string   = $document->comment_lines_str;
+	return unless defined $string;
+	$editor->uncomment_lines($begin, $end, $string);
 	return;
 }
 
 sub on_autocompletition {
-	my $self   = shift;
-	my $doc    = $self->selected_document or return;
-	my ( $length, @words ) = $doc->autocomplete;
+	my $self     = shift;
+	my $document = $self->current->document or return;
+	my ( $length, @words ) = $document->autocomplete;
 	if ( $length =~ /\D/ ) {
-		Wx::MessageBox($length, Wx::gettext("Autocompletions error"), Wx::wxOK);
+		Wx::MessageBox(
+			$length,
+			Wx::gettext("Autocompletions error"),
+			Wx::wxOK,
+		);
 	}
 	if ( @words ) {
-		$doc->editor->AutoCompShow($length, join " ", @words);
+		$document->editor->AutoCompShow($length, join " ", @words);
 	}
 	return;
 }
 
 sub on_goto {
-	my $self = shift;
-
-	my $dialog = Wx::TextEntryDialog->new( $self, Wx::gettext("Line number:"), "", '' );
+	my $self   = shift;
+	my $dialog = Wx::TextEntryDialog->new(
+		$self,
+		Wx::gettext("Line number:"),
+		"",
+		'',
+	);
 	if ($dialog->ShowModal == Wx::wxID_CANCEL) {
 		return;
 	}   
@@ -952,36 +950,37 @@ sub on_goto {
 	return if not defined $line_number or $line_number !~ /^\d+$/;
 	#what if it is bigger than buffer?
 
-	my $page = $self->selected_editor;
-
+	my $page = $self->current->editor;
 	$line_number--;
-	$page->GotoLine($line_number);
+	$page->goto_line_centerize($line_number);
 
 	return;
 }
 
 sub on_close_window {
-	my $self   = shift;
-	my $event  = shift;
-	my $padre  = Padre->ide;
-	my $config = $padre->config;
+	my $self      = shift;
+	my $event     = shift;
+	my $padre     = Padre->ide;
+	my $config    = $padre->config;
+	my $notebook  = $self->notebook;
+	my @documents = grep { $_ }
+		map  { $_->{Document} }
+		grep { $_ }
+		map  { $notebook->GetPage($_) }
+		$self->pageids;
 
 	# Capture the current session, before we start the interactive
 	# part of the shutdown which will mess it up. Don't save it to
 	# the config yet, because we haven't committed to the shutdown
 	# until we get past the interactive phase.
-	my $main_file  = $self->selected_filename;
-	my $main_files = [
+	my $main_file  = $self->current->filename;
+	my $main_files = [ 
 		map  { $_->filename }
-		grep { $_ } 
-		map  { Padre::Documents->by_id($_) }
-		$self->pageids
+		@documents
 	];
 	my $main_files_pos = [
 		map  { $_->editor->GetCurrentPos }
-		grep { $_ } 
-		map  { Padre::Documents->by_id($_) }
-		$self->pageids
+		@documents
 	];
 
 	# Check that all files have been saved
@@ -1048,17 +1047,16 @@ sub on_close_window {
 }
 
 sub on_split_window {
-	my ($self) = @_;
-
-	my $editor  = $self->selected_editor;
-	my $id      = $self->nb->GetSelection;
-	my $title   = $self->nb->GetPageText($id);
-	my $file    = $self->selected_filename;
-	return if not $file;
-	my $pointer = $editor->GetDocPointer();
+	my $self     = shift;
+	my $current  = $self->current;
+	my $notebook = $current->_notebook;
+	my $editor   = $current->editor;
+	my $title    = $current->title;
+	my $file     = $current->filename or return;
+	my $pointer  = $editor->GetDocPointer;
 	$editor->AddRefDocument($pointer);
 
-	my $new_editor = Padre::Wx::Editor->new( $self->nb );
+	my $new_editor = Padre::Wx::Editor->new( $self->notebook );
 	$new_editor->{Document} = $editor->{Document};
 	$new_editor->padre_setup;
 	$new_editor->SetDocPointer($pointer);
@@ -1072,15 +1070,16 @@ sub on_split_window {
 }
 
 sub setup_editors {
-	my ($self, @files) = @_;
+	my $self  = shift;
+	my @files = @_;
 	$self->Freeze;
 
 	# If and only if there is only one current file,
 	# and it is unused, close it. This is a somewhat
 	# subtle interface DWIM trick, but it's one that
 	# clearly looks wrong when we DON'T do it.
-	if ( $self->nb->GetPageCount == 1 ) {
-		if ( Padre::Documents->current->is_unused ) {
+	if ( $self->notebook->GetPageCount == 1 ) {
+		if ( $self->current->document->is_unused ) {
 			$self->on_close($self);
 		}
 	}
@@ -1132,7 +1131,7 @@ sub setup_editor {
 		return;
 	}
 
-	my $editor = Padre::Wx::Editor->new( $self->nb );
+	my $editor = Padre::Wx::Editor->new( $self->notebook );
 	$editor->{Document} = $doc;
 	$doc->set_editor( $editor );
 	$editor->configure_editor($doc);
@@ -1161,13 +1160,10 @@ sub setup_editor {
 
 sub create_tab {
 	my ($self, $editor, $file, $title) = @_;
-
-	$self->nb->AddPage($editor, $title, 1);
+	$self->notebook->AddPage($editor, $title, 1);
 	$editor->SetFocus;
-	my $id  = $self->nb->GetSelection;
-
+	my $id = $self->notebook->GetSelection;
 	$self->refresh;
-
 	return $id;
 }
 
@@ -1179,10 +1175,10 @@ sub create_tab {
 #    of a module and try to open it locally or from @INC.
 sub on_open_selection {
 	my ($self, $event) = @_;
-	
+
 	# get selection, ask for it if needed
-	my $selection = $self->selected_text();
-	if (not $selection) {
+	my $text = $self->current->text;
+	unless ( $text ) {
 		my $dialog = Wx::TextEntryDialog->new(
 			$self,
 			Wx::gettext("Nothing selected. Enter what should be opened:"),
@@ -1191,36 +1187,36 @@ sub on_open_selection {
 		);
 		return if $dialog->ShowModal == Wx::wxID_CANCEL;
 
-		$selection = $dialog->GetValue;
+		$text = $dialog->GetValue;
 		$dialog->Destroy;
-		return if not defined $selection;
+		return unless defined $text;
 	}
 	
 	my $file;
-	if (-e $selection) {
-		$file = $selection;
-		if (not File::Spec->file_name_is_absolute($file)) {
+	if ( -e $text ) {
+		$file = $text;
+		unless ( File::Spec->file_name_is_absolute($file) ) {
 			$file = File::Spec->catfile(Cwd::cwd(), $file);
 			# check if this is still a file?
 		}
 	} else {
-		my $filename
-			= File::Spec->catfile(
-					File::Basename::dirname($self->selected_filename),
-					$selection);
-		if (-e $filename) {
+		my $filename = File::Spec->catfile(
+			File::Basename::dirname($self->current->filename),
+			$text,
+		);
+		if ( -e $filename ) {
 			$file = $filename;
 		}
 	}
-	if (not $file) { # and we are in a Perl environment
-		$selection =~ s{::}{/}g;
-		$selection .= ".pm";
-		my $filename = File::Spec->catfile(Cwd::cwd(), $selection);
+	unless ( $file ) { # and we are in a Perl environment
+		$text =~ s{::}{/}g;
+		$text .= ".pm";
+		my $filename = File::Spec->catfile(Cwd::cwd(), $text);
 		if (-e $filename) {
 			$file = $filename;
 		} else {
 			foreach my $path (@INC) {
-				my $filename = File::Spec->catfile( $path, $selection );
+				my $filename = File::Spec->catfile( $path, $text );
 				if (-e $filename) {
 					$file = $filename;
 					last;
@@ -1229,8 +1225,13 @@ sub on_open_selection {
 		}
 	}
 
-	if (not $file) {
-		Wx::MessageBox(sprintf(Wx::gettext("Could not find file '%s'"), $selection), Wx::gettext("Open Selection"), Wx::wxOK, $self);
+	unless ( $file ) {
+		Wx::MessageBox(
+			sprintf(Wx::gettext("Could not find file '%s'"), $text),
+			Wx::gettext("Open Selection"),
+			Wx::wxOK,
+			$self,
+		);
 		return;
 	}
 
@@ -1240,18 +1241,15 @@ sub on_open_selection {
 }
 
 sub on_open_all_recent_files {
-	my ( $self ) = @_;
-	
 	my $files = Padre::DB->get_recent_files;
-	$self->setup_editors( @$files );
+	$_[0]->setup_editors( @$files );
 }
 
 sub on_open {
-	my ($self, $event) = @_;
-
-	my $current_filename = $self->selected_filename;
-	if ($current_filename) {
-		$default_dir = File::Basename::dirname($current_filename);
+	my $self     = shift;
+	my $filename = $self->current->filename;
+	if ( $filename ) {
+		$default_dir = File::Basename::dirname($filename);
 	}
 	my $dialog = Wx::FileDialog->new(
 		$self,
@@ -1277,28 +1275,29 @@ sub on_open {
 }
 
 sub on_reload_file {
-	my ($self) = @_;
-
-	my $doc     = $self->selected_document or return;
-	if (not $doc->reload) {
-		$self->error(sprintf(Wx::gettext("Could not reload file: %s"), $doc->errstr));
+	my $self     = shift;
+	my $document = $self->current->document or return;
+	if ( $document->reload ) {
+		$document->editor->configure_editor($document);
 	} else {
-		$doc->editor->configure_editor($doc);
+		$self->error( sprintf(
+			Wx::gettext("Could not reload file: %s"),
+			$document->errstr
+		) );
 	}
-
 	return;
 }
 
 # Returns true if saved.
 # Returns false if cancelled.
 sub on_save_as {
-	my $self    = shift;
-	my $doc     = $self->selected_document or return;
-	my $current = $doc->filename;
+	my $self     = shift;
+	my $document = $self->current->document or return;
+	my $current  = $document->filename;
 	if ( defined $current ) {
 		$default_dir = File::Basename::dirname($current);
 	}
-	while (1) {
+	while ( 1 ) {
 		my $dialog = Wx::FileDialog->new(
 			$self,
 			Wx::gettext("Save file as..."),
@@ -1314,29 +1313,29 @@ sub on_save_as {
 		$default_dir = $dialog->GetDirectory;
 		my $path = File::Spec->catfile($default_dir, $filename);
 		if ( -e $path ) {
-			my $res = Wx::MessageBox(
+			my $response = Wx::MessageBox(
 				Wx::gettext("File already exists. Overwrite it?"),
 				Wx::gettext("Exist"),
 				Wx::wxYES_NO,
 				$self,
 			);
-			if ( $res == Wx::wxYES ) {
-				$doc->_set_filename($path);
-				$doc->set_newline_type(Padre::Util::NEWLINE);
+			if ( $response == Wx::wxYES ) {
+				$document->_set_filename($path);
+				$document->set_newline_type(Padre::Util::NEWLINE);
 				last;
 			}
 		} else {
-			$doc->_set_filename($path);
-			$doc->set_newline_type(Padre::Util::NEWLINE);
+			$document->_set_filename($path);
+			$document->set_newline_type(Padre::Util::NEWLINE);
 			last;
 		}
 	}
-	my $pageid = $self->nb->GetSelection;
+	my $pageid = $self->notebook->GetSelection;
 	$self->_save_buffer($pageid);
 
-	$doc->set_mimetype( $doc->guess_mimetype );
-	$doc->editor->padre_setup;
-	$doc->rebless;
+	$document->set_mimetype( $document->guess_mimetype );
+	$document->editor->padre_setup;
+	$document->rebless;
 
 	$self->refresh;
 
@@ -1344,15 +1343,14 @@ sub on_save_as {
 }
 
 sub on_save {
-	my $self = shift;
+	my $self     = shift;
+	my $document = $self->current->document or return;
 
-	my $doc    = $self->selected_document or return;
-
-	if ( $doc->is_new ) {
+	if ( $document->is_new ) {
 		return $self->on_save_as;
 	}
-	if ( $doc->is_modified ) {
-		my $pageid = $self->nb->GetSelection;
+	if ( $document->is_modified ) {
+		my $pageid = $self->notebook->GetSelection;
 		$self->_save_buffer($pageid);
 	}
 
@@ -1364,7 +1362,7 @@ sub on_save {
 sub on_save_all {
 	my $self = shift;
 	foreach my $id ( $self->pageids ) {
-		my $doc = Padre::Documents->by_id($id);
+		my $doc = $self->notebook->GetPage($id) or next;
 		$self->on_save( $doc ) or return 0;
 	}
 	return 1;
@@ -1373,10 +1371,10 @@ sub on_save_all {
 sub _save_buffer {
 	my ($self, $id) = @_;
 
-	my $page         = $self->nb->GetPage($id);
-	my $doc          = Padre::Documents->by_id($id) or return;
+	my $page = $self->notebook->GetPage($id);
+	my $doc  = $page->{Document} or return;
 
-	if ($doc->has_changed_on_disk) {
+	if ( $doc->has_changed_on_disk ) {
 		my $ret = Wx::MessageBox(
 			Wx::gettext("File changed on disk since last saved. Do you want to overwrite it?"),
 			$doc->filename || Wx::gettext("File not in sync"),
@@ -1386,8 +1384,13 @@ sub _save_buffer {
 		return if $ret != Wx::wxYES;
 	}
 
-	if (not $doc->save_file) {
-		Wx::MessageBox(Wx::gettext("Could not save file: ") . $doc->errstr, Wx::gettext("Error"), Wx::wxOK, $self);
+	unless ( $doc->save_file ) {
+		Wx::MessageBox(
+			Wx::gettext("Could not save file: ") . $doc->errstr,
+			Wx::gettext("Error"),
+			Wx::wxOK,
+			$self,
+		);
 		return;
 	}
 
@@ -1411,27 +1414,31 @@ sub on_close {
 		$event->Veto;
 	}
 	$self->close;
-    $self->{no_syntax_check_refresh} = 1;
+	$self->{no_syntax_check_refresh} = 1;
 	$self->refresh;
 }
 
 sub close {
-	my ($self, $id) = @_;
-
-	$id = defined $id ? $id : $self->nb->GetSelection;
-	
+	my $self     = shift;
+	my $notebook = $self->notebook;
+	my $id       = shift;
+	unless ( defined $id ) {
+		$id = $notebook->GetSelection;
+	}
 	return if $id == -1;
-	
-	my $doc = Padre::Documents->by_id($id) or return;
+
+	my $editor = $notebook->GetPage($id) or return;
+	my $doc    = $editor->{Document}     or return;
 
 	local $self->{_no_refresh} = 1;
-	
 
 	if ( $doc->is_modified and not $doc->is_unused ) {
 		my $ret = Wx::MessageBox(
 			Wx::gettext("File changed. Do you want to save it?"),
 			$doc->filename || Wx::gettext("Unsaved File"),
-			Wx::wxYES_NO|Wx::wxCANCEL|Wx::wxCENTRE,
+			Wx::wxYES_NO
+			| Wx::wxCANCEL
+			| Wx::wxCENTRE,
 			$self,
 		);
 		if ( $ret == Wx::wxYES ) {
@@ -1443,10 +1450,10 @@ sub close {
 			return 0;
 		}
 	}
-	$self->nb->DeletePage($id);
+	$self->notebook->DeletePage($id);
 
 	# Remove the entry from the Window menu
-	$self->menu->window->refresh;
+	$self->menu->window->refresh($self->current);
 
 	return 1;
 }
@@ -1460,7 +1467,7 @@ sub on_close_all {
 
 sub on_close_all_but_current {
 	my $self = shift;
-	return $self->_close_all( $self->nb->GetSelection );
+	return $self->_close_all( $self->notebook->GetSelection );
 }
 
 sub _close_all {
@@ -1479,10 +1486,10 @@ sub _close_all {
 
 sub on_nth_pane {
 	my ($self, $id) = @_;
-	my $page = $self->nb->GetPage($id);
+	my $page = $self->notebook->GetPage($id);
 	if ($page) {
-		$self->nb->SetSelection($id);
-		$self->refresh_status;
+		$self->notebook->SetSelection($id);
+		$self->refresh_status($self->current);
 		$page->{Document}->set_indentation_style(); # TODO: encapsulation?
 		return 1;
 	}
@@ -1493,10 +1500,10 @@ sub on_nth_pane {
 sub on_next_pane {
 	my ($self) = @_;
 
-	my $count = $self->nb->GetPageCount;
+	my $count = $self->notebook->GetPageCount;
 	return if not $count;
 
-	my $id    = $self->nb->GetSelection;
+	my $id    = $self->notebook->GetSelection;
 	if ($id + 1 < $count) {
 		$self->on_nth_pane($id + 1);
 	} else {
@@ -1507,9 +1514,9 @@ sub on_next_pane {
 
 sub on_prev_pane {
 	my ($self) = @_;
-	my $count = $self->nb->GetPageCount;
+	my $count = $self->notebook->GetPageCount;
 	return if not $count;
-	my $id    = $self->nb->GetSelection;
+	my $id    = $self->notebook->GetSelection;
 	if ($id) {
 		$self->on_nth_pane($id - 1);
 	} else {
@@ -1519,23 +1526,24 @@ sub on_prev_pane {
 }
 
 sub on_diff {
-	my $self = shift;
-	my $doc  = Padre::Documents->current;
-	return if not $doc;
-
-	my $current = $doc->text_get;
-	my $file    = $doc->filename;
-	return $self->error(Wx::gettext("Cannot diff if file was never saved")) if not $file;
+	my $self     = shift;
+	my $document = Padre::Current->document or return;
+	my $text     = $document->text_get;
+	my $file     = $document->filename;
+	unless ( $file ) {
+		return $self->error(Wx::gettext("Cannot diff if file was never saved"));
+	}
 
 	require Text::Diff;
-	my $diff = Text::Diff::diff($file, \$current);
-	
-	if ( not $diff ) {
+	my $diff = Text::Diff::diff( $file, \$text );
+	unless ( $diff ) {
 		$diff = Wx::gettext("There are no differences\n");
 	}
+
 	$self->show_output(1);
 	$self->{gui}->{output_panel}->clear;
 	$self->{gui}->{output_panel}->AppendText($diff);
+
 	return;
 }
 
@@ -1545,8 +1553,7 @@ sub on_diff {
 # toggle full screen status.
 #
 sub on_full_screen {
-	my ($self, $event) = @_;
-	$self->ShowFullScreen( ! $self->IsFullScreen );
+	$_[0]->ShowFullScreen( ! $_[0]->IsFullScreen );
 }
 
 #
@@ -1555,14 +1562,13 @@ sub on_full_screen {
 # join current line with next one (a-la vi with Ctrl+J)
 #
 sub on_join_lines {
-	my ($self) = @_;
-
-	my $page = $self->selected_editor;
+	my $self = shift;
+	my $page = $self->current->editor;
 
 	# find positions
 	my $pos1 = $page->GetCurrentPos;
 	my $line = $page->LineFromPosition($pos1);
-	my $pos2 = $page->PositionFromLine($line+1);
+	my $pos2 = $page->PositionFromLine($line + 1);
 
 	# mark target & join lines
 	$page->SetTargetStart($pos1);
@@ -1574,7 +1580,7 @@ sub on_join_lines {
 
 sub zoom {
 	my $self = shift;
-	my $zoom = $self->selected_editor->GetZoom + shift;
+	my $zoom = $self->current->editor->GetZoom + shift;
 	foreach my $page ( $self->pages ) {
 		$page->SetZoom($zoom);
 	}
@@ -1588,7 +1594,7 @@ sub on_preferences {
 		foreach my $editor ( $self->pages ) {
 			$editor->set_preferences;
 		}
-		$self->refresh_methods;
+		$self->refresh_methods($self->current);
 	}
 
 	return;
@@ -1711,9 +1717,8 @@ sub on_word_wrap {
 		$self->menu->view->{word_wrap}->Check($on);
 	}
 	
-	my $doc = $self->selected_document;
-	return unless $doc;
-	
+	my $doc = $self->current->document or return;
+
 	if ( $on ) {
 		$doc->editor->SetWrapMode( Wx::wxSTC_WRAP_WORD );
 	} else {
@@ -1898,18 +1903,22 @@ sub on_toggle_status_bar {
 }
 
 sub on_insert_from_file {
-	my ( $win ) = @_;
-	
-	my $id  = $win->nb->GetSelection;
+	my $self = shift;
+	my $id   = $self->notebook->GetSelection;
 	return if $id == -1;
-	
+
 	# popup the window
-	my $last_filename = $win->selected_filename;
-	if ($last_filename) {
+	my $last_filename = $self->current->filename;
+	if ( $last_filename ) {
 		$default_dir = File::Basename::dirname($last_filename);
 	}
 	my $dialog = Wx::FileDialog->new(
-		$win, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
+		$self,
+		Wx::gettext('Open file'),
+		$default_dir,
+		'',
+		'*.*',
+		Wx::wxFD_OPEN,
 	);
 	unless ( Padre::Util::WIN32 ) {
 		$dialog->SetWildcard("*");
@@ -1935,7 +1944,7 @@ sub on_insert_from_file {
 	$data->SetText($text);
 	my $length = $data->GetTextLength;
 	
-	my $editor = $win->nb->GetPage($id);
+	my $editor = $self->notebook->GetPage($id);
 	$editor->ReplaceSelection('');
 	my $pos = $editor->GetCurrentPos;
 	$editor->InsertText( $pos, $text );
@@ -1943,27 +1952,28 @@ sub on_insert_from_file {
 }
 
 sub convert_to {
-	my ($self, $newline_type) = @_;
-
-	my $editor = $self->selected_editor;
-	$editor->ConvertEOLs( $Padre::Wx::Editor::mode{$newline_type} );
+	my $self    = shift;
+	my $newline = shift;
+	my $current = $self->current;
+	my $editor  = $current->editor;
+	$editor->ConvertEOLs( $Padre::Wx::Editor::mode{$newline} );
 
 	# TODO: include the changing of file type in the undo/redo actions
 	# or better yet somehow fetch it from the document when it is needed.
-	my $doc = $self->selected_document or return;
-	$doc->set_newline_type($newline_type);
+	my $document = $current->document or return;
+	$document->set_newline_type($newline);
 
 	$self->refresh;
-
-	return;
 }
 
 sub find_editor_of_file {
-	my ($self, $file) = @_;
-	foreach my $id (0 .. $self->nb->GetPageCount -1) {
-	my $doc = Padre::Documents->by_id($id) or return;
-		my $filename = $doc->filename;
-		next if not $filename;
+	my $self     = shift;
+	my $file     = shift;
+	my $notebook = $self->notebook;
+	foreach my $id ( $self->pageids ) {
+		my $editor   = $notebook->GetPage($id) or return;
+		my $document = $editor->{Document}     or return;
+		my $filename = $document->filename     or next;
 		return $id if $filename eq $file;
 	}
 	return;
@@ -1971,7 +1981,7 @@ sub find_editor_of_file {
 
 sub run_in_padre {
 	my $self = shift;
-	my $doc  = $self->selected_document or return;
+	my $doc  = $self->current->document or return;
 	my $code = $doc->text_get;
 	eval $code; ## no critic
 	if ( $@ ) {
@@ -1986,13 +1996,31 @@ sub run_in_padre {
 }
 
 sub on_function_selected {
-	my ($self, $event) = @_;
-	my $sub = $event->GetItem->GetText;
-	return if not defined $sub;
+	$DB::single = 1;
+	my $self     = shift;
+	my $event    = shift;
+	my $subname  = $event->GetItem->GetText or return;
+	my $document = $self->current->document;
+	my $editor   = $document->editor;
 
-	my $doc = $self->selected_document;
-	Padre::Wx::Dialog::Find->search( search_term => $doc->get_function_regex($sub) );
-	$self->selected_editor->SetFocus;
+	# Locate the function
+	my ($start, $end) = Padre::Util::get_matches(
+		$editor->GetText,
+		$document->get_function_regex($subname),
+		$editor->GetSelection, # Provides two params
+	);
+	return unless defined $start; # Couldn't find it
+
+	# Move the selection to the sub location
+	$editor->GotoPos($start);
+	$editor->ScrollToLine(
+		$editor->GetCurrentLine - ($editor->LinesOnScreen / 2)
+	);
+	$editor->SetFocus;
+
+	# $editor->SetCurrentPos($start);
+	# $editor->goto_pos_centerize($start);
+
 	return;
 }
 
@@ -2001,7 +2029,7 @@ sub on_function_selected {
 sub on_stc_style_needed {
 	my ( $self, $event ) = @_;
 
-	my $doc = Padre::Documents->current or return;
+	my $doc = Padre::Current->document or return;
 	if ($doc->can('colorize')) {
 
 		# workaround something that seems like a Scintilla bug
@@ -2019,50 +2047,43 @@ sub on_stc_style_needed {
 
 
 sub on_stc_update_ui {
-	my ($self, $event) = @_;
+	my $self    = shift;
 
-	# avoid recursion
+	# Avoid recursion
 	return if $self->{_in_stc_update_ui};
 	local $self->{_in_stc_update_ui} = 1;
 
-	# check for brace, on current position, higlight the matching brace
-	my $editor = $self->selected_editor;
+	# Check for brace, on current position, higlight the matching brace
+	my $current = $self->current;
+	my $editor  = $current->editor;
 	$editor->highlight_braces;
 	$editor->show_calltip;
 
-	$self->refresh_menu;
-	$self->refresh_toolbar;
-	$self->refresh_status;
-	#$self->refresh_methods;
-	#$self->refresh_syntaxcheck;
 	# avoid refreshing the subs as that takes a lot of time
 	# TODO maybe we should refresh it on every 20s hit or so
-#	$self->refresh;
+	$self->refresh_menu($current);
+	$self->refresh_toolbar($current);
+	$self->refresh_status($current);
+	#$self->refresh_methods;
+	#$self->refresh_syntaxcheck;
 
 	return;
 }
 
 sub on_stc_change {
-	my ($self, $event) = @_;
-
-	return if $self->no_refresh;
-
 	return;
 }
 
 # http://www.yellowbrain.com/stc/events.html#EVT_STC_CHARADDED
 # TODO: maybe we need to check this more carefully.
 sub on_stc_char_added {
-	my ($self, $event) = @_;
-
-	my $key = $event->GetKey;
-	if ($key == 10) { # ENTER
-		my $editor = $self->selected_editor;
-		$editor->autoindent("indent");
-	}
-	elsif ($key == 125) { # Closing brace }
-		my $editor = $self->selected_editor;
-		$editor->autoindent("deindent");
+	my $self  = shift;
+	my $event = shift;
+	my $key   = $event->GetKey;
+	if ( $key == 10 ) { # ENTER
+		$self->current->editor->autoindent('indent');
+	} elsif ( $key == 125 ) { # Closing brace
+		$self->current->editor->autoindent('deindent');
 	}
 	return;
 }
@@ -2070,27 +2091,25 @@ sub on_stc_char_added {
 sub on_stc_dwell_start {
 	my ($self, $event) = @_;
 
-	print Data::Dumper::Dumper $event;
-	my $editor = $self->selected_editor;
-	print "dwell: ", $event->GetPosition, "\n";
-	#$editor->show_tooltip;
-	#print Wx::GetMousePosition, "\n";
-	#print Wx::GetMousePositionXY, "\n";
+	# print Data::Dumper::Dumper $event;
+	my $editor = $self->current->editor;
+	# print "dwell: ", $event->GetPosition, "\n";
+	# $editor->show_tooltip;
+	# print Wx::GetMousePosition, "\n";
+	# print Wx::GetMousePositionXY, "\n";
 
 	return;
 }
 
 sub on_close_pane {
 	my ( $self, $event ) = @_;
-	my $pane = $event->GetPane();
-
-
+	my $pane = $event->GetPane;
 }
 
 sub on_doc_stats {
 	my ($self, $event) = @_;
 
-	my $doc = $self->selected_document;
+	my $doc = $self->current->document;
 	if (not $doc) {
 		$self->message( 'No file is open', 'Stats' );
 		return;
@@ -2123,13 +2142,14 @@ sub on_doc_stats {
 }
 
 sub on_tab_and_space {
-	my ( $self, $type ) = @_;
-	
-	my $doc = $self->selected_document;
-	return if not $doc;
+	my $self    = shift;
+	my $type    = shift;
+	my $current = $self->current;
+	my $doc     = $current->document or return;
+	my $title   = $type eq 'Space_to_Tab'
+		? Wx::gettext('Space to Tab')
+		: Wx::gettext('Tab to Space');
 
-	my $title = $type eq 'Space_to_Tab' ? Wx::gettext('Space to Tab') : Wx::gettext('Tab to Space');
-	
 	my $dialog = Padre::Wx::History::TextDialog->new(
 		$self, Wx::gettext('How many spaces for each tab:'), $title, $type,
 	);
@@ -2142,7 +2162,7 @@ sub on_tab_and_space {
 		return;
 	}
 	
-	my $src = $self->selected_text;
+	my $src  = $current->text;
 	my $code = ( $src ) ? $src : $doc->text_get;
 	
 	return unless ( defined $code and length($code) );
@@ -2155,7 +2175,7 @@ sub on_tab_and_space {
 	}
 	
 	if ( $src ) {
-		my $editor = $self->selected_editor;
+		my $editor = $current->editor;
 		$editor->ReplaceSelection( $code );
 	} else {
 		$doc->text_set( $code );
@@ -2163,34 +2183,32 @@ sub on_tab_and_space {
 }
 
 sub on_delete_ending_space {
-	my ( $self ) = @_;
-	
-	my $doc = $self->selected_document;
-	return if not $doc;
-	
-	my $src = $self->selected_text;
-	my $code = ( $src ) ? $src : $doc->text_get;
-	
-	# remove ending space
+	my $self     = shift;
+	my $current  = $self->current;
+	my $document = $current->document or return;	
+	my $src      = $current->text;
+	my $code     = defined($src) ? $src : $document->text_get;
+
+	# Remove ending space
 	$code =~ s/([^\n\S]+)$//mg;
 	
 	if ( $src ) {
-		my $editor = $self->selected_editor;
+		my $editor = $current->editor;
 		$editor->ReplaceSelection( $code );
 	} else {
-		$doc->text_set( $code );
+		$document->text_set( $code );
 	}
 }
 
 sub on_delete_leading_space {
-	my ( $self ) = @_;
-	
-	my $src = $self->selected_text;
+	my $self    = shift;
+	my $current = $self->current;
+	my $src     = $current->text;
 	unless ( $src ) {
 		$self->message('No selection');
 		return;
 	}
-	
+
 	my $dialog = Padre::Wx::History::TextDialog->new(
 		$self, 'How many leading spaces to delete(1 tab == 4 spaces):',
 		'Delete Leading Space', 'fay_delete_leading_space',
@@ -2212,7 +2230,7 @@ sub on_delete_leading_space {
 	$tabs .= '' x $space_num_left if ( $space_num_left );
 	$code =~ s/^($spaces|$tabs)//mg;
 	
-	my $editor = $self->selected_editor;
+	my $editor = $current->editor;
 	$editor->ReplaceSelection( $code );
 }
 
@@ -2220,7 +2238,7 @@ sub on_delete_leading_space {
 # should be in a class representing the subs panel
 sub on_subs_panel_left {
 	my ($self, $event) = @_;
-	my $main  = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main_window;
 	if ( $main->{subs_panel_was_closed} ) {
 		$main->show_functions(0);
 		$main->{subs_panel_was_closed} = 0;
@@ -2236,7 +2254,7 @@ sub on_subs_panel_left {
 #
 sub timer_check_overwrite {
 	my $self = shift;
-	my $doc  = $self->selected_document or return;
+	my $doc  = $self->current->document or return;
 
 	return unless $doc->has_changed_on_disk;
 	return if     $doc->{_already_popup_file_changed};
@@ -2268,21 +2286,22 @@ sub on_last_visited_pane {
 
 	if (@{ $self->{page_history} } >= 2) {
 		@{ $self->{page_history} }[-1, -2] = @{ $_[0]->{page_history} }[-2, -1];
-		foreach my $i ($self->pageids) {
-			my $editor = $_[0]->nb->GetPage($i);
+		foreach my $i ( $self->pageids ) {
+			my $editor = $_[0]->notebook->GetPage($i);
 			if ( Scalar::Util::refaddr($editor) eq Scalar::Util::refaddr($_[0]->{page_history}[-1]) ) {
-				$self->nb->SetSelection($i);
+				$self->notebook->SetSelection($i);
 				last;
 			}
 		}
-		#$self->refresh;
-		$self->refresh_status;
-		$self->refresh_toolbar;
+
+		# Partial refresh
+		$self->refresh_status($self->current);
+		$self->refresh_toolbar($self->current);
 	}
 }
 
 sub on_notebook_page_changed {
-	my $editor = $_[0]->selected_editor;
+	my $editor = $_[0]->current->editor;
 	if ( $editor ) {
 		my $history = $_[0]->{page_history};
 		@$history = grep {

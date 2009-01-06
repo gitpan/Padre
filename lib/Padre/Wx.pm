@@ -19,7 +19,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 
 
@@ -47,6 +47,24 @@ sub id_POST_INIT_TIMER { 30003 }
 
 
 
+#####################################################################
+# Convenience Functions
+
+sub color {
+	my $rgb = shift;
+	my @c   = ( 0xFF, 0xFF, 0xFF ); # Some default
+	if ( not defined $rgb ) {
+		# Carp::cluck("undefined color");
+	} elsif ( $rgb =~ /^(..)(..)(..)$/ ) {
+		@c = map { hex($_) } ($1, $2, $3);
+	} else {
+		# Carp::cluck("invalid color '$rgb'");
+	}
+	return Wx::Colour->new(@c);
+}
+
+
+
 
 
 #####################################################################
@@ -58,6 +76,14 @@ sub tango {
 		Wx::wxBITMAP_TYPE_PNG,
 	);
 }
+
+sub icon {
+	Wx::Bitmap->new(
+		Padre::Util::sharefile( 'miscicons', @_ ),
+		Wx::wxBITMAP_TYPE_PNG,
+	);
+}
+
 
 1;
 

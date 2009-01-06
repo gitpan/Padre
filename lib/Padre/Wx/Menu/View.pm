@@ -7,9 +7,9 @@ use strict;
 use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
-use Padre::Documents   ();
+use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -78,7 +78,7 @@ sub new {
 		},
 	);
 
-	# On Windows disabling the status bar is broken, so don't allow it
+	# On Windows disabling the status bar doesn't work, so don't allow it
 	unless ( Padre::Util::WIN32 ) {
 		$self->{statusbar} = $self->AppendCheckItem( -1,
 			Wx::gettext("Show StatusBar")
@@ -94,6 +94,40 @@ sub new {
 	$self->AppendSeparator;
 
 
+
+	# View as (Highlighting File Type)
+	$self->{view_as_highlighting} = Wx::Menu->new;
+	$self->Append( -1,
+		Wx::gettext("View Document As..."),
+		$self->{view_as_highlighting}
+	);
+
+	my %mimes = Padre::Document::menu_view_mimes();
+	foreach my $name ( sort keys %mimes ) {
+		my $label = $name;
+		$label =~ s/^\d+//;
+		my $radio = $self->{view_as_highlighting}->AppendRadioItem( -1, $label );
+		Wx::Event::EVT_MENU( $main,
+			$radio,
+			sub {
+				my $doc = $_[0]->current->document;
+				if ( $doc ) {
+					$doc->set_mimetype( $mimes{$name} );
+					$doc->editor->padre_setup;
+					$doc->rebless;
+					$doc->remove_color;
+					if ($doc->can('colorize')) {
+						$doc->colorize;
+					} else {
+						$doc->editor->Colourise( 0, $doc->editor->GetLength );
+					}
+				}
+				$_[0]->refresh;
+			},
+		);
+	}
+
+	$self->AppendSeparator;
 
 
 
@@ -192,30 +226,33 @@ sub new {
 
 
 	# Font Size
+	$self->{font_increase} = $self->Append( -1,
+		Wx::gettext("Increase Font Size\tCtrl-+")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
-			Wx::gettext("Increase Font Size\tCtrl-+")
-		),
+		$self->{font_increase},
 		sub {
 			$_[0]->zoom(+1);
 		},
 	);
 
+	$self->{font_decrease} = $self->Append( -1,
+		Wx::gettext("Decrease Font Size\tCtrl--")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
-			Wx::gettext("Decrease Font Size\tCtrl--")
-		),
+		$self->{font_decrease},
 		sub {
 			$_[0]->zoom(-1);
 		},
 	);
 
+	$self->{font_reset} = $self->Append( -1,
+		Wx::gettext("Reset Font Size\tCtrl-/")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
-			Wx::gettext("Reset Font Size\tCtrl-/")
-		),
+		$self->{font_reset},
 		sub {
-			$_[0]->zoom( -1 * $_[0]->selected_editor->GetZoom );
+			$_[0]->zoom( -1 * $_[0]->current->editor->GetZoom );
 		},
 	);
 
@@ -226,41 +263,56 @@ sub new {
 
 
 	# Bookmark Support
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
+	unless (
+		$config->{experimental}
+		and
+		defined $config->{experimental_bookmarks}
+		and
+		not $config->{experimental_bookmarks}
+	) {
+		$self->{bookmark_set} = $self->Append( -1,
 			Wx::gettext("Set Bookmark\tCtrl-B")
-		),
-		sub {
-			Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]);
-		},
-	);
-
-	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1,
+		);
+		Wx::Event::EVT_MENU( $main,
+			$self->{bookmark_set},
+			sub {
+				Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]);
+			},
+		);
+		
+		$self->{bookmark_goto} = $self->Append( -1,
 			Wx::gettext("Goto Bookmark\tCtrl-Shift-B")
-		),
-		sub {
-			Padre::Wx::Dialog::Bookmarks->goto_bookmark($_[0]);
-		},
-	);
+		);
+		Wx::Event::EVT_MENU( $main,
+			$self->{bookmark_goto},
+			sub {
+				Padre::Wx::Dialog::Bookmarks->goto_bookmark($_[0]);
+			},
+		);
+		
+		$self->AppendSeparator;
+	}
 
-	$self->AppendSeparator;
 
 
 
 
-
-	# Styles (temporary location?)
+	# Editor Look and Feel
 	$self->{style} = Wx::Menu->new;
 	$self->Append( -1,
 		Wx::gettext("Style"),
 		$self->{style}
 	);
-	
-	# TODO: name should be localized
-	my %styles = ( default => 'Default', night => 'Night' );
-	
-	foreach my $name ( sort { $styles{$a} cmp $styles{$b} }  keys %styles) {
+	my %styles = (
+		default => Wx::gettext('Padre'),
+		night   => Wx::gettext('Night'),
+	);
+	my @order = sort {
+		($b eq 'default') <=> ($a eq 'default')
+		or
+		$styles{$a} cmp $styles{$b}
+	} keys %styles;
+	foreach my $name ( @order ) {
 		my $label = $styles{$name};
 		my $radio = $self->{style}->AppendRadioItem( -1, $label );
 		if ( $config->{host}->{style} and $config->{host}->{style} eq $name ) {
@@ -278,7 +330,7 @@ sub new {
 	my @private_styles =
 		map { substr File::Basename::basename($_), 0, -4 }
 		glob File::Spec->catdir( $dir, '*.yml' );
-	if (@private_styles) {
+	if ( @private_styles ) {
 		$self->AppendSeparator;
 		foreach my $name (@private_styles) {
 			my $label = $name;
@@ -300,24 +352,37 @@ sub new {
 
 
 	# Language Support
+	# TODO: God this is horrible, there has to be a better way
+	my $default  = Padre::Locale::system_rfc4646();
+	my $current  = Padre::Locale::rfc4646();
+	my %language = Padre::Locale::menu_view_languages();
+
+	# Parent Menu
 	$self->{language} = Wx::Menu->new;
 	$self->Append( -1,
 		Wx::gettext("Language"),
 		$self->{language}
 	);
+
+	# Default menu entry
+	$self->{language_default} = $self->{language}->AppendCheckItem( -1,
+		Wx::gettext("System Default") . " ($default)"
+	);
 	Wx::Event::EVT_MENU( $main,
-		$self->{language}->AppendRadioItem( -1, Wx::gettext("System Default") ),
+		$self->{language_default},
 		sub {
 			$_[0]->change_locale;
 		},
 	);
+	if ( defined $config->{host}->{locale} and $default eq $config->{host}->{locale} ) {
+		$self->{language_default}->Check(1);
+	}
 
 	$self->{language}->AppendSeparator;
 
-	my %languages = Padre::Locale::menu_view_languages();
-	foreach my $name ( sort { $languages{$a} cmp $languages{$b} }  keys %languages) {
-		my $label = $languages{$name};
-		if ( $label eq 'English' ) {
+	foreach my $name ( sort { $language{$a} cmp $language{$b} }  keys %language ) {
+		my $label = $language{$name};
+		if ( $label eq 'English (United Kingdom)' ) {
 			# NOTE: A dose of fun in a mostly boring application.
 			# With more Padre developers, more countries, and more
 			# people in total British English instead of American
@@ -327,7 +392,6 @@ sub new {
 			# speakers, non-English localisations do NOT show this.
 			$label = "English (New Britstralian)";
 		}
-
 		my $radio = $self->{language}->AppendRadioItem( -1, $label );
 		Wx::Event::EVT_MENU( $main,
 			$radio,
@@ -335,7 +399,7 @@ sub new {
 				$_[0]->change_locale($name);
 			},
 		);
-		if ( $config->{host}->{locale} and $config->{host}->{locale} eq $name ) {
+		if ( $current eq $name ) {
 			$radio->Check(1);
 		}
 	}
@@ -361,26 +425,26 @@ sub new {
 
 sub refresh {
 	my $self     = shift;
+	my $document = _CURRENT(@_)->document;
 	my $config   = Padre->ide->config;
 
 	# Simple check state cases from configuration
-	$self->{lines}->Check( $config->{editor_linenumbers} ? 1 : 0 );
-	$self->{folding}->Check( $config->{editor_codefolding} ? 1 : 0 );
-	$self->{current_line_background}->Check( $config->{editor_current_line_background} ? 1 : 0 );
-	$self->{eol}->Check( $config->{editor_eol} ? 1 : 0 );
-	$self->{whitespaces}->Check( $config->{editor_whitespaces} ? 1 : 0 );
 	unless ( Padre::Util::WIN32 ) {
 		$self->{statusbar}->Check( $config->{main_statusbar} ? 1 : 0 );
 	}
-	$self->{output}->Check( $config->{main_output_panel} ? 1 : 0 );
-	$self->{functions}->Check( $config->{main_subs_panel} ? 1 : 0 );
-	$self->{indentation_guide}->Check( $config->{editor_indentationguides} ? 1 : 0 );
-	$self->{show_calltips}->Check( $config->{editor_calltips} ? 1 : 0 );
-	$self->{show_syntaxcheck}->Check( $config->{editor_syntaxcheck} ? 1 : 0 );
-	$self->{show_errorlist}->Check( $config->{editor_errorlist} ? 1 : 0 );
+	$self->{ lines        }->Check( $config->{editor_linenumbers} ? 1 : 0 );
+	$self->{ folding      }->Check( $config->{editor_codefolding} ? 1 : 0 );
+	$self->{ current_line_background}->Check( $config->{editor_current_line_background} ? 1 : 0 );
+	$self->{ eol           }->Check( $config->{editor_eol} ? 1 : 0 );
+	$self->{ whitespaces   }->Check( $config->{editor_whitespaces} ? 1 : 0 );
+	$self->{ output        }->Check( $config->{main_output_panel} ? 1 : 0 );
+	$self->{ functions     }->Check( $config->{main_subs_panel} ? 1 : 0 );
+	$self->{ indentation_guide}->Check( $config->{editor_indentationguides} ? 1 : 0 );
+	$self->{ show_calltips    }->Check( $config->{editor_calltips} ? 1 : 0 );
+	$self->{ show_syntaxcheck }->Check( $config->{editor_syntaxcheck} ? 1 : 0 );
+	$self->{ show_errorlist   }->Check( $config->{editor_errorlist} ? 1 : 0 );
 
 	# Check state for word wrap is document-specific
-	my $document = Padre::Documents->current;
 	if ( $document ) {
 		my $editor = $document->editor;
 		my $mode   = $editor->GetWrapMode;
@@ -390,7 +454,32 @@ sub refresh {
 		} elsif ( $mode eq Wx::wxSTC_WRAP_NONE and $wrap->IsChecked ) {
 			$wrap->Check(0);
 		}
+
+		# Set mimetype
+		my $has_checked = 0;
+		if ( $document->get_mimetype ) {
+			my %mimes = Padre::Document::menu_view_mimes();
+			my @mimes = sort keys %mimes;
+			foreach my $pos ( 0 .. scalar @mimes - 1 ) {
+				my $radio = $self->{view_as_highlighting}->FindItemByPosition($pos);
+				if ( $document->get_mimetype eq $mimes{$mimes[$pos]} ) {
+					$radio->Check(1);
+					$has_checked = 1;
+				}
+			}
+		}
+
+		# By default 'Plain Text';
+		$self->{view_as_highlighting}->FindItemByPosition(0)->Check(1) unless $has_checked;
 	}
+
+	# Disable zooming and bookmarks if there's no current document
+	my $doc = $document ? 1 : 0;
+	$self->{ font_increase        }->Enable($doc);
+	$self->{ font_decrease        }->Enable($doc);
+	$self->{ font_reset           }->Enable($doc);
+	$self->{ bookmark_set         }->Enable($doc);
+	$self->{ bookmark_goto        }->Enable($doc);
 
 	return;
 }

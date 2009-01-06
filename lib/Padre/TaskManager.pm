@@ -79,7 +79,7 @@ BEGIN {
 	$INC{"Padre/TaskManager.pm"} ||= __FILE__;
 }
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use threads;
 # According to Wx docs, this MUST be loaded before Wx, so this also happens in the script
@@ -92,14 +92,20 @@ use Padre::Wx ();
 
 use Class::XSAccessor
 	getters => {
-		task_queue    => 'task_queue',
-		reap_interval => 'reap_interval',
-		use_threads   => 'use_threads',
+		task_queue     => 'task_queue',
+		reap_interval  => 'reap_interval',
+		use_threads    => 'use_threads',
+		running_tasks  => 'running_tasks',
+		max_no_workers => 'max_no_workers',
 	};
 
 # This event is triggered by the worker thread main loop after
 # finishing a task.
 our $TASK_DONE_EVENT : shared = Wx::NewEventType;
+# This event is triggered by the worker thread main loop before
+# running a task.
+our $TASK_START_EVENT : shared = Wx::NewEventType;
+
 # Timer to reap dead workers every N milliseconds
 our $REAP_TIMER;
 # You can instantiate this class only once.
@@ -121,6 +127,7 @@ sub new {
 		@_,
 		workers        => [],
 		task_queue     => undef,
+		running_tasks  => 0,
 	}, $class;
 
 	$self->{use_threads} = 0 if Wx->VERSION < 0.89;
@@ -128,6 +135,7 @@ sub new {
 	my $main = Padre->ide->wx->main_window;
 
 	Wx::Event::EVT_COMMAND($main, -1, $TASK_DONE_EVENT, \&on_task_done_event);
+	Wx::Event::EVT_COMMAND($main, -1, $TASK_START_EVENT, \&on_task_start_event);
 	Wx::Event::EVT_CLOSE($main, \&on_close);
  
 	$self->{task_queue} = Thread::Queue->new;
@@ -416,6 +424,34 @@ sub on_task_done_event {
 	my $process = Padre::Task->deserialize( \$frozen );
 
 	$process->finish($main);
+
+	# TODO/FIXME:
+	# This should somehow get at the specific TaskManager object
+	# instead of going through the Padre globals!
+	Padre->ide->task_manager->{running_tasks}--;
+	$main->GetToolBar->update_task_status();
+
+	return();
+}
+
+=pod
+
+=head2 on_task_start_event
+
+This event handler is called when a background task is about to start
+execution.
+It simply increments the running task counter.
+
+=cut
+
+sub on_task_start_event {
+	my ($main, $event) = @_; @_ = (); # hack to avoid "Scalars leaked"
+	# TODO/FIXME:
+	# This should somehow get at the specific TaskManager object
+	# instead of going through the Padre globals!
+	Padre->ide->task_manager->{running_tasks}++;
+	$main->GetToolBar->update_task_status();
+
 	return();
 }
 
@@ -437,6 +473,9 @@ sub worker_loop {
 		#warn("THREAD TERMINATING"), return 1 if not ref($task) and $task eq 'STOP';
 		return 1 if not ref($task) and $task eq 'STOP';
 
+		my $thread_start_event = Wx::PlThreadEvent->new( -1, $TASK_START_EVENT, 0 );
+		Wx::PostEvent($main, $thread_start_event);
+
 		my $process = Padre::Task->deserialize( \$task);
 		
 		# RUN
@@ -445,8 +484,9 @@ sub worker_loop {
 		# FREEZE THE PROCESS AND PASS IT BACK
 		undef $task;
 		$process->serialize( \$task );
-		my $thread_event = Wx::PlThreadEvent->new( -1, $TASK_DONE_EVENT, $task );
-		Wx::PostEvent($main, $thread_event);
+
+		my $thread_done_event = Wx::PlThreadEvent->new( -1, $TASK_DONE_EVENT, $task );
+		Wx::PostEvent($main, $thread_done_event);
 
 		#warn threads->tid() . " -- done with task.";
 	}

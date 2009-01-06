@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -75,6 +75,7 @@ our %EXT_MIME = (
 	diff  => 'text/x-patch',
 	e     => 'text/x-eiffel',
 	f     => 'text/x-fortran',
+	htm   => 'text/html',
 	html  => 'text/html',
 	js    => 'application/javascript',
 	json  => 'application/json',
@@ -154,9 +155,24 @@ our %MIME_LEXER = (
 
 # This is the mime-type to document class mapping
 our %MIME_CLASS = (
-	'application/x-perl'     => 'Padre::Document::Perl',
-	'text/x-pod'             => 'Padre::Document::POD',
+	'application/x-perl' => 'Padre::Document::Perl',
+	'text/x-pod'         => 'Padre::Document::POD',
 );
+
+sub menu_view_mimes {
+	'00Plain Text' => 'text/plain',
+	'01Perl'       => 'application/x-perl',
+	'03HTML'       => 'text/html',
+	'05JavaScript' => 'application/javascript',
+	'07CSS'        => 'text/css',
+	'09Python'     => 'text/x-python',
+	'11Ruby'       => 'application/x-ruby',
+	'13PHP'        => 'application/x-php',
+	'15YAML'       => 'text/x-yaml',
+	'17VBScript'   => 'text/vbscript',
+	'19SQL'        => 'text/x-sql',
+	'21Perl6'      => 'application/x-perl6',
+}
 
 
 
@@ -247,41 +263,43 @@ sub last_sync {
 # innappropriate just to get them out of here.
 
 sub guess_mimetype {
-	my $self = shift;
+	my $self     = shift;
+	my $text     = $self->{original_content};
+	my $filename = $self->filename;
 
 	# Default mime-type of new files, should be configurable in the GUI
-	unless ( $self->filename ) {
+	# TODO: Make it configurable in the GUI :)
+	unless ( $filename ) {
 		return 'application/x-perl';
 	}
 
-	my $text = $self->{original_content};
-
 	# Try derive the mime type from the name
-	if ( $self->filename and $self->filename =~ /\.([^.]+)$/ ) {
+	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 		my $ext = lc $1;
-		
 		if ( $EXT_MIME{$ext} ) {
-			return $EXT_MIME{$ext} if $EXT_MIME{$ext} ne 'application/x-perl';
 			if ( $EXT_MIME{$ext} eq 'application/x-perl' ) {
+				# Sometimes Perl 6 will look like Perl 5
 				if ( $text and $text =~ /^use\sv6;/m ) {
 					return 'application/x-perl6';
-				} else {
-					return 'application/x-perl';
 				}
 			}
+			return $EXT_MIME{$ext};
 		}
 	}
 
-	# Fall back on deriving the type from the content
-	# Hardcode this for now for the special cases we care about.
-
+	# Fall back on deriving the type from the content.
+	# Hardcode this for now for the cases that we care about and
+	# are obvious.
+	# TODO: Add support for plugins being able to do something here.
 	if ( $text and $text =~ /\A#!/m ) {
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl\b/m ) {
 			return 'application/x-perl';
 		}
+		if ( $text =~ /\A---/ ) {
+			return 'text/x-yaml';
+		}
 	}
-
 
 	# Fall back to a null value
 	return '';
@@ -399,7 +417,6 @@ sub load_file {
 	require Padre::Locale;
 	$self->{encoding} = Padre::Locale::encoding_from_string($content);
 	$content = Encode::decode($self->{encoding}, $content);
-	#print "DEBUG: SystemDefault($system_default), $lang_shortname:$self->{encoding}, $file\n";
 
 	$self->{original_content} = $content;
 
@@ -656,16 +673,26 @@ sub guess_indentation_style {
 #####################################################################
 # Project Integration Methods
 
+sub project {
+	my $self = shift;
+	my $root = $self->project_dir;
+	if ( defined $root ) {
+		return Padre->ide->project($root);
+	} else {
+		return undef;
+	}
+}
+
 sub project_dir {
 	my $self = shift;
 	$self->{project_dir} or
-	$self->{project_dir} = $self->find_project;
+	$self->{project_dir} = $self->project_find;
 }
 
-sub find_project {
+sub project_find {
 	my $self = shift;
 
-	# Anonmous files don't have a project
+	# Anonymous files don't have a project
 	unless ( defined $self->filename ) {
 		return;
 	}
@@ -674,24 +701,22 @@ sub find_project {
 	my ($v, $d, $f) = File::Spec->splitpath( $self->filename );
 	my @d = File::Spec->splitdir($d);
 	pop @d if $d[-1] eq '';
-	require List::Util;
 	my $dirs = List::Util::first {
 		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
 		or
 		-f File::Spec->catpath( $v, $_, 'Build.PL' )
 		or
-		# Some notional Padre project file
 		-f File::Spec->catpath( $v, $_, 'padre.yml' )
 	} map {
 		File::Spec->catdir(@d[0 .. $_])
 	} reverse ( 0 .. $#d );
 
 	unless ( defined $dirs ) {
-		# This document is not part of a recognised project
-		return;
+		# This document is part of the null project
+		return File::Spec->catpath( $v, $d, '' );
 	}
 
-	return File::Spec->catpath( $v, $dirs );
+	return File::Spec->catpath( $v, $dirs, '' );
 }
 
 

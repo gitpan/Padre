@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use Class::XSAccessor
 	getters => {
@@ -77,6 +77,13 @@ sub enable {
 			Wx::Event::EVT_IDLE( $main, \&syntax_check_idle_timer );
 		}
 		$main->show_syntaxbar(1);
+
+		my $width0 = $self->syntaxbar->GetCharWidth * ( length( Wx::gettext('Line') ) + 3 );
+		my $width1 = $self->syntaxbar->GetCharWidth * ( length( Wx::gettext('Type') ) + 3 );
+		my $width2 = $self->syntaxbar->GetSize->GetWidth - $width0 - $width1;
+		$self->syntaxbar->SetColumnWidth( 0, $width0 );
+		$self->syntaxbar->SetColumnWidth( 1, $width1 );
+		$self->syntaxbar->SetColumnWidth( 2, $width2 );
 	}
 	else {
 		if (   defined($self->{synCheckTimer})
@@ -85,7 +92,7 @@ sub enable {
 			$self->{synCheckTimer}->Stop;
 			Wx::Event::EVT_IDLE( $main, sub { return } );
 		}
-		my $page = $main->selected_editor;
+		my $page = $main->current->editor;
 		if ( defined($page) ) {
 			$page->MarkerDeleteAll(Padre::Wx::MarkError);
 			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
@@ -121,7 +128,7 @@ sub syntax_check_idle_timer {
 sub on_syntax_check_msg_selected {
 	my ($main, $event) = @_;
 
-	my $page = $main->selected_editor;
+	my $page = $main->current->editor;
 
 	my $line_number = $event->GetItem->GetText;
 	return if  not defined($line_number)
@@ -141,7 +148,7 @@ sub on_syntax_check_timer {
 	my $self = $win->syntax_checker;
 	my $syntaxbar = $self->syntaxbar;
 
-	my $page = $win->selected_editor;
+	my $page = $win->current->editor;
 	if ( ! defined $page ) {
 		return;
 	}

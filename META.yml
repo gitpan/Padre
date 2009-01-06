@@ -7,7 +7,6 @@ build_requires:
   Test::Compile: 0.08
   Test::Exception: 0.27
   Test::More: 0.47
-  Test::NeedsDisplay: 1.05
   Test::NoWarnings: 0.084
   Test::Script: 1.03
 distribution_type: module
@@ -55,6 +54,7 @@ requires:
   Getopt::Long: 0
   HTML::Entities: 3.57
   HTML::Parser: 3.58
+  IO::Scalar: 0
   IO::Socket: 1.30
   IO::String: 1.08
   IPC::Cmd: 0.42
@@ -68,7 +68,7 @@ requires:
   PAR: 0.970
   PPI: 1.203
   Params::Util: 0.33
-  Parse::ErrorString::Perl: 0.08
+  Parse::ErrorString::Perl: 0.11
   Pod::POM: 0.17
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
@@ -78,6 +78,7 @@ requires:
   Text::Diff: 0.35
   Text::FindIndent: 0.03
   Thread::Queue: 2.11
+  URI: 0
   Wx: 0.89
   Wx::Perl::Dialog: 0.04
   Wx::Perl::ProcessStream: 0.11
@@ -90,4 +91,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.23
+version: 0.24

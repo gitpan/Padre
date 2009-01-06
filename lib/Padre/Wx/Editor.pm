@@ -5,11 +5,11 @@ use strict;
 use warnings;
 use YAML::Tiny                ();
 use Padre::Util               ();
+use Padre::Current            ();
 use Padre::Wx                 ();
-use Padre::Documents          ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -27,17 +27,21 @@ sub new {
 	my( $class, $parent ) = @_;
 
 	my $self = $class->SUPER::new( $parent );
-#	$self->UsePopUp(0);
 	$data = data('default');
-#	$self->SetMouseDwellTime(1000); # off: Wx::SC_TIME_FOREVER
 
+	# Set the code margins a little larger than the default.
+	# This seems to noticably reduce eye strain.
+	$self->SetMarginLeft(2);
+	$self->SetMarginRight(2);
+
+	# Clear out all the other margins
 	$self->SetMarginWidth(0, 0);
 	$self->SetMarginWidth(1, 0);
 	$self->SetMarginWidth(2, 0);
 
 	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
-	Wx::Event::EVT_LEFT_UP(  $self, \&on_left_up );
-	
+	Wx::Event::EVT_LEFT_UP(    $self, \&on_left_up    );
+
 	if ( Padre->ide->config->{editor_use_wordwrap} ) {
 		$self->SetWrapMode( Wx::wxSTC_WRAP_WORD );
 	}
@@ -117,25 +121,25 @@ sub padre_setup_plain {
 
 	my $config = Padre->ide->config;
 
-	if ( defined $data->{plain}{current_line_foreground} ) {
-		$self->SetCaretForeground( _color( $data->{plain}{current_line_foreground} ) );
+	if ( defined $data->{plain}->{current_line_foreground} ) {
+		$self->SetCaretForeground( _color( $data->{plain}->{current_line_foreground} ) );
 	}
-	if ( defined $data->{plain}{current_line_background} ) {
+	if ( defined $data->{plain}->{current_line_background} ) {
 		if ( defined $config->{editor_current_line_background_color} ) {
-			if (   $data->{plain}{current_line_background}
+			if (   $data->{plain}->{current_line_background}
 				ne $config->{editor_current_line_background_color}
 			) {
-				$data->{plain}{current_line_background} = $config->{editor_current_line_background_color};
+				$data->{plain}->{current_line_background} = $config->{editor_current_line_background_color};
 			}
 		}
-		$self->SetCaretLineBackground( _color( $data->{plain}{current_line_background} ) );
+		$self->SetCaretLineBackground( _color( $data->{plain}->{current_line_background} ) );
 	}
 	elsif ( defined $config->{editor_current_line_background_color} ) {
 		$self->SetCaretLineBackground( _color( $config->{editor_current_line_background_color} ) );
 	}
 
-	foreach my $k (keys %{ $data->{plain}{foregrounds} }) {
-		$self->StyleSetForeground( $k, _color( $data->{plain}{foregrounds}{$k} ) );
+	foreach my $k (keys %{ $data->{plain}->{foregrounds} }) {
+		$self->StyleSetForeground( $k, _color( $data->{plain}->{foregrounds}->{$k} ) );
 	}
 
 	# Apply tag style for selected lexer (blue)
@@ -153,7 +157,7 @@ sub padre_setup_style {
 
 	$self->padre_setup_plain;
 
-	foreach my $k ( keys %{ $data->{$name}{colors} }) {
+	foreach my $k ( keys %{ $data->{$name}->{colors} }) {
 		my $f = 'Wx::' . $k;
 		no strict "refs"; ## no critic
 		my $v = eval {$f->()};
@@ -166,11 +170,11 @@ sub padre_setup_style {
 			}
 		}
 
-		$self->StyleSetForeground( $f->(), _color($data->{$name}{colors}{$k}) );
+		$self->StyleSetForeground( $f->(), _color($data->{$name}->{colors}->{$k}) );
 	}
 
-	$self->StyleSetBackground(34, _color($data->{$name}{brace_highlight}));
-	$self->StyleSetBackground($_, _color($data->{$name}{background})) for (0..32);
+	$self->StyleSetBackground(34, _color($data->{$name}->{brace_highlight}));
+	$self->StyleSetBackground($_, _color($data->{$name}->{background})) for (0..32);
 
 	return;
 }
@@ -225,7 +229,7 @@ sub show_line_numbers {
 
 	# premature optimization, caching the with that was on the 3rd place at load time
 	# as timed my Deve::NYTProf
-	$width ||= $self->TextWidth(Wx::wxSTC_STYLE_LINENUMBER, "9"); # width of a single character
+	$width ||= $self->TextWidth(Wx::wxSTC_STYLE_LINENUMBER, "m"); # width of a single character
 	if ($on) {
 		my $n = 1 + List::Util::max (2, length ($self->GetLineCount * 2));
 		my $width = $n * $width;
@@ -324,8 +328,7 @@ sub set_font {
 
 
 sub set_preferences {
-	my ($self) = @_;
-
+	my $self   = shift;
 	my $config = Padre->ide->config;
 
 	$self->show_line_numbers(    $config->{editor_linenumbers}       );
@@ -344,25 +347,21 @@ sub set_preferences {
 
 
 sub show_calltip {
-	my ($self) = @_;
-
+	my $self   = shift;
 	my $config = Padre->ide->config;
-	return if not $config->{editor_calltips};
-
+	return unless $config->{editor_calltips};
 
 	my $pos    = $self->GetCurrentPos;
 	my $line   = $self->LineFromPosition($pos);
 	my $first  = $self->PositionFromLine($line);
 	my $prefix = $self->GetTextRange($first, $pos); # line from beginning to current position
-	   #$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
-	if ($self->CallTipActive) {
+	if ( $self->CallTipActive ) {
 		$self->CallTipCancel;
 	}
 
-	my $doc = Padre::Documents->current or return;
+	my $doc      = Padre::Current->document or return;
 	my $keywords = $doc->keywords;
-
-	my $regex = join '|', sort {length $a <=> length $b} keys %$keywords;
+	my $regex    = join '|', sort { length $a <=> length $b } keys %$keywords;
 
 	my $tip;
 	if ( $prefix =~ /(?:^|[^\w\$\@\%\&])($regex)[ (]?$/ ) {
@@ -370,7 +369,7 @@ sub show_calltip {
 		return if not $z or not ref($z) or ref($z) ne 'HASH';
 		$tip = "$z->{cmd}\n$z->{exp}";
 	}
-	if ($tip) {
+	if ( $tip ) {
 		$self->CallTipShow($self->CallTipPosAtStart() + 1, $tip);
 	}
 	return;
@@ -514,7 +513,7 @@ sub _get_line_by_number {
 sub on_right_down {
 	my ($self, $event) = @_;
 	
-	my $win = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main_window;
 	
 	my $pos       = $self->GetCurrentPos;
 	#my $line      = $self->LineFromPosition($pos);
@@ -527,10 +526,10 @@ sub on_right_down {
 	if (not $self->CanUndo) {
 		$undo->Enable(0);
 	}
-	my $z = Wx::Event::EVT_MENU( $win, # Ctrl-Z
+	my $z = Wx::Event::EVT_MENU( $main, # Ctrl-Z
 		$undo,
 		sub {
-			my $editor = Padre::Documents->current->editor;
+			my $editor = Padre::Current->editor;
 			if ( $editor->CanUndo ) {
 				$editor->Undo;
 			}
@@ -542,10 +541,10 @@ sub on_right_down {
 		$redo->Enable(0);
 	}
 	
-	Wx::Event::EVT_MENU( $win, # Ctrl-Y
+	Wx::Event::EVT_MENU( $main, # Ctrl-Y
 		$redo,
 		sub {
-			my $editor = Padre::Documents->current->editor;
+			my $editor = Padre::Current->editor;
 			if ( $editor->CanRedo ) {
 				$editor->Redo;
 			}
@@ -555,19 +554,19 @@ sub on_right_down {
 	$menu->AppendSeparator;
 
 	my $selection_exists = 0;
-	my $id = $win->nb->GetSelection;
+	my $id = $main->nb->GetSelection;
 	if ( $id != -1 ) {
-		my $txt = $win->nb->GetPage($id)->GetSelectedText;
-		if ( defined($txt) && length($txt) > 0 ) {
+		my $text = $main->nb->GetPage($id)->GetSelectedText;
+		if ( defined($text) && length($text) > 0 ) {
 			$selection_exists = 1;
 		}
 	}
 
 	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
-	if ( not $win->nb->GetPage($id)->GetTextLength > 0 ) {
+	if ( not $main->nb->GetPage($id)->GetTextLength > 0 ) {
 		$sel_all->Enable(0);
 	}
-	Wx::Event::EVT_MENU( $win, # Ctrl-A
+	Wx::Event::EVT_MENU( $main, # Ctrl-A
 		$sel_all,
 		sub { \&text_select_all(@_) },
 	);
@@ -577,27 +576,33 @@ sub on_right_down {
 	if ( not $selection_exists ) {
 		$copy->Enable(0);
 	}
-	Wx::Event::EVT_MENU( $win, # Ctrl-C
+	Wx::Event::EVT_MENU( $main, # Ctrl-C
 		$copy,
-		sub { Padre->ide->wx->main_window->selected_editor->Copy; }
+		sub {
+			Padre::Current->editor->Copy;
+		}
 	);
 
 	my $cut = $menu->Append( Wx::wxID_CUT, '' );
 	if ( not $selection_exists ) {
 		$cut->Enable(0);
 	}
-	Wx::Event::EVT_MENU( $win, # Ctrl-X
+	Wx::Event::EVT_MENU( $main, # Ctrl-X
 		$cut,
-		sub { Padre->ide->wx->main_window->selected_editor->Cut; }
+		sub {
+			Padre::Current->editor->Cut;
+		}
 	);
 
 	my $paste = $menu->Append( Wx::wxID_PASTE, '' );
 	my $text  = get_text_from_clipboard();
 
-	if ( length($text) && $win->nb->GetPage($id)->CanPaste ) {
-		Wx::Event::EVT_MENU( $win, # Ctrl-V
+	if ( length($text) && $main->nb->GetPage($id)->CanPaste ) {
+		Wx::Event::EVT_MENU( $main, # Ctrl-V
 			$paste,
-			sub { Padre->ide->wx->main_window->selected_editor->Paste },
+			sub {
+				Padre::Current->editor->Paste;
+			},
 		);
 	} else {
 		$paste->Enable(0);
@@ -606,17 +611,19 @@ sub on_right_down {
 	$menu->AppendSeparator;
 
 	my $comment = $menu->Append( -1, Wx::gettext("&Comment Selected Lines\tCtrl-M") );
-	Wx::Event::EVT_MENU( $win, $comment,
+	Wx::Event::EVT_MENU( $main, $comment,
 		\&Padre::Wx::MainWindow::on_comment_out_block,
 	);
 	my $uncomment = $menu->Append( -1, Wx::gettext("&Uncomment Selected Lines\tCtrl-Shift-M") );
-	Wx::Event::EVT_MENU( $win, $uncomment,
+	Wx::Event::EVT_MENU( $main, $uncomment,
 		\&Padre::Wx::MainWindow::on_uncomment_block,
 	);
 
 	$menu->AppendSeparator;
 
-	if ( Padre->ide->config->{editor_codefolding} eq 1 ) {
+	if ( $event->isa('Wx::MouseEvent')
+	     && Padre->ide->config->{editor_codefolding} eq 1
+	) {
 		my $mousePos = $event->GetPosition;
 		my $line = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
 		my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
@@ -625,24 +632,22 @@ sub on_right_down {
 			&& $mousePos->x > ( $firstPointInLine->x - 18 )
 		) {
 			my $fold = $menu->Append( -1, Wx::gettext("Fold all") );
-			Wx::Event::EVT_MENU( $win, $fold,
+			Wx::Event::EVT_MENU( $main, $fold,
 				sub {
-					my $main = shift;
-					$main->selected_editor->fold_all;
+					$_[0]->current->editor->fold_all;
 				},
 			);
 			my $unfold = $menu->Append( -1, Wx::gettext("Unfold all") );
-			Wx::Event::EVT_MENU( $win, $unfold,
+			Wx::Event::EVT_MENU( $main, $unfold,
 				sub {
-					my $main = shift;
-					$main->selected_editor->unfold_all;
+					$_[0]->current->editor->unfold_all;
 				},
 			);
 			$menu->AppendSeparator;
 		}
 	}
 
-	Wx::Event::EVT_MENU( $win,
+	Wx::Event::EVT_MENU( $main,
 		$menu->Append( -1, Wx::gettext("&Split window") ),
 		\&Padre::Wx::MainWindow::on_split_window,
 	);
@@ -736,11 +741,11 @@ sub on_mouse_motion {
 }
 
 sub text_select_all {
-	my ( $win, $event ) = @_;
+	my ( $main, $event ) = @_;
 
-	my $id = $win->nb->GetSelection;
+	my $id = $main->nb->GetSelection;
 	return if $id == -1;
-	$win->nb->GetPage($id)->SelectAll;
+	$main->nb->GetPage($id)->SelectAll;
 	return;
 }
 
@@ -770,32 +775,29 @@ sub text_selection_mark_end {
 }
 
 sub text_selection_clear_marks {
-	my ($win) = @_;
-
-	my $page = $win->selected_editor;
-
-	undef $page->{selection_mark_start};
-	undef $page->{selection_mark_end};
+	my $editor = $_[0]->current->editor;
+	undef $editor->{selection_mark_start};
+	undef $editor->{selection_mark_end};
 }
 
 sub put_text_to_clipboard {
-	my ($txt) = @_;
-
+	my $text = shift;
 	Wx::wxTheClipboard->Open;
-	Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($txt) );
+	Wx::wxTheClipboard->SetData(
+		Wx::TextDataObject->new($text)
+	);
 	Wx::wxTheClipboard->Close;
-
 	return;
 }
 
 sub get_text_from_clipboard {
 	Wx::wxTheClipboard->Open;
-	my $text   = '';
+	my $text = '';
 	if ( Wx::wxTheClipboard->IsSupported(Wx::wxDF_TEXT) ) {
 		my $data = Wx::TextDataObject->new;
 		my $ok   = Wx::wxTheClipboard->GetData($data);
-		if ($ok) {
-			$text   = $data->GetText;
+		if ( $ok ) {
+			$text = $data->GetText;
 		}
 	}
 	Wx::wxTheClipboard->Close;
@@ -877,7 +879,7 @@ sub configure_editor {
 		$self->SetText( $doc->{original_content} );
 	}
 	$self->EmptyUndoBuffer;
-	if ($convert_to) {
+	if ( $convert_to ) {
 		my $file = $doc->filename;
 		warn "Converting $file to $convert_to";
 		$self->ConvertEOLs( $mode{$newline_type} );
@@ -888,7 +890,28 @@ sub configure_editor {
 	return;
 }
 
+sub goto_line_centerize {
+	my ( $self, $line ) = @_;
+	
+	my $pos = $self->PositionFromLine($line);
+	$self->goto_pos_centerize($pos);
+}
 
+# borrowed from Kephra
+sub goto_pos_centerize {
+	my ( $self, $pos ) = @_;
+
+	my $max = $self->GetLength;
+	$pos = 0 unless $pos or $pos < 0;
+	$pos = $max if $pos > $max;
+
+	$self->SetCurrentPos($pos);
+	$self->SetSelection($pos, $pos);
+	$self->SearchAnchor;
+
+	$self->ScrollToLine($self->GetCurrentLine - ( $self->LinesOnScreen / 2 ));
+	$self->EnsureCaretVisible;
+}
 
 1;
 

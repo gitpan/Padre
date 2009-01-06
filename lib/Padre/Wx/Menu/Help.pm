@@ -13,10 +13,10 @@ use warnings;
 use utf8;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
+use Padre::Wx::DocBrowser();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Padre::Wx::Submenu';
-
 
 
 
@@ -48,15 +48,24 @@ sub new {
 			
 				# TODO This feels wrong, the help menu code shouldn't
 				# populate the mainwindow hash.
-				my $selection = $_[0]->selected_text;
+				my $selection = $_[0]->current->text;
 				$_[0]->menu->help->help($_[0]);
 				if ( $selection ) {
-					$_[0]->{help}->show( $selection );
+					$_[0]->{help}->help( $selection );
 				}
 				return;
 			}
 		},
 	);
+       Wx::Event::EVT_MENU( $main,
+                $self->Append( -1, 'Current Document' ),
+                sub {
+                        $_[0]->menu->help->help($_[0]);
+			my $doc = $_[0]->current->document;
+			$_[0]->{help}->help( $doc );
+                },
+        );
+
 
 	# Add interesting and helpful websites
 	$self->AppendSeparator;
@@ -64,6 +73,21 @@ sub new {
 		$self->Append( -1, Wx::gettext('Visit the PerlMonks') ),
 		sub {
 			Wx::LaunchDefaultBrowser('http://perlmonks.org/');
+		},
+	);
+
+	# Add Padre website tools
+	$self->AppendSeparator;
+	Wx::Event::EVT_MENU( $main,
+		$self->Append( -1, Wx::gettext("Report a New &Bug") ),
+		sub {
+			Wx::LaunchDefaultBrowser('http://padre.perlide.org/wiki/Tickets');
+		},
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->Append( -1, Wx::gettext("View All &Open Bugs") ),
+		sub {
+			Wx::LaunchDefaultBrowser('http://padre.perlide.org/report/1');
 		},
 	);
 
@@ -79,23 +103,43 @@ sub new {
 	return $self;
 }
 
-# TODO - This violates encapsulation, a menu entry should be
+# TODO - This violates encapsulation, a menu entry shouldn't be
 #        spawning windows and storing them in the window hash.
 sub help {
 	my $self = shift;
 	my $main = shift;
 
 	unless ( $main->{help} ) {
-		$main->{help} = Padre::Pod::Frame->new;
+		$main->{help} = Padre::Wx::DocBrowser->new;
+	        Wx::Event::EVT_CLOSE(
+        	        $main->{help},
+	                \&on_help_close,
+       		 );
+
 		my $module = Padre::DB->get_last_pod || 'Padre';
 		if ( $module ) {
-			$main->{help}->{html}->display($module);
+			$main->{help}->help($module);
 		}
 	}
 	$main->{help}->SetFocus;
 	$main->{help}->Show(1);
 	return;
 }
+
+# FIXME this feels utterly backwards to me
+sub on_help_close {
+        my ($self,$event) = @_;
+	my $help = Padre->ide->wx->main_window->{help};
+
+        if ( $event->CanVeto ) {
+                $help->Hide;
+        }
+        else {
+                delete Padre->ide->wx->main_window->{help};
+                $help->Destroy;
+        }
+}
+
 
 sub about {
 	my $self = shift;

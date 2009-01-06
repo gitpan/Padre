@@ -1,9 +1,9 @@
-
 package Padre::Task::SyntaxChecker::Perl;
+
 use strict;
 use warnings;
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 use base 'Padre::Task::SyntaxChecker';
 
@@ -25,10 +25,10 @@ Padre::Task::SyntaxChecker::Perl - Perl document syntax-checking in the backgrou
   $task->schedule;
   
   my $task2 = Padre::Task::SyntaxChecker::Perl->new(
-    text => Padre::Documents->current->text_get,
-    notebook_page => Padre::Documents->current->editor,
-    on_finish => sub { my $task = shift; ... },
-    newlines => "\r\n", # specify the newline type!
+    text          => Padre::Current->document->text_get,
+    notebook_page => Padre::Current->editor,
+    on_finish     => sub { my $task = shift; ... },
+    newlines      => "\r\n", # specify the newline type!
   );
   $task2->schedule;
 
@@ -42,7 +42,7 @@ Please read its documentation!
 
 sub run {
 	my $self = shift;
-	$self->_check_syntax();
+	$self->_check_syntax;
 	return 1;
 }
 
@@ -62,18 +62,31 @@ sub _check_syntax {
 		$file->close;
 		my @cmd = (
 			Padre->perl_interpreter,
+		);
+		if ( $self->{perl_cmd} ) {
+			push @cmd, @{$self->{perl_cmd}};
+		}
+		push @cmd, (
 			'-Mdiagnostics',
 			'-c',
 			$file->filename,
 		);
 		require IPC::Cmd;
 		require IPC::Open3;
+
 		# damn global variables. This is likely unnecessary, but safe
 		local $IPC::Cmd::USE_IPC_OPEN3 = 1;
 		$IPC::Cmd::USE_IPC_OPEN3 = 1; # silence warning
-		
-		my( undef, undef, undef, undef, $stderr_buf )
-		  = IPC::Cmd::run( command => \@cmd, verbose => 0 );
+
+		# Make sure we execute from the correct directory
+		my $stderr_buf = [];
+		if ( $self->{cwd} ) {
+			require File::pushd;
+			my $pushd = File::pushd::pushd($self->{cwd});
+			$stderr_buf = (IPC::Cmd::run( command => \@cmd, verbose => 0 ))[4];
+		} else {
+			$stderr_buf = (IPC::Cmd::run( command => \@cmd, verbose => 0 ))[4];
+		}
 		$stderr = join '', @$stderr_buf if ref($stderr_buf) eq 'ARRAY';
 	}
 
@@ -154,8 +167,6 @@ sub _check_syntax {
 
 	$self->{syntax_check} = $issues;
 }
-
-
 
 1;
 

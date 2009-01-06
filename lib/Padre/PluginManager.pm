@@ -30,7 +30,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 
 
@@ -106,7 +106,7 @@ use Class::XSAccessor
 sub plugin_names {
 	my $self = shift;
 	unless ( $self->{plugin_names} ) {
-		# Schwatzian transform that sorts the plugins by their
+		# Schwartzian transform that sorts the plugins by their
 		# full names, but always puts "My Plugin" first.
 		$self->{plugin_names} = [
 			map { $_->[0] }
@@ -686,7 +686,7 @@ sub test_a_plugin {
 	my $plugins = $self->plugins;
 
 	my $last_filename = $config->{last_test_plugin_file};
-	$last_filename  ||= $main->selected_filename;
+	$last_filename  ||= $main->current->filename;
 	my $default_dir = '';
 	if ( $last_filename ) {
 		$default_dir = File::Basename::dirname($last_filename);

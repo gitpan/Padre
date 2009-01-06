@@ -28,20 +28,15 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Wx::App';
-
-use Class::XSAccessor
-	getters => {
-		main_window => 'main_window',
-	};
 
 
 
 
 
 #####################################################################
-# Constructor
+# Constructor and Accessors
 
 sub new {
 	my $class = shift;
@@ -53,15 +48,6 @@ sub new {
 	return $self;
 }
 
-sub OnInit { 1 }
-
-
-
-
-
-#####################################################################
-# Padre Methods
-
 =pod
 
 =head2 main_window
@@ -71,6 +57,20 @@ L<Padre::Wx::MainWindow> object, representing the main editor window
 of the application.
 
 =cut
+
+use Class::XSAccessor
+	getters => {
+		main_window => 'main_window',
+	};
+
+
+
+
+
+#####################################################################
+# Wx Methods
+
+sub OnInit { 1 }
 
 1;
 

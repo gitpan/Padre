@@ -4,12 +4,13 @@ use 5.008;
 use strict;
 use warnings;
 use Carp            ();
+use Encode          ();
 use Params::Util    '_INSTANCE';
 use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Padre::Document';
 
 
@@ -197,13 +198,11 @@ sub _css_class {
 				return 'core';
 			}
 		}
-		
 		if ( $Token->previous_sibling and $Token->previous_sibling->content eq '->' ) {
 			if ( $Token->content =~ /^(?:new)$/ ) {
 				return 'core';
 			}
 		}
-
 		if ( $Token->parent->isa('PPI::Statement::Include') ) {
 			if ( $Token->content =~ /^(?:use|no)$/ ) {
 				return 'keyword';
@@ -255,20 +254,13 @@ sub keywords {
 sub get_functions {
 	my $self = shift;
 	my $text = $self->text_get;
-
-	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
-	my $nlchar = $nlCharTable{ $self->get_newline_type };
-
-	return $text =~ m/${nlchar}sub\s+(\w+(?:::\w+)*)/g;
+	return $text =~ m/[\012\015]sub\s+(\w+(?:::\w+)*)/g;
 }
 
 sub get_function_regex {
-	my ( $self, $sub ) = @_;
-
-	my %nlCharTable = ( UNIX => "\n", WIN => "\r\n", MAC => "\r" );
-	my $nlchar = $nlCharTable{ $self->get_newline_type };
-
-	return qr!(?:^|${nlchar})sub\s+$sub\b!;
+	# This emulates qr/(?<=^|[\012\0125])sub\s$name\b/ but without
+	# triggering a "Variable length lookbehind not implemented" error.
+	return qr/(?:(?<=^)sub\s+$_[1]|(?<=[\012\0125])sub\s+$_[1])\b/;
 }
 
 sub get_command {
@@ -329,7 +321,6 @@ sub check_syntax_in_background {
 sub _check_syntax_internals {
 	my $self = shift;
 	my $args = shift;
-	
 	my $text = $self->text_get;
 	unless ( defined $text and $text ne '' ) {
 		return [];
@@ -337,17 +328,17 @@ sub _check_syntax_internals {
 
 	# Do we really need an update?
 	require Digest::MD5;
-	use Encode qw(encode_utf8);
-	my $md5 = Digest::MD5::md5(encode_utf8($text));
+	my $md5 = Digest::MD5::md5(Encode::encode_utf8($text));
 	unless ( $args->{force} ) {
-		if ( defined( $self->{last_checked_md5} )
-		     && $self->{last_checked_md5} eq $md5
+		if (
+			defined($self->{last_checked_md5})
+			and
+			$self->{last_checked_md5} eq $md5
 		) {
 			return;
 		}
 	}
 	$self->{last_checked_md5} = $md5;
-
 	
 	my $nlchar = "\n";
 	if ( $self->get_newline_type eq 'WIN' ) {
@@ -356,20 +347,26 @@ sub _check_syntax_internals {
 	elsif ( $self->get_newline_type eq 'MAC' ) {
 		$nlchar = "\r";
 	}
-	
+
 	require Padre::Task::SyntaxChecker::Perl;
-	my $task = Padre::Task::SyntaxChecker::Perl->new(
+	my %check = (
 		notebook_page => $self->editor,
-		text => $text,
-		newlines => $nlchar,
-		( exists $args->{on_finish} ? (on_finish => $args->{on_finish}) : () ),
+		text          => $text,
+		newlines      => $nlchar,
 	);
-	if ($args->{background}) {
-		# asynchroneous execution (see on_finish hook)
-		$task->schedule();
-		return();
+	if ( exists $args->{on_finish} ) {
+		$check{on_finish} = $args->{on_finish};
 	}
-	else {
+	if ( $self->project ) {
+		$check{cwd} = $self->project->root;
+		$check{perl_cmd} = [ '-Ilib' ];
+	}
+	my $task = Padre::Task::SyntaxChecker::Perl->new( %check );
+	if ( $args->{background} ) {
+		# asynchroneous execution (see on_finish hook)
+		$task->schedule;
+		return();
+	} else {
 		# serial execution, returning the result
 		return() if $task->prepare() =~ /^break$/;
 		$task->run();

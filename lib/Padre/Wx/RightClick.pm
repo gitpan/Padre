@@ -3,12 +3,9 @@ package Padre::Wx::RightClick;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Wx ();
 
-# Find and Replace widget of Padre
-
-use Padre::Wx  ();
-
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 
 sub on_right_click {
 	my ($self, $event) = @_;

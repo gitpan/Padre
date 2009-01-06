@@ -5,9 +5,8 @@ use strict;
 use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
-use Padre::Documents   ();
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -29,7 +28,7 @@ sub new {
 		$self->Append( -1, Wx::gettext('Disable Experimental Mode') ),
 		sub {
 			Padre->ide->config->{experimental} = 0;
-			$_[0]->menu->refresh;
+			$_[0]->menu->refresh($_[0]->current);
 			return;
 		},
 	);
@@ -40,7 +39,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1, Wx::gettext('Refresh Menu') ),
 		sub {
-			$_[0]->menu->refresh;
+			$_[0]->menu->refresh($_[0]->current);
 			return;
 		},
 	);

@@ -7,8 +7,9 @@ use strict;
 use warnings;
 use Padre::Wx          ();
 use Padre::Wx::Submenu ();
+use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.23';
+our $VERSION = '0.24';
 our @ISA     = 'Padre::Wx::Submenu';
 
 
@@ -174,7 +175,7 @@ sub new {
 			require Padre::Wx::Printout;
 			my $printer  = Wx::Printer->new;
 			my $printout = Padre::Wx::Printout->new(
-				$_[0]->selected_editor, "Print",
+				$_[0]->current->editor, "Print",
 			);
 			$printer->Print( $_[0], $printout, 1 );
 			$printout->Destroy;
@@ -321,8 +322,8 @@ sub new {
 
 sub refresh {
 	my $self     = shift;
-	my $document = Padre::Documents->current;
-	my $doc      = $document ? 1 : 0;
+	my $current  = _CURRENT(@_);
+	my $doc      = $current->document ? 1 : 0;
 
 	$self->{ open_selection        }->Enable($doc);
 	$self->{ close                 }->Enable($doc);
