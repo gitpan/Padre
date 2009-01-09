@@ -19,7 +19,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 
 
@@ -63,29 +63,6 @@ sub color {
 	return Wx::Colour->new(@c);
 }
 
-
-
-
-
-#####################################################################
-# Load Shared Resources
-
-sub tango {
-	Wx::Bitmap->new(
-		Padre::Util::sharefile( 'tango', '16x16', @_ ),
-		Wx::wxBITMAP_TYPE_PNG,
-	);
-}
-
-sub icon {
-	Wx::Bitmap->new(
-		Padre::Util::sharefile( 'miscicons', @_ ),
-		Wx::wxBITMAP_TYPE_PNG,
-	);
-}
-
-
-1;
 
 # Copyright 2008 Gabor Szabo.
 # LICENSE

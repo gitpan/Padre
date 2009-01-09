@@ -6,7 +6,7 @@ use warnings;
 use Carp         'croak';
 use Params::Util qw{_IDENTIFIER _CLASS _INSTANCE};
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use overload
 	'bool'     => sub { 1 },
@@ -148,7 +148,15 @@ sub enable {
 	}
 
 	# Call the enable method for the object
-	$self->object->plugin_enable;
+	eval {
+		$self->object->plugin_enable;
+	};
+	if ( $@ ) {
+		# Crashed during plugin enable
+		$self->status('error');
+		warn $@;
+		return 0;
+	}
 
 	# If the plugin defines document types, register them
 	my @documents = $self->object->registered_documents;
@@ -182,12 +190,19 @@ sub disable {
 	}
 
 	# Call the plugin's own disable method
-	$self->object->plugin_disable;
+	eval {
+		$self->object->plugin_disable;
+	};
+	if ( $@ ) {
+		# Crashed during plugin disable
+		$self->status('error');
+		return 1;
+	}
 
 	# Update the status
 	$self->status('disabled');
 
-	return 1;
+	return 0;
 }
 
 
@@ -214,3 +229,7 @@ sub _STATUS {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

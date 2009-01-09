@@ -13,7 +13,7 @@ my %opts;
 my %stats;
 my $panel_string_index = 9999999;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 my $DONE_EVENT : shared = Wx::NewEventType;
 
 my $ack_loaded = 0;
@@ -267,7 +267,7 @@ sub create_ack_pane {
 	
 	$main->{gui}->{ack_panel} = Wx::ListCtrl->new(
 		$main->{gui}->{bottompane},
-		Wx::wxID_ANY,
+		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
@@ -303,8 +303,8 @@ sub show_ack_output {
 		);
 		${$op}->Show;
 	}
-	$main->manager->GetPane('bottompane')->Show;
-	$main->manager->Update;
+	$main->aui->GetPane('bottompane')->Show;
+	$main->aui->Update;
 
 	return;
 }

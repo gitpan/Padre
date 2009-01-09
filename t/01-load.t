@@ -4,13 +4,17 @@ use strict;
 BEGIN {
 	$|  = 1;
 	$^W = 1;
-
-	# Twice to avoid a warning
-	$DB::single = $DB::single = 1;
 }
 
-use Test::NeedsDisplay ':skip_all';
-use Test::More tests => 24;
+#use Test::NeedsDisplay ':skip_all';
+use Test::More;
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+plan( tests => 23 );
 use Test::Script;
 use Test::NoWarnings;
 use Class::Autouse ':devel';
@@ -25,7 +29,6 @@ use_ok( 'Padre::Util'                      );
 use_ok( 'Padre::Config'                    );
 use_ok( 'Padre::DB'                        );
 use_ok( 'Padre::DB::Patch'                 );
-use_ok( 'Padre::Pod::Indexer'              );
 use_ok( 'Padre::Project'                   );
 use_ok( 'Padre::Wx'                        );
 use_ok( 'Padre::Wx::HtmlWindow'            );
@@ -36,9 +39,9 @@ use_ok( 'Padre::Wx::History::TextDialog'   );
 use_ok( 'Padre::Wx::History::ComboBox'     );
 use_ok( 'Padre'                            );
 use_ok( 'Padre::Pod2HTML'                  );
-use_ok( 'Padre::Pod::Viewer'               );
 use_ok( 'Padre::Plugin::Devel'             );
 use_ok( 'Padre::Plugin::My'                );
 
 script_compiles_ok('script/padre');
 script_compiles_ok('share/timeline/migrate-1.pl');
+script_compiles_ok('share/timeline/migrate-2.pl');

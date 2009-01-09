@@ -6,26 +6,43 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Wx          ();
-use Padre::Wx::Submenu ();
+use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.24';
-our @ISA     = 'Padre::Wx::Submenu';
+our $VERSION = '0.25';
+our @ISA     = 'Padre::Wx::Menu';
 
 
 
 
 
 #####################################################################
-# Padre::Wx::Submenu Methods
+# Padre::Wx::Menu Methods
 
 sub new {
 	my $class  = shift;
 	my $main   = shift;
-	my $config = Padre->ide->config;
+	my $config = $main->config;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
+
+
+
+
+
+	# Can the user move stuff around
+	$self->{lock_panels} = $self->AppendCheckItem( -1,
+		Wx::gettext("Lock User Interface")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{lock_panels},
+		sub {
+			$_[0]->on_toggle_lockpanels($_[1]);
+		},
+	);
+
+	$self->AppendSeparator;
 
 
 
@@ -79,19 +96,21 @@ sub new {
 	);
 
 	# On Windows disabling the status bar doesn't work, so don't allow it
-	unless ( Padre::Util::WIN32 ) {
+	unless ( Padre::Util::WXWIN32 ) {
 		$self->{statusbar} = $self->AppendCheckItem( -1,
 			Wx::gettext("Show StatusBar")
 		);
 		Wx::Event::EVT_MENU( $main,
 			$self->{statusbar},
 			sub {
-				$_[0]->on_toggle_status_bar($_[1]);
+				$_[0]->on_toggle_statusbar($_[1]);
 			},
 		);
 	}
 
 	$self->AppendSeparator;
+
+
 
 
 
@@ -353,7 +372,8 @@ sub new {
 
 	# Language Support
 	# TODO: God this is horrible, there has to be a better way
-	my $default  = Padre::Locale::system_rfc4646();
+	require Padre::Locale;
+	my $default  = Padre::Locale::system_rfc4646() || 'x-unknown';
 	my $current  = Padre::Locale::rfc4646();
 	my %language = Padre::Locale::menu_view_languages();
 
@@ -425,11 +445,13 @@ sub new {
 
 sub refresh {
 	my $self     = shift;
-	my $document = _CURRENT(@_)->document;
-	my $config   = Padre->ide->config;
+	my $current  = _CURRENT(@_);
+	my $config   = $current->config;
+	my $document = $current->document;
+	my $doc      = $document ? 1 : 0;
 
 	# Simple check state cases from configuration
-	unless ( Padre::Util::WIN32 ) {
+	unless ( Padre::Util::WXWIN32 ) {
 		$self->{statusbar}->Check( $config->{main_statusbar} ? 1 : 0 );
 	}
 	$self->{ lines        }->Check( $config->{editor_linenumbers} ? 1 : 0 );
@@ -439,6 +461,7 @@ sub refresh {
 	$self->{ whitespaces   }->Check( $config->{editor_whitespaces} ? 1 : 0 );
 	$self->{ output        }->Check( $config->{main_output_panel} ? 1 : 0 );
 	$self->{ functions     }->Check( $config->{main_subs_panel} ? 1 : 0 );
+	$self->{ lock_panels      }->Check( $config->{main_lockpanels} ? 1 : 0 );
 	$self->{ indentation_guide}->Check( $config->{editor_indentationguides} ? 1 : 0 );
 	$self->{ show_calltips    }->Check( $config->{editor_calltips} ? 1 : 0 );
 	$self->{ show_syntaxcheck }->Check( $config->{editor_syntaxcheck} ? 1 : 0 );
@@ -474,14 +497,17 @@ sub refresh {
 	}
 
 	# Disable zooming and bookmarks if there's no current document
-	my $doc = $document ? 1 : 0;
-	$self->{ font_increase        }->Enable($doc);
-	$self->{ font_decrease        }->Enable($doc);
-	$self->{ font_reset           }->Enable($doc);
-	$self->{ bookmark_set         }->Enable($doc);
-	$self->{ bookmark_goto        }->Enable($doc);
+	$self->{ font_increase }->Enable($doc);
+	$self->{ font_decrease }->Enable($doc);
+	$self->{ font_reset    }->Enable($doc);
+	$self->{ bookmark_set  }->Enable($doc);
+	$self->{ bookmark_goto }->Enable($doc);
 
 	return;
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

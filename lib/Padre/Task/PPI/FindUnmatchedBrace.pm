@@ -3,9 +3,10 @@ package Padre::Task::PPI::FindUnmatchedBrace;
 use strict;
 use warnings;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use base 'Padre::Task::PPI';
+use Padre::Wx();
 
 =pod
 
@@ -76,7 +77,7 @@ sub finish {
 		Wx::MessageBox(
 			Wx::gettext("All braces appear to be matched"),
 			Wx::gettext("Check Complete"),
-			Wx::wxOK(),
+			Wx::wxOK,
 			Padre->ide->wx->main_window
 		);
 	}

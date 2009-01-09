@@ -7,49 +7,76 @@ package Padre::Wx::Output;
 use 5.008;
 use strict;
 use warnings;
+use utf8;
+use Encode       ();
 use Params::Util ();
 use Padre::Wx    ();
 
-use base 'Wx::TextCtrl';
-
-our $VERSION = '0.24';
+our $VERSION = '0.25';
+our @ISA     = 'Wx::TextCtrl';
 
 sub new {
-	my $class  = shift;
-	my $parent = shift;
-	my $self   = $class->SUPER::new(
-		$parent,
+	my $class = shift;
+	my $main  = shift;
+
+	# Create the underlying object
+	my $self = $class->SUPER::new(
+		$main->bottom,
 		-1,
 		"", 
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTE_READONLY | Wx::wxTE_MULTILINE | Wx::wxTE_DONTWRAP | Wx::wxNO_FULL_REPAINT_ON_RESIZE,
+		Wx::wxTE_READONLY
+		| Wx::wxTE_MULTILINE
+		| Wx::wxTE_DONTWRAP
+		| Wx::wxNO_FULL_REPAINT_ON_RESIZE,
 	);
 
 	# Do custom startup stuff here
 	$self->clear;
-	my $stdFontSize = Wx::wxNORMAL_FONT->GetPointSize;
-	my $font = Wx::Font->new( $stdFontSize, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
-	$self->SetFont($font);
-	$self->AppendText(Wx::gettext('No output'));
+	$self->SetFont(
+		Wx::Font->new(
+			Wx::wxNORMAL_FONT->GetPointSize,
+			Wx::wxTELETYPE,
+			Wx::wxNORMAL,
+			Wx::wxNORMAL,
+		),
+	);
+	$self->AppendText( Wx::gettext('No output') );
 
 	return $self;
 }
 
-# from Sean Healy on wxPerl mailing list
-use Encode;
+sub main {
+	$_[0]->GetGrandParent;
+}
+
+sub gettext_label {
+	Wx::gettext('Output');
+}
+
+
+
+
+
+#####################################################################
+# Main Methods
+
+# From Sean Healy on wxPerl mailing list.
+# Tweaked to avoid copying as much as possible.
 sub AppendText {
-	my ($self, $text) = @_;
-	my $string = utf8::is_utf8($text) ? $text : decode('utf8', $text);
-	$self->SUPER::AppendText($string);
+	my $self = shift;
+	if ( utf8::is_utf8($_[0]) ) {
+		return $self->SUPER::AppendText($_[0]);
+	}
+	my $text = Encode::decode('utf8', $_[0]);
+	$self->SUPER::AppendText($text);
 }
 
 sub select {
-	my $self = shift;
-
-	my $idx = $self->GetParent->GetPageIndex($self);
-	$self->GetParent->SetSelection($idx);
-
+	my $self   = shift;
+	my $parent = $self->GetParent;
+	$parent->SetSelection( $parent->GetPageIndex($self) );
 	return;
 }
 
@@ -71,27 +98,19 @@ sub clear {
 }
 
 sub style_good {
-	my $self = shift;
-	$self->SetBackgroundColour('#CCFFCC');
-	return 1;
+	$_[0]->SetBackgroundColour('#CCFFCC');
 }
 
 sub style_bad {
-	my $self = shift;
-	$self->SetBackgroundColour('#FFCCCC');
-	return 1;
+	$_[0]->SetBackgroundColour('#FFCCCC');
 }
 
 sub style_neutral {
-	my $self = shift;
-	$self->SetBackgroundColour('#FFFFFF');
-	return 1;
+	$_[0]->SetBackgroundColour('#FFFFFF');
 }
 
 sub style_busy {
-	my $self = shift;
-	$self->SetBackgroundColour('#CCCCCC');
-	return 1;
+	$_[0]->SetBackgroundColour('#CCCCCC');
 }
 
 1;

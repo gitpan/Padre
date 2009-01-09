@@ -8,7 +8,7 @@ use warnings;
 use Params::Util qw{_INSTANCE};
 use Padre::Wx    ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 # Due to an overly simplistic implementation at the C level,
 # Wx::AuiManager is only a SCALAR reference and cannot be
@@ -60,4 +60,32 @@ sub relocale {
 	return $self;
 }
 
+# Set the lock status of the panels
+sub lock_panels {
+	my $self   = shift;
+	my $unlock = $_[0] ? 0 : 1;
+
+	$self->Update;
+
+	$self->GetPane('bottompane')
+		->CaptionVisible($unlock)
+		->Floatable($unlock)
+		->Dockable($unlock)
+		->Movable($unlock);
+
+	$self->GetPane('sidepane')
+		->CaptionVisible($unlock)
+		->Floatable($unlock)
+		->Dockable($unlock)
+		->Movable($unlock);
+
+	$self->Update;
+
+	return;
+}
+
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

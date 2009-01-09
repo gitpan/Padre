@@ -30,7 +30,11 @@ use Scalar::Util              ();
 use Params::Util              ();
 use Padre::Util               ();
 use Padre::Locale             ();
+use Padre::Current            qw{_CURRENT};
+use Padre::Document           ();
 use Padre::Wx                 ();
+use Padre::Wx::Icon           ();
+use Padre::Wx::Right          ();
 use Padre::Wx::Editor         ();
 use Padre::Wx::Output         ();
 use Padre::Wx::Bottom         ();
@@ -39,11 +43,12 @@ use Padre::Wx::Notebook       ();
 use Padre::Wx::StatusBar      ();
 use Padre::Wx::ErrorList      ();
 use Padre::Wx::AuiManager     ();
+use Padre::Wx::DocOutliner    ();
+use Padre::Wx::FunctionList   ();
+use Padre::Wx::SyntaxChecker  ();
 use Padre::Wx::FileDropTarget ();
-use Padre::Document           ();
-use Padre::Current            qw{_CURRENT};
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 our @ISA     = 'Wx::Frame';
 
 my $default_dir = Cwd::cwd();
@@ -59,11 +64,13 @@ use constant SECONDS => 1000;
 
 use Class::XSAccessor
 	getters => {
+		config         => 'config',
+		aui            => 'aui',
 		menu           => 'menu',
-		manager        => 'manager',
 		no_refresh     => '_no_refresh',
 		syntax_checker => 'syntax_checker',
 		errorlist      => 'errorlist',
+		doc_outliner   => 'doc_outliner',
 	};
 
 # NOTE: Yes this method does get a little large, but that's fine.
@@ -111,6 +118,10 @@ sub new {
 		$wx_frame_style,
 	);
 
+	# Save a pointer to the configuration object.
+	# This prevents tons of Padre->ide->config calls.
+	$self->{config} = $config;
+
 	# Set the locale
 	$self->{locale} = Padre::Locale::object();
 
@@ -127,13 +138,13 @@ sub new {
 	$self->{page_history} = [];
 
 	# Set the window manager
-	$self->{manager} = Padre::Wx::AuiManager->new($self);
+	$self->{aui} = Padre::Wx::AuiManager->new($self);
 
 	# Add some additional attribute slots
 	$self->{marker} = {};
 
 	# Create the menu bar
-	$self->{menu} = Padre::Wx::Menu->new($self);
+	$self->{menu} = Padre::Wx::Menubar->new($self);
 	$self->SetMenuBar( $self->menu->wx );
 
 	# Create the tool bar
@@ -142,32 +153,21 @@ sub new {
 	);
 	$self->GetToolBar->Realize;
 
-	# Create the status bar
+	# Create the tool panes 
 	$self->{gui}->{statusbar} = Padre::Wx::StatusBar->new($self);
 
-	# Create the main notebook for the documents
-	$self->{gui}->{notebook} = Padre::Wx::Notebook->new($self);
+	# Create the three notebooks (document and tools) that
+	# serve as the main AUI manager GUI elements.
+	$self->{gui}->{notebook}     = Padre::Wx::Notebook->new($self);
+	$self->{gui}->{sidepane}     = Padre::Wx::Right->new($self);
+	$self->{gui}->{bottompane}   = Padre::Wx::Bottom->new($self);
 
-	$self->create_side_pane;
-
-	# Create the bottom pane
-	$self->{gui}->{bottompane} = Padre::Wx::Bottom->new($self);
-
-	# Create the output textarea
-	$self->{gui}->{output_panel} = Padre::Wx::Output->new(
-		$self->{gui}->{bottompane}
-	);
-
-	$self->show_output( Padre->ide->config->{main_output_panel} );
-
-	# Create the syntax checker and sidebar for syntax check messages
-	# Must be created after the bottom pane!
-	$self->{syntax_checker} = Padre::Wx::SyntaxChecker->new($self);
-	$self->show_syntaxbar( $self->menu->view->{show_syntaxcheck}->IsChecked );
-
-	# Create the error list
-	# Must be created after the bottom pane!
-	$self->{errorlist} = Padre::Wx::ErrorList->new($self);
+	# Creat the various tools that will live in the panes
+	$self->{gui}->{subs_panel}   = Padre::Wx::FunctionList->new($self);
+	$self->{gui}->{output_panel} = Padre::Wx::Output->new($self);
+	$self->{errorlist}           = Padre::Wx::ErrorList->new($self);
+	$self->{syntax_checker}      = Padre::Wx::SyntaxChecker->new($self);
+	$self->{doc_outliner}        = Padre::Wx::DocOutliner->new($self);
 
 	# on close pane
 	Wx::Event::EVT_AUI_PANE_CLOSE(
@@ -184,11 +184,11 @@ sub new {
 		my $code = $event->GetKeyCode;
 
 		# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
-		$mod = $mod & (Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT());
+		$mod = $mod & (Wx::wxMOD_ALT + Wx::wxMOD_CMD + Wx::wxMOD_SHIFT);
 		if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
 			# Ctrl-TAB  #TODO it is already in the menu
 			$self->on_next_pane if $code == Wx::WXK_TAB;
-		} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT()) { # Ctrl-Shift
+		} elsif ( $mod == Wx::wxMOD_CMD + Wx::wxMOD_SHIFT) { # Ctrl-Shift
 			# Ctrl-Shift-TAB #TODO it is already in the menu
 			$self->on_prev_pane if $code == Wx::WXK_TAB;
 		}
@@ -212,9 +212,15 @@ sub new {
 	# used to use was far uglier
 	$self->SetIcon( Wx::GetWxPerlIcon() );
 
+	# Show the tools that the configuration dictates
+	$self->show_functions( $self->config->{main_subs_panel} );
+	$self->show_output( $self->config->{main_output_panel} );
+	$self->show_syntaxbar( $self->menu->view->{show_syntaxcheck}->IsChecked );
+	$self->show_outlinebar( 0 );# NOT YET #$self->menu->view->{show_docoutline}->IsChecked );
+
 	# Load the saved pane layout from last time (if any)
 	if ( defined $config->{host}->{aui_manager_layout} ) {
-		$self->manager->LoadPerspective( $config->{host}->{aui_manager_layout} );
+		$self->aui->LoadPerspective( $config->{host}->{aui_manager_layout} );
 	}
 
 	# we need an event immediately after the window opened
@@ -235,94 +241,6 @@ sub new {
 	return $self;
 }
 
-sub create_side_pane {
-	my $self = shift;
-
-	$self->{gui}->{sidepane} = Wx::AuiNotebook->new(
-		$self,
-		Wx::wxID_ANY,
-		Wx::wxDefaultPosition,
-		Wx::Size->new(300, 350), # used when pane is floated
-		Wx::wxAUI_NB_SCROLL_BUTTONS|Wx::wxAUI_NB_WINDOWLIST_BUTTON|Wx::wxAUI_NB_TOP
-		# |Wx::wxAUI_NB_TAB_EXTERNAL_MOVE crashes on Linux/GTK
-	);
-
-	# Create the right-hand sidebar
-	$self->{gui}->{subs_panel} = Wx::ListCtrl->new(
-		$self->{gui}->{sidepane},
-		Wx::wxID_ANY,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
-	);
-
-	Wx::Event::EVT_KILL_FOCUS( $self->{gui}->{subs_panel}, \&on_subs_panel_left );
-
-	# find-as-you-type in functions tab
-	# TODO: should the whole subs_panel stuff be in its own class? (Yes)
-	Wx::Event::EVT_CHAR( $self->{gui}->{subs_panel}, sub {
-		my ($self, $event) = @_;
-		my $mod  = $event->GetModifiers || 0;
-		my $code = $event->GetKeyCode;
-		
-		# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
-		$mod = $mod & (Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT()); # TODO: This is cargo-cult
-
-		if (!$mod) {
-			if ($code <= 255 and $code > 0 and chr($code) =~ /^[\w_:-]$/) { # TODO is there a better way? use ==?
-				$code = 95 if $code == 45; # transform - => _ for convenience
-				$self->{function_find_string} .= chr($code);
-				# this does a partial match starting at the beginning of the function name
-				my $pos = $self->FindItem(0, $self->{function_find_string}, 1);
-				if (defined $pos) {
-					$self->SetItemState($pos, Wx::wxLIST_STATE_SELECTED, Wx::wxLIST_STATE_SELECTED);
-				}
-			}
-			else {
-				# reset the find string
-				$self->{function_find_string} = undef;
-			}
-		}
-
-		$event->Skip(1);
-		return;
-	} );
-
-	$self->manager->AddPane(
-		$self->{gui}->{sidepane},
-		Wx::AuiPaneInfo->new
-			->Name('sidepane')
-			->CenterPane
-			->Resizable(1)
-			->PaneBorder(0)
-			->Movable(1)
-			->CaptionVisible(1)
-			->CloseButton(0)
-			->DestroyOnClose(0)
-			->MaximizeButton(0)
-			->Floatable(1)
-			->Dockable(1)
-			->Caption( Wx::gettext("Workspace View") )
-			->Position(3)
-			->Right
-			->Layer(3)
-			->Hide
-	);
-
-	$self->{gui}->{subs_panel}->InsertColumn(0, Wx::gettext('Methods'));
-	$self->{gui}->{subs_panel}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
-
-	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
-		$self,
-		$self->{gui}->{subs_panel},
-		\&on_function_selected,
-	);
-
-	$self->show_functions( Padre->ide->config->{main_subs_panel} );
-
-	return;
-}
-
 # Load any default files
 sub load_files {
 	my $self   = shift;
@@ -335,7 +253,7 @@ sub load_files {
 	}
 
 	# Config setting 'nothing' means startup with nothing open
-	my $config  = Padre->ide->config;
+	my $config  = $self->config;
 	my $startup = $config->{main_startup};
 	if ( $startup eq 'nothing' ) {
 		return;
@@ -390,7 +308,7 @@ sub timer_post_init {
 	# Load all files and refresh the application so that it
 	# represents the loaded state.
 	$self->load_files;
-	$self->on_toggle_status_bar;
+	$self->on_toggle_statusbar;
 	Padre->ide->plugin_manager->enable_editors_for_all;
 	if ( $self->menu->view->{show_syntaxcheck}->IsChecked ) {
 		$self->syntax_checker->enable(1);
@@ -466,15 +384,10 @@ sub refresh {
 	$self->refresh_status($current);
 	$self->refresh_methods($current);
 
-	# Fix ticket #185: Padre crash when closing files
-	if ( ! $self->{no_syntax_check_refresh} ) {
-		$self->refresh_syntaxcheck($current);
-	}
-	$self->{no_syntax_check_refresh} = 0;
-
 	my $id = $self->notebook->GetSelection;
 	if ( defined $id and $id >= 0 ) {
 		$self->notebook->GetPage($id)->SetFocus;
+		$self->refresh_syntaxcheck;
 	}
 
 	$self->Thaw;
@@ -525,7 +438,7 @@ sub refresh_methods {
 		return;
 	}
 
-	my $config  = Padre->ide->config;
+	my $config  = $self->config;
 	my @methods = $document->get_functions;
 	if ( $config->{editor_methods} eq 'original' ) {
 		# That should be the one we got from get_functions
@@ -583,7 +496,7 @@ sub change_locale {
 	}
 
 	# Save the locale to the config
-	Padre->ide->config->{host}->{locale} = $name;
+	$self->config->{host}->{locale} = $name;
 
 	# Reset the locale
 	delete $self->{locale};
@@ -607,19 +520,25 @@ sub relocale {
 
 	# The menu doesn't support relocale, replace it
 	delete $self->{menu};
-	$self->{menu} = Padre::Wx::Menu->new($self);
+	$self->{menu} = Padre::Wx::Menubar->new($self);
 	$self->SetMenuBar( $self->menu->wx );
 
 	# The toolbar doesn't support relocale, replace it
+	$self->rebuild_toolbar;
+
+	# Update window manager captions
+	$self->aui->relocale;
+
+	return;
+}
+
+sub rebuild_toolbar {
+	my $self = shift;
 	$self->SetToolBar(
 		Padre::Wx::ToolBar->new($self)
 	);
 	$self->GetToolBar->Realize;
-
-	# Update window manager captions
-	$self->manager->relocale;
-
-	return;
+	return 1;
 }
 
 
@@ -629,12 +548,28 @@ sub relocale {
 #####################################################################
 # Introspection
 
-sub nb {
+sub notebook {
 	return $_[0]->{gui}->{notebook};
 }
 
-sub notebook {
-	return $_[0]->{gui}->{notebook};
+sub bottom {
+	$_[0]->{gui}->{bottompane};
+}
+
+sub right {
+	$_[0]->{gui}->{sidepane};
+}
+
+sub output {
+	$_[0]->{gui}->{output_panel};
+}
+
+sub outline {
+	$_[0]->{gui}->{outline_panel};
+}
+
+sub functions {
+	$_[0]->{gui}->{subs_panel};
 }
 
 =pod
@@ -667,6 +602,7 @@ sub pages {
 	my $notebook = $_[0]->notebook;
 	return map { $notebook->GetPage($_) } $_[0]->pageids;
 }
+
 
 
 
@@ -760,7 +696,7 @@ sub run_command {
 }
 
 # This should really be somewhere else, but can stay here for now
-sub run_script {
+sub run_document {
 	my $self     = shift;
 	my $document = $self->current->document;
 	unless ( $document ) {
@@ -769,7 +705,7 @@ sub run_script {
 
 	# Apply the user's save-on-run policy
 	# TODO: Make this code suck less
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	if ( $config->{run_save} eq 'same' ) {
 		$self->on_save;
 	} elsif ( $config->{run_save} eq 'all_files' ) {
@@ -783,12 +719,12 @@ sub run_script {
 	}
 
 	my $cmd = eval { $document->get_command };
-	if ($@) {
+	if ( $@ ) {
 		chomp $@;
 		$self->error($@);
 		return;
 	}
-	if ($cmd) {
+	if ( $cmd ) {
 		if ($document->pre_process) {
 			$self->run_command( $cmd );
 		} else {
@@ -813,7 +749,7 @@ sub debug_perl {
 
 	# Apply the user's save-on-run policy
 	# TODO: Make this code suck less
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	if ( $config->{run_save} eq 'same' ) {
 		$self->on_save;
 	} elsif ( $config->{run_save} eq 'all_files' ) {
@@ -1015,7 +951,7 @@ sub on_close_window {
 	$config->{host}->{main_files_pos} = $main_files_pos;
 
 	# Save the window geometry
-	$config->{host}->{aui_manager_layout} = $self->manager->SavePerspective;
+	$config->{host}->{aui_manager_layout} = $self->aui->SavePerspective;
 	$config->{host}->{main_maximized}     = $self->IsMaximized ? 1 : 0;
 	unless ( $self->IsMaximized ) {
 		# Don't save the maximized window size
@@ -1121,7 +1057,7 @@ sub setup_editor {
 
 	local $self->{_no_refresh} = 1;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	
 	my $doc = Padre::Document->new(
 		filename => $file,
@@ -1414,7 +1350,6 @@ sub on_close {
 		$event->Veto;
 	}
 	$self->close;
-	$self->{no_syntax_check_refresh} = 1;
 	$self->refresh;
 }
 
@@ -1451,6 +1386,10 @@ sub close {
 		}
 	}
 	$self->notebook->DeletePage($id);
+
+	if ( defined $self->syntax_checker->syntaxbar ) {
+		$self->syntax_checker->syntaxbar->DeleteAllItems;
+	}
 
 	# Remove the entry from the Window menu
 	$self->menu->window->refresh($self->current);
@@ -1603,7 +1542,7 @@ sub on_preferences {
 sub on_toggle_line_numbers {
 	my ($self, $event) = @_;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_linenumbers} = $event->IsChecked ? 1 : 0;
 
 	foreach my $editor ( $self->pages ) {
@@ -1616,7 +1555,7 @@ sub on_toggle_line_numbers {
 sub on_toggle_code_folding {
 	my ($self, $event) = @_;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_codefolding} = $event->IsChecked ? 1 : 0;
 
 	foreach my $editor ( $self->pages ) {
@@ -1632,7 +1571,7 @@ sub on_toggle_code_folding {
 sub on_toggle_current_line_background {
 	my ($self, $event) = @_;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_current_line_background} = $event->IsChecked ? 1 : 0;
 
 	foreach my $editor ( $self->pages ) {
@@ -1645,7 +1584,7 @@ sub on_toggle_current_line_background {
 sub on_toggle_syntax_check {
 	my ($self, $event) = @_;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_syntaxcheck} = $event->IsChecked ? 1 : 0;
 
 	$self->syntax_checker->enable( $config->{editor_syntaxcheck} ? 1 : 0 );
@@ -1656,7 +1595,7 @@ sub on_toggle_syntax_check {
 sub on_toggle_errorlist {
 	my ($self, $event) = @_;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_errorlist} = $event->IsChecked ? 1 : 0;
 
 	$config->{editor_errorlist} ? $self->errorlist->enable : $self->errorlist->disable;
@@ -1667,7 +1606,7 @@ sub on_toggle_errorlist {
 sub on_toggle_indentation_guide {
 	my $self   = shift;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_indentationguides} = $self->menu->view->{indentation_guide}->IsChecked ? 1 : 0;
 
 	foreach my $editor ( $self->pages ) {
@@ -1680,7 +1619,7 @@ sub on_toggle_indentation_guide {
 sub on_toggle_eol {
 	my $self   = shift;
 
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_eol} = $self->menu->view->{eol}->IsChecked ? 1 : 0;
 
 	foreach my $editor ( $self->pages ) {
@@ -1699,7 +1638,7 @@ sub on_toggle_whitespaces {
 	my ($self) = @_;
 	
 	# check whether we need to show / hide spaces & tabs.
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{editor_whitespaces} = $self->menu->view->{whitespaces}->IsChecked
 		? Wx::wxSTC_WS_VISIBLEALWAYS
 		: Wx::wxSTC_WS_INVISIBLE;
@@ -1716,7 +1655,7 @@ sub on_word_wrap {
 	unless ( $on == $self->menu->view->{word_wrap}->IsChecked ) {
 		$self->menu->view->{word_wrap}->Check($on);
 	}
-	
+
 	my $doc = $self->current->document or return;
 
 	if ( $on ) {
@@ -1732,36 +1671,15 @@ sub show_output {
 	unless ( $on == $self->menu->view->{output}->IsChecked ) {
 		$self->menu->view->{output}->Check($on);
 	}
-
-	my $bp = \$self->{gui}->{bottompane};
-	my $op = \$self->{gui}->{output_panel};
+	$self->config->{main_output_panel} = $on;
 
 	if ( $on ) {
-		my $idx = ${$bp}->GetPageIndex(${$op});
-		if ( $idx >= 0 ) {
-			${$bp}->SetSelection($idx);
-		}
-		else {
-			${$bp}->InsertPage(
-				0,
-				${$op},
-				Wx::gettext("Output"),
-				1,
-				# Padre::Wx::tango( 'mimetypes', 'text-x-generic.png' )
-			);
-			${$op}->Show;
-			$self->check_pane_needed('bottompane');
-		}
+		$self->bottom->show($self->output);
 	} else {
-		my $idx = ${$bp}->GetPageIndex(${$op});
-		${$op}->Hide;
-		if ( $idx >= 0 ) {
-			${$bp}->RemovePage($idx);
-			$self->check_pane_needed('bottompane');
-		}
+		$self->bottom->hide($self->output);
 	}
-	$self->manager->Update;
-	Padre->ide->config->{main_output_panel} = $on;
+
+	$self->aui->Update;
 
 	return;
 }
@@ -1769,40 +1687,58 @@ sub show_output {
 sub show_functions {
 	my $self = shift;
 	my $on   = ( @_ ? ($_[0] ? 1 : 0) : 1 );
-
-	my $sp = \$self->{gui}->{sidepane};
-	my $fp = \$self->{gui}->{subs_panel};
-
 	unless ( $on == $self->menu->view->{functions}->IsChecked ) {
 		$self->menu->view->{functions}->Check($on);
 	}
+	$self->config->{main_subs_panel} = $on;
 
 	if ( $on ) {
-		# $self->refresh_methods();
-		my $idx = ${$sp}->GetPageIndex(${$fp});
+		$self->right->show($self->functions);
+	} else {
+		$self->right->hide($self->functions);
+	}
+
+	$self->aui->Update;
+
+	return;
+}
+
+sub show_outlinebar {
+	my $self = shift;
+	my $on   = ( @_ ? ($_[0] ? 1 : 0) : 1 );
+
+	my $sp = \$self->{gui}->{sidepane};
+	my $op = \$self->{gui}->{outline_panel};
+
+	# XXX error while $self->menu->view->{show_docoutline} is not defined...
+	#unless ( $on == $self->menu->view->{show_docoutline}->IsChecked ) {
+	#	$self->menu->view->{show_docoutline}->Check($on);
+	#}
+
+	if ( $on ) {
+		my $idx = ${$sp}->GetPageIndex(${$op});
 		if ( $idx >= 0 ) {
 			${$sp}->SetSelection($idx);
 		}
 		else {
 			${$sp}->InsertPage(
-				0,
-				${$fp},
-				Wx::gettext("Subs"),
+				1,
+				${$op},
+				Wx::gettext("Outline"),
 				1,
 			);
-			${$fp}->Show;
+			${$op}->Show;
 			$self->check_pane_needed('sidepane');
 		}
 	} else {
-		my $idx = ${$sp}->GetPageIndex(${$fp});
-		${$fp}->Hide;
+		my $idx = ${$sp}->GetPageIndex(${$op});
+		${$op}->Hide;
 		if ( $idx >= 0 ) {
 			${$sp}->RemovePage($idx);
 			$self->check_pane_needed('sidepane');
 		}
 	}
-	$self->manager->Update;
-	Padre->ide->config->{main_subs_panel} = $on;
+	$self->aui->Update;
 
 	return;
 }
@@ -1829,7 +1765,7 @@ sub show_syntaxbar {
 				${$sp},
 				Wx::gettext("Syntax Check"),
 				1,
-				# Padre::Wx::tango( 'status', 'dialog-warning.png' )
+				# Padre::Wx::Icon::find('status/dialog-warning')
 			);
 			${$sp}->Show;
 			$self->check_pane_needed('bottompane');
@@ -1843,7 +1779,7 @@ sub show_syntaxbar {
 			$self->check_pane_needed('bottompane');
 		}
 	}
-	$self->manager->Update;
+	$self->aui->Update;
 
 	return;
 }
@@ -1871,24 +1807,24 @@ sub check_pane_needed {
 		}
 	}
 	if ($visible) {
-		$self->manager->GetPane($pane)->Show;
+		$self->aui->GetPane($pane)->Show;
 	}
 	else {
-		$self->manager->GetPane($pane)->Hide;
+		$self->aui->GetPane($pane)->Hide;
 	}
 
 	return;
 }
 
-sub on_toggle_status_bar {
+sub on_toggle_statusbar {
 	my ($self, $event) = @_;
-	if ( Padre::Util::WIN32 ) {
+	if ( Padre::Util::WXWIN32 ) {
 		# Status bar always shown on Windows
 		return;
 	}
 
 	# Update the configuration
-	my $config = Padre->ide->config;
+	my $config = $self->config;
 	$config->{main_statusbar} = $self->menu->view->{statusbar}->IsChecked ? 1 : 0;
 
 	# Update the status bar
@@ -1898,6 +1834,24 @@ sub on_toggle_status_bar {
 	} else {
 		$status_bar->Hide;
 	}
+
+	return;
+}
+
+sub on_toggle_lockpanels {
+	my $self  = shift;
+	my $event = shift;
+
+	# Update the configuration
+	my $config = $self->config;
+	$config->{main_lockpanels} = $self->menu->view->{lock_panels}->IsChecked ? 1 : 0;
+
+	# Update the lock status
+	$self->aui->lock_panels($config->{main_lockpanels});
+
+	# The toolbar can't dynamically switch between
+	# tearable and non-tearable so rebuild it.
+	$self->rebuild_toolbar;
 
 	return;
 }
@@ -1983,7 +1937,7 @@ sub run_in_padre {
 	my $self = shift;
 	my $doc  = $self->current->document or return;
 	my $code = $doc->text_get;
-	eval $code; ## no critic
+	my @rv   = eval $code; ## no critic
 	if ( $@ ) {
 		Wx::MessageBox(
 			sprintf(Wx::gettext("Error: %s"), $@),
@@ -1991,35 +1945,16 @@ sub run_in_padre {
 			Wx::wxOK,
 			$self,
 		);
+		return;
 	}
-	return;
-}
 
-sub on_function_selected {
-	$DB::single = 1;
-	my $self     = shift;
-	my $event    = shift;
-	my $subname  = $event->GetItem->GetText or return;
-	my $document = $self->current->document;
-	my $editor   = $document->editor;
-
-	# Locate the function
-	my ($start, $end) = Padre::Util::get_matches(
-		$editor->GetText,
-		$document->get_function_regex($subname),
-		$editor->GetSelection, # Provides two params
-	);
-	return unless defined $start; # Couldn't find it
-
-	# Move the selection to the sub location
-	$editor->GotoPos($start);
-	$editor->ScrollToLine(
-		$editor->GetCurrentLine - ($editor->LinesOnScreen / 2)
-	);
-	$editor->SetFocus;
-
-	# $editor->SetCurrentPos($start);
-	# $editor->goto_pos_centerize($start);
+	# Dump the results to the output window
+	require Devel::Dumpvar;
+	my $dumper = Devel::Dumpvar->new( to => 'return' );
+	my $string = $dumper->dump( @rv );
+	$self->show_output(1);
+	$self->output->clear;
+	$self->output->AppendText($string);
 
 	return;
 }
@@ -2232,18 +2167,6 @@ sub on_delete_leading_space {
 	
 	my $editor = $current->editor;
 	$editor->ReplaceSelection( $code );
-}
-
-# TODO next function
-# should be in a class representing the subs panel
-sub on_subs_panel_left {
-	my ($self, $event) = @_;
-	my $main = Padre->ide->wx->main_window;
-	if ( $main->{subs_panel_was_closed} ) {
-		$main->show_functions(0);
-		$main->{subs_panel_was_closed} = 0;
-	}
-	return;
 }
 
 #

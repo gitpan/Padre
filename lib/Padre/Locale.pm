@@ -41,7 +41,7 @@ use File::Spec ();
 # Padre::Wx should not implement anything using Wx modules.
 # We make an exception in this case, because we're only using the locale
 # logic in Wx, which isn't related to widgets anyway.
-use Padre::Util ();
+use Padre::Util '_T';
 use Padre::Wx   ();
 
 use constant DEFAULT  => 'en-gb';
@@ -49,7 +49,7 @@ use constant SHAREDIR => File::Spec->rel2abs(
 	Padre::Util::sharedir('locale')
 );
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -67,7 +67,7 @@ BEGIN {
 		# documentation purposes.
 		'en-gb' => {
 			# REQUIRED: The gettext msgid for the language.
-			gettext    => 'English (United Kingdom)',
+			gettext    => _T('English (United Kingdom)'),
 	
 			# REQUIRED: The native name of the language
 			utf8text   => 'English (United Kingdom)',
@@ -106,7 +106,7 @@ BEGIN {
 		# Example entry for an language which is not supported directly,
 		# but which Padre is aware of.
 		'en-au' => {
-			gettext   => 'English (Australian)',
+			gettext   => _T('English (Australian)'),
 			utf8text  => 'English (Australian)',
 			iso639    => 'en',
 			iso3166   => 'AU',
@@ -123,7 +123,7 @@ BEGIN {
 	
 		# The fallback entry when Wx can't determine a language
 		'x-unknown' => {
-			gettext   => 'Unknown',
+			gettext   => _T('Unknown'),
 			utf8text  => 'Unknown',
 			iso639    => 'en', # For convenience
 			iso3166   => undef,
@@ -137,7 +137,7 @@ BEGIN {
 		# fully aware of any 
 	
 		'ar' => {
-			gettext   => 'Arabic',
+			gettext   => _T('Arabic'),
 			utf8text  => 'عربي',
 			iso639    => 'ar',
 			iso3166   => undef,
@@ -147,7 +147,7 @@ BEGIN {
 		},
 	
 		'de' => {
-			gettext   => 'German',
+			gettext   => _T('German'),
 			utf8text  => 'Deutsch',
 			iso639    => 'de',
 			iso3166   => undef,
@@ -157,7 +157,7 @@ BEGIN {
 		},
 	
 		'en' => {
-			gettext   => 'English',
+			gettext   => _T('English'),
 			utf8text  => 'English',
 			iso639    => 'en',
 			iso3166   => undef,
@@ -166,7 +166,7 @@ BEGIN {
 		},
 	
 		'en-ca' => {
-			gettext   => 'English (Canada)',
+			gettext   => _T('English (Canada)'),
 			utf8text  => 'English (Canada)',
 			iso639    => 'en',
 			iso3166   => undef,
@@ -175,7 +175,7 @@ BEGIN {
 		},
 	
 		'en-nz' => {
-			gettext   => 'English (New Zealand)',
+			gettext   => _T('English (New Zealand)'),
 			utf8text  => 'English (New Zealand)',
 			iso639    => 'en',
 			iso3166   => 'NZ',
@@ -185,7 +185,7 @@ BEGIN {
 		},
 	
 		'en-us' => {
-			gettext   => 'English (United States)',
+			gettext   => _T('English (United States)'),
 			utf8text  => 'English (United States)',
 			iso639    => 'en',
 			iso3166   => 'US',
@@ -194,7 +194,7 @@ BEGIN {
 		},
 	
 		'es-ar' => {
-			gettext   => 'Spanish (Argentina)',
+			gettext   => _T('Spanish (Argentina)'),
 			utf8text  => 'Español (Argentina)',
 			iso639    => 'sp',
 			iso3166   => 'AR',
@@ -206,7 +206,7 @@ BEGIN {
 			# Simplify until there's another Spanish
 			# gettext   => 'Spanish (Spain)',
 			# utf8text  => 'Español (de España)',
-			gettext   => 'Spanish',
+			gettext   => _T('Spanish'),
 			utf8text  => 'Español',
 			iso639    => 'sp',
 			iso3166   => 'SP',
@@ -216,7 +216,7 @@ BEGIN {
 		},
 	
 		'fr-ca' => {
-			gettext   => 'French (France)',
+			gettext   => _T('French (France)'),
 			utf8text  => 'Français (Canada)',
 			iso639    => 'fr',
 			iso3166   => 'CA',
@@ -228,7 +228,7 @@ BEGIN {
 			# Simplify until there's another French
 			# gettext   => 'French (France)',
 			# utf8text  => 'Français (France)',
-			gettext   => 'French',
+			gettext   => _T('French'),
 			utf8text  => 'Français',
 			iso639    => 'fr',
 			iso3166   => 'FR',
@@ -238,7 +238,7 @@ BEGIN {
 		},
 	
 		'he' => {
-			gettext   => 'Hebrew',
+			gettext   => _T('Hebrew'),
 			utf8text  => 'עברית',
 			iso639    => 'he',
 			iso3166   => undef,
@@ -248,7 +248,7 @@ BEGIN {
 		},
 	
 		'hu' => {
-			gettext   => 'Hungarian',
+			gettext   => _T('Hungarian'),
 			utf8text  => 'Magyar',
 			iso639    => 'hu',
 			iso3166   => undef,
@@ -261,7 +261,7 @@ BEGIN {
 			# Simplify until there's another Italian
 			# gettext   => 'Italian (Italy)',
 			# utf8text  => 'Italiano (Italy)',
-			gettext   => 'Italian',
+			gettext   => _T('Italian'),
 			utf8text  => 'Italiano',
 			iso639    => 'it',
 			iso3166   => 'IT',
@@ -271,7 +271,7 @@ BEGIN {
 		},
 	
 		'ja' => {
-			gettext   => 'Japanese',
+			gettext   => _T('Japanese'),
 			utf8text  => '日本語',
 			iso639    => 'ja',
 			iso3166   => undef,
@@ -281,10 +281,10 @@ BEGIN {
 		},
 	
 		'ko' => {
-			gettext   => 'Korean',
+			gettext   => _T('Korean'),
 			utf8text  => '한국어',
 			iso639    => 'ko',
-			iso3166   => undef,
+			iso3166   => 'KR',
 			wxid      => Wx::wxLANGUAGE_KOREAN,
 			fallback  => [ ],
 			supported => 1,
@@ -294,7 +294,7 @@ BEGIN {
 			# Simplify until there's another Italian
 			# gettext   => 'Dutch (Netherlands)',
 			# utf8text  => 'Nederlands (Nederlands)',
-			gettext   => 'Dutch',
+			gettext   => _T('Dutch'),
 			utf8text  => 'Nederlands',
 			iso639    => 'nl',
 			iso3166   => 'NL',
@@ -304,7 +304,7 @@ BEGIN {
 		},
 	
 		'nl-be' => {
-			gettext   => 'Dutch (Belgium)',
+			gettext   => _T('Dutch (Belgium)'),
 			utf8text  => 'Nederlands (België)',
 			iso639    => 'en',
 			iso3166   => 'BE',
@@ -313,7 +313,7 @@ BEGIN {
 		},
 	
 		'pt-br' => {
-			gettext   => 'Portuguese (Brazil)',
+			gettext   => _T('Portuguese (Brazil)'),
 			utf8text  => 'Português (Brasil)',
 			iso639    => 'pt',
 			iso3166   => 'BR',
@@ -323,7 +323,7 @@ BEGIN {
 		},
 	
 		'pt-pt' => {
-			gettext   => 'Portuguese (Portugal)',
+			gettext   => _T('Portuguese (Portugal)'),
 			utf8text  => 'Português (Europeu)',
 			iso639    => 'pt',
 			iso3166   => 'PT',
@@ -332,7 +332,7 @@ BEGIN {
 		},
 	
 		'ru' => {
-			gettext   => 'Russian',
+			gettext   => _T('Russian'),
 			utf8text  => 'Русский',
 			iso639    => 'ru',
 			iso3166   => undef,
@@ -342,7 +342,7 @@ BEGIN {
 		},
 	
 		'zh' => {
-			gettext   => 'Chinese',
+			gettext   => _T('Chinese'),
 			utf8text  => 'Chinese',
 			iso639    => 'zh',
 			iso3166   => undef,
@@ -351,16 +351,17 @@ BEGIN {
 		},
 	
 		'zh-cn' => {
-			gettext   => 'Chinese (Simplified)',
+			gettext   => _T('Chinese (Simplified)'),
 			utf8text  => '中文 (简体)',
 			iso639    => 'zh',
 			iso3166   => 'CN',
 			wxid      => Wx::wxLANGUAGE_CHINESE_SIMPLIFIED,
 			fallback  => [ 'en-us' ],
+			supported => 1,
 		},
 	
 		'zh-tw' => {
-			gettext   => 'Chinese (Traditional)',
+			gettext   => _T('Chinese (Traditional)'),
 			utf8text  => '正體中文 (繁體)',
 			iso639    => 'zh',
 			iso3166   => 'TW',
@@ -373,7 +374,7 @@ BEGIN {
 		# Mostly what these do is uncover issues that might arise when
 		# a language is not supported by various older standards.
 		'x-klingon' => {
-			gettext   => 'Klingon',
+			gettext   => _T('Klingon'),
 			utf8text  => 'Klingon', # TODO Fix this at some point
 			iso639    => undef,
 			iso3166   => undef,
@@ -479,7 +480,7 @@ sub encoding_system_default {
 		$encoding = Wx::Locale::GetSystemEncodingName();
 		$encoding =~ s/^windows-/cp/i;
 
-	} elsif ( Padre::Util::LINUX ) {
+	} elsif ( Padre::Util::UNIX ) {
 		$encoding = Wx::Locale::GetSystemEncodingName();
 		unless ( $encoding ) {
 			# this is not a usual case, but...
@@ -569,3 +570,7 @@ sub encoding_from_string {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

@@ -5,9 +5,13 @@ package Padre::Wx::Dialog::Search;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx;
+use Padre::Wx       ();
+use Padre::Wx::Icon ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
+
+
+
 
 
 ######################################################################
@@ -23,6 +27,9 @@ sub new {
 	}, $class;
 	return $self;
 }
+
+
+
 
 
 ######################################################################
@@ -41,7 +48,7 @@ sub search {
 		$self->_create_panel;
 	}
 	# pane != panel
-	my $pane = Padre->ide->wx->main_window->manager->GetPane('find');
+	my $pane = Padre->ide->wx->main_window->aui->GetPane('find');
 	if ( $pane->IsShown ) {
 		$self->_find;
 	} else {
@@ -117,10 +124,10 @@ sub _create_panel {
 	# Close button
 	$self->{close} = Wx::BitmapButton->new(
 		$self->{panel}, -1,
-		Padre::Wx::tango( 'emblems', 'emblem-unreadable.png' ),
+		Padre::Wx::Icon::find('actions/x-document-close'),
 		Wx::Point->new(-1,-1),
 		Wx::Size->new(-1,-1),
-		Wx::wxNO_BORDER,
+		Wx::wxBORDER_NONE,
 	);
 	Wx::Event::EVT_BUTTON($main, $self->{close}, sub { $self->_hide_panel } );
 
@@ -136,20 +143,20 @@ sub _create_panel {
 	# Previous button
 	$self->{previous} = Wx::BitmapButton->new(
 		$self->{panel}, -1,
-		Padre::Wx::tango( 'actions', 'go-previous.png' ),
+		Padre::Wx::Icon::find('actions/go-previous'),
 		Wx::Point->new(-1,-1),
 		Wx::Size->new(-1,-1),
-		Wx::wxNO_BORDER
+		Wx::wxBORDER_NONE
 	);
 	Wx::Event::EVT_BUTTON($main, $self->{previous}, sub { $self->search('previous') } );
 
 	# Previous button
 	$self->{next} = Wx::BitmapButton->new(
 		$self->{panel}, -1,
-		Padre::Wx::tango( 'actions', 'go-next.png' ),
+		Padre::Wx::Icon::find('actions/go-next'),
 		Wx::Point->new(-1,-1),
 		Wx::Size->new(-1,-1),
-		Wx::wxNO_BORDER,
+		Wx::wxBORDER_NONE,
 	);
 	Wx::Event::EVT_BUTTON($main, $self->{next}, sub { $self->search('next') } );
 
@@ -180,7 +187,7 @@ sub _create_panel {
 	$self->{panel}->SetSize( $size );
 
 	# manage the pane in aui
-	$main->manager->AddPane( $self->{panel},
+	$main->aui->AddPane( $self->{panel},
 		Wx::AuiPaneInfo->new->Name( 'find' )
 		->Bottom
 		->CaptionVisible(0)
@@ -196,7 +203,7 @@ sub _hide_panel {
 	my $self = shift;
 
 	# pane != panel
-	my $auimngr = Padre->ide->wx->main_window->manager;
+	my $auimngr = Padre->ide->wx->main_window->aui;
 	$auimngr->GetPane('find')->Hide;
 	$auimngr->Update;
 
@@ -207,7 +214,7 @@ sub _show_panel {
 	my $self = shift;
 
 	# Show the panel; pane != panel
-	my $auimngr = Padre->ide->wx->main_window->manager;
+	my $auimngr = Padre->ide->wx->main_window->aui;
 	$auimngr->GetPane('find')->Show(1);
 	$auimngr->Update;
 

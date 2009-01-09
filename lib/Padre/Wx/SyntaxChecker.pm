@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use Class::XSAccessor
 	getters => {
@@ -35,7 +35,7 @@ sub create_syntaxbar {
 
 	$main->{gui}->{syntaxcheck_panel} = Wx::ListView->new(
 		$main->{gui}->{bottompane},
-		Wx::wxID_ANY,
+		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxLC_REPORT | Wx::wxLC_SINGLE_SEL
@@ -92,6 +92,7 @@ sub enable {
 			$self->{synCheckTimer}->Stop;
 			Wx::Event::EVT_IDLE( $main, sub { return } );
 		}
+		# TODO: Need to do this on all pages
 		my $page = $main->current->editor;
 		if ( defined($page) ) {
 			$page->MarkerDeleteAll(Padre::Wx::MarkError);
@@ -154,7 +155,11 @@ sub on_syntax_check_timer {
 	}
 	my $document = $page->{Document};
 
-	unless ( defined( $document ) and $document->can('check_syntax') ) {
+	if ( ! defined $document ) {
+		$syntaxbar->DeleteAllItems;
+		return;
+	}
+	elsif ( ! $document->can('check_syntax') ) {
 		if ( defined $page and $page->isa('Padre::Wx::Editor') ) {
 			$page->MarkerDeleteAll(Padre::Wx::MarkError);
 			$page->MarkerDeleteAll(Padre::Wx::MarkWarn);
@@ -163,8 +168,14 @@ sub on_syntax_check_timer {
 		return;
 	}
 
-	$document->check_syntax_in_background(force => $force);
-	
+	my $pre_exec_result = $document->check_syntax_in_background(force => $force);
+
+	# In case we have created a new and still completely empty doc we
+	# need to clean up the message list
+	if ( ref $pre_exec_result eq 'ARRAY' && ! @{$pre_exec_result} ) {
+		$syntaxbar->DeleteAllItems;
+	}
+
 	if ( defined($event) ) {
 		$event->Skip(0);
 	}

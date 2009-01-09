@@ -30,7 +30,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 
 
@@ -789,4 +789,8 @@ This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
 =cut
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.
 

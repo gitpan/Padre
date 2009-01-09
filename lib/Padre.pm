@@ -23,28 +23,41 @@ use Class::Autouse ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version        ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
-use Padre::Util    ();
-use Padre::Config  ();
+use Padre::Util   ();
+use Padre::Config ();
 
 # Nudges to make Class::Autouse behave
 BEGIN {
 	$Class::Autouse::LOADED{'Wx::Object'} = 1;
 }
+
+# Modules to be run-time autoloaded.
+# This is more efficient that use'ing a module, but less efficient
+# than making a direct call to require.
+# This is for fully OO classes that are refered to in a number of
+# different places in the code, making the use of "require" tricky.
+# For modules that are only used in one or two places (such as
+# task-specific dialog boxes and so on) you should use require instead.
+# This section can also be used for classes which aren't called
+# directly by name. For example, a document type class is called from
+# $class->new variable obtained from a HASH mapping.
+# This should not be used for abstract parent classes that are never
+# refered to directly. Let them get loaded normally via the top level
+# module's "use base" (or similar) call.
 use Class::Autouse qw{
 	Padre::DB
 	Padre::Document
 	Padre::Document::Perl
+	Padre::Document::POD
 	Padre::PPI
 	Padre::Project
 	Padre::Project::Null
 	Padre::Project::Perl
 	Padre::PluginManager
-	Padre::Pod::Frame
-	Padre::Pod::Viewer
 	Padre::Task
 	Padre::Task::PPI
 	Padre::Task::PPI::FindUnmatchedBrace
@@ -53,7 +66,7 @@ use Class::Autouse qw{
 	Padre::TaskManager
 	Padre::Wx::Popup
 	Padre::Wx::Editor
-	Padre::Wx::Menu
+	Padre::Wx::Menubar
 	Padre::Wx::Ack
 	Padre::Wx::App
 	Padre::Wx::Dialog::Bookmarks
@@ -62,20 +75,20 @@ use Class::Autouse qw{
 	Padre::Wx::Dialog::Snippets
 	Padre::Wx::History::TextDialog
 	Padre::Wx::MainWindow
-	Padre::Wx::SyntaxChecker
 };
 
-# generate fast accessors
+# Gnerate faster accessors
 use Class::XSAccessor
 	getters => {
 		config         => 'config',
 		config_dir     => 'config_dir',
 		config_yaml    => 'config_yaml',
+		wx             => 'wx',
+		task_manager   => 'task_manager',
 		plugin_manager => 'plugin_manager',
 	};
 
-
-# Globally shared Perl detection object
+# Globally shared detection of the "curent" Perl
 sub perl_interpreter {
 	require Probe::Perl;
 	my $perl = Probe::Perl->find_perl_interpreter;
@@ -107,11 +120,8 @@ sub new {
 		# Plugin Attributes
 		plugin_manager => undef,
 
-		# Second-Generation Object Model
-		# (Adam says ignore these for now, but don't comment out)
+		# Project Attributes
 		project        => {},
-		document       => {},
-
 	}, $class;
 
 	# Load (and migrate if needed) the persistant host state database
@@ -142,14 +152,6 @@ sub ide {
 	$SINGLETON = Padre->new;
 }
 
-sub wx {
-	$_[0]->{wx};
-}
-
-sub task_manager {
-	$_[0]->{task_manager};
-}
-
 sub run {
 	my $self = shift;
 
@@ -161,30 +163,24 @@ sub run {
 	}
 	@ARGV = grep { ! /^-M/ } @ARGV;
 
-	# Handle regular command line options
-	my $USAGE = '';
-	my $INDEX = '';
-	my $rv    = Getopt::Long::GetOptions(
-		help  => \$USAGE,
-		index => \$INDEX,
+	# Handle the common command line "padre --help" case.
+	my $USAGE  = '';
+	my $getopt = Getopt::Long::GetOptions(
+		help => \$USAGE,
 	);
-	if ( $USAGE or ! $rv ) {
-		usage();
-	}
-
-	# Launch the indexer if requested
-	if ( $INDEX ) {
-		require Padre::Pod::Indexer;
-		Padre::Pod::Indexer->run;
-		return;
+	if ( $USAGE or ! $getopt ) {
+		print <<"END_USAGE";
+Usage: $0 [FILENAMES]
+    --help Shows this help message
+END_USAGE
+		exit(1);
 	}
 
 	# We can now confirm the GUI will be used
 	$self->wx->main_window->Show(1);
 
-	# FIXME: This call should be delayed until after the
+	# FIXME: RT #1 This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
-	# (RT #1)
 	$self->plugin_manager->load_plugins;
 
 	$self->{ARGV} = [ map {File::Spec->rel2abs( $_ )} @ARGV ];
@@ -197,7 +193,11 @@ sub run {
 		chdir $documents;
 	}
 
+	# Switch into runtime mode
 	$self->wx->MainLoop;
+
+	# All shutdown procedures complete.
+	# Do some final cleaning up.
 	$self->{wx} = undef;
 
 	return;
@@ -207,12 +207,6 @@ sub run {
 sub save_config {
 	$_[0]->config->write( $_[0]->config_yaml );
 }
-
-sub usage { print <<"END_USAGE"; exit(1) }
-Usage: $0 [FILENAMES]
-           --index to index the modules found on this computer
-           --help this help
-END_USAGE
 
 
 
@@ -529,12 +523,6 @@ Need to define the mime-type mapping in L<Padre::Document>
 
 For examples see L<Padre::Document::PASM>, L<Padre::Document::PIR>,
 L<Padre::Document::Perl>.
-
-=head1 Command line options
-
-  --index   will go over the @INC and list all the available modules in the database
-
-  a list of filenames can be given to be opened
 
 =head1 Preferences
 
@@ -906,11 +894,6 @@ Various utility functions.
 
 =back
 
-=head2 POD viewer
-
-Padre::Pod::* are there to index and show documentation written in pod.
-TODO: One day we might be able to factor it out into a separate pod-viewer class.
-
 =head2 Wx GUI
 
 The Padre::WX::* namespace is supposed to deal with all the
@@ -1037,14 +1020,6 @@ Copyright 2008 Gabor Szabo. L<http://www.szabgab.com/>
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
-The icons were taken from
-http://tango.freedesktop.org/Tango_Desktop_Project
-
-The Tango base icon theme is licensed under the
-Creative Commons Attribution Share-Alike license.
-
-Using tango-icon-theme-0.8.1.tar.gz
-
 =head1 DISCLAIMER OF WARRANTY
 
 There is no warranty whatsoever. If you lose data or your hair because
@@ -1129,3 +1104,7 @@ Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
 Spanish - Paco Alguacil (PacoLinux)
 
 =cut
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

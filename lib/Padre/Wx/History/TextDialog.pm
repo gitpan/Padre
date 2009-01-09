@@ -11,7 +11,7 @@ use Class::Adapter::Builder
 	ISA      => 'Wx::TextEntryDialog',
 	AUTOLOAD => 1;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 sub new {
 	my $class  = shift;
@@ -41,7 +41,7 @@ sub ShowModal {
 
 	# Get the return value as normal
 	my $rv = $self->{OBJECT}->ShowModal(@_);
-	unless ( $rv == Wx::wxID_OK() ) {
+	unless ( $rv == Wx::wxID_OK ) {
 		# They hit Cancel
 		return $rv;
 	}

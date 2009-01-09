@@ -1,9 +1,10 @@
-
 package Padre::Task::PPI::FindVariableDeclaration;
+
 use strict;
 use warnings;
+use Padre::Wx ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use base 'Padre::Task::PPI';
 
@@ -95,7 +96,7 @@ sub finish {
 		Wx::MessageBox(
 			$text,
 			Wx::gettext("Check Canceled"),
-			Wx::wxOK(),
+			Wx::wxOK,
 			Padre->ide->wx->main_window
 		);
 	}

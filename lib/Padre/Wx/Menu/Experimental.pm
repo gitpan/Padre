@@ -3,18 +3,18 @@ package Padre::Wx::Menu::Experimental;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx          ();
-use Padre::Wx::Submenu ();
+use Padre::Wx       ();
+use Padre::Wx::Menu ();
 
-our $VERSION = '0.24';
-our @ISA     = 'Padre::Wx::Submenu';
+our $VERSION = '0.25';
+our @ISA     = 'Padre::Wx::Menu';
 
 
 
 
 
 #####################################################################
-# Padre::Wx::Submenu Methods
+# Padre::Wx::Menu Methods
 
 sub new {
 	my $class  = shift;
@@ -25,7 +25,9 @@ sub new {
 
 	# Disable experimental mode
 	Wx::Event::EVT_MENU( $main,
-		$self->Append( -1, Wx::gettext('Disable Experimental Mode') ),
+		$self->Append( -1,
+			Wx::gettext('Disable Experimental Mode')
+		),
 		sub {
 			Padre->ide->config->{experimental} = 0;
 			$_[0]->menu->refresh($_[0]->current);
@@ -47,7 +49,8 @@ sub new {
 	# Force-refresh the menu
 	$self->{refresh_counter} = 0;
 	$self->{refresh_count}   = $self->Append( -1,
-		Wx::gettext('Refresh Counter: ') . $self->{refresh_counter}
+		Wx::gettext('Refresh Counter: ')
+		. $self->{refresh_counter}
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{refresh_count},
@@ -65,20 +68,12 @@ sub new {
 		$self->{recent_projects},
 	);
 
-	# Launch a script INSIDE the running Padre instance
-	Wx::Event::EVT_MENU(
-		$main,
-		$self->Append( -1, Wx::gettext('Run in &Padre') ),
-		\&Padre::Wx::MainWindow::run_in_padre,
-	);
-
 	return $self;
 }
 
 # Update the checkstate for several menu items
 sub refresh {
 	my $self   = shift;
-	my $config = Padre->ide->config;
 
 	# Update the refresh counter
 	$self->{refresh_counter}++;
@@ -90,3 +85,7 @@ sub refresh {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

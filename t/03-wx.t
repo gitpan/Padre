@@ -2,9 +2,14 @@
 
 use strict;
 use warnings;
-use Test::NeedsDisplay ':skip_all';
+#use Test::NeedsDisplay ':skip_all';
 use Test::More;
-
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
 BEGIN {
 	if ( $^O eq 'MSWin32' ) {
 		plan skip_all => 'Windows currently has problems with Unicode files';

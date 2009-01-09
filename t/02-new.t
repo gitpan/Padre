@@ -2,8 +2,15 @@
 
 use strict;
 use warnings;
-use Test::NeedsDisplay ':skip_all';
-use Test::More tests => 20;
+# use Test::NeedsDisplay ':skip_all';
+use Test::More;
+BEGIN {
+	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+plan( tests => 20 );
 use Test::NoWarnings;
 use t::lib::Padre;
 use Padre;
@@ -26,21 +33,19 @@ SCOPE: {
 	is_deeply  $config,
 		{
 		experimental       => 0,
-		pod_minlist        => 2,
-		pod_maxlist        => 200,
 
-		editor_linenumbers => 0,
+		editor_linenumbers => 1,
 		editor_eol         => 0,
 		editor_indentationguides => 0,
-		editor_calltips    => 1,
+		editor_calltips    => 0,
 		editor_autoindent  => 'deep',
 		editor_methods     => 'alphabetical',
 		editor_whitespaces => 0,
 		editor_codefolding => 0,
 
-		editor_auto_indentation_style => 0,
+		editor_auto_indentation_style => 1,
 		editor_tabwidth               => 8,
-		editor_indentwidth            => 4,
+		editor_indentwidth            => 8,
 		editor_use_tabs               => 1,
 		editor_perl5_beginner         => 1,
 
@@ -53,6 +58,7 @@ SCOPE: {
 		main_statusbar     => 1,
 		main_output        => 0,
 		main_rightbar      => 1,
+		main_lockpanels    => 1,
 		projects           => {},
 		run_save           => 'same',
 		current_project    => '',
@@ -101,16 +107,16 @@ SCOPE: {
 
 	# The main menu
 	my $menu = $main->menu;
-	isa_ok( $menu, 'Padre::Wx::Menu' );
-	refis( $menu->win,  $main, 'Menu ->win gets the main window' );
-	refis( $menu->main, $main, 'Menu ->main gets the main window' );
+	isa_ok( $menu, 'Padre::Wx::Menubar' );
+	refis( $menu->win,  $main, 'Menubar ->win gets the main window' );
+	refis( $menu->main, $main, 'Menubar ->main gets the main window' );
 
 	# A submenu
 	my $file = $menu->file;
-	isa_ok( $file, 'Padre::Wx::Submenu' );
+	isa_ok( $file, 'Padre::Wx::Menu' );
 
 	# The notebook
-	my $notebook = $main->nb;
+	my $notebook = $main->notebook;
 	isa_ok( $notebook, 'Padre::Wx::Notebook' );
 
 	# Current context

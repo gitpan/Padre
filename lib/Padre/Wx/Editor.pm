@@ -9,7 +9,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -31,8 +31,8 @@ sub new {
 
 	# Set the code margins a little larger than the default.
 	# This seems to noticably reduce eye strain.
-	$self->SetMarginLeft(2);
-	$self->SetMarginRight(2);
+	$self->SetMarginLeft(3);
+	$self->SetMarginRight(0);
 
 	# Clear out all the other margins
 	$self->SetMarginWidth(0, 0);
@@ -85,14 +85,13 @@ sub padre_setup {
 	my ($self) = @_;
 
 	$self->SetLexer( $self->{Document}->lexer );
-#	 $self->Colourise(0, $self->GetTextLength);
 
 	# the next line will change the ESC key to cut the current selection
 	# See: http://www.yellowbrain.com/stc/keymap.html
 	#$self->CmdKeyAssign(Wx::wxSTC_KEY_ESCAPE, 0, Wx::wxSTC_CMD_CUT);
 
 	$self->SetCodePage(65001); # which is supposed to be Wx::wxSTC_CP_UTF8
-	# and Wx::wxUNICODE() or wxUSE_UNICODE should be on
+	# and Wx::wxUNICODE or wxUSE_UNICODE should be on
 
 	my $mimetype = $self->{Document}->get_mimetype;
 	if ($mimetype eq 'application/x-perl') {
@@ -286,7 +285,7 @@ sub show_folding {
 
 		Wx::Event::EVT_STC_MARGINCLICK(
 			$self,
-			Wx::wxID_ANY,
+			-1,
 			sub {
 				my ( $editor, $event ) = @_;
 				if ( $event->GetMargin() == 2 ) {
@@ -554,16 +553,16 @@ sub on_right_down {
 	$menu->AppendSeparator;
 
 	my $selection_exists = 0;
-	my $id = $main->nb->GetSelection;
+	my $id = $main->notebook->GetSelection;
 	if ( $id != -1 ) {
-		my $text = $main->nb->GetPage($id)->GetSelectedText;
+		my $text = $main->notebook->GetPage($id)->GetSelectedText;
 		if ( defined($text) && length($text) > 0 ) {
 			$selection_exists = 1;
 		}
 	}
 
 	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
-	if ( not $main->nb->GetPage($id)->GetTextLength > 0 ) {
+	if ( not $main->notebook->GetPage($id)->GetTextLength > 0 ) {
 		$sel_all->Enable(0);
 	}
 	Wx::Event::EVT_MENU( $main, # Ctrl-A
@@ -597,7 +596,7 @@ sub on_right_down {
 	my $paste = $menu->Append( Wx::wxID_PASTE, '' );
 	my $text  = get_text_from_clipboard();
 
-	if ( length($text) && $main->nb->GetPage($id)->CanPaste ) {
+	if ( length($text) && $main->notebook->GetPage($id)->CanPaste ) {
 		Wx::Event::EVT_MENU( $main, # Ctrl-V
 			$paste,
 			sub {
@@ -743,9 +742,9 @@ sub on_mouse_motion {
 sub text_select_all {
 	my ( $main, $event ) = @_;
 
-	my $id = $main->nb->GetSelection;
+	my $id = $main->notebook->GetSelection;
 	return if $id == -1;
-	$main->nb->GetPage($id)->SelectAll;
+	$main->notebook->GetPage($id)->SelectAll;
 	return;
 }
 

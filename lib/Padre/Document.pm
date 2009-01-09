@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -279,7 +279,7 @@ sub guess_mimetype {
 		if ( $EXT_MIME{$ext} ) {
 			if ( $EXT_MIME{$ext} eq 'application/x-perl' ) {
 				# Sometimes Perl 6 will look like Perl 5
-				if ( $text and $text =~ /^use\sv6;/m ) {
+				if ( $text and $text =~ /^\s*use\s+v6;/m ) {
 					return 'application/x-perl6';
 				}
 			}

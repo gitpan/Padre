@@ -5,19 +5,19 @@ package Padre::Wx::Menu::Run;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx          ();
-use Padre::Wx::Submenu ();
-use Padre::Current     qw{_CURRENT};
+use Padre::Wx       ();
+use Padre::Wx::Menu ();
+use Padre::Current  qw{_CURRENT};
 
-our $VERSION = '0.24';
-our @ISA     = 'Padre::Wx::Submenu';
+our $VERSION = '0.25';
+our @ISA     = 'Padre::Wx::Menu';
 
 
 
 
 
 #####################################################################
-# Padre::Wx::Submenu Methods
+# Padre::Wx::Menu Methods
 
 sub new {
 	my $class = shift;
@@ -27,15 +27,19 @@ sub new {
 	my $self = $class->SUPER::new(@_);
 
 	# Script Execution
-	$self->{run_script} = $self->Append( -1, Wx::gettext("Run Script\tF5") );
+	$self->{run_document} = $self->Append( -1,
+		Wx::gettext("Run Script\tF5")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$self->{run_script},
+		$self->{run_document},
 		sub {
-			$_[0]->run_script;
+			$_[0]->run_document;
 		},
 	);
 
-	$self->{run_command} = $self->Append( -1, Wx::gettext("Run Command\tCtrl-F5") );
+	$self->{run_command} = $self->Append( -1,
+		Wx::gettext("Run Command\tCtrl-F5")
+	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{run_command},
 		sub {
@@ -43,7 +47,9 @@ sub new {
 		},
 	);
 
-	$self->{stop} = $self->Append( -1, Wx::gettext("&Stop") );
+	$self->{stop} = $self->Append( -1,
+		Wx::gettext("&Stop")
+	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{stop},
 		sub {
@@ -67,9 +73,10 @@ sub refresh {
 
 	# Disable if not document,
 	# otherwise match run_command state
-	$self->{run_script}->Enable( $document
-		? $self->{run_command}->IsEnabled
-		: 0
+	$self->{run_document}->Enable(
+		$document
+			? $self->{run_command}->IsEnabled
+			: 0
 	);
 
 	return 1;
@@ -84,7 +91,7 @@ sub refresh {
 
 sub enable {
 	my $self = shift;
-	$self->{run_script}->Enable(1);
+	$self->{run_document}->Enable(1);
 	$self->{run_command}->Enable(1);
 	$self->{stop}->Enable(0);
 	return;
@@ -92,10 +99,14 @@ sub enable {
 
 sub disable {
 	my $self = shift;
-	$self->{run_script}->Enable(0);
+	$self->{run_document}->Enable(0);
 	$self->{run_command}->Enable(0);
 	$self->{stop}->Enable(1);
 	return;
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

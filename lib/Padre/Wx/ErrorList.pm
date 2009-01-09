@@ -3,7 +3,7 @@ package Padre::Wx::ErrorList;
 use strict;
 use warnings;
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 require Padre;
 use Padre::Wx;
@@ -64,7 +64,7 @@ sub enable {
 	$self->Show;
 	$self->{mw}->{gui}->{bottompane}->SetSelection($index);
 	$self->mw->check_pane_needed('bottompane');
-	$self->mw->manager->Update;
+	$self->mw->aui->Update;
 	$self->{enabled} = 1;
 }
 
@@ -74,7 +74,7 @@ sub disable {
 	$self->Hide;
 	$self->{mw}->{gui}->{bottompane}->RemovePage($index);
 	$self->mw->check_pane_needed('bottompane');
-	$self->mw->manager->Update;
+	$self->mw->aui->Update;
 	$self->{enabled} = 0;
 }
 

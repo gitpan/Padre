@@ -8,7 +8,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 our @ISA     = 'Wx::StatusBar';
 
 use Class::XSAccessor
@@ -105,3 +105,7 @@ sub refresh {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

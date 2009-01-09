@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 our @ISA     = 'Wx::AuiNotebook';
 
 sub new {
@@ -12,27 +12,33 @@ sub new {
 	my $main  = shift;
 	my $self  = $class->SUPER::new(
 		$main,
-		Wx::wxID_ANY,
+		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxAUI_NB_TOP
+		| Wx::wxBORDER_NONE
 		| Wx::wxAUI_NB_SCROLL_BUTTONS
 		| Wx::wxAUI_NB_CLOSE_ON_ACTIVE_TAB
 		| Wx::wxAUI_NB_WINDOWLIST_BUTTON,
 	);
 
 	# Add ourself to the main window
-	$main->manager->AddPane(
+	$main->aui->AddPane(
 		$self,
 		Wx::AuiPaneInfo->new
 			->Name('editorpane')
-			->CenterPane
-			->Resizable
-			->PaneBorder
-			->Dockable
-			->Position(1)
+ 			->CenterPane
+			->Resizable(1)
+			->PaneBorder(0)
+			->Movable(1)
+			->CaptionVisible(0)
+			->CloseButton(0)
+			->MaximizeButton(0)
+			->Floatable(1)
+			->Dockable(1)
+			->Layer(1)
 	);
-	$main->manager->caption_gettext('editorpane' => 'Files');
+	$main->aui->caption_gettext('editorpane' => 'Files');
 
 	Wx::Event::EVT_AUINOTEBOOK_PAGE_CHANGED(
 		$main,
@@ -58,3 +64,7 @@ sub main {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

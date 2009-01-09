@@ -24,28 +24,48 @@ may be moved, removed or changed at any time without notice.
 use 5.008;
 use strict;
 use warnings;
+use Exporter   ();
+use FindBin    ();
+use File::Spec ();
+use List::Util qw(first);
 
-use Exporter     ();
-use FindBin      ();
-use File::Spec   ();
-use List::Util   qw(first);
-
-our $VERSION   = '0.24';
+our $VERSION   = '0.25';
 our @ISA       = 'Exporter';
-our @EXPORT_OK = qw(newline_type get_matches);
+our @EXPORT_OK = qw(newline_type get_matches _T);
 
-# Padre targets three major platforms.
-# 1. Native Win32
-# 2. Mac OS X
-# 3. GTK Unix/Linux
-# The following defined reusable constants for these platforms,
-# suitable for use in platform-specific adaptation code.
 
+
+
+
+#####################################################################
+# Officially Supported Constants
+
+# Convenience constants for the operating system
 use constant WIN32   => !! ( $^O eq 'MSWin32'  );
 use constant MAC     => !! ( $^O eq 'darwin'   );
-use constant LINUX   => !! ( $^O =~ m/^linux/i ); # TODO Is an insensitive regex really needed?
 use constant UNIX    => !  ( WIN32 or MAC );
+
+# Padre targets the three largest Wx backends
+# 1. Win32 Native 
+# 2. Mac OS X Native
+# 3. Unix GTK 
+# The following defined reusable constants for these platforms,
+# suitable for use in Wx platform-specific adaptation code.
+# Currently (and a bit naively) we align these to the platforms.
+use constant WXWIN32 => WIN32;
+use constant WXMAC   => MAC;
+use constant WXGTK   => UNIX;
+
+# The local newline type
 use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAC' : 'UNIX';
+
+
+
+
+
+
+#####################################################################
+# Miscellaneous Functions
 
 =pod
 
@@ -133,6 +153,30 @@ sub get_matches {
 	return ($start, $end, @matches);
 }
 
+
+
+
+
+#####################################################################
+
+=pod
+
+=head2 _T
+
+This is the shorthand of Wx::gettext('some text to translate')
+
+Specifically to be used for strings that you want to
+delay translation until later, so that the translation
+tools can find it.
+=cut
+sub _T { 
+	shift; 
+}
+
+
+
+
+
 #####################################################################
 # Shared Resources
 
@@ -165,7 +209,6 @@ use constant {
 	PADRE_BROWN         => 8,
 };
 
-
 1;
 
 =head1 SUPPORT
@@ -182,3 +225,7 @@ This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
 =cut
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

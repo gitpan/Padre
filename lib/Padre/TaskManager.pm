@@ -79,7 +79,7 @@ BEGIN {
 	$INC{"Padre/TaskManager.pm"} ||= __FILE__;
 }
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 use threads;
 # According to Wx docs, this MUST be loaded before Wx, so this also happens in the script
@@ -523,3 +523,7 @@ This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
 =cut
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

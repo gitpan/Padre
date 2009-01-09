@@ -6,53 +6,65 @@ use warnings;
 use Padre::Current    qw{_CURRENT};
 use Padre::Wx         ();
 use Padre::Wx::Editor ();
+use Padre::Wx::Icon   ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 our @ISA     = 'Wx::ToolBar';
 
 sub new {
 	my $class = shift;
 	my $main  = shift;
 
-	my $self  = $class->SUPER::new( $main, -1,
+	# Prepare the style
+	my $style = Wx::wxTB_HORIZONTAL
+		| Wx::wxTB_FLAT
+		| Wx::wxTB_NO_TOOLTIPS
+		| Wx::wxTB_NODIVIDER
+		| Wx::wxBORDER_NONE;
+	unless ( $main->config->{main_lockpanels} ) {
+		$style = $style | Wx::wxTB_DOCKABLE;
+	}
+
+	# Create the parent Wx object
+	my $self = $class->SUPER::new( $main, -1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxNO_BORDER | Wx::wxTB_HORIZONTAL | Wx::wxTB_FLAT | Wx::wxTB_DOCKABLE,
+		$style,
 		5050,
 	);
 
-	# Automatically populate
-	$self->AddTool(
-		Wx::wxID_NEW, '',
-		Padre::Wx::tango( 'actions', 'document-new.png' ),
-		Wx::gettext('New File'),
+	# Default icon size is 16x15 for Wx, to use the 16x16 GPL
+	# icon sets we need to be SLIGHTLY bigger.
+	$self->SetToolBitmapSize(
+		Wx::Size->new( 16, 16 )
 	);
-	Wx::Event::EVT_TOOL(
-		$main,
-		Wx::wxID_NEW,
-		sub { $_[0]->on_new },
+
+	# Populate the toolbar
+	$self->add_tool(
+		id    => Wx::wxID_NEW,
+		icon  => 'actions/document-new',
+		short => Wx::gettext('New File'),
+		event => sub { $_[0]->on_new },
 	);
-	$self->AddTool(
-		Wx::wxID_OPEN, '',
-		Padre::Wx::tango( 'actions', 'document-open.png' ),
-		Wx::gettext('Open File'),
+	$self->add_tool(
+		id    => Wx::wxID_OPEN,
+		icon  => 'actions/document-open',
+		short => Wx::gettext('Open File'),
 	);
-	$self->AddTool(
-		Wx::wxID_SAVE, '',
-		Padre::Wx::tango( 'actions', 'document-save.png' ),
-		Wx::gettext('Save File'),
+	$self->add_tool(
+		id    => Wx::wxID_SAVE,
+		icon  => 'actions/document-save',
+		short => Wx::gettext('Save File'),
 	);
-	$self->AddTool(
-		Wx::wxID_CLOSE, '',
-		Padre::Wx::tango( 'emblems', 'emblem-unreadable.png' ),
-		Wx::gettext('Close File'),
+	$self->add_tool(
+		id    => Wx::wxID_CLOSE,
+		icon  => 'actions/x-document-close',
+		short => Wx::gettext('Close File'),
+		event => sub { $_[0]->on_close($_[1]) },
 	);
-	Wx::Event::EVT_TOOL(
-		$main,
-		Wx::wxID_CLOSE,
-		sub { $_[0]->on_close($_[1]) },
-	);
+
 	$self->AddSeparator;
+
 
 
 
@@ -60,14 +72,16 @@ sub new {
 	# Undo/Redo Support
 	$self->AddTool(
 		Wx::wxID_UNDO, '',
-		Padre::Wx::tango( 'actions', 'edit-undo.png' ),
+		Padre::Wx::Icon::find('actions/edit-undo'),
 		Wx::gettext('Undo'),
 	);
+
 	$self->AddTool(
 		Wx::wxID_REDO, '',
-		Padre::Wx::tango( 'actions', 'edit-redo.png' ),
+		Padre::Wx::Icon::find('actions/edit-redo'),
 		Wx::gettext('Redo'),
 	);
+
 	$self->AddSeparator;
 
 
@@ -77,7 +91,7 @@ sub new {
 	# Cut/Copy/Paste
 	$self->AddTool(
 		Wx::wxID_CUT, '',
-		Padre::Wx::tango( 'actions', 'edit-cut.png' ),
+		Padre::Wx::Icon::find('actions/edit-cut'),
 		Wx::gettext('Cut'),
 	);
 	Wx::Event::EVT_TOOL(
@@ -87,9 +101,10 @@ sub new {
 			Padre::Current->editor->Cut
 		},
 	);
+
 	$self->AddTool(
 		Wx::wxID_COPY,  '',
-		Padre::Wx::tango( 'actions', 'edit-copy.png' ),
+		Padre::Wx::Icon::find('actions/edit-copy'),
 		Wx::gettext('Copy'),
 	);
 	Wx::Event::EVT_TOOL(
@@ -99,9 +114,10 @@ sub new {
 			Padre::Current->editor->Copy
 		},
 	);
+
 	$self->AddTool(
 		Wx::wxID_PASTE, '',
-		Padre::Wx::tango( 'actions', 'edit-paste.png' ),
+		Padre::Wx::Icon::find('actions/edit-paste'),
 		Wx::gettext('Paste'),
 	);
 	Wx::Event::EVT_TOOL(
@@ -112,9 +128,10 @@ sub new {
 			$editor->Paste;
 		},
 	);
+
 	$self->AddTool(
 		Wx::wxID_SELECTALL, '',
-		Padre::Wx::tango( 'actions', 'edit-select-all.png' ),
+		Padre::Wx::Icon::find('actions/edit-select-all'),
 		Wx::gettext('Select all'),
 	);
 	Wx::Event::EVT_TOOL(
@@ -122,12 +139,15 @@ sub new {
 		Wx::wxID_SELECTALL,
 		sub { \&Padre::Wx::Editor::text_select_all(@_) },
 	);
+
 	$self->AddSeparator;
 
 
 
+
+
 	# Task status
-       
+
 	# There can be three statuses:
 	# idle, running (light load), and load (high load).
 	# They'll be switched on demand by update_task_status()
@@ -138,11 +158,13 @@ sub new {
 
 	$self->AddTool(
 		$self->{task_status_idle_id}, '',
-		Padre::Wx::icon( 'tasks-idle.png' ),
+		Padre::Wx::Icon::find('status/padre-tasks-idle'),
 		Wx::gettext('Background Tasks are idle'),
 	);
+
 	# Remember the id of the current status for update checks
 	$self->{task_status_id} = $self->{task_status_idle_id};
+
 	# Remember the position of the status icon for replacement
 	$self->{task_status_tool_pos} = $self->GetToolPos($self->{task_status_idle_id});
 
@@ -152,54 +174,52 @@ sub new {
 # checks whether a Task status icon update is in order
 # and if so, changes the icon to one of the other states
 sub update_task_status {
-	my $self = shift;
-	
+	my $self    = shift;
 	my $manager = Padre->ide->task_manager;
+
 	# Still in editor-startup phase, default to idle
-	return $self->set_task_status_idle()
-	  if not defined $manager;
+	return $self->set_task_status_idle unless defined $manager;
 
 	my $running = $manager->running_tasks;
-	return $self->set_task_status_idle()
-	  if not $running;
+	return $self->set_task_status_idle unless $running;
 
 	my $max_workers = $manager->max_no_workers;
-	my $jobs = $manager->task_queue->pending() + $running;
+	my $jobs = $manager->task_queue->pending + $running;
 	# High load is defined as the state when the number of
 	# running and pending jobs is larger that twice the
 	# MAXIMUM number of workers
-	if ($jobs > 2*$max_workers) {
-		return $self->set_task_status_load();
+	if ($jobs > 2 * $max_workers) {
+		return $self->set_task_status_load;
 	}
-	return $self->set_task_status_running();
+	return $self->set_task_status_running;
 }
 
 sub set_task_status_idle {
 	my $self = shift;
-	my $id = $self->{task_status_idle_id};
-	return() if $self->{task_status_id} == $id;
+	my $id   = $self->{task_status_idle_id};
+	return if $self->{task_status_id} == $id;
 
-	my $bitmap = Padre::Wx::icon( 'tasks-idle.png' );
+	my $bitmap = Padre::Wx::Icon::find('status/padre-tasks-idle');
 	my $text   = Wx::gettext('Background Tasks are idle');
 	return $self->_set_task_status($id, $bitmap, $text);
 }
 
 sub set_task_status_running {
 	my $self = shift;
-	my $id = $self->{task_status_running_id};
-	return() if $self->{task_status_id} == $id;
+	my $id   = $self->{task_status_running_id};
+	return if $self->{task_status_id} == $id;
 
-	my $bitmap = Padre::Wx::icon( 'tasks-running.png' );
+	my $bitmap = Padre::Wx::Icon::find('status/padre-tasks-running');
 	my $text   = Wx::gettext('Background Tasks are running');
 	return $self->_set_task_status($id, $bitmap, $text);
 }
 
 sub set_task_status_load {
 	my $self = shift;
-	my $id = $self->{task_status_load_id};
-	return() if $self->{task_status_id} == $id;
+	my $id   = $self->{task_status_load_id};
+	return if $self->{task_status_id} == $id;
 
-	my $bitmap = Padre::Wx::icon( 'tasks-load.png' );
+	my $bitmap = Padre::Wx::Icon::find('status/padre-tasks-load');
 	my $text   = Wx::gettext('Background Tasks are running with high load');
 	return $self->_set_task_status($id, $bitmap, $text);
 }
@@ -219,12 +239,13 @@ sub _set_task_status {
 		$self->{task_status_tool_pos},
 		$id, '',
 		$bitmap,
-		$bitmap,
-		Wx::wxITEM_NORMAL(),
+		Wx::wxNullBitmap,
+		Wx::wxITEM_NORMAL,
 		$text,
 	);
+	$self->Realize;
 
-	return(1);
+	return 1;
 }
 
 sub refresh {
@@ -244,7 +265,38 @@ sub refresh {
 	$self->EnableTool( Wx::wxID_PASTE,     ( $editor and $editor->CanPaste ));
 	$self->EnableTool( Wx::wxID_SELECTALL, ( $editor ? 1 : 0 ));
 
-	$self->update_task_status();
+	$self->update_task_status;
+
+	return;
+}
+
+
+
+
+
+#####################################################################
+# Toolbar 2.0
+
+sub add_tool {
+	my $self  = shift;
+	my %param = @_;
+	my $id    = $param{id} || -1;
+
+	# Create the tool
+	$self->AddTool(
+		$id, '',
+		Padre::Wx::Icon::find($param{icon}),
+		$param{short},
+	);
+
+	# Add the optional event hook
+	if ( defined $param{event} ) {
+		Wx::Event::EVT_TOOL(
+			$self->GetParent,
+			$id,
+			$param{event},
+		);
+	}
 
 	return;
 }

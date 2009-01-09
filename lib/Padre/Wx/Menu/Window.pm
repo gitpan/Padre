@@ -6,18 +6,18 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Wx          ();
-use Padre::Wx::Submenu ();
+use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.24';
-our @ISA     = 'Padre::Wx::Submenu';
+our $VERSION = '0.25';
+our @ISA     = 'Padre::Wx::Menu';
 
 
 
 
 
 #####################################################################
-# Padre::Wx::Submenu Methods
+# Padre::Wx::Menu Methods
 
 sub new {
 	my $class = shift;
@@ -92,7 +92,6 @@ sub new {
 			Wx::gettext("GoTo Subs Window\tAlt-S")
 		),
 		sub {
-			$_[0]->{subs_panel_was_closed} = ! Padre->ide->config->{main_subs_panel};
 			$_[0]->refresh_methods($_[0]->current);
 			$_[0]->show_functions(1); 
 			$_[0]->{gui}->{subs_panel}->SetFocus;
@@ -181,3 +180,7 @@ sub refresh {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

@@ -12,17 +12,17 @@ use strict;
 use warnings;
 use utf8;
 use Padre::Wx          ();
-use Padre::Wx::Submenu ();
+use Padre::Wx::Menu ();
 use Padre::Wx::DocBrowser();
 
-our $VERSION = '0.24';
-our @ISA     = 'Padre::Wx::Submenu';
+our $VERSION = '0.25';
+our @ISA     = 'Padre::Wx::Menu';
 
 
 
 
 #####################################################################
-# Padre::Wx::Submenu Methods
+# Padre::Wx::Menu Methods
 
 sub new {
 	my $class = shift;
@@ -153,10 +153,12 @@ sub about {
 	);
 	$about->SetVersion($Padre::VERSION);
 	$about->SetCopyright( Wx::gettext("Copyright 2008 Gabor Szabo"));
+
 	# Only Unix/GTK native about box supports websites
-	if ( Padre::Util::UNIX ) {
+	if ( Padre::Util::WXGTK ) {
 		$about->SetWebSite("http://padre.perlide.org/");
 	}
+
 	$about->AddDeveloper("Adam Kennedy");
 	$about->AddDeveloper("Ahmad Zawawi - أحمد محمد زواوي");
 	$about->AddDeveloper("Brian Cassidy");
@@ -191,3 +193,7 @@ sub about {
 }
 
 1;
+# Copyright 2008 Gabor Szabo.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

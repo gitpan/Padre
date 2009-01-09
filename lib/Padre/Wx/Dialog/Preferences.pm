@@ -7,7 +7,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Padre::Current    ();
 
-our $VERSION = '0.24';
+our $VERSION = '0.25';
 
 sub get_layout_for_behaviour {
 	my ($config, $main_startup, $editor_autoindent, $editor_methods) = @_;
@@ -28,14 +28,6 @@ sub get_layout_for_behaviour {
 		[
 			[ 'Wx::StaticText', undef,              Wx::gettext('Guess from current document')],
 			[ 'Wx::Button',     '_guess_',          Wx::gettext('Guess')     ],
-		],
-		[
-			[ 'Wx::StaticText', undef,              Wx::gettext('Max number of modules')],
-			[ 'Wx::TextCtrl',   'pod_maxlist',      $config->{pod_maxlist}],
-		],
-		[
-			[ 'Wx::StaticText', undef,              Wx::gettext('Min number of modules')],
-			[ 'Wx::TextCtrl',   'pod_minlist',      $config->{pod_minlist}],
 		],
 		[
 			[ 'Wx::StaticText', undef,              Wx::gettext('Open files:')],

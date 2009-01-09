@@ -1,5 +1,5 @@
 ---
-abstract: 'Perl Application Development and Refactoring Environment'
+abstract: "Perl Application Development and Refactoring Environment\r"
 author:
   - 'Gabor Szabo'
 build_requires:
@@ -39,6 +39,7 @@ requires:
   DBD::SQLite: 1.10
   DBI: 1.58
   Data::Dumper: 0
+  Devel::Dumpvar: 0.04
   Digest::MD5: 0
   Encode: 2.26
   File::Basename: 0
@@ -91,4 +92,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.24
+version: 0.25
