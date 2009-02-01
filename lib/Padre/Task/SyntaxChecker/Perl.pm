@@ -3,7 +3,7 @@ package Padre::Task::SyntaxChecker::Perl;
 use strict;
 use warnings;
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 use base 'Padre::Task::SyntaxChecker';
 
@@ -26,7 +26,7 @@ Padre::Task::SyntaxChecker::Perl - Perl document syntax-checking in the backgrou
   
   my $task2 = Padre::Task::SyntaxChecker::Perl->new(
     text          => Padre::Current->document->text_get,
-    notebook_page => Padre::Current->editor,
+    editor => Padre::Current->editor,
     on_finish     => sub { my $task = shift; ... },
     newlines      => "\r\n", # specify the newline type!
   );
@@ -152,7 +152,7 @@ sub _check_syntax {
 			$cur->{desc} = $diag[ $cur->{diag} ];
 			delete $cur->{diag};
 		}
-		if (   defined( $cur->{desc} )
+		if ( defined( $cur->{desc} )
 			&& $cur->{desc} =~ /^\s*\([WD]/o
 		) {
 			$cur->{severity} = 'W';

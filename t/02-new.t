@@ -10,7 +10,7 @@ BEGIN {
 		exit 0;
 	}
 }
-plan( tests => 20 );
+plan( tests => 63 );
 use Test::NoWarnings;
 use t::lib::Padre;
 use Padre;
@@ -19,10 +19,6 @@ my $app = Padre->new;
 isa_ok($app, 'Padre');
 
 SCOPE: {
-	my $inst = Padre->inst;
-	isa_ok($inst, 'Padre');
-	refis( $inst, $app, '->inst matches ->new' );
-
 	my $ide = Padre->ide;
 	isa_ok($ide, 'Padre');
 	refis( $ide, $app, '->ide matches ->new' );
@@ -30,58 +26,54 @@ SCOPE: {
 
 SCOPE: {
 	my $config = $app->config;
-	is_deeply  $config,
-		{
-		experimental       => 0,
+	isa_ok( $config, 'Padre::Config' );
 
-		editor_linenumbers => 1,
-		editor_eol         => 0,
-		editor_indentationguides => 0,
-		editor_calltips    => 0,
-		editor_autoindent  => 'deep',
-		editor_methods     => 'alphabetical',
-		editor_whitespaces => 0,
-		editor_codefolding => 0,
-
-		editor_auto_indentation_style => 1,
-		editor_tabwidth               => 8,
-		editor_indentwidth            => 8,
-		editor_use_tabs               => 1,
-		editor_perl5_beginner         => 1,
-
-		ppi_highlight                 => 0,
-		ppi_highlight_limit           => 10_000,
-
-		search_terms       => [],
-		replace_terms      => [],
-		main_startup       => 'new',
-		main_statusbar     => 1,
-		main_output        => 0,
-		main_rightbar      => 1,
-		main_lockpanels    => 1,
-		projects           => {},
-		run_save           => 'same',
-		current_project    => '',
-		bookmarks          => {},
-
-		host               => {
-			main_maximized => 0,
-			main_top       => 20,
-			main_left      => 40,
-			main_width     => 600,
-			main_height    => 400,
-			run_command    => '',
-			main_files     => [],
-			main_files_pos => [],
-			style          => 'default',
-		},
-		main_subs_panel   => 0,
-		main_output_panel => 0,
-
-		plugins => {},
-		use_worker_threads        => 1,
-	},
-	'defaults';
+	is( $config->experimental             => 0              );
+	is( $config->main_startup             => 'new'          );
+	is( $config->main_lockinterface       => 1              );
+	is( $config->main_functions           => 0              );
+	is( $config->main_functions_order     => 'alphabetical' );
+	is( $config->main_outline             => 0              );
+	is( $config->main_output              => 0              );
+	is( $config->main_output_ansi         => 1              );
+	is( $config->main_syntaxcheck         => 0              );
+	is( $config->main_errorlist           => 0              );
+	is( $config->main_statusbar           => 1              );
+	is( $config->editor_font              => ''             );
+	is( $config->editor_linenumbers       => 1              );
+	is( $config->editor_eol               => 0              );
+	is( $config->editor_indentationguides => 0              );
+	is( $config->editor_calltips          => 0              );
+	is( $config->editor_autoindent        => 'deep'         );
+	is( $config->editor_whitespace        => 0              );
+	is( $config->editor_folding           => 0              );
+	is( $config->editor_wordwrap          => 0              );
+	is( $config->editor_currentline       => 1              );
+	is( $config->editor_currentline_color => 'FFFF04'       );
+	is( $config->editor_indent_auto       => 1              );
+	is( $config->editor_indent_tab_width  => 8              );
+	is( $config->editor_indent_width      => 8              );
+	is( $config->editor_indent_tab        => 1              );
+	is( $config->editor_beginner          => 1              );
+	is( $config->find_case                => 1              );
+	is( $config->find_regex               => 0              );
+	is( $config->find_reverse             => 0              );
+	is( $config->find_first               => 0              );
+	is( $config->find_nohidden            => 1              );
+	is( $config->find_quick               => 0              );
+	is( $config->ppi_highlight            => 0              );
+	is( $config->ppi_highlight_limit      => 2000           );
+	is( $config->run_save                 => 'same'         );
+	is( $config->run_stacktrace           => 0              );
+	is( $config->threads                  => 1              );
+	is( $config->locale                   => ''             );
+	is( $config->locale_perldiag          => ''             );
+	is( $config->editor_style             => 'default'      );
+	is( $config->main_maximized           => 0              );
+	is( $config->main_top                 => 40             );
+	is( $config->main_left                => 20             );
+	is( $config->main_width               => 600            );
+	is( $config->main_height              => 400            );
 }
 
 
@@ -102,13 +94,12 @@ SCOPE: {
 	isa_ok( $app, 'Padre::Wx::App' );
 
 	# The main window
-	my $main = $app->main_window;
-	isa_ok( $main, 'Padre::Wx::MainWindow' );
+	my $main = $app->main;
+	isa_ok( $main, 'Padre::Wx::Main' );
 
 	# The main menu
 	my $menu = $main->menu;
 	isa_ok( $menu, 'Padre::Wx::Menubar' );
-	refis( $menu->win,  $main, 'Menubar ->win gets the main window' );
 	refis( $menu->main, $main, 'Menubar ->main gets the main window' );
 
 	# A submenu
@@ -122,8 +113,8 @@ SCOPE: {
 	# Current context
 	my $current = $main->current;
 	isa_ok( $current, 'Padre::Current' );
-	isa_ok( $current->_main,     'Padre::Wx::MainWindow' );
-	isa_ok( $current->_notebook, 'Padre::Wx::Notebook'   );
-	refis(  $current->_main,     $main,     '->current->_main ok'     );
-	refis(  $current->_notebook, $notebook, '->current->_notebook ok' );
+	isa_ok( $current->main,     'Padre::Wx::Main' );
+	isa_ok( $current->notebook, 'Padre::Wx::Notebook'   );
+	refis(  $current->main,     $main,     '->current->main ok'     );
+	refis(  $current->notebook, $notebook, '->current->notebook ok' );
 }

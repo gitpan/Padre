@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -22,13 +22,11 @@ our @ISA     = 'Padre::Wx::Menu';
 sub new {
 	my $class = shift;
 	my $main  = shift;
-
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
 
-
-
-
+	# Add additional properties
+	$self->{main} = $main;
 
 	# Create new things
 	$self->{new} = $self->Append(
@@ -272,7 +270,7 @@ sub new {
 	$self->{recentfiles}->AppendSeparator;
 
 	my $idx = 0;
-	foreach my $file ( grep { -f } Padre::DB->get_recent_files ) {
+	foreach my $file ( grep { -f } Padre::DB::History->recent('files') ) {
 		Wx::Event::EVT_MENU( $main,
 			$self->{recentfiles}->Append( -1,
 				++$idx < 10 ? "&$idx. $file" : "$idx. $file"

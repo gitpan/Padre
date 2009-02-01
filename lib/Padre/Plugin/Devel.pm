@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -18,17 +18,40 @@ our @ISA     = 'Padre::Plugin';
 # Padre::Plugin Methods
 
 sub padre_interfaces {
-	'Padre::Plugin'         => 0.24,
-	'Padre::Wx::MainWindow' => 0.24,
+	'Padre::Plugin'   => 0.26,
+	'Padre::Wx::Main' => 0.26,
 }
 
 sub plugin_name {
 	'Padre Developer Tools';
 }
 
-# Load our non-core dependencies when we are enabled
 sub plugin_enable {
+	my $self = shift;
+
+	# Load our non-core dependencies=
 	require Devel::Dumpvar;
+
+	# Load our configuration
+	# (Used for testing purposes)
+	$self->{config} = $self->config_read;
+
+	return 1;
+}
+
+sub plugin_disable {
+	my $self   = shift;
+
+	# Save our configuration
+	# (Used for testing purposes)
+	if ( $self->{config} ) {
+		$self->{config}->{foo}++;
+		$self->config_write( delete($self->{config}) );
+	} else {
+		$self->config_write( { foo => 1 } );
+	}
+
+	return 1;
 }
 
 sub menu_plugins_simple {
@@ -39,6 +62,8 @@ sub menu_plugins_simple {
 		'Dump Current Document'     => 'dump_document',
 		'Dump Top IDE Object'       => 'dump_padre',
 		'Dump %INC HASH'            => 'dump_inc',
+		'---'                       => undef,
+		'Simulate Crash'            => 'simulate_crash',
 		'---'                       => undef,
 		'wxWidgets 2.8.8 Reference' => sub {
 			Wx::LaunchDefaultBrowser('http://docs.wxwidgets.org/2.8.8/');
@@ -57,7 +82,7 @@ sub menu_plugins_simple {
 
 sub eval_document {
 	my $self     = shift;
-	my $document = Padre::Current->document or return;
+	my $document = $self->current->document or return;
 	return $self->_dump_eval( $document->text_get );
 }
 
@@ -65,7 +90,7 @@ sub dump_document {
 	my $self     = shift;
 	my $document = Padre::Current->document;
 	unless ( $document ) {
-		Padre::Current->_main->message( 'No file is open', 'Info' );
+		Padre::Current->main->message( 'No file is open', 'Info' );
 		return;
 	}
 	return $self->_dump( $document );
@@ -79,6 +104,11 @@ sub dump_padre {
 sub dump_inc {
 	my $self = shift;
 	return $self->_dump( \%INC );
+}
+
+sub simulate_crash {
+	require POSIX;
+	POSIX::_exit();
 }
 
 sub show_about {
@@ -100,7 +130,7 @@ sub _dump_eval {
 	# Evecute the code and handle errors
 	my @rv = eval $code; ## no critic
 	if ( $@ ) {
-		Padre::Current->_main->error(
+		Padre::Current->main->error(
 			sprintf(Wx::gettext("Error: %s"), $@)
 		);
 		return;
@@ -111,23 +141,21 @@ sub _dump_eval {
 
 sub _dump {
 	my $self = shift;
+	my $main = Padre::Current->main;
 
-	# Generate the dump string
-	my $dumper = Devel::Dumpvar->new( to => 'return' );
-	my $string = $dumper->dump( @_ );
-
-	# Show it in the output window
-	my $main = Padre::Current->_main;
+	# Generate the dump string and set into the output window
+	$main->output->SetValue(
+		Devel::Dumpvar->new(
+			to => 'return',
+		)->dump(@_)
+	);
+	$main->output->SetSelection(0, 0);
 	$main->show_output(1);
-	$main->output->clear;
-	$main->output->AppendText($string);
 
 	return;
 }
 
 1;
-
-__END__
 
 =pod
 
@@ -161,6 +189,7 @@ This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 
 =cut
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

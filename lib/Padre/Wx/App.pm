@@ -13,6 +13,10 @@ of resources, a Wx object tree representing the literal GUI elements,
 and a second tree of objects representing the abstract concepts, such
 as configuration, projects, and so on.
 
+Theoretically, this should allow Padre to run automated processes of
+various types without having to bootstrap a process up into an entire
+30+ megabyte Wx-capable instance.
+
 B<Padre::Wx::App> is a L<Wx::App> subclass that represents the Wx
 application as a whole, and acts as the root of the object tree for
 the GUI elements.
@@ -26,9 +30,11 @@ From the main L<Padre> object, it can be accessed via the C<wx> method.
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx ();
+use Carp         ();
+use Params::Util qw{ _INSTANCE };
+use Padre::Wx    ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Wx::App';
 
 
@@ -39,29 +45,54 @@ our @ISA     = 'Wx::App';
 # Constructor and Accessors
 
 sub new {
-	my $class = shift;
-	my $self  = $class->SUPER::new(@_);
+	my $class  = shift;
+	my $ide    = shift;
+	unless ( _INSTANCE($ide, 'Padre') ) {
+		Carp::croak("Did not provide the ide object to Padre::App->new");
+	}
+
+	# Create the Wx object
+	my $self = $class->SUPER::new;
+
+	# Save a link back to the parent ide
+	$self->{ide} = $ide;
 
 	# Immediately populate the main window
-	$self->{main_window} = Padre::Wx::MainWindow->new;
+	$self->{main} = Padre::Wx::Main->new($ide);
 
 	return $self;
 }
 
 =pod
 
-=head2 main_window
+=head2 ide
 
-The C<main_window> method creates or returns the existing
-L<Padre::Wx::MainWindow> object, representing the main editor window
-of the application.
+The C<ide> accessor provides a link back to the parent L<Padre> ide object.
+
+=head2 main
+
+The C<main> accessor returns the L<Padre::Wx::Main> object for the
+application.
 
 =cut
 
 use Class::XSAccessor
 	getters => {
-		main_window => 'main_window',
+		ide  => 'ide',
+		main => 'main',
 	};
+
+=pod
+
+=head2 config
+
+The C<config> accessor returns the L<Padre::Config> for the application.
+
+=cut
+
+sub config {
+	$_[0]->ide->config;
+}
 
 
 
@@ -86,6 +117,7 @@ This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
 =cut
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

@@ -5,11 +5,12 @@ package Padre::Wx::Menu::View;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx          ();
+use Padre::Wx       ();
+use Padre::Locale   ();
 use Padre::Wx::Menu ();
-use Padre::Current     qw{_CURRENT};
+use Padre::Current  qw{_CURRENT};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -27,18 +28,20 @@ sub new {
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
 
+	# Add additional properties
+	$self->{main} = $main;
 
 
 
 
 	# Can the user move stuff around
-	$self->{lock_panels} = $self->AppendCheckItem( -1,
+	$self->{lockinterface} = $self->AppendCheckItem( -1,
 		Wx::gettext("Lock User Interface")
 	);
 	Wx::Event::EVT_MENU( $main,
-		$self->{lock_panels},
+		$self->{lockinterface},
 		sub {
-			$_[0]->on_toggle_lockpanels($_[1]);
+			$_[0]->on_toggle_lockinterface($_[1]);
 		},
 	);
 
@@ -66,12 +69,23 @@ sub new {
 		$self->{functions},
 		sub {
 			if ( $_[1]->IsChecked ) {
-				$_[0]->refresh_methods;
+				$_[0]->refresh_functions;
 				$_[0]->show_functions(1);
 			}
 			else {
 				$_[0]->show_functions(0);
 			}
+		},
+	);
+
+	# Show or hide GUI elements
+	$self->{outline} = $self->AppendCheckItem( -1,
+		Wx::gettext("Show Outline")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{outline},
+		sub {
+			$_[0]->show_outline( $_[1]->IsChecked );
 		},
 	);
 
@@ -135,7 +149,7 @@ sub new {
 					$doc->editor->padre_setup;
 					$doc->rebless;
 					$doc->remove_color;
-					if ($doc->can('colorize')) {
+					if ( $doc->can('colorize') ) {
 						$doc->colorize;
 					} else {
 						$doc->editor->Colourise( 0, $doc->editor->GetLength );
@@ -177,17 +191,20 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{show_calltips},
 		sub {
-			Padre->ide->config->{editor_calltips} = $_[1]->IsChecked;
+			$_[0]->config->set(
+				'editor_calltips',
+				$_[1]->IsChecked ? 1 : 0,
+			);
 		},
 	);
 
-	$self->{current_line_background} = $self->AppendCheckItem( -1,
+	$self->{currentline} = $self->AppendCheckItem( -1,
 		Wx::gettext("Show Current Line")
 	);
 	Wx::Event::EVT_MENU( $main,
-		$self->{current_line_background},
+		$self->{currentline},
 		sub {
-			$_[0]->on_toggle_current_line_background($_[1]);
+			$_[0]->on_toggle_currentline($_[1]);
 		},
 	);
 
@@ -282,35 +299,27 @@ sub new {
 
 
 	# Bookmark Support
-	unless (
-		$config->{experimental}
-		and
-		defined $config->{experimental_bookmarks}
-		and
-		not $config->{experimental_bookmarks}
-	) {
-		$self->{bookmark_set} = $self->Append( -1,
-			Wx::gettext("Set Bookmark\tCtrl-B")
-		);
-		Wx::Event::EVT_MENU( $main,
-			$self->{bookmark_set},
-			sub {
-				Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]);
-			},
-		);
-		
-		$self->{bookmark_goto} = $self->Append( -1,
-			Wx::gettext("Goto Bookmark\tCtrl-Shift-B")
-		);
-		Wx::Event::EVT_MENU( $main,
-			$self->{bookmark_goto},
-			sub {
-				Padre::Wx::Dialog::Bookmarks->goto_bookmark($_[0]);
-			},
-		);
-		
-		$self->AppendSeparator;
-	}
+	$self->{bookmark_set} = $self->Append( -1,
+		Wx::gettext("Set Bookmark\tCtrl-B")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{bookmark_set},
+		sub {
+			Padre::Wx::Dialog::Bookmarks->set_bookmark($_[0]);
+		},
+	);
+	
+	$self->{bookmark_goto} = $self->Append( -1,
+		Wx::gettext("Goto Bookmark\tCtrl-Shift-B")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{bookmark_goto},
+		sub {
+			Padre::Wx::Dialog::Bookmarks->goto_bookmark($_[0]);
+		},
+	);
+	
+	$self->AppendSeparator;
 
 
 
@@ -323,8 +332,10 @@ sub new {
 		$self->{style}
 	);
 	my %styles = (
-		default => Wx::gettext('Padre'),
-		night   => Wx::gettext('Night'),
+		default   => Wx::gettext('Padre'),
+		night     => Wx::gettext('Night'),
+		ultraedit => Wx::gettext('Ultraedit'),
+		notepad   => Wx::gettext('Notepad++'),
 	);
 	my @order = sort {
 		($b eq 'default') <=> ($a eq 'default')
@@ -334,7 +345,7 @@ sub new {
 	foreach my $name ( @order ) {
 		my $label = $styles{$name};
 		my $radio = $self->{style}->AppendRadioItem( -1, $label );
-		if ( $config->{host}->{style} and $config->{host}->{style} eq $name ) {
+		if ( $config->editor_style and $config->editor_style eq $name ) {
 			$radio->Check(1);
 		}
 		Wx::Event::EVT_MENU( $main,
@@ -354,7 +365,7 @@ sub new {
 		foreach my $name (@private_styles) {
 			my $label = $name;
 			my $radio = $self->{style}->AppendRadioItem( -1, $label );
-			if ( $config->{host}->{style} and $config->{host}->{style} eq $name ) {
+			if ( $config->editor_style and $config->editor_style eq $name ) {
 				$radio->Check(1);
 			}
 			Wx::Event::EVT_MENU( $main,
@@ -372,7 +383,6 @@ sub new {
 
 	# Language Support
 	# TODO: God this is horrible, there has to be a better way
-	require Padre::Locale;
 	my $default  = Padre::Locale::system_rfc4646() || 'x-unknown';
 	my $current  = Padre::Locale::rfc4646();
 	my %language = Padre::Locale::menu_view_languages();
@@ -394,7 +404,7 @@ sub new {
 			$_[0]->change_locale;
 		},
 	);
-	if ( defined $config->{host}->{locale} and $default eq $config->{host}->{locale} ) {
+	if ( defined $config->locale and $config->locale eq $default ) {
 		$self->{language_default}->Check(1);
 	}
 
@@ -436,7 +446,15 @@ sub new {
 			Wx::gettext("&Full Screen\tF11")
 		),
 		sub {
-			$_[0]->on_full_screen($_[1]);
+			if ( $_[0]->IsFullScreen ) {
+				$_[0]->ShowFullScreen(0);
+			} else {
+				$_[0]->ShowFullScreen( 1,
+					Wx::wxFULLSCREEN_NOCAPTION
+					| Wx::wxFULLSCREEN_NOBORDER
+				);
+			}
+			return;
 		},
 	);
 
@@ -452,20 +470,22 @@ sub refresh {
 
 	# Simple check state cases from configuration
 	unless ( Padre::Util::WXWIN32 ) {
-		$self->{statusbar}->Check( $config->{main_statusbar} ? 1 : 0 );
+		$self->{statusbar}->Check( $config->main_statusbar );
 	}
-	$self->{ lines        }->Check( $config->{editor_linenumbers} ? 1 : 0 );
-	$self->{ folding      }->Check( $config->{editor_codefolding} ? 1 : 0 );
-	$self->{ current_line_background}->Check( $config->{editor_current_line_background} ? 1 : 0 );
-	$self->{ eol           }->Check( $config->{editor_eol} ? 1 : 0 );
-	$self->{ whitespaces   }->Check( $config->{editor_whitespaces} ? 1 : 0 );
-	$self->{ output        }->Check( $config->{main_output_panel} ? 1 : 0 );
-	$self->{ functions     }->Check( $config->{main_subs_panel} ? 1 : 0 );
-	$self->{ lock_panels      }->Check( $config->{main_lockpanels} ? 1 : 0 );
-	$self->{ indentation_guide}->Check( $config->{editor_indentationguides} ? 1 : 0 );
-	$self->{ show_calltips    }->Check( $config->{editor_calltips} ? 1 : 0 );
-	$self->{ show_syntaxcheck }->Check( $config->{editor_syntaxcheck} ? 1 : 0 );
-	$self->{ show_errorlist   }->Check( $config->{editor_errorlist} ? 1 : 0 );
+
+	$self->{ lines             }->Check( $config->editor_linenumbers );
+	$self->{ folding           }->Check( $config->editor_folding );
+	$self->{ currentline       }->Check( $config->editor_currentline );
+	$self->{ eol               }->Check( $config->editor_eol );
+	$self->{ whitespaces       }->Check( $config->editor_whitespace );
+	$self->{ output            }->Check( $config->main_output );
+	$self->{ outline           }->Check( $config->main_outline );
+	$self->{ functions         }->Check( $config->main_functions );
+	$self->{ lockinterface     }->Check( $config->main_lockinterface );
+	$self->{ indentation_guide }->Check( $config->editor_indentationguides );
+	$self->{ show_calltips     }->Check( $config->editor_calltips );
+	$self->{ show_syntaxcheck  }->Check( $config->main_syntaxcheck );
+	$self->{ show_errorlist    }->Check( $config->main_errorlist );
 
 	# Check state for word wrap is document-specific
 	if ( $document ) {
@@ -500,13 +520,16 @@ sub refresh {
 	$self->{ font_increase }->Enable($doc);
 	$self->{ font_decrease }->Enable($doc);
 	$self->{ font_reset    }->Enable($doc);
-	$self->{ bookmark_set  }->Enable($doc);
-	$self->{ bookmark_goto }->Enable($doc);
+
+	# You cannot set a bookmark unless the current document is on disk.
+	my $set = ( $doc and defined $document->filename ) ? 1 : 0;
+	$self->{ bookmark_set }->Enable($set);
 
 	return;
 }
 
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

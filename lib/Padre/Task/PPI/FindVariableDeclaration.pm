@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 use base 'Padre::Task::PPI';
 
@@ -80,7 +80,7 @@ sub finish {
 	my $self = shift;
 	if (defined $self->{declaration_location}) {
 		# GUI update
-		$self->{main_thread_only}{document}->ppi_select( $self->{declaration_location} );
+		$self->{main_thread_only}->{document}->ppi_select( $self->{declaration_location} );
 	}
 	else {
 		my $text;
@@ -97,7 +97,7 @@ sub finish {
 			$text,
 			Wx::gettext("Check Canceled"),
 			Wx::wxOK,
-			Padre->ide->wx->main_window
+			Padre->ide->wx->main
 		);
 	}
 	return();

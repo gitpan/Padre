@@ -41,15 +41,16 @@ use File::Spec ();
 # Padre::Wx should not implement anything using Wx modules.
 # We make an exception in this case, because we're only using the locale
 # logic in Wx, which isn't related to widgets anyway.
-use Padre::Util '_T';
-use Padre::Wx   ();
+use Padre::Util   ('_T');
+use Padre::Config ();
+use Padre::Wx     ();
 
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => File::Spec->rel2abs(
 	Padre::Util::sharedir('locale')
 );
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -411,7 +412,7 @@ use constant system_rfc4646 =>
 
 # Find the rfc4646 to use by default
 sub rfc4646 {
-	my $config = Padre->ide->config->{host}->{locale};
+	my $config = Padre::Config->read;
 	if ( $config and not $RFC4646{$config} ) {
 		# Bad or unsupported configuration
 		$config = undef;
@@ -461,7 +462,7 @@ sub menu_view_languages {
 sub encoding_system_default {
 	my $encoding;
 	if ( Padre::Util::MAC ) {
-		# In mac system Wx::locale::GetSystemEncodingName() couldn't
+		# In mac system Wx::Locale::GetSystemEncodingName() couldn't
 		# return the name of encoding directly.
 		# Use LC_CTYPE to guess system default encoding.
 		require POSIX;
@@ -474,7 +475,7 @@ sub encoding_system_default {
 		}
 
 	} elsif ( Padre::Util::WIN32 ) {
-		# In windows system Wx::locale::GetSystemEncodingName() returns
+		# In windows system Wx::Locale::GetSystemEncodingName() returns
 		# like ``windows-1257'' and it matches as ``cp1257''
 		# refer to src/common/intl.cpp
 		$encoding = Wx::Locale::GetSystemEncodingName();
@@ -570,6 +571,7 @@ sub encoding_from_string {
 }
 
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

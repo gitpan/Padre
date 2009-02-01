@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -27,6 +27,7 @@ sub new {
 	my $self = $class->SUPER::new(@_);
 
 	# Add additional properties
+	$self->{main} = $main;
 	$self->{alt} = [];
 
 
@@ -37,7 +38,7 @@ sub new {
 		$self->Append( -1,
 			Wx::gettext("&Split window")
 		),
-		\&Padre::Wx::MainWindow::on_split_window,
+		\&Padre::Wx::Main::on_split_window,
 	);
 
 	$self->AppendSeparator;
@@ -51,21 +52,21 @@ sub new {
 		$self->Append( -1,
 			Wx::gettext("Next File\tCtrl-TAB")
 		),
-		\&Padre::Wx::MainWindow::on_next_pane,
+		\&Padre::Wx::Main::on_next_pane,
 	);
 
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1,
 			Wx::gettext("Previous File\tCtrl-Shift-TAB")
 		),
-		\&Padre::Wx::MainWindow::on_prev_pane,
+		\&Padre::Wx::Main::on_prev_pane,
 	);
 
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1,
 			Wx::gettext("Last Visited File\tCtrl-6")
 		),
-		\&Padre::Wx::MainWindow::on_last_visited_pane,
+		\&Padre::Wx::Main::on_last_visited_pane,
 	);
 
 	Wx::Event::EVT_MENU( $main,
@@ -92,9 +93,19 @@ sub new {
 			Wx::gettext("GoTo Subs Window\tAlt-S")
 		),
 		sub {
-			$_[0]->refresh_methods($_[0]->current);
+			$_[0]->refresh_functions($_[0]->current);
 			$_[0]->show_functions(1); 
-			$_[0]->{gui}->{subs_panel}->SetFocus;
+			$_[0]->functions->SetFocus;
+		},
+	);
+
+	Wx::Event::EVT_MENU( $main,
+		$self->Append( -1,
+			Wx::gettext("GoTo Outline Window\tAlt-L")
+		),
+		sub {
+			$_[0]->show_outline(1);
+			$_[0]->outline->SetFocus;
 		},
 	);
 
@@ -104,7 +115,7 @@ sub new {
 		),
 		sub {
 			$_[0]->show_output(1);
-			$_[0]->{gui}->{output_panel}->SetFocus;
+			$_[0]->output->SetFocus;
 		},
 	);
 
@@ -114,8 +125,8 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{goto_syntax_check},
 		sub {
-			$_[0]->show_syntaxbar(1);
-			$_[0]->{gui}->{syntaxcheck_panel}->SetFocus;
+			$_[0]->show_syntax(1);
+			$_[0]->syntax->SetFocus;
 		},
 	);
 
@@ -142,7 +153,7 @@ sub refresh {
 	my $alt      = $self->{alt};
 	my $default  = $self->{default};
 	my $items    = $self->GetMenuItemCount;
-	my $notebook = $current->_notebook;
+	my $notebook = $current->notebook;
 	my $pages    = $notebook->GetPageCount;
 
 	# Add or remove menu entries as needed

@@ -1,14 +1,15 @@
-
 package Padre::TaskManager;
-BEGIN {$INC{"Padre/TaskManager.pm"} ||= __FILE__}
 
 use strict;
 use warnings;
 
 our $VERSION = '0.20';
 
+# According to Wx docs,
+# this MUST be loaded before Wx,
+# so this also happens in the script.
 use threads;
-use threads::shared; # according to Wx docs, this MUST be loaded before Wx, so this also happens in the script
+use threads::shared;
 use Thread::Queue;
 
 require Padre;
@@ -47,11 +48,13 @@ sub schedule {
 		# as a non-threading, non-queued, fake worker loop
 		$self->task_queue->enqueue( $string );
 		$self->task_queue->enqueue( "STOP" );
-		worker_loop( Padre->ide->wx->main_window, $self );
+		worker_loop( Padre->ide->wx->main, $self );
 	}
 
 	return 1;
 }
+
+=pod
 
 =head2 setup_workers
 
@@ -66,13 +69,13 @@ sub setup_workers {
 	return if not $self->use_threads;
 
 	@_=(); # avoid "Scalars leaked"
-	my $mw = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main;
 
 
 	# ensure minimum no. workers
 	my $workers = $self->{workers};
 	while (@$workers < $self->{min_no_workers}) {
-		$self->_make_worker_thread($mw);
+		$self->_make_worker_thread($main);
 	}
 
 	# add workers to satisfy demand
@@ -81,12 +84,14 @@ sub setup_workers {
 	if (@$workers < $self->{max_no_workers} and $jobs_pending > 2*@$workers) {
 		my $target = int($jobs_pending/2);
 		$target = $self->{max_no_workers} if $target > $self->{max_no_workers};
-		$self->_make_worker_thread($mw) for 1..($target-@$workers);
+		$self->_make_worker_thread($main) for 1..($target-@$workers);
                 $n_threads_to_kill *= 5;#fake
 	}
 
 	return 1;
 }
+
+=pod
 
 =head2 reap
 
@@ -149,4 +154,3 @@ sub reap {
 
 	return 1;
 }
-

@@ -9,7 +9,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -24,14 +24,18 @@ my $data_private;
 my $width;
 
 sub new {
-	my( $class, $parent ) = @_;
+	my $class    = shift;
+	my $notebook = shift;
 
-	my $self = $class->SUPER::new( $parent );
+	# Create the underlying Wx object
+	my $self = $class->SUPER::new( $notebook );
+
+	# TODO: Make this suck less
 	$data = data('default');
 
 	# Set the code margins a little larger than the default.
 	# This seems to noticably reduce eye strain.
-	$self->SetMarginLeft(3);
+	$self->SetMarginLeft(2);
 	$self->SetMarginRight(0);
 
 	# Clear out all the other margins
@@ -42,15 +46,17 @@ sub new {
 	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
 	Wx::Event::EVT_LEFT_UP(    $self, \&on_left_up    );
 
-	if ( Padre->ide->config->{editor_use_wordwrap} ) {
+	if ( Padre->ide->config->editor_wordwrap ) {
 		$self->SetWrapMode( Wx::wxSTC_WRAP_WORD );
 	}
 	$self->SetDropTarget(
-		Padre::Wx::FileDropTarget->new(
-			Padre->ide->wx->main_window
-		)
+		Padre::Wx::FileDropTarget->new($self->main)
 	);
 	return $self;
+}
+
+sub main {
+	$_[0]->GetGrandParent;
 }
 
 sub data {
@@ -82,7 +88,7 @@ sub data {
 # most of this should be read from some external files
 # but for now we use this if statement
 sub padre_setup {
-	my ($self) = @_;
+	my $self = shift;
 
 	$self->SetLexer( $self->{Document}->lexer );
 
@@ -98,6 +104,20 @@ sub padre_setup {
 		$self->padre_setup_style('perl');
 	#} elsif ( $mimetype eq 'application/x-pasm' ) {
 	#	$self->padre_setup_style('pasm');
+	} elsif ( $mimetype eq 'text/x-patch' ) {
+		$self->padre_setup_style('diff');
+	} elsif ( $mimetype eq 'text/x-makefile' ) {
+		$self->padre_setup_style('make');
+	} elsif ( $mimetype eq 'text/x-yaml' ) {
+		$self->padre_setup_style('yaml');
+	} elsif ( $mimetype eq 'text/css' ) {
+		$self->padre_setup_style('css');
+	} elsif ( $mimetype eq 'text/plain' ) {
+		my $filename = $self->{Document}->filename || q{};
+		if ( $filename and $filename =~ /\.([^.]+)$/ ) {
+			my $ext = lc $1;
+			$self->padre_setup_style('conf') if $ext eq 'conf';
+		}
 	} elsif ($mimetype) {
 		# setup some default coloring
 		# for the time being it is the same as for Perl
@@ -113,28 +133,26 @@ sub padre_setup {
 
 sub padre_setup_plain {
 	my $self = shift;
-
 	$self->set_font;
-
-	$self->StyleClearAll();
+	$self->StyleClearAll;
 
 	my $config = Padre->ide->config;
 
 	if ( defined $data->{plain}->{current_line_foreground} ) {
 		$self->SetCaretForeground( _color( $data->{plain}->{current_line_foreground} ) );
 	}
-	if ( defined $data->{plain}->{current_line_background} ) {
-		if ( defined $config->{editor_current_line_background_color} ) {
-			if (   $data->{plain}->{current_line_background}
-				ne $config->{editor_current_line_background_color}
+	if ( defined $data->{plain}->{currentline} ) {
+		if ( defined $config->editor_currentline_color ) {
+			if (   $data->{plain}->{currentline}
+				ne $config->editor_currentline_color
 			) {
-				$data->{plain}->{current_line_background} = $config->{editor_current_line_background_color};
+				$data->{plain}->{currentline} = $config->editor_currentline_color;
 			}
 		}
-		$self->SetCaretLineBackground( _color( $data->{plain}->{current_line_background} ) );
+		$self->SetCaretLineBackground( _color( $data->{plain}->{currentline} ) );
 	}
-	elsif ( defined $config->{editor_current_line_background_color} ) {
-		$self->SetCaretLineBackground( _color( $config->{editor_current_line_background_color} ) );
+	elsif ( defined $config->editor_currentline_color ) {
+		$self->SetCaretLineBackground( _color( $config->editor_currentline_color ) );
 	}
 
 	foreach my $k (keys %{ $data->{plain}->{foregrounds} }) {
@@ -148,6 +166,8 @@ sub padre_setup_plain {
 		$self->SetLayoutDirection( Wx::wxLayout_LeftToRight );
 	}
 
+	$self->setup_style_from_config('plain');
+
 	return;
 }
 
@@ -155,6 +175,15 @@ sub padre_setup_style {
 	my ($self, $name) = @_;
 
 	$self->padre_setup_plain;
+
+	$self->StyleSetBackground($_, _color($data->{$name}->{background})) for (0..Wx::wxSTC_STYLE_DEFAULT);
+	$self->setup_style_from_config($name);
+
+	return;
+}
+
+sub setup_style_from_config {
+	my ($self, $name) = @_;
 
 	foreach my $k ( keys %{ $data->{$name}->{colors} }) {
 		my $f = 'Wx::' . $k;
@@ -169,13 +198,19 @@ sub padre_setup_style {
 			}
 		}
 
-		$self->StyleSetForeground( $f->(), _color($data->{$name}->{colors}->{$k}) );
+		$self->StyleSetForeground( $f->(), _color($data->{$name}->{colors}->{$k}->{foreground}) )
+			if exists $data->{$name}->{colors}->{$k}->{foreground};
+		$self->StyleSetBackground( $f->(), _color($data->{$name}->{colors}->{$k}->{background}) )
+			if exists $data->{$name}->{colors}->{$k}->{background};
+		$self->StyleSetBold( $f->(), $data->{$name}->{colors}->{$k}->{bold} )
+			if exists $data->{$name}->{colors}->{$k}->{bold};
+		$self->StyleSetItalic( $f->(), $data->{$name}->{colors}->{$k}->{italic} )
+			if exists $data->{$name}->{colors}->{$k}->{italic};
+		$self->StyleSetEOLFilled( $f->(), $data->{$name}->{colors}->{$k}->{eolfilled} )
+			if exists $data->{$name}->{colors}->{$k}->{eolfilled};
+		$self->StyleSetUnderline( $f->(), $data->{$name}->{colors}->{$k}->{underline} )
+			if exists $data->{$name}->{colors}->{$k}->{underline};
 	}
-
-	$self->StyleSetBackground(34, _color($data->{$name}->{brace_highlight}));
-	$self->StyleSetBackground($_, _color($data->{$name}->{background})) for (0..32);
-
-	return;
 }
 
 sub _color {
@@ -316,8 +351,8 @@ sub set_font {
 	my $config = Padre->ide->config;
 
 	my $font = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
-	if ( defined $config->{editor_font} ) {
-		$font->SetNativeFontInfoUserDesc( $config->{editor_font} );
+	if ( defined $config->editor_font && length $config->editor_font > 0 ) { # empty default...
+		$font->SetNativeFontInfoUserDesc( $config->editor_font );
 	}
 	$self->SetFont($font);
 	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
@@ -330,12 +365,12 @@ sub set_preferences {
 	my $self   = shift;
 	my $config = Padre->ide->config;
 
-	$self->show_line_numbers(    $config->{editor_linenumbers}       );
-	$self->show_folding(         $config->{editor_codefolding}       );
-	$self->SetIndentationGuides( $config->{editor_indentationguides} );
-	$self->SetViewEOL(           $config->{editor_eol}               );
-	$self->SetViewWhiteSpace(    $config->{editor_whitespaces}       );
-	$self->SetCaretLineVisible(  $config->{editor_current_line_background} ? 1 : 0 );
+	$self->show_line_numbers(    $config->editor_linenumbers       );
+	$self->show_folding(         $config->editor_folding           );
+	$self->SetIndentationGuides( $config->editor_indentationguides );
+	$self->SetViewEOL(           $config->editor_eol               );
+	$self->SetViewWhiteSpace(    $config->editor_whitespace        );
+	$self->SetCaretLineVisible(  $config->editor_currentline       );
 
 	$self->padre_setup;
 
@@ -348,7 +383,7 @@ sub set_preferences {
 sub show_calltip {
 	my $self   = shift;
 	my $config = Padre->ide->config;
-	return unless $config->{editor_calltips};
+	return unless $config->editor_calltips;
 
 	my $pos    = $self->GetCurrentPos;
 	my $line   = $self->LineFromPosition($pos);
@@ -385,12 +420,12 @@ sub autoindent {
 	my ($self, $mode) = @_;
 
 	my $config = Padre->ide->config;
-	return if not $config->{editor_autoindent} or $config->{editor_autoindent} eq 'no';
-	
-	if ($mode eq 'deindent') {
+	return unless $config->editor_autoindent;
+	return if $config->editor_autoindent eq 'no';
+
+	if ( $mode eq 'deindent' ) {
 		$self->_auto_deindent($config);
-	}
-	else {
+	} else {
 		# default to "indent"
 		$self->_auto_indent($config);
 	}
@@ -410,7 +445,7 @@ sub _auto_indent {
 	my $content = $self->_get_line_by_number($prev_line);
 	my $indent  = ($content =~ /^(\s+)/ ? $1 : '');
 
-	if ($config->{editor_autoindent} eq 'deep' and $content =~ /\{\s*$/) {
+	if ( $config->editor_autoindent eq 'deep' and $content =~ /\{\s*$/ ) {
 		my $indent_width = $indent_style->{indentwidth};
 		my $tab_width    = $indent_style->{tabwidth};
 		if ($indent_style->{use_tabs} and $indent_width != $tab_width) {
@@ -451,7 +486,7 @@ sub _auto_deindent {
 	my $indent    = ($content =~ /^(\s+)/ ? $1 : '');
 
 	# This is for } on a new line:
-	if ($config->{editor_autoindent} eq 'deep' and $content =~ /^\s*\}\s*$/) {
+	if ( $config->editor_autoindent eq 'deep' and $content =~ /^\s*\}\s*$/ ) {
 		my $prev_line    = $line-1;
 		my $prev_content = ( $prev_line < 0 ? '' : $self->_get_line_by_number($prev_line) );
 		my $prev_indent  = ($prev_content =~ /^(\s+)/ ? $1 : '');
@@ -492,7 +527,7 @@ sub _auto_deindent {
 		$self->GotoPos( $self->GetLineEndPosition($line) );
 	}
 	# this is if the line matches "blahblahSomeText}".
-	elsif ($config->{editor_autoindent} eq 'deep' and $content =~ /\}\s*$/) {
+	elsif ( $config->editor_autoindent eq 'deep' and $content =~ /\}\s*$/) {
 		# TODO: What should happen in this case?
 	}
 
@@ -510,16 +545,15 @@ sub _get_line_by_number {
 }
 
 sub on_right_down {
-	my ($self, $event) = @_;
-	
-	my $main = Padre->ide->wx->main_window;
-	
-	my $pos       = $self->GetCurrentPos;
-	#my $line      = $self->LineFromPosition($pos);
+	my $self  = shift;
+	my $event = shift;
+	my $main  = $self->main;
+	my $pos   = $self->GetCurrentPos;
+	#my $line  = $self->LineFromPosition($pos);
 	#print "right down: $pos\n"; # this is the position of the cursor and not that of the mouse!
 	#my $p = $event->GetLogicalPosition;
 	#print "x: ", $p->x, "\n";
-	
+
 	my $menu = Wx::Menu->new;
 	my $undo = $menu->Append( Wx::wxID_UNDO, '' );
 	if (not $self->CanUndo) {
@@ -608,20 +642,26 @@ sub on_right_down {
 	}
 
 	$menu->AppendSeparator;
-
+	
+	my $commentToggle = $menu->Append( -1, Wx::gettext("&Toggle Comment\tCtrl-Shift-C") );
+        Wx::Event::EVT_MENU( $main, $commentToggle,
+                \&Padre::Wx::Main::on_comment_toggle_block,
+        );
 	my $comment = $menu->Append( -1, Wx::gettext("&Comment Selected Lines\tCtrl-M") );
 	Wx::Event::EVT_MENU( $main, $comment,
-		\&Padre::Wx::MainWindow::on_comment_out_block,
+		\&Padre::Wx::Main::on_comment_out_block,
 	);
 	my $uncomment = $menu->Append( -1, Wx::gettext("&Uncomment Selected Lines\tCtrl-Shift-M") );
 	Wx::Event::EVT_MENU( $main, $uncomment,
-		\&Padre::Wx::MainWindow::on_uncomment_block,
+		\&Padre::Wx::Main::on_uncomment_block,
 	);
 
 	$menu->AppendSeparator;
 
-	if ( $event->isa('Wx::MouseEvent')
-	     && Padre->ide->config->{editor_codefolding} eq 1
+	if (
+		$event->isa('Wx::MouseEvent')
+		and
+		Padre->ide->config->editor_folding
 	) {
 		my $mousePos = $event->GetPosition;
 		my $line = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
@@ -648,7 +688,7 @@ sub on_right_down {
 
 	Wx::Event::EVT_MENU( $main,
 		$menu->Append( -1, Wx::gettext("&Split window") ),
-		\&Padre::Wx::MainWindow::on_split_window,
+		\&Padre::Wx::Main::on_split_window,
 	);
 	if ($event->isa('Wx::MouseEvent')) {
 		$self->PopupMenu( $menu, $event->GetX, $event->GetY);
@@ -700,13 +740,15 @@ sub unfold_all {
 sub on_left_up {
 	my ($self, $event) = @_;
 
-	my $pos       = $self->GetCurrentPos;
-	#my $line      = $self->LineFromPosition($pos);
-	#print "$pos\n"; # this is the position of the cursor and not that of the mouse!
+	my $text = $self->GetSelectedText;
+	if ( Padre::Util::WXGTK and defined $text and $text ne '' ) {
+		# Only on X11 based platforms
+		Wx::wxTheClipboard->UsePrimarySelection(1);
+		$self->put_text_to_clipboard($text);
+		Wx::wxTheClipboard->UsePrimarySelection(0);
+	}
 
-	#print "left $pos\n";
-
-	$event->Skip();
+	$event->Skip;
 	return;
 }
 
@@ -714,14 +756,14 @@ sub on_mouse_motion {
 	my ( $self, $event ) = @_;
 
 	$event->Skip;
-	return unless Padre->ide->config->{editor_syntaxcheck};
+	return unless Padre->ide->config->main_syntaxcheck;
 
 	my $mousePos = $event->GetPosition;
 	my $line = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
 	my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
 
 	my ( $offset1, $offset2 ) = ( 0, 18 );
-	if ( Padre->ide->config->{editor_codefolding} ) {
+	if ( Padre->ide->config->editor_folding ) {
 		$offset1 += 18;
 		$offset2 += 18;
 	}
@@ -780,12 +822,14 @@ sub text_selection_clear_marks {
 }
 
 sub put_text_to_clipboard {
-	my $text = shift;
+	my ( $self, $text ) = @_;
+
 	Wx::wxTheClipboard->Open;
 	Wx::wxTheClipboard->SetData(
 		Wx::TextDataObject->new($text)
 	);
 	Wx::wxTheClipboard->Close;
+
 	return;
 }
 
@@ -801,6 +845,18 @@ sub get_text_from_clipboard {
 	}
 	Wx::wxTheClipboard->Close;
 	return $text;
+}
+
+# Coment or comment text depending on the first selected line.
+# This is the most coherent way to handle mixed blocks(commented and
+# uncommented lines).
+sub comment_toggle_lines {
+	my ($self, $begin, $end, $str) = @_;
+	if ( _get_line_by_number($self, $begin) =~ /\s*$str/ ) {
+		uncomment_lines(@_);
+	} else {
+		comment_lines(@_);
+		}	
 }
 
 # $editor->comment_lines($begin, $end, $str);

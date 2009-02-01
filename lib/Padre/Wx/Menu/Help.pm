@@ -1,22 +1,19 @@
 package Padre::Wx::Menu::Help;
 
-# Second attempt to build an fully encapsulated help menu.
-# (As a test bed for doing it for the bigger ones)
-# Whoever ripped my last attempt apart and made it a trivial
-# container for functions instead of a real menu, please leave
-# this one alone for now. :(
-# Adam K
+# Fully encapsulated help menu
 
 use 5.008;
 use strict;
 use warnings;
 use utf8;
-use Padre::Wx          ();
-use Padre::Wx::Menu ();
-use Padre::Wx::DocBrowser();
+use Padre::Config         ();
+use Padre::Wx             ();
+use Padre::Wx::Menu       ();
+use Padre::Wx::DocBrowser ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
+
 
 
 
@@ -30,6 +27,7 @@ sub new {
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
+	$self->{main} = $main;
 
 	# Add the POD-based help launchers
 	Wx::Event::EVT_MENU( $main,
@@ -42,12 +40,11 @@ sub new {
 		$self->Append( -1, Wx::gettext("Context Help\tF1") ),
 		sub {
 			my $current = Wx::Window::FindFocus();
-			if ( $current->isa('Padre::Wx::ErrorList') ) {
-				$_[0]->errorlist->on_f1;
+			if ( (defined $current) and $current->isa('Padre::Wx::ErrorList') ) {
+				$_[0]->errorlist->on_menu_help_context_help;
 			} else {
-			
 				# TODO This feels wrong, the help menu code shouldn't
-				# populate the mainwindow hash.
+				# populate the main window hash.
 				my $selection = $_[0]->current->text;
 				$_[0]->menu->help->help($_[0]);
 				if ( $selection ) {
@@ -58,7 +55,7 @@ sub new {
 		},
 	);
        Wx::Event::EVT_MENU( $main,
-                $self->Append( -1, 'Current Document' ),
+                $self->Append( -1, Wx::gettext('Current Document') ),
                 sub {
                         $_[0]->menu->help->help($_[0]);
 			my $doc = $_[0]->current->document;
@@ -111,35 +108,30 @@ sub help {
 
 	unless ( $main->{help} ) {
 		$main->{help} = Padre::Wx::DocBrowser->new;
-	        Wx::Event::EVT_CLOSE(
-        	        $main->{help},
-	                \&on_help_close,
-       		 );
-
-		my $module = Padre::DB->get_last_pod || 'Padre';
-		if ( $module ) {
-			$main->{help}->help($module);
-		}
+		Wx::Event::EVT_CLOSE(
+			$main->{help},
+			\&on_help_close,
+		);
+		$main->{help}->help('Padre');
 	}
 	$main->{help}->SetFocus;
 	$main->{help}->Show(1);
 	return;
 }
 
-# FIXME this feels utterly backwards to me
+# TODO - this feels utterly backwards to me
 sub on_help_close {
         my ($self,$event) = @_;
-	my $help = Padre->ide->wx->main_window->{help};
+	my $help = Padre->ide->wx->main->{help};
 
         if ( $event->CanVeto ) {
                 $help->Hide;
         }
         else {
-                delete Padre->ide->wx->main_window->{help};
+                delete Padre->ide->wx->main->{help};
                 $help->Destroy;
         }
 }
-
 
 sub about {
 	my $self = shift;
@@ -149,7 +141,8 @@ sub about {
 	$about->SetDescription(
 		"Perl Application Development and Refactoring Environment\n\n" .
 		"Based on Wx.pm $Wx::VERSION and " . Wx::wxVERSION_STRING . "\n" .
-		"Config at " . Padre->ide->config_dir . "\n"
+		"Config at " . Padre::Config->default_dir . "\n" .
+		"SQLite user_version at " . Padre::DB->pragma('user_version') . "\n"
 	);
 	$about->SetVersion($Padre::VERSION);
 	$about->SetCopyright( Wx::gettext("Copyright 2008 Gabor Szabo"));
@@ -193,6 +186,7 @@ sub about {
 }
 
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

@@ -8,13 +8,8 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Wx::StatusBar';
-
-use Class::XSAccessor
-	getters => {
-		main => 'main',
-	};
 
 sub new {
 	my $class = shift;
@@ -24,16 +19,13 @@ sub new {
 	my $self = $class->SUPER::new(
 		$main,
 		-1,
-		Wx::wxST_SIZEGRIP | Wx::wxFULL_REPAINT_ON_RESIZE
+		Wx::wxST_SIZEGRIP
+		| Wx::wxFULL_REPAINT_ON_RESIZE
 	);
-	$self->{main} = $main;
 
 	# Set up the fields
 	$self->SetFieldsCount(4);
 	$self->SetStatusWidths(-1, 100, 50, 100);
-
-	# Put the status bar onto the parent frame
-	$main->SetStatusBar($self);
 
 	return $self;
 }
@@ -47,9 +39,13 @@ sub clear {
 	return;
 }
 
+sub main {
+	$_[0]->GetParent;
+}
+
 sub current {
 	Padre::Current->new(
-		main => $_[0]->main,
+		main => $_[0]->GetParent,
 	);
 }
 
@@ -61,7 +57,7 @@ sub refresh {
 	my $editor   = $current->editor or return $self->clear;
 
 	# Prepare the various strings that form the status bar
-	my $notebook = $current->_notebook;
+	my $notebook = $current->notebook;
 	my $document = $current->document;
 	my $newline  = $document->get_newline_type || Padre::Util::NEWLINE;
 	my $pageid   = $notebook->GetSelection;

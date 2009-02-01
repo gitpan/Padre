@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -26,6 +26,8 @@ sub new {
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
 
+	# Add additional properties
+	$self->{main} = $main;
 
 
 
@@ -38,7 +40,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{find},
 		sub {
-			Padre::Wx::Dialog::Find->find(@_)
+			$_[0]->find->find(@_);
 		},
 	);
 
@@ -48,7 +50,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{find_next},
 		sub {
-			Padre::Wx::Dialog::Find->find_next(@_);
+			$_[0]->find->find_next(@_);
 		},
 	);
 
@@ -58,7 +60,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{find_previous},
 		sub {
-			Padre::Wx::Dialog::Find->find_previous(@_);
+			$_[0]->find->find_previous(@_);
 		},
 	);
 
@@ -69,7 +71,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{replace},
 		sub {
-			Padre::Wx::Dialog::Find->find(@_);
+			$_[0]->find->find(@_);
 		},
 	);
 		
@@ -86,12 +88,16 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{quick_find},
 		sub {
-			Padre->ide->config->{is_quick_find} = $_[1]->IsChecked ? 1 : 0;
+			Padre->ide->config->set(
+				'find_quick',
+				$_[1]->IsChecked ? 1 : 0,
+			);
 			return;
 		},
 	);
-	$self->{quick_find}->Check( Padre->ide->config->{is_quick_find} ? 1 : 0 );
+	$self->{quick_find}->Check( Padre->ide->config->find_quick );
 
+#We should be able to remove F4 and shift-F4 and hook this functionality to F3 and shift-F3
 	# Incremental find (#60)
 	$self->{quick_find_next} = $self->Append( -1,
 		Wx::gettext("Find Next\tF4")
@@ -99,7 +105,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{quick_find_next},
 		sub {
-			$_[0]->find->search('next');
+			$_[0]->fast_find->search('next');
 		},
 	);
 
@@ -109,7 +115,7 @@ sub new {
 	Wx::Event::EVT_MENU( $main,
 		$self->{quick_find_previous},
 		sub {
-			$_[0]->find->search('previous');
+			$_[0]->fast_find->search('previous');
 		}
 	);
 

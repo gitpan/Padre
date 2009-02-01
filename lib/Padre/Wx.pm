@@ -19,7 +19,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 
 
@@ -39,10 +39,10 @@ sub MarkWarn  { 2 }
 #####################################################################
 # Defines for object IDs
 
-sub id_SYNCHK_TIMER    { 30001 }
-sub id_FILECHK_TIMER   { 30002 }
-sub id_POST_INIT_TIMER { 30003 }
-
+sub ID_TIMER_SYNTAX    { 30001 }
+sub ID_TIMER_FILECHECK { 30002 }
+sub ID_TIMER_POSTINIT  { 30003 }
+sub ID_TIMER_OUTLINE   { 30004 }
 
 
 
@@ -63,6 +63,7 @@ sub color {
 	return Wx::Colour->new(@c);
 }
 
+1;
 
 # Copyright 2008 Gabor Szabo.
 # LICENSE

@@ -5,11 +5,11 @@ package Padre::Wx::Menu::Edit;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Current     qw{_CURRENT};
-use Padre::Wx          ();
+use Padre::Current  qw{_CURRENT};
+use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -25,6 +25,9 @@ sub new {
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
+
+	# Add additional properties
+	$self->{main} = $main;
 
 	# Undo/Redo
 	$self->{undo} = $self->Append(
@@ -150,7 +153,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{goto},
-		\&Padre::Wx::MainWindow::on_goto,
+		\&Padre::Wx::Main::on_goto,
 	);
 
 	$self->{autocomp} = $self->Append( -1,
@@ -158,7 +161,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{autocomp},
-		\&Padre::Wx::MainWindow::on_autocompletition,
+		\&Padre::Wx::Main::on_autocompletition,
 	);
 
 	$self->{brace_match} = $self->Append( -1,
@@ -166,7 +169,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{brace_match},
-		\&Padre::Wx::MainWindow::on_brace_matching,
+		\&Padre::Wx::Main::on_brace_matching,
 	);
 
 	$self->{join_lines} = $self->Append( -1,
@@ -174,7 +177,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{join_lines},
-		\&Padre::Wx::MainWindow::on_join_lines,
+		\&Padre::Wx::Main::on_join_lines,
 	);
 
 	$self->{snippets} = $self->Append( -1,
@@ -194,12 +197,20 @@ sub new {
 
 
 	# Commenting
+	$self->{comment_toggle} = $self->Append( -1,
+                Wx::gettext("&Toggle Comment\tCtrl-Shift-C")
+        );
+        Wx::Event::EVT_MENU( $main,
+                $self->{comment_toggle},
+                \&Padre::Wx::Main::on_comment_toggle_block,
+        );
+
 	$self->{comment_out} = $self->Append( -1,
 		Wx::gettext("&Comment Selected Lines\tCtrl-M")
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{comment_out},
-		\&Padre::Wx::MainWindow::on_comment_out_block,
+		\&Padre::Wx::Main::on_comment_out_block,
 	);
 
 	$self->{uncomment} = $self->Append( -1,
@@ -207,7 +218,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{uncomment},
-		\&Padre::Wx::MainWindow::on_uncomment_block,
+		\&Padre::Wx::Main::on_uncomment_block,
 	);
 	$self->AppendSeparator;
 
@@ -216,39 +227,50 @@ sub new {
 
 
 	# Tabs And Spaces
-	my $edit_tab = Wx::Menu->new;
+	$self->{tabs} = Wx::Menu->new;
 	$self->Append( -1,
 		Wx::gettext("Tabs and Spaces"),
-		$edit_tab
+		$self->{tabs},
+	);
+
+	$self->{tabs_to_spaces} = $self->{tabs}->Append( -1,
+		Wx::gettext("Tabs to Spaces...")
 	);
 	Wx::Event::EVT_MENU( $main,
-		$edit_tab->Append( -1,
-			Wx::gettext("Tabs to Spaces...")
-		),
+		$self->{tabs_to_spaces},
 		sub {
 			$_[0]->on_tab_and_space('Tab_to_Space');
 		},
 	);
+
+	$self->{spaces_to_tabs} = $self->{tabs}->Append( -1,
+		Wx::gettext("Spaces to Tabs...")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$edit_tab->Append( -1,
-			Wx::gettext("Spaces to Tabs...")
-		),
+		$self->{spaces_to_tabs},
 		sub {
 			$_[0]->on_tab_and_space('Space_to_Tab');
 		},
 	);
+
+	$self->{tabs}->AppendSeparator;
+
+	$self->{delete_trailing} = $self->{tabs}->Append( -1,
+		Wx::gettext("Delete Trailing Spaces")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$edit_tab->Append( -1,
-			Wx::gettext("Delete Trailing Spaces")
-		),
+		$self->{delete_trailing},
 		sub {
+			$DB::single = $DB::single = 1; # stupdily duplicated to avoid warning
 			$_[0]->on_delete_ending_space;
 		},
 	);
+
+	$self->{delete_leading} = $self->{tabs}->Append( -1,
+		Wx::gettext("Delete Leading Spaces")
+	);
 	Wx::Event::EVT_MENU( $main,
-		$edit_tab->Append( -1,
-			Wx::gettext("Delete Leading Spaces")
-		),
+		$self->{delete_leading},
 		sub {
 			$_[0]->on_delete_leading_space;
 		},
@@ -297,7 +319,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{diff},
-		\&Padre::Wx::MainWindow::on_diff,
+		\&Padre::Wx::Main::on_diff,
 	);
 
 	$self->{insert_from_file} = $self->Append( -1,
@@ -305,7 +327,7 @@ sub new {
 	);
 	Wx::Event::EVT_MENU( $main,
 		$self->{insert_from_file},
-		\&Padre::Wx::MainWindow::on_insert_from_file,
+		\&Padre::Wx::Main::on_insert_from_file,
 	);
 
 	$self->AppendSeparator;
@@ -319,7 +341,7 @@ sub new {
 		$self->Append( -1,
 			Wx::gettext("Preferences")
 		),
-		\&Padre::Wx::MainWindow::on_preferences,
+		\&Padre::Wx::Main::on_preferences,
 	);
 
 
@@ -349,6 +371,10 @@ sub refresh {
 	$self->{ insert_from_file }->Enable($doc);
 	$self->{ case_upper       }->Enable($doc);
 	$self->{ case_lower       }->Enable($doc);
+	$self->{ tabs_to_spaces   }->Enable($doc);
+	$self->{ spaces_to_tabs   }->Enable($doc);
+	$self->{ delete_leading   }->Enable($doc);
+	$self->{ delete_trailing  }->Enable($doc);
 
 	# Handle the complex cases
 	my $selection = !! ( defined $text and $text ne '' );
@@ -362,6 +388,7 @@ sub refresh {
 }
 
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

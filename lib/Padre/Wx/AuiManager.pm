@@ -8,7 +8,7 @@ use warnings;
 use Params::Util qw{_INSTANCE};
 use Padre::Wx    ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 # Due to an overly simplistic implementation at the C level,
 # Wx::AuiManager is only a SCALAR reference and cannot be
@@ -67,13 +67,13 @@ sub lock_panels {
 
 	$self->Update;
 
-	$self->GetPane('bottompane')
+	$self->GetPane('bottom')
 		->CaptionVisible($unlock)
 		->Floatable($unlock)
 		->Dockable($unlock)
 		->Movable($unlock);
 
-	$self->GetPane('sidepane')
+	$self->GetPane('right')
 		->CaptionVisible($unlock)
 		->Floatable($unlock)
 		->Dockable($unlock)

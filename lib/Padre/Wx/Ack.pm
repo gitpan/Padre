@@ -3,6 +3,7 @@ package Padre::Wx::Ack;
 use 5.008;
 use strict;
 use warnings;
+use Padre::DB ();
 use Padre::Wx ();
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
@@ -13,7 +14,7 @@ my %opts;
 my %stats;
 my $panel_string_index = 9999999;
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 my $DONE_EVENT : shared = Wx::NewEventType;
 
 my $ack_loaded = 0;
@@ -30,7 +31,7 @@ sub load_ack {
 
 	# redefine some app::ack subs to display results in padre's output
 	{
-		no warnings 'redefine';
+		no warnings 'redefine', 'once';
 		*{App::Ack::print_first_filename} = sub { print_results("$_[0]\n"); };
 		*{App::Ack::print_separator}      = sub { print_results("--\n"); };
 		*{App::Ack::print}                = sub { print_results($_[0]); };
@@ -69,39 +70,49 @@ sub on_ack {
 # Dialog related
 
 sub get_layout {
-	my ( $term ) = shift;
-	
-	my $config = Padre->ide->config;
-	$config->{ack_terms}      ||= [];
-	$config->{ack_dirs}       ||= [];
-	$config->{ack_file_types} ||= [];
+	my $term   = shift;
+	my $search = Padre::DB::History->recent('search');
+	my $in_dir = Padre::DB::History->recent('find in');
+	my $types  = Padre::DB::History->recent('find types');
+
 	# default value is 1 for ignore_hidden_subdirs
-	$config->{ack}->{ignore_hidden_subdirs} = 1 unless ( exists $config->{ack}->{ignore_hidden_subdirs} );
+	my $config = Padre->ide->config;
 
 	my @layout = (
 		[
 			[ 'Wx::StaticText', undef,              gettext('Term:')],
-			[ 'Wx::ComboBox',   '_ack_term_',       $term, $config->{ack_terms} ],
+			[ 'Wx::ComboBox',   '_ack_term_',       $term, $search ],
 			[ 'Wx::Button',     '_find_',           Wx::wxID_FIND ],
 		],
 		[
 			[ 'Wx::StaticText', undef,              gettext('Dir:')],
-			[ 'Wx::ComboBox',   '_ack_dir_',        '', $config->{ack_dirs} ],
+			[ 'Wx::ComboBox',   '_ack_dir_',        '', $in_dir ],
 			[ 'Wx::Button',     '_pick_dir_',        gettext('Pick &directory')],
 		],
 		[
 			[ 'Wx::StaticText', undef,              gettext('In Files/Types:')],
-			[ 'Wx::ComboBox',   '_file_types_',     '', $config->{ack_file_types} ],
+			[ 'Wx::ComboBox',   '_file_types_',     '', $types ],
 			[ 'Wx::Button',     '_cancel_',         Wx::wxID_CANCEL],
 		],
 		[
-			['Wx::CheckBox',    'case_insensitive', gettext('Case &Insensitive'),    ($config->{ack}->{case_insensitive} ? 1 : 0) ],
+			[
+				'Wx::CheckBox',
+				'case_insensitive',
+				gettext('Case &Insensitive'),
+				($config->find_case ? 0 : 1)
+			],
 		],
 		[
-			['Wx::CheckBox',    'ignore_hidden_subdirs', gettext('I&gnore hidden Subdirectories'),    ($config->{ack}->{ignore_hidden_subdirs} ? 1 : 0) ],
+			[
+				'Wx::CheckBox',
+				'ignore_hidden_subdirs',
+				gettext('I&gnore hidden Subdirectories'),
+				$config->find_nohidden,
+			],
 		],
 		
 	);
+
 	return \@layout;
 }
 
@@ -118,11 +129,11 @@ sub dialog {
 		pos    => Wx::wxDefaultPosition,
 	);
 	
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_find_},     \&find_clicked);
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_pick_dir_}, \&on_pick_dir);
-	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_},   \&cancel_clicked);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}->{_find_},     \&find_clicked);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}->{_pick_dir_}, \&on_pick_dir);
+	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}->{_cancel_},   \&cancel_clicked);
 	
-	$dialog->{_widgets_}{_ack_term_}->SetFocus;
+	$dialog->{_widgets_}->{_ack_term_}->SetFocus;
 
 	return $dialog;
 }
@@ -130,9 +141,9 @@ sub dialog {
 sub on_pick_dir {
 	my ($dialog, $event) = @_;
 
-	my $main = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main;
 
-	my $default_dir = $dialog->{_widgets_}{_ack_dir_}->GetValue;
+	my $default_dir = $dialog->{_widgets_}->{_ack_dir_}->GetValue;
 	unless ( $default_dir ) { # we use currect editor
 		my $filename = $main->current->filename;
 		if ( $filename ) {
@@ -144,7 +155,7 @@ sub on_pick_dir {
 	if ($dir_dialog->ShowModal == Wx::wxID_CANCEL) {
 		return;
 	}
-	$dialog->{_widgets_}{_ack_dir_}->SetValue($dir_dialog->GetPath);
+	$dialog->{_widgets_}->{_ack_dir_}->SetValue($dir_dialog->GetPath);
 
 	return;
 }
@@ -165,7 +176,7 @@ sub find_clicked {
 	$search->{dir} ||= '.';
 	return if not $search->{term};
 	
-	my $main = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main;
 
 	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
 
@@ -201,12 +212,12 @@ sub find_clicked {
 	$iter = App::Ack::get_iterator( $what, \%opts );
 	App::Ack::filetype_setup();
 
-	unless ( $main->{gui}->{ack_panel} ) {
+	unless ( $main->{ack} ) {
 		create_ack_pane( $main );
 	}
 	$main->show_output(1);
 	show_ack_output($main, 1);
-	$main->{gui}->{ack_panel}->DeleteAllItems;
+	$main->{ack}->DeleteAllItems;
 
 	Wx::Event::EVT_COMMAND( $main, -1, $DONE_EVENT, \&ack_done );
 
@@ -227,33 +238,31 @@ sub _get_data_from {
 	my $ignore_hidden_subdirs = $data->{ignore_hidden_subdirs};
 	
 	$dialog->Destroy;
-	
+
+	# Save our preferences
 	my $config = Padre->ide->config;
-	if ( $term ) {
-		unshift @{$config->{ack_terms}}, $term;
-		my %seen;
-		@{$config->{ack_terms}} = grep {!$seen{$_}++} @{$config->{ack_terms}};
-		@{$config->{ack_terms}} = splice(@{$config->{ack_terms}},  0, 20);
-	}
-	if ( $dir ) {
-		unshift @{$config->{ack_dirs}}, $dir;
-		my %seen;
-		@{$config->{ack_dirs}} = grep {!$seen{$_}++} @{$config->{ack_dirs}};
-		@{$config->{ack_dirs}} = splice(@{$config->{ack_dirs}},  0, 20);
-	}
-	if ( $file_types ) {
-		unshift @{$config->{ack_file_types}}, $dir;
-		my %seen;
-		@{$config->{ack_file_types}} = grep {!$seen{$_}++} @{$config->{ack_file_types}};
-		@{$config->{ack_file_types}} = splice(@{$config->{ack_file_types}},  0, 20);
-	}
-	$config->{ack}->{case_insensitive}      = $case_insensitive;
-	$config->{ack}->{ignore_hidden_subdirs} = $ignore_hidden_subdirs;
-	
+	Padre::DB->begin;
+	Padre::DB::History->create(
+		type => 'search',
+		name => $term,
+	) if $term;
+	Padre::DB::History->create(
+		type => 'find in',
+		name => $dir,
+	) if $dir;
+	Padre::DB::History->create(
+		type => 'find type',
+		name => $file_types,
+	) if $file_types;
+	Padre::DB->commit;
+
+	$config->set( find_case     => $case_insensitive ? 0 : 1 );
+	$config->set( find_nohidden => $ignore_hidden_subdirs    );
+
 	return {
-		term => $term,
-		dir  => $dir,
-		file_types => $file_types,
+		term                  => $term,
+		dir                   => $dir,
+		file_types            => $file_types,
 		case_insensitive      => $case_insensitive,
 		ignore_hidden_subdirs => $ignore_hidden_subdirs,
 	}
@@ -265,20 +274,20 @@ sub _get_data_from {
 sub create_ack_pane {
 	my ( $main ) = @_;
 	
-	$main->{gui}->{ack_panel} = Wx::ListCtrl->new(
-		$main->{gui}->{bottompane},
+	$main->{ack} = Wx::ListCtrl->new(
+		$main->bottom,
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
 	);
 	
-	$main->{gui}->{ack_panel}->InsertColumn(0, Wx::gettext('Ack'));
-	$main->{gui}->{ack_panel}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
+	$main->{ack}->InsertColumn(0, Wx::gettext('Ack'));
+	$main->{ack}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
 	
 	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
 		$main,
-		$main->{gui}->{ack_panel},
+		$main->{ack},
 		\&on_ack_result_selected,
 	);
 }
@@ -287,8 +296,8 @@ sub show_ack_output {
 	my $main = shift;
 	my $on   = @_ ? $_[0] ? 1 : 0 : 1;
 	
-	my $bp = \$main->{gui}->{bottompane};
-	my $op = \$main->{gui}->{ack_panel};
+	my $bp = \$main->{bottom};
+	my $op = \$main->{ack};
 
 	my $idx = ${$bp}->GetPageIndex(${$op});
 	if ( $idx >= 0 ) {
@@ -303,7 +312,7 @@ sub show_ack_output {
 		);
 		${$op}->Show;
 	}
-	$main->aui->GetPane('bottompane')->Show;
+	$main->aui->GetPane('bottom')->Show;
 	$main->aui->Update;
 
 	return;
@@ -318,7 +327,7 @@ sub on_ack_result_selected {
 	my ($file, $line) = ($text =~ /^(.*?)\((\d+)\)\:/);
 	return unless $line;
 
-	my $main = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main;
 	my $id   = $main->setup_editor($file);
 	$main->on_nth_pane($id) if $id;
 
@@ -335,9 +344,9 @@ sub ack_done {
 
 	my $data = $event->GetData;
 
-	$main = Padre->ide->wx->main_window;
-	$main->{gui}->{ack_panel}->InsertStringItem( $panel_string_index--, $data);
-	$main->{gui}->{ack_panel}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
+	$main = Padre->ide->wx->main;
+	$main->{ack}->InsertStringItem( $panel_string_index--, $data);
+	$main->{ack}->SetColumnWidth(0, Wx::wxLIST_AUTOSIZE);
 
 	return;
 }
@@ -410,7 +419,7 @@ sub print_results {
 
 sub _send_text {
 	my $text = shift;
-	my $frame = Padre->ide->wx->main_window;
+	my $frame = Padre->ide->wx->main;
 	my $threvent = Wx::PlThreadEvent->new( -1, $DONE_EVENT, $text );
 	Wx::PostEvent( $frame, $threvent );
 }

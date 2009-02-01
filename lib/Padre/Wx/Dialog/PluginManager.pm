@@ -7,7 +7,7 @@ use Params::Util      qw{_INSTANCE};
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 sub new {
 	my $class   = shift;
@@ -52,7 +52,8 @@ sub show {
 		width  => [ 200, 100, 100 ],
 	);
 	foreach my $name ( @names ) {
-		my $object = $plugins->{$name}->{object};
+		my $plugin = $plugins->{$name};
+		my $object = $plugin->object;
 		Wx::Event::EVT_BUTTON(
 			$dialog,
 			$dialog->{_widgets_}->{"pref_$name"},
@@ -64,13 +65,18 @@ sub show {
 			$dialog,
 			$dialog->{_widgets_}->{"able_$name"},
 			sub {
-				$self->toggle_enabled($name);
+				if ($plugin->error or $plugin->incompatible) {
+					$self->{parent}->error( $plugin->errstr() );
+				}
+				else {
+					$self->toggle_enabled($name);
+				}
 			},
 		);
 		unless ( $object and $object->can('plugin_preferences') ) {
 			$dialog->{_widgets_}->{"pref_$name"}->Disable;
 		}
-		if ( $plugins->{$name}->{status} eq 'failed' ) {
+		if ( $plugin->error || $plugin->incompatible and not $plugin->errstr ) {
 			$dialog->{_widgets_}->{"able_$name"}->Disable;
 		}
 		$self->update_labels($name);
@@ -107,13 +113,16 @@ sub toggle_enabled {
 	my $manager = $self->{manager};
 	my $config  = $manager->parent->config;
 	my $plugin  = $manager->plugins->{$name};
-	my $status  = $plugin->{status};
 	$self->{parent}->Freeze;
-	if ( $status eq 'enabled' ) {
-		$config->{plugins}->{$name}->{enabled} = 0;
+	if ( $plugin->enabled ) {
+		Padre::DB::Plugin->update_enabled(
+			$plugin->class => 0,
+		);
 		$manager->_plugin_disable($name);
-	} elsif ( $status eq 'new' or $status eq 'disabled' ) {
-		$config->{plugins}->{$name}->{enabled} = 1;
+	} elsif ( $plugin->can_enable ) {
+		Padre::DB::Plugin->update_enabled(
+			$plugin->class => 1,
+		);
 		$manager->_plugin_enable($name);
 	}
 	$self->update_labels($name);
@@ -147,14 +156,22 @@ sub update_labels {
 
 	if ( $plugin->error ) {
 		$dialog->{_widgets_}->{"able_$name"}->SetLabel(Wx::gettext('Crashed'));
-		$dialog->{_widgets_}->{"able_$name"}->Disable;
+		if ( $plugin->errstr ) {
+			$dialog->{_widgets_}->{"able_$name"}->Enable;
+		} else {
+			$dialog->{_widgets_}->{"pref_$name"}->Disable;
+		}
 		$dialog->{_widgets_}->{"pref_$name"}->Disable;
 		return;
 	}
 
 	if ( $plugin->incompatible ) {
 		$dialog->{_widgets_}->{"able_$name"}->SetLabel(Wx::gettext('Crashed'));
-		$dialog->{_widgets_}->{"able_$name"}->Disable;
+		if ( $plugin->errstr ) {
+			$dialog->{_widgets_}->{"able_$name"}->Enable;
+		} else {
+			$dialog->{_widgets_}->{"pref_$name"}->Disable;
+		}
 		$dialog->{_widgets_}->{"pref_$name"}->Disable;
 		return;
 	}

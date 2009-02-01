@@ -5,12 +5,13 @@ package Padre::Wx::Menu::Plugins;
 use 5.008;
 use strict;
 use warnings;
-use Params::Util       ();
-use Padre::Wx          ();
+use Padre::Config   ();
+use Params::Util    ();
+use Padre::Wx       ();
 use Padre::Wx::Menu ();
-use Padre::Current     qw{_CURRENT};
+use Padre::Current  qw{_CURRENT};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -26,6 +27,9 @@ sub new {
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
+
+	# Add additional properties
+	$self->{main} = $main;
 
 	# Link to the Plugin Manager
 	Wx::Event::EVT_MENU( $main,
@@ -44,7 +48,7 @@ sub new {
 		$tools->Append( -1, Wx::gettext("Edit My Plugin") ),
 		sub {
 			my $file = File::Spec->catfile(
-				Padre->ide->config_dir,
+				Padre::Config->default_dir,
 				qw{ plugins Padre Plugin My.pm }
 			);
 			return $self->error(
@@ -155,7 +159,7 @@ sub remove_plugin_specific_entries {
 
 sub refresh {
 	my $self = shift;
-	my $main = _CURRENT(@_)->_main;
+	my $main = _CURRENT(@_)->main;
 
 	$self->remove_plugin_specific_entries;
 	$self->add_plugin_specific_entries($main);

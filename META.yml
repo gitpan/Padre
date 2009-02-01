@@ -35,6 +35,7 @@ requires:
   Class::Autouse: 1.26
   Class::Unload: 0.03
   Class::XSAccessor: 0.14
+  Class::XSAccessor::Array: 0.14
   Cwd: 3.2701
   DBD::SQLite: 1.10
   DBI: 1.58
@@ -64,9 +65,10 @@ requires:
   Module::Inspector: 0.04
   Module::Refresh: 0.13
   Module::Starter: 1.50
-  ORLite: 1.17
+  ORLite: 1.18
   ORLite::Migrate: 0.01
   PAR: 0.970
+  POSIX: 0
   PPI: 1.203
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
@@ -92,4 +94,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.25
+version: 0.26

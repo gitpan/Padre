@@ -3,7 +3,7 @@ package Padre::Task::PPI::LexicalReplaceVariable;
 use strict;
 use warnings;
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 use base 'Padre::Task::PPI';
 use Padre::Wx ();
@@ -129,8 +129,8 @@ sub finish {
 	if (defined $self->{updated_document_string}) {
 		# GUI update
 		# TODO: What if the document changed? Bad luck for now.
-		$self->{main_thread_only}{document}->editor->SetText( $self->{updated_document_string} );
-		$self->{main_thread_only}{document}->ppi_select( $self->{token_location} );
+		$self->{main_thread_only}->{document}->editor->SetText( $self->{updated_document_string} );
+		$self->{main_thread_only}->{document}->ppi_select( $self->{token_location} );
 	}
 	else {
 		my $text;
@@ -147,7 +147,7 @@ sub finish {
 			$text,
 			Wx::gettext("Check Canceled"),
 			Wx::wxOK,
-			Padre->ide->wx->main_window
+			Padre->ide->wx->main
 		);
 	}
 	return();

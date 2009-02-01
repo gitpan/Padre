@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 
 
@@ -48,7 +48,7 @@ sub search {
 		$self->_create_panel;
 	}
 	# pane != panel
-	my $pane = Padre->ide->wx->main_window->aui->GetPane('find');
+	my $pane = Padre->ide->wx->main->aui->GetPane('find');
 	if ( $pane->IsShown ) {
 		$self->_find;
 	} else {
@@ -60,7 +60,7 @@ sub search {
 
 sub _find {
 	my $self  = shift;
-	my $main  = Padre->ide->wx->main_window;
+	my $main  = Padre->ide->wx->main;
 	my $page  = $main->current->editor;
 	my $last  = $page->GetLength;
 	my $text  = $page->GetTextRange(0, $last);
@@ -114,7 +114,7 @@ sub _find {
 #
 sub _create_panel {
 	my $self = shift;
-	my $main = Padre->ide->wx->main_window;
+	my $main = Padre->ide->wx->main;
 
 	# The panel and the boxsizer to place controls
 	$self->{outer} = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
@@ -203,7 +203,7 @@ sub _hide_panel {
 	my $self = shift;
 
 	# pane != panel
-	my $auimngr = Padre->ide->wx->main_window->aui;
+	my $auimngr = Padre->ide->wx->main->aui;
 	$auimngr->GetPane('find')->Hide;
 	$auimngr->Update;
 
@@ -214,15 +214,15 @@ sub _show_panel {
 	my $self = shift;
 
 	# Show the panel; pane != panel
-	my $auimngr = Padre->ide->wx->main_window->aui;
+	my $auimngr = Padre->ide->wx->main->aui;
 	$auimngr->GetPane('find')->Show(1);
 	$auimngr->Update;
 
 	# Update checkboxes with config values
 	# since they might have been updated by find dialog
 	my $config = Padre->ide->config;
-	$self->{case}->SetValue( $config->{search}->{case_insensitive} );
-	$self->{regex}->SetValue( $config->{search}->{use_regex} );
+	$self->{case}->SetValue( $config->find_case ? 0 : 1 );
+	$self->{regex}->SetValue( $config->find_regex );
 
 	# You probably want to use the Find
 	$self->{entry}->SetFocus;
@@ -240,7 +240,10 @@ sub _show_panel {
 #
 sub _on_case_checked {
 	my $self = shift;
-	Padre->ide->config->{search}->{case_insensitive} = $self->{case}->GetValue;
+	Padre->ide->config->set(
+		'find_case',
+		$self->{case}->GetValue ? 0 : 1
+	);
 	$self->{restart} = 1;
 	$self->_find;
 	return;
@@ -290,7 +293,10 @@ sub _on_key_pressed {
 #
 sub _on_regex_checked {
 	my $self = shift;
-	Padre->ide->config->{search}->{use_regex} = $self->{regex}->GetValue;
+	Padre->ide->config->set(
+		'find_regex',
+		$self->{regex}->GetValue,
+	);
 	$self->{restart} = 1;
 	$self->_find;
 	return;

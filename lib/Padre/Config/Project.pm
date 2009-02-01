@@ -1,12 +1,14 @@
 package Padre::Config::Project;
 
+# Configuration and state data that describes project policies.
+
 use 5.008;
 use strict;
 use warnings;
 use YAML::Tiny   ();
 use Params::Util qw{_HASH0};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 
 
@@ -42,6 +44,7 @@ sub read {
 }
 
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

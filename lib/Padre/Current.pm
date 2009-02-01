@@ -8,7 +8,7 @@ use Carp         ();
 use Exporter     ();
 use Params::Util qw{_INSTANCE};
 
-our $VERSION   = '0.25';
+our $VERSION   = '0.26';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_CURRENT';
 
@@ -83,10 +83,10 @@ sub text {
 # Get the title of the current editor window (and don't cache)
 sub title {
 	my $self     = ref($_[0]) ? $_[0] : $_[0]->new;
-	my $notebook = $self->_notebook;
+	my $notebook = $self->notebook;
 	my $selected = $notebook->GetSelection;
 	if ( $selected >= 0 ) {
-		return $notebook->getPageText($selected);
+		return $notebook->GetPageText($selected);
 	} else {
 		return undef;
 	}
@@ -124,7 +124,7 @@ sub document {
 sub editor {
 	my $self = ref($_[0]) ? $_[0] : $_[0]->new;
 	unless ( exists $self->{editor} ) {
-		my $notebook = $self->_notebook;
+		my $notebook = $self->notebook;
 		my $selected = $notebook->GetSelection;
 		if ( $selected == -1 ) {
 			$self->{editor} = undef;
@@ -141,31 +141,52 @@ sub editor {
 }
 
 # Convenience method
-sub _notebook {
+sub notebook {
 	my $self = ref($_[0]) ? $_[0] : $_[0]->new;
 	unless ( defined $self->{notebook} ) {
-		$self->{notebook} = $self->_main->notebook;
+		$self->{notebook} = $self->main->notebook;
 	}
 	return $self->{notebook};
 }
 
-# Get the project from the main_window (and don't cache)
+# Get the project from the main window (and don't cache)
 sub config {
 	my $self = ref($_[0]) ? $_[0] : $_[0]->new;
-	$self->_main->config;
+	$self->main->config;
 }
 
 # Convenience method
-sub _main {
+sub main {
 	my $self = ref($_[0]) ? $_[0] : $_[0]->new;
 	unless ( defined $self->{main} ) {
-		require Padre;
-		$self->{main} = Padre->ide->wx->main_window;
+		if ( defined $self->{ide} ) {
+			$self->{main} = $self->{ide}->wx->main;
+		} else {
+			require Padre;
+			$self->{ide}  = Padre->ide;
+			$self->{main} = $self->{ide}->wx->main;
+		}
+		return $self->{main};
 	}
 	return $self->{main};
 }
 
+# Convenience method
+sub ide {
+	my $self = ref($_[0]) ? $_[0] : $_[0]->new;
+	unless ( defined $self->{ide} ) {
+		if ( defined $self->{main} ) {
+			$self->{ide} = $self->{main}->ide;
+		} else {
+			require Padre;
+			$self->{ide} = Padre->ide;
+		}
+	}
+	return $self->{ide};
+}
+
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

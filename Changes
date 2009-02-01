@@ -1,5 +1,34 @@
 Changes for Perl Application Development and Refactoring Environment
 
+v0.26 2009.02.01
+
+    On X11 based platforms, selecting text using the mouse and pasting it
+        via middle mouse button now works (HJANSEN)
+    Unifying Padre->inst and Padre->ide (ADAMK)
+    Complete rewrite of the configuration layer. All access to configuration
+        data is now via methods so that we can add support for project-level
+        customisation of the interface. (ADAMK)
+    Completely refactored all of the config setting names (ADAMK)
+    Added first-class configuration support for Plugins (ADAMK)
+    Moved config data on bookmarks, plugins and historical search/replace
+        strings out of the config file and into the database. (ADAMK)
+    The output window now understands the color and font-face
+        related ANSI control sequences (SMUELLER)
+    The long-awaited MainWindow.pm -> Main.pm (ADAMK)
+    Heavily modified many variables and method names to bring a greater
+       simplicity and consistency to various APIs. Only possible because
+       we were already breaking the config system and Main.pm (ADAMK)
+    Removed some classes and other code that had (astonishingly for such a
+        young application) become useless and bit-rotten (ADAMK)
+    Added styles for text/x-patch, text/x-makefile, text/x-yaml,
+        text/css, text/plain(apache conf) file types (KEEDI)
+    Now style config file supports foreground, background, bold,
+        italic, eolfilled, underline properties (KEEDI)
+    Output window now uses mono-spaced font by default (SMUELLER)
+    The 'Crashed' button in the plugin manager dialog is now
+        clickable if an explanation for the failure is
+        available (SMUELLER)
+
 v0.25 2009.01.09
 
     Added Chinese (Simplified) translation (FAYLAND)
@@ -22,6 +51,7 @@ v0.25 2009.01.09
         family of modules (ADAMK)
     Automatic indentation style detection now the default (SMUELLER)
     User interface now "locked" by default (SMUELLER)
+    Updated Italian translation (SBLANDIN)
 
 v0.24 2009.01.06
 
@@ -157,7 +187,7 @@ v0.20 2008.12.02
     Reworked the autoindentation: Now with auto-de-indentation on
         closing brace (SMUELLER)
     Now using Class::XSAccessor for generating accessors (SMUELLER)
-    Moved the syntax checker from MainWindow.pm into
+    Moved the syntax checker from Main.pm into
         Padre::Wx::SyntaxChecker (SMUELLER)
     Small improvement to startup time by not refreshing the plugin
         menu after loading each plugin (SMUELLER)

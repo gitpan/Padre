@@ -23,12 +23,13 @@ use Class::Autouse ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version        ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
 use Padre::Util   ();
 use Padre::Config ();
+use Padre::DB     ();
 
 # Nudges to make Class::Autouse behave
 BEGIN {
@@ -49,7 +50,6 @@ BEGIN {
 # refered to directly. Let them get loaded normally via the top level
 # module's "use base" (or similar) call.
 use Class::Autouse qw{
-	Padre::DB
 	Padre::Document
 	Padre::Document::Perl
 	Padre::Document::POD
@@ -74,15 +74,14 @@ use Class::Autouse qw{
 	Padre::Wx::Dialog::Search
 	Padre::Wx::Dialog::Snippets
 	Padre::Wx::History::TextDialog
-	Padre::Wx::MainWindow
+	Padre::Wx::Main
 };
 
 # Gnerate faster accessors
 use Class::XSAccessor
 	getters => {
+		original_cwd   => 'original_cwd',
 		config         => 'config',
-		config_dir     => 'config_dir',
-		config_yaml    => 'config_yaml',
 		wx             => 'wx',
 		task_manager   => 'task_manager',
 		plugin_manager => 'plugin_manager',
@@ -98,24 +97,21 @@ sub perl_interpreter {
 }
 
 my $SINGLETON = undef;
-sub inst {
-	Carp::croak("Padre->new has not been called yet") if not $SINGLETON;
-	return $SINGLETON;
+
+# Access to the Singleton post-construction
+sub ide {
+	$SINGLETON or Carp::croak('Padre->new has not been called yet');
 }
 
 # The order of initialisation here is VERY important
 sub new {
-	Carp::croak("Padre->new already called. Use Padre->inst") if $SINGLETON;
+	Carp::croak('Padre->new already called. Use Padre->ide') if $SINGLETON;
 	my $class = shift;
 
 	# Create the empty object
 	my $self = $SINGLETON = bless {
 		# Wx Attributes
 		wx             => undef,
-
-		# Internal Attributes
-		config_dir     => undef,
-		config_yaml    => undef,
 
 		# Plugin Attributes
 		plugin_manager => undef,
@@ -124,32 +120,24 @@ sub new {
 		project        => {},
 	}, $class;
 
-	# Load (and migrate if needed) the persistant host state database
-	Class::Autouse->load('Padre::DB');
+	# Save the startup dir before anyone can move us.
+	$self->{original_cwd} = Cwd::cwd();
 
 	# Load (and sync if needed) the user's portable configuration
-	$self->{config_dir}  = Padre::Config->default_dir;
-	$self->{config_yaml} = Padre::Config->default_yaml;
-	$self->{config}      = Padre::Config->read(   $self->config_yaml );
-	$self->{config}    ||= Padre::Config->create( $self->config_yaml );
+	$self->{config} = Padre::Config->read;
 
 	# Create the plugin manager
 	$self->{plugin_manager} = Padre::PluginManager->new($self);
 
 	# Create the main window
-	$self->{wx} = Padre::Wx::App->new;
+	$self->{wx} = Padre::Wx::App->new($self);
 
 	# Create the task manager
 	$self->{task_manager} = Padre::TaskManager->new(
-		use_threads => $self->config->{use_worker_threads},
+		use_threads => $self->config->threads,
 	);
 
 	return $self;
-}
-
-sub ide {
-	$SINGLETON or
-	$SINGLETON = Padre->new;
 }
 
 sub run {
@@ -163,29 +151,11 @@ sub run {
 	}
 	@ARGV = grep { ! /^-M/ } @ARGV;
 
-	# Handle the common command line "padre --help" case.
-	my $USAGE  = '';
-	my $getopt = Getopt::Long::GetOptions(
-		help => \$USAGE,
-	);
-	if ( $USAGE or ! $getopt ) {
-		print <<"END_USAGE";
-Usage: $0 [FILENAMES]
-    --help Shows this help message
-END_USAGE
-		exit(1);
-	}
-
-	# We can now confirm the GUI will be used
-	$self->wx->main_window->Show(1);
-
 	# FIXME: RT #1 This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
 	$self->plugin_manager->load_plugins;
 
-	$self->{ARGV} = [ map {File::Spec->rel2abs( $_ )} @ARGV ];
-
-	$self->{original_dir} = Cwd::cwd();
+	$self->{ARGV} = [ map {File::Spec->rel2abs( $_, $self->{original_cwd} )} @ARGV ];
 
 	# Move our current dir to the user's documents directory by default
 	my $documents = File::HomeDir->my_documents;
@@ -205,7 +175,7 @@ END_USAGE
 
 # Save the YAML configuration file
 sub save_config {
-	$_[0]->config->write( $_[0]->config_yaml );
+	$_[0]->config->write;
 }
 
 
@@ -382,7 +352,7 @@ Padre will have the notion of a Perl project. As we would like
 to make things as natural as possible for the perl developer
 and we think the distribution methods used for CPAN module are
 a good way to handle any project Padre will understand a project
-as a CPAN module. This does not mean that you project needs to end
+as a CPAN module. This does not mean that your project needs to end
 up on CPAN of course. But if your projects directory structure
 follows that of the modules on CPAN, Padre will be automatically
 recognize it.
@@ -523,6 +493,41 @@ Need to define the mime-type mapping in L<Padre::Document>
 
 For examples see L<Padre::Document::PASM>, L<Padre::Document::PIR>,
 L<Padre::Document::Perl>.
+
+=head2 Syntax checking
+
+Depending on a corresponding support in the respective C<Padre::Document::Language> 
+class, Padre supports real time syntax checking capabilities: 
+
+=over 4
+
+=item
+
+Syntax errors or warnings are displayed in a side bar (usually at the bottom of the
+Padre window). By double-clicking a list entry you can navigate to the position in
+the file.
+
+=item
+
+Additionally, there is a symbol column on the left side of the editor where colored
+symbols mark the code lines with problems.
+
+=back
+
+=head3 WARNING NOTE
+
+Syntax checking for Perl5 documents comes bundled with Padre. It is implemented 
+using "perl -c". This means that parts of the code actually get executed (e.g.
+BEGIN blocks). Malicious software might used this fact to damage your system
+(C<BEGIN { system('rm -rf ~') }>) or suck up your resources 
+(C<BEGIN { while(1) { } }>).
+Syntax checking is currently disabled by default and has to be enabled manually
+after every start of Padre. This somewhat increases security when doing
+C<padre some_unknown_file.pl>.
+However, it does not protect you when you open a file from within Padre while
+syntax checking is turned on.
+The most secure solution would require a really fast non-executing syntax checker
+which unfortunately is currently not available.
 
 =head1 Preferences
 
@@ -720,10 +725,7 @@ TODO: What to do if a newer version of the same plugin was installed?
 TODO: What to do if a module was removed ? Shall we keep its data in
 the configuration file or remove it?
 
-The configuration file has a plugins hash. The keys are the names of the plugins
-(sans the Padre::Plugin:: part)
-
-TODO Padre should offer an easy but simple way for plugin authors
+TODO: Padre should offer an easy but simple way for plugin authors
 to declare configuration variables and automaticly generate both configuration
 file and configuration dialog. Padre should also allow for full customization
 of both for those more advanced in wx foo.
@@ -841,7 +843,7 @@ List of functions
 
 =item L<Padre::DB>
 
-is the database abstraction for SQLite.
+The SQLite database abstraction for storing Padre's internal data.
 
 =item L<Padre::Document>
 
@@ -956,9 +958,9 @@ Scintilla.
 
 =item L<Padre::Wx::History::TextDialog>
 
-=item L<Padre::Wx::MainWindow>
+=item L<Padre::Wx::Main>
 
-is the main frame, most of the code is currently there.
+This is the main window, most of the code is currently there.
 
 =item L<Padre::Wx::Menu>
 
@@ -980,10 +982,6 @@ not in use.
 =item L<Padre::Wx::Printout>
 
 Implementing the printing capability of Padre.
-
-=item L<Padre::Wx::Project>
-
-not in use.
 
 =item L<Padre::Wx::RightClick>
 
@@ -1104,6 +1102,7 @@ Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
 Spanish - Paco Alguacil (PacoLinux)
 
 =cut
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

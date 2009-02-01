@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -23,13 +23,16 @@ sub new {
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
 
+	# Add additional properties
+	$self->{main} = $main;
+
 	# Disable experimental mode
 	Wx::Event::EVT_MENU( $main,
 		$self->Append( -1,
 			Wx::gettext('Disable Experimental Mode')
 		),
 		sub {
-			Padre->ide->config->{experimental} = 0;
+			Padre->ide->config->set( experimental => 0 );
 			$_[0]->menu->refresh($_[0]->current);
 			return;
 		},
@@ -60,13 +63,6 @@ sub new {
 	);
 
 	$self->AppendSeparator;
-
-	# Recent projects
-	$self->{recent_projects} = Wx::Menu->new;
-	$self->Append( -1,
-		Wx::gettext("Recent Projects") . '...',
-		$self->{recent_projects},
-	);
 
 	return $self;
 }

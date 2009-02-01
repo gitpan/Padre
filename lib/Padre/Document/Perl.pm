@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Document';
 
 
@@ -87,7 +87,7 @@ sub lexer {
 	my $self = shift;
 	my $config = Padre->ide->config;
 
-	if ( $config->{ppi_highlight} and $self->editor->GetTextLength < $config->{ppi_highlight_limit} ) {
+	if ( $config->ppi_highlight and $self->editor->GetTextLength < $config->ppi_highlight_limit ) {
 		return Wx::wxSTC_LEX_CONTAINER;
 	} else {
 		return $self->SUPER::lexer();
@@ -278,16 +278,15 @@ sub get_command {
 
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
-	my $config = Padre->ide->config;
-	return $config->{run_with_stack_trace} ? 
-		qq{"$perl" -Mdiagnostics(-traceonly) "$filename"} : qq{"$perl" "$filename"};
+	return Padre->ide->config->run_stacktrace
+		? qq{"$perl" -Mdiagnostics(-traceonly) "$filename"}
+		: qq{"$perl" "$filename"};
 }
 
 sub pre_process {
-	my ( $self ) = @_;
-	my $config = Padre->ide->config;
+	my $self = shift;
 
-	if ($config->{editor_perl5_beginner}) {
+	if ( Padre->ide->config->editor_beginner ) {
 		require Padre::Document::Perl::Beginner;
 		my $b = Padre::Document::Perl::Beginner->new;
 		if ($b->check( $self->text_get )) {
@@ -350,9 +349,9 @@ sub _check_syntax_internals {
 
 	require Padre::Task::SyntaxChecker::Perl;
 	my %check = (
-		notebook_page => $self->editor,
-		text          => $text,
-		newlines      => $nlchar,
+		editor   => $self->editor,
+		text     => $text,
+		newlines => $nlchar,
 	);
 	if ( exists $args->{on_finish} ) {
 		$check{on_finish} = $args->{on_finish};
@@ -374,7 +373,62 @@ sub _check_syntax_internals {
 	}
 }
 
-sub comment_lines_str { return '#' }
+sub get_outline_in_background {
+	my $self  = shift;
+	my %args  = @_;
+	$args{background} = 1;
+	return $self->_get_outline_internals(\%args);
+}
+
+sub _get_outline_internals {
+	my $self = shift;
+	my $args = shift;
+	my $text = $self->text_get;
+	unless ( defined $text and $text ne '' ) {
+		return [];
+	}
+
+	# Do we really need an update?
+	require Digest::MD5;
+	my $md5 = Digest::MD5::md5(Encode::encode_utf8($text));
+	unless ( $args->{force} ) {
+		if (
+			defined($self->{last_checked_md5})
+			and
+			$self->{last_checked_md5} eq $md5
+		) {
+			return;
+		}
+	}
+	$self->{last_checked_md5} = $md5;
+	require Padre::Task::Outline::Perl;
+	my %check = (
+		editor   => $self->editor,
+		text     => $text,
+	);
+	if ( exists $args->{on_finish} ) {
+		$check{on_finish} = $args->{on_finish};
+	}
+	if ( $self->project ) {
+		$check{cwd} = $self->project->root;
+		$check{perl_cmd} = [ '-Ilib' ];
+	}
+	my $task = Padre::Task::Outline::Perl->new( %check );
+	if ( $args->{background} ) {
+		# asynchronous execution (see on_finish hook)
+		$task->schedule;
+		return;
+	} else {
+		# serial execution, returning the result
+		return if $task->prepare =~ /^break$/;
+		$task->run;
+		return $task->{outline};
+	}
+}
+
+sub comment_lines_str {
+	return '#';
+}
 
 sub find_unmatched_brace {
 	my ($self) = @_;
@@ -427,7 +481,7 @@ sub find_variable_declaration {
 			Wx::gettext("Current cursor does not seem to point at a variable"),
 			Wx::gettext("Check cancelled"),
 			Wx::wxOK,
-			Padre->ide->wx->main_window
+			Padre->ide->wx->main
 		);
 		return ();
 	}
@@ -457,7 +511,7 @@ sub lexical_variable_replacement {
 			Wx::gettext("Current cursor does not seem to point at a variable"),
 			Wx::gettext("Check cancelled"),
 			Wx::wxOK,
-			Padre->ide->wx->main_window
+			Padre->ide->wx->main
 		);
 		return ();
 	}

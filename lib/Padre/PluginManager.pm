@@ -30,7 +30,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 
 
@@ -133,14 +133,28 @@ sub plugin_objects {
 #####################################################################
 # Bulk Plugin Operations
 
-# Disable (but don't unload) all plugins when Padre exits
+# Disable (but don't unload) all plugins when Padre exits.
+# Save the plugin enable/disable states for the next startup.
 sub shutdown {
 	my $self = shift;
+
+	Padre::DB->begin;
 	foreach my $name ( $self->plugin_names ) {
 		my $plugin = $self->_plugin($name);
-		next unless $plugin->enabled;
-		$self->_plugin_disable($plugin);
+		if ( $plugin->enabled ) {
+			Padre::DB::Plugin->update_enabled(
+				$plugin->class => 1,
+			);
+			$self->_plugin_disable($plugin);
+
+		} elsif ( $plugin->disabled ) {
+			Padre::DB::Plugin->update_enabled(
+				$plugin->class => 0,
+			);
+		}
 	}
+	Padre::DB->commit;
+
 	return 1;
 }
 
@@ -192,7 +206,7 @@ sub load_plugins {
 		# Turn this back on once we can track these over time
 		# and only report on plugins that USED to work but now
 		# have started to fail.
-		#$self->parent->wx->main_window->error(
+		#$self->parent->wx->main->error(
 		#	Wx::gettext("Failed to load the following plugin(s):\n")
 		#	. join "\n", @failed
 		#) unless $ENV{HARNESS_ACTIVE};
@@ -265,7 +279,7 @@ List of new plugins:
 
 END_MSG
 
-		$self->parent->wx->main_window->message( $msg,
+		$self->parent->wx->main->message( $msg,
 			Wx::gettext('New plugins detected')
 		);
 	}
@@ -288,7 +302,7 @@ sub failed {
 	my $self    = shift;
 	my $plugins = $self->plugins;
 	return grep {
-		$plugins->{$_}->{status} eq 'error'
+		$plugins->{$_}->status eq 'error'
 	} keys %$plugins;
 }
 
@@ -392,12 +406,14 @@ sub _load_plugin {
 	my $code = "use $module ();";
 	eval $code; ## no critic
 	if ( $@ ) {
-		$self->{errstr} = sprintf(
-			Wx::gettext(
-				"Plugin:%s - Failed to load module: %s"
-			),
-			$name,
-			$@,
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext(
+					"Plugin:%s - Failed to load module: %s"
+				),
+				$name,
+				$@,
+			)
 		);
 		$plugin->status('error');
 		return;
@@ -405,11 +421,13 @@ sub _load_plugin {
 
 	# Plugin must be a Padre::Plugin subclass
 	unless ( $module->isa('Padre::Plugin') ) {
-		$self->{errstr} = sprintf(
-			Wx::gettext(
-				"Plugin:%s - Not compatible with Padre::Plugin API. "
-				. "Need to be subclass of Padre::Plugin"
-			), $name,
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext(
+					"Plugin:%s - Not compatible with Padre::Plugin API. "
+					. "Need to be subclass of Padre::Plugin"
+				), $name,
+			)
 		);
 		$plugin->status('error');
 		return;
@@ -417,11 +435,13 @@ sub _load_plugin {
 
 	# Does the plugin have new method?
 	unless ( $module->can('new') ) {
-		$self->{errstr} = sprintf(
-			Wx::gettext(
-				"Plugin:%s - Not compatible with Padre::Plugin API. "
-				. "Plugin cannot be instantiated"
-			), $name,
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext(
+					"Plugin:%s - Not compatible with Padre::Plugin API. "
+					. "Plugin cannot be instantiated"
+				), $name,
+			)
 		);
 		$plugin->status('error');
 		return;
@@ -429,32 +449,40 @@ sub _load_plugin {
 
 	# This will not check anything as padre_interfaces is defined in Padre::Plugin
 	unless ( $module->can('padre_interfaces') ) {
-		$self->{errstr} = sprintf(
-			Wx::gettext(
-				"Plugin:%s - Not compatible with Padre::Plugin API. "
-				. "Need to have sub padre_interfaces"
-			),
-			$name,
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext(
+					"Plugin:%s - Not compatible with Padre::Plugin API. "
+					. "Need to have sub padre_interfaces"
+				),
+				$name,
+			)
 		);
 		$plugin->status('error');
 		return;
 	}
 
 	# Attempt to instantiate the plugin
-	my $object = eval { $module->new };
+	my $object = eval { $module->new($self->{parent}) };
 	if ( $@ ) {
-		# TODO report error in a nicer way
-		$self->{errstr} = $@;
-		$plugin->status('error');
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext(
+					"Plugin:%s - Could not instantiate plugin object"
+				),
+				$name,
+			) . ": $@"
+		);		$plugin->status('error');
 		return;
 	}
 	unless ( _INSTANCE($object, 'Padre::Plugin') ) {
-		$self->{errstr} = sprintf(
-			Wx::gettext(
-				"Plugin:%s - Not compatible with Padre::Plugin API. "
-				. "Need to have sub padre_interfaces"
-			),
-			$name,
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext(
+					"Plugin:%s - Could not instantiate plugin object: the constructor does not return a Padre::Plugin object"
+				),
+				$name,
+			)
 		);
 		$plugin->status('error');
 		return;
@@ -465,12 +493,12 @@ sub _load_plugin {
 	$plugin->status('loaded');
 
 	# Should we try to enable the plugin
-	my $config = $self->plugin_config($plugin);
-	unless ( defined $config->{enabled} ) {
+	my $conf = $self->plugin_db($plugin);
+	unless ( defined $conf->{enabled} ) {
 		# Do not enable by default
-		$config->{enabled} = 0;
+		$conf->{enabled} = 0;
 	}
-	unless ( $config->{enabled} ) {
+	unless ( $conf->{enabled} ) {
 		$plugin->status('disabled');
 		return;
 	}
@@ -504,8 +532,11 @@ sub _unload_plugin {
 	my $handle = $self->_plugin(shift);
 
 	# Remember if we are enabled or not
-	$self->plugin_config($handle)->{enabled} = $handle->enabled ? 1 : 0;
-	
+	my $enabled = $handle->enabled ? 1 : 0;
+	Padre::DB::Plugin->update_enabled(
+		$handle->class => $enabled,
+	);
+
 	# Disable if needed
 	if ( $handle->enabled ) {
 		$handle->disable;
@@ -564,7 +595,7 @@ sub _plugin_disable {
 
 =pod
 
-=head2 plugin_config
+=head2 plugin_db
 
 Given a plugin name or namespace, returns a hash reference
 which corresponds to the configuration section in the Padre
@@ -577,7 +608,7 @@ a plugin namespace, the plugin name is determine automatically.
 
 =cut
 
-sub plugin_config {
+sub plugin_db {
 	my $self = shift;
 
 	# Infer the plugin name from caller if not provided
@@ -590,17 +621,18 @@ sub plugin_config {
 		$param = $package;
 	}
 
-	# Get the plugin, and from there he config
+	# Get the plugin, and from there the config
 	my $plugin  = $self->_plugin($param);
-	my $name    = $plugin->name;
-	my $config  = $self->parent->config;
-	unless ( $config->{plugins} ) {
-		$config->{plugins} = {};
+	my $object  = Padre::DB::Plugin->fetch_name($plugin->class);
+	unless ( $object ) {
+		$object = Padre::DB::Plugin->create(
+			name    => $plugin->class,
+			version => $plugin->version,
+			enabled => undef, # undef means no preference yet
+			config  => undef,
+		);
 	}
-	unless ( $config->{plugins}->{$name} ) {
-		$config->{plugins}->{$name} = {};
-	}
-	return $config->{plugins}->{$name};
+	return $object;
 }
 
 # enable all the plugins for a single editor
@@ -638,7 +670,7 @@ sub enable_editors {
 	my $plugin = $self->plugins->{$name} or return;
 	my $object = $plugin->{object}       or return;
 	return unless ( $plugin->{status} and $plugin->{status} eq 'enabled' );
-	foreach my $editor ( $self->parent->wx->main_window->pages ) {
+	foreach my $editor ( $self->parent->wx->main->editors ) {
 		if ( $object->can('editor_enable') ) {
 			$object->editor_enable( $editor, $editor->{Document} );
 		}
@@ -669,7 +701,7 @@ sub get_menu {
 		$plugin->{object}->menu_plugins($main)
 	};
 	if ( $@ ) {
-		$self->{errstr} = "Error when calling menu for plugin '$name' $@";
+		$plugin->errstr(Wx::gettext("Error when calling menu for plugin") .  "'$name': $@");
 		return ();
 	}
 	unless ( defined $label and defined $menu ) {
@@ -681,12 +713,11 @@ sub get_menu {
 # TODO: document this.
 sub test_a_plugin {
 	my $self    = shift;
-	my $main    = $self->parent->wx->main_window;
+	my $main    = $self->parent->wx->main;
 	my $config  = $self->parent->config;
 	my $plugins = $self->plugins;
 
-	my $last_filename = $config->{last_test_plugin_file};
-	$last_filename  ||= $main->current->filename;
+	my $last_filename = $main->current->filename;
 	my $default_dir = '';
 	if ( $last_filename ) {
 		$default_dir = File::Basename::dirname($last_filename);
@@ -705,7 +736,6 @@ sub test_a_plugin {
 	
 	# Save into plugin for next time
 	my $file = File::Spec->catfile($default_dir, $filename);
-	$config->{last_test_plugin_file} = $file;
 	
 	( $default_dir, $filename ) = split(/Padre[\\\/]Plugin[\\\/]/, $file, 2);
 	$filename =~ s/\.pm$//; # remove last .pm
@@ -716,10 +746,9 @@ sub test_a_plugin {
 
 	# Load plugin
 	delete $plugins->{$filename};
-	$config->{plugins}->{$filename}->{enabled} = 1;
 	$self->load_plugin($filename);
 	if ( $self->plugins->{$filename}->{status} eq 'error' ) {
-		$main->error(sprintf(Wx::gettext("Failed to load the plugin '%s'\n%s"), $filename, $self->{errstr}));
+		$main->error(sprintf(Wx::gettext("Failed to load the plugin '%s'\n%s"), $filename, $self->plugins->{$filename}->errstr));
 		return;
 	}
 
@@ -728,7 +757,7 @@ sub test_a_plugin {
 
 # Refresh the Plugins menu
 sub _refresh_plugin_menu {
-	$_[0]->parent->wx->main_window->menu->plugins->refresh;
+	$_[0]->parent->wx->main->menu->plugins->refresh;
 }
 
 
@@ -789,6 +818,7 @@ This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.
 
 =cut
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

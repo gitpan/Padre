@@ -3,10 +3,11 @@ package Padre::Plugin::My;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Config ();
 use Padre::Wx     ();
 use Padre::Plugin ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -47,7 +48,7 @@ sub show_about {
 
 	# Locate this plugin
 	my $path = File::Spec->catfile(
-		Padre->ide->config_dir,
+		Padre::Config->default_dir,
 		qw{ plugins Padre Plugin My.pm }
 	);
 
@@ -72,6 +73,7 @@ END_MESSAGE
 }
 
 1;
+
 # Copyright 2008 Gabor Szabo.
 # LICENSE
 # This program is free software; you can redistribute it and/or

@@ -17,7 +17,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 
 
@@ -29,7 +29,6 @@ our $VERSION = '0.25';
 use Class::XSAccessor
 	getters => {
 		wx           => 'wx',
-		win          => 'main',
 		main         => 'main',
 
 		# Don't add accessors to here until they have been
@@ -84,7 +83,7 @@ sub new {
 	$self->wx->Append( $self->help->wx,    Wx::gettext("&Help")    );
 
 	my $config = Padre->ide->config;
-	if ( $config->{experimental} ) {
+	if ( $config->experimental ) {
 		# Create the Experimental menu
 		# All the crap that doesn't work, have a home,
 		# or should never be seen be real users goes here.

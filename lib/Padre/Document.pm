@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -64,6 +64,47 @@ my $unsaved_number = 0;
 
 #####################################################################
 # Document Registration
+
+# This is the list of binary files
+# (which we don't support loading in fallback text mode)
+our %EXT_BINARY = (
+	aiff  => 1,
+	au    => 1,
+	avi   => 1,
+	bmp   => 1,
+	cache => 1,
+	dat   => 1,
+	doc   => 1,
+	gif   => 1,
+	gz    => 1,
+	icns  => 1,
+	jar   => 1,
+	jpeg  => 1,
+	jpg   => 1,
+	m4a   => 1,
+	mov   => 1,
+	mp3   => 1,
+	mpg   => 1,
+	ogg   => 1,
+	pdf   => 1,
+	png   => 1,
+	pnt   => 1,
+	ppt   => 1,
+	qt    => 1,
+	ra    => 1,
+	svg   => 1,
+	svgz  => 1,
+	svn   => 1,
+	swf   => 1,
+	tar   => 1,
+	tgz   => 1,
+	tif   => 1,
+	tiff  => 1,
+	wav   => 1,
+	xls   => 1,
+	xlw   => 1,
+	zip   => 1,
+);
 
 # This is the primary file extension to mime-type mapping
 our %EXT_MIME = (
@@ -98,6 +139,7 @@ our %EXT_MIME = (
 	pm    => 'application/x-perl',
 	pod   => 'application/x-perl',
 	t     => 'application/x-perl',
+	conf  => 'text/plain',
 	txt   => 'text/plain',
 	xml   => 'text/xml',
 	yml   => 'text/x-yaml',
@@ -265,7 +307,7 @@ sub last_sync {
 sub guess_mimetype {
 	my $self     = shift;
 	my $text     = $self->{original_content};
-	my $filename = $self->filename;
+	my $filename = $self->filename || q{};
 
 	# Default mime-type of new files, should be configurable in the GUI
 	# TODO: Make it configurable in the GUI :)
@@ -285,6 +327,12 @@ sub guess_mimetype {
 			}
 			return $EXT_MIME{$ext};
 		}
+	}
+
+	# Try derive the mime type from the basename
+	my $basename = File::Basename::basename($filename);
+	if ( $basename ) {
+		return 'text/x-makefile' if $basename =~ /^Makefile\.?/i;
 	}
 
 	# Fall back on deriving the type from the content.
@@ -533,6 +581,19 @@ sub lexer {
 	my $self = shift;
 	return Wx::wxSTC_LEX_AUTOMATIC unless $self->get_mimetype;
 	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{$self->get_mimetype};
+
+	# If mime type is not sufficient to figure out file type
+	# than use suffix for lexer
+	my $filename = $self->filename || q{};
+	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
+		my $ext = lc $1;
+		if ( $EXT_MIME{$ext} ) {
+			if ( $EXT_MIME{$ext} eq 'text/plain' ) {
+				return Wx::wxSTC_LEX_CONF if $ext eq 'conf';
+			}
+		}
+	}
+
 	return $MIME_LEXER{$self->get_mimetype};
 }
 
@@ -571,15 +632,15 @@ sub get_indentation_style {
 	# TODO: (document >) project > config
 
 	my $style;
-	if ($config->{editor_auto_indentation_style}) {
+	if ( $config->editor_indent_auto ) {
 		# TODO: This should be cached? What's with newish documents then?
 		$style = $self->guess_indentation_style;
 	}
 	else {
 		$style = {
-			use_tabs    => $config->{editor_use_tabs},
-			tabwidth    => $config->{editor_tabwidth},
-			indentwidth => $config->{editor_indentwidth},
+			use_tabs    => $config->editor_indent_tab,
+			tabwidth    => $config->editor_indent_tab_width,
+			indentwidth => $config->editor_indent_width,
 		};
 	}
 	
@@ -657,9 +718,9 @@ sub guess_indentation_style {
 		# fallback
 		my $config = Padre->ide->config;
 		$style = {
-			use_tabs    => $config->{editor_use_tabs},
-			tabwidth    => $config->{editor_tabwidth},
-			indentwidth => $config->{editor_indentwidth},
+			use_tabs    => $config->editor_indent_tab,
+			tabwidth    => $config->editor_indent_tab_width,
+			indentwidth => $config->editor_indent_width,
 		};
 	}
 	

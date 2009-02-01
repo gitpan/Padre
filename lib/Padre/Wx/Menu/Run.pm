@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  qw{_CURRENT};
 
-our $VERSION = '0.25';
+our $VERSION = '0.26';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -25,6 +25,9 @@ sub new {
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
+
+	# Add additional properties
+	$self->{main} = $main;
 
 	# Script Execution
 	$self->{run_document} = $self->Append( -1,
@@ -46,6 +49,8 @@ sub new {
 			$_[0]->on_run_command;
 		},
 	);
+
+	$self->AppendSeparator;
 
 	$self->{stop} = $self->Append( -1,
 		Wx::gettext("&Stop")
