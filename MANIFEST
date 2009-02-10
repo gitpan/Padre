@@ -6,6 +6,10 @@ eg/hello.p6
 eg/hello.pasm
 eg/hello_foo.pl
 eg/hello_world.pl
+eg/perl5.pod
+eg/perl5_with_perl6_example.pod
+eg/perl6.pod
+eg/Perl6Class.pm
 eg/shell.pl
 eg/sleep.pl
 eg/stderr.pl
@@ -24,6 +28,7 @@ inc/Module/Install/Fetch.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
 inc/Module/Install/PRIVATE/Padre.pm
+inc/Module/Install/Scripts.pm
 inc/Module/Install/Share.pm
 inc/Module/Install/Win32.pm
 inc/Module/Install/With.pm
@@ -50,6 +55,7 @@ lib/Padre/DocBrowser/POD.pm
 lib/Padre/Document.pm
 lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl/Beginner.pm
+lib/Padre/Document/Perl/Lexer.pm
 lib/Padre/Document/POD.pm
 lib/Padre/Locale.pm
 lib/Padre/Manual.pod
@@ -202,7 +208,8 @@ t/00-compile.t
 t/01-load.t
 t/02-new.t
 t/03-wx.t
-t/04_config.t
+t/04-config.t
+t/05-project.t
 t/10-copyright.t
 t/50-docbrowser.t
 t/60-db.t
@@ -223,6 +230,7 @@ t/collection/Config-Tiny/Makefile.PL
 t/collection/Config-Tiny/t/01_compile.t
 t/collection/Config-Tiny/t/02_main.t
 t/collection/Config-Tiny/test.conf
+t/collection/Padre-Null/foo.pl
 t/collection/Padre-Null/padre.yml
 t/files/beginner/boolean_expression_or.pl
 t/files/beginner/boolean_expression_pipes.pl

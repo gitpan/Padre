@@ -50,7 +50,7 @@ use constant SHAREDIR => File::Spec->rel2abs(
 	Padre::Util::sharedir('locale')
 );
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -413,19 +413,21 @@ use constant system_rfc4646 =>
 # Find the rfc4646 to use by default
 sub rfc4646 {
 	my $config = Padre::Config->read;
-	if ( $config and not $RFC4646{$config} ) {
+	my $locale = $config->locale;
+	
+	if ( $locale and not $RFC4646{$locale} ) {
 		# Bad or unsupported configuration
-		$config = undef;
+		$locale = undef;
 	}
 
 	# Try for the system default
-	$config ||= system_rfc4646;
+	$locale ||= system_rfc4646;
 
 	# Use the fallback default
-	$config ||= DEFAULT;
+	$locale ||= DEFAULT;
 
 	# Return supported language for this language
-	return $RFC4646{$config}->{actual};
+	return $RFC4646{$locale}->{actual};
 }
 
 # Given a rfc4646 identifier, sets the language globally
@@ -572,7 +574,7 @@ sub encoding_from_string {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -29,7 +29,7 @@ use FindBin    ();
 use File::Spec ();
 use List::Util qw(first);
 
-our $VERSION   = '0.26';
+our $VERSION   = '0.27';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches _T);
 
@@ -246,7 +246,7 @@ See the support section of the main L<Padre> module.
 
 =head1 COPYRIGHT
 
-Copyright 2008 Gabor Szabo.
+Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 
 =head1 LICENSE
 
@@ -255,7 +255,7 @@ modify it under the same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

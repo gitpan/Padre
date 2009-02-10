@@ -10,7 +10,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 my @cbs = qw(
 	find_case
@@ -26,7 +26,6 @@ sub new {
 }
 
 sub get_layout {
-	my $search_term = shift;
 	my $config      = shift;
 
 	# Get the search terms
@@ -43,7 +42,7 @@ sub get_layout {
 			[
 				'Wx::ComboBox',
 				'_find_choice_',
-				$search_term,
+				'',
 				$recent_search
 			],
 			[
@@ -126,12 +125,10 @@ sub get_layout {
 }
 
 sub dialog {
-	my ( $class, $parent, $args) = @_;
+	my ( $class, $parent ) = @_;
 
 	my $config = Padre->ide->config;
-	my $search_term = $args->{term} || '';
-
-	my $layout = get_layout($search_term, $config);
+	my $layout = get_layout($config);
 	my $dialog = Padre::Wx::Dialog->new(
 		parent => $parent,
 		title  => Wx::gettext("Search"),
@@ -184,12 +181,16 @@ sub find {
 
 	# TODO: if selection is more than one lines then consider it as the limit
 	# of the search and replace and not as the string to be used
-	
+	$text = '' if $text =~ /\n/;
+
 	unless ( $self->{dialog} ) {
-		$self->{dialog}  = $self->dialog($main, { term => $text } );
-	} else {
-		#TODO: give focus.
+		$self->{dialog}  = $self->dialog( $main );
 	}
+	$self->{dialog}->{_widgets_}->{_find_choice_}->SetValue($text);
+	# Focus is given by the Cancel Button
+	#else {
+	#	#TODO: give focus.
+	#}
 
 	$self->{dialog}->Show(1);
 
@@ -236,6 +237,8 @@ sub find_previous {
 
 sub cancel_clicked {
 	$_[0]->Hide;
+	# If no focus is set, the focus is lost when reopening the dialog
+	$_[0]->{_widgets_}->{_find_choice_}->SetFocus;
 	return;
 }
 
@@ -395,7 +398,7 @@ sub search {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

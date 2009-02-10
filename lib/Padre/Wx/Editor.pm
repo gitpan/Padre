@@ -9,7 +9,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -45,6 +45,7 @@ sub new {
 
 	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
 	Wx::Event::EVT_LEFT_UP(    $self, \&on_left_up    );
+	Wx::Event::EVT_CHAR(       $self, \&on_char       );
 
 	if ( Padre->ide->config->editor_wordwrap ) {
 		$self->SetWrapMode( Wx::wxSTC_WRAP_WORD );
@@ -690,6 +691,12 @@ sub on_right_down {
 		$menu->Append( -1, Wx::gettext("&Split window") ),
 		\&Padre::Wx::Main::on_split_window,
 	);
+
+	my $doc = $self->{Document};
+	if ( $doc->can('event_on_right_down') ) {
+		$doc->event_on_right_down( $self, $menu, $event );
+	}
+
 	if ($event->isa('Wx::MouseEvent')) {
 		$self->PopupMenu( $menu, $event->GetX, $event->GetY);
 	} else { #Wx::CommandEvent
@@ -734,6 +741,18 @@ sub unfold_all {
 		$currentLine++;
 	}
 
+	return;
+}
+
+sub on_char {
+	my ( $self, $event ) = @_;
+
+	my $doc = $self->{Document};
+	if ( $doc->can('event_on_char') ) {
+		$doc->event_on_char( $self, $event );
+	}
+
+	$event->Skip;
 	return;
 }
 
@@ -847,8 +866,8 @@ sub get_text_from_clipboard {
 	return $text;
 }
 
-# Coment or comment text depending on the first selected line.
-# This is the most coherent way to handle mixed blocks(commented and
+# Comment or uncomment text depending on the first selected line.
+# This is the most coherent way to handle mixed blocks (commented and
 # uncommented lines).
 sub comment_toggle_lines {
 	my ($self, $begin, $end, $str) = @_;
@@ -970,7 +989,7 @@ sub goto_pos_centerize {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

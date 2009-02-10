@@ -16,8 +16,9 @@ BEGIN {
 		exit(0);
 	}
 }
+
 BEGIN {
-	plan( skip_all => 'Fails for unknown reasons, skipping for release' );
+	plan( skip_all => 'Sometimes fails for unknown reasons, skipping for release till fixed' );
 	exit 0;
 }
 
@@ -43,6 +44,10 @@ copy catfile('t', 'files', 'one_char.pl'),  catfile($home, 'one_char.pl');
 my $padreInstance = Padre->new;
 my $ide   = Padre->ide;
 my $frame = $ide->wx->main;
+
+diag "This test script is known to fail sometimes on some operating systems";
+diag "If this happens to you, please report it to the Padre developers";
+diag "and use the force to install Padre anyway.";
 
 my @events = (
 	{

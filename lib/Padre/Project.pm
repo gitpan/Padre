@@ -10,7 +10,7 @@ use YAML::Tiny    ();
 use Padre::Config ();
 use Padre::Config::Project ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 use Class::XSAccessor
 	getters => {
@@ -30,13 +30,13 @@ sub class {
 	unless ( -d $root ) {
 		Carp::croak("Project directory '$root' does not exist");
 	}
-	if ( File::Spec->catfile($root, 'Makefile.PL') ) {
+	if ( -f File::Spec->catfile($root, 'Makefile.PL') ) {
 		return 'Padre::Project::Perl';
 	}
-	if ( File::Spec->catfile($root, 'Build.PL') ) {
+	if ( -f File::Spec->catfile($root, 'Build.PL') ) {
 		return 'Padre::Project::Perl';
 	}
-	if ( File::Spec->catfile($root, 'padre.yml') ) {
+	if ( -f File::Spec->catfile($root, 'padre.yml') ) {
 		return 'Padre::Project';
 	}
 	return 'Padre::Project::Null';
@@ -101,7 +101,7 @@ sub config {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

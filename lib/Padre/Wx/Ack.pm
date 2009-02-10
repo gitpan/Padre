@@ -14,7 +14,7 @@ my %opts;
 my %stats;
 my $panel_string_index = 9999999;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 my $DONE_EVENT : shared = Wx::NewEventType;
 
 my $ack_loaded = 0;
@@ -433,7 +433,7 @@ sub fill_type_wanted {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

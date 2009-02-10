@@ -30,7 +30,7 @@ use warnings;
 use Padre::Wx ();
 use base 'Wx::Frame';
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 =pod
 
@@ -105,7 +105,7 @@ Adam Kennedy E<lt>adamk@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright 2008 Adam Kennedy.
+Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.

@@ -3,7 +3,7 @@ package Padre::DB::Plugin;
 use strict;
 use warnings;
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 # Finds and returns a single element by name
 sub fetch_name {
@@ -211,7 +211,7 @@ Adam Kennedy
 
 =head1 COPYRIGHT
 
-Copyright 2009 Adam Kennedy.
+Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -221,7 +221,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -23,7 +23,7 @@ use Class::Autouse ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version        ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -37,7 +37,7 @@ BEGIN {
 }
 
 # Modules to be run-time autoloaded.
-# This is more efficient that use'ing a module, but less efficient
+# This is more efficient than use'ing a module, but less efficient
 # than making a direct call to require.
 # This is for fully OO classes that are refered to in a number of
 # different places in the code, making the use of "require" tricky.
@@ -77,7 +77,7 @@ use Class::Autouse qw{
 	Padre::Wx::Main
 };
 
-# Gnerate faster accessors
+# Generate faster accessors
 use Class::XSAccessor
 	getters => {
 		original_cwd   => 'original_cwd',
@@ -997,7 +997,6 @@ handles everything the toolbar should know and do.
 
 =back
 
-
 =head1 BUGS
 
 Please submit your bugs at L<http://padre.perlide.org/>
@@ -1011,7 +1010,8 @@ See also L<http://padre.perlide.org/>
 
 =head1 COPYRIGHT
 
-Copyright 2008 Gabor Szabo. L<http://www.szabgab.com/>
+Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+L<http://padre.perlide.org/>
 
 =head1 LICENSE
 
@@ -1049,39 +1049,53 @@ SUCH DAMAGES.
 
 =head1 ACKNOWLEDGEMENTS
 
-To Mattia Barbon for providing WxPerl.
-Part of the code was copied from his Wx::Demo application.
+=head2 The Padre development team
 
 The developers of Padre in alphabetical order:
 
-Aaron Trevena (TEEJAY),
-Ahmad Zawawi أحمد محمد زواوي (AZAWAWI),
-Adam Kennedy (ADAMK),
-Brian Cassidy (BRICAS),
-Chris Dolan (CHRISDOLAN),
-Fayland Lam (FAYLAND),
-Gábor Szabó - גאבור סבו (SZABGAB),
-Heiko Jansen (HJANSEN),
-Jérôme Quelin (JQUELIN),
-Kaare Rasmussen (KAARE),
-Keedi Kim - 김도형 (KEEDI),
-Max Maischein (CORION),
-Patrick Donelan (PATSPAM),
-Paweł Murias (PMURIAS),
-Petar Shangov (PSHANGOV),
-Steffen Müller (TSEE)
+Aaron Trevena (TEEJAY)
 
-To Herbert Breunung for letting me work on Kephra.
+Ahmad Zawawi أحمد محمد زواوي (AZAWAWI)
 
-To Octavian Rasnita for early testing and bug reports.
+Adam Kennedy (ADAMK) E<lt>adamk@cpan.orgE<gt>
 
-=head2 Translations
+Brian Cassidy (BRICAS)
+
+Chris Dolan (CHRISDOLAN)
+
+Claudio Ramirez (CLAUDIO) L<padre.claudio@apt-get.be>
+
+Fayland Lam (FAYLAND) L<mailto:fayland@gmail.com>
+
+Gábor Szabó - גאבור סבו (SZABGAB) L<mailto:szabgab@gmail.com>
+
+Heiko Jansen (HJANSEN)
+
+Jérôme Quelin (JQUELIN) L<mailto:jquelin@cpan.org>
+
+Kaare Rasmussen (KAARE) L<mailto:kaare@cpan.org>
+
+Keedi Kim - 김도형 (KEEDI)
+
+Max Maischein (CORION)
+
+Patrick Donelan (PATSPAM)
+
+Paweł Murias (PMURIAS)
+
+Petar Shangov (PSHANGOV)
+
+Steffen Müller (TSEE) L<mailto:smueller@cpan.org>
+
+=head2 Translators
 
 Arabic - Ahmad M. Zawawi - أحمد محمد زواوي (AZAWAWI)
 
+Chinese (Simplified) - Fayland Lam (FAYLAND)
+
 Dutch - Dirk De Nijs (ddn123456)
 
-English - everyone on the team
+English - Everyone on the team
 
 French - Jérôme Quelin (JQUELIN)
 
@@ -1101,9 +1115,18 @@ Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
 
 Spanish - Paco Alguacil (PacoLinux)
 
+=head2 Thanks
+
+To Mattia Barbon for providing WxPerl.
+Part of the code was copied from his Wx::Demo application.
+
+To Herbert Breunung for letting me work on Kephra.
+
+To Octavian Rasnita for early testing and bug reports.
+
 =cut
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

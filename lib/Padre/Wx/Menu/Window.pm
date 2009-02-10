@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -163,9 +163,13 @@ sub refresh {
 			$items++;
 		}
 		my $need = $pages - $items + $default + 1;
+		my $main = $self->{main};
 		if ( $need > 0 ) {
-			foreach ( 1 .. $need ) {
-				push @$alt, $self->Append( -1, '' );
+			foreach my $i ( 1 .. $need ) {
+				my $menu_entry = $self->Append( -1, '' );
+				push @$alt, $menu_entry;
+				Wx::Event::EVT_MENU( $main, $menu_entry, 
+					sub { $main->on_nth_pane($pages - $need + $i -1) } );
 			}
 		} elsif ( $need < 0 ) {
 			foreach ( 1 .. -$need ) {
@@ -191,7 +195,7 @@ sub refresh {
 }
 
 1;
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

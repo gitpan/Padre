@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -315,13 +315,17 @@ sub guess_mimetype {
 		return 'application/x-perl';
 	}
 
+	# Perl 6:   use v6; class ..., module ...
+	# maybe also grammar ...
+	# but make sure that is real code and not just a comment or doc in some perl 5 code...
+
 	# Try derive the mime type from the name
 	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 		my $ext = lc $1;
 		if ( $EXT_MIME{$ext} ) {
 			if ( $EXT_MIME{$ext} eq 'application/x-perl' ) {
 				# Sometimes Perl 6 will look like Perl 5
-				if ( $text and $text =~ /^\s*use\s+v6;/m ) {
+				if ( is_perl6($text) ) {
 					return 'application/x-perl6';
 				}
 			}
@@ -341,8 +345,8 @@ sub guess_mimetype {
 	# TODO: Add support for plugins being able to do something here.
 	if ( $text and $text =~ /\A#!/m ) {
 		# Found a hash bang line
-		if ( $text =~ /\A#![^\n]*\bperl\b/m ) {
-			return 'application/x-perl';
+		if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
+			return is_perl6($text) ? 'application/x-perl6' : 'application/x-perl';
 		}
 		if ( $text =~ /\A---/ ) {
 			return 'text/x-yaml';
@@ -357,6 +361,18 @@ sub guess_mimetype {
 # TODO: get it from config
 sub _get_default_newline_type {
 	Padre::Util::NEWLINE;
+}
+
+# naive sub to decide if a piece of code is Perl 6 or Perl 5.
+sub is_perl6 {
+	my ($text) = @_;
+	return if not $text;
+	return 1 if $text =~ /^=begin\s+pod/msx;
+	return   if $text =~ /^=head[12]/msx;
+
+	return 1 if $text =~ /^\s*use\s+v6;/msx;
+	return 1 if $text =~ /^\s*class\s+\w/msx;
+	return;
 }
 
 # Where to convert (UNIX, WIN, MAC)
@@ -727,6 +743,38 @@ sub guess_indentation_style {
 	return $style;
 }
 
+=head2 event_on_char
+
+NOT IMPLEMENTED IN THE BASE CLASS
+
+This method - if implemented - is called after any addition of a character
+to the current document. This enables document classes to aid the user
+in the editing process in various ways, e.g. by auto-pairing of brackets
+or by suggesting usable method names when method-call syntax is detected.
+
+Parameters retrieved are the objects for the document, the editor, and the 
+wxWidgets event.
+
+Returns nothing.
+
+Cf. C<Padre::Document::Perl> for an example.
+
+=head2 event_on_right_down
+
+NOT IMPLEMENTED IN THE BASE CLASS
+
+This method - if implemented - is called when a user right-clicks in an 
+editor to open a context menu and after the standard context menu was 
+created and populated in the C<Padre::Wx::Editor> class.
+By manipulating the menu document classes may provide the user with 
+additional options.
+
+Parameters retrieved are the objects for the document, the editor, the 
+context menu (C<Wx::Menu>) and the event.
+
+Returns nothing.
+
+=cut
 
 
 
@@ -982,7 +1030,7 @@ sub autocomplete {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

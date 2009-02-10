@@ -35,7 +35,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -177,9 +177,14 @@ sub new {
 	$self->GetToolBar->Realize;
 
 	# Create the status bar
-	$self->SetStatusBar(
-		Padre::Wx::StatusBar->new($self)
-	);
+	my $statusbar = Padre::Wx::StatusBar->new($self);
+	$self->SetStatusBar($statusbar);
+	# show the statusbar if needed.
+	if ( $self->config->main_statusbar ) {
+		$statusbar->Show;
+	} else {
+		$statusbar->Hide;
+	}
 
 	# Create the three notebooks (document and tools) that
 	# serve as the main AUI manager GUI elements.
@@ -415,7 +420,7 @@ sub timer_post_init {
 			$_[0]->timer_check_overwrite;
 		},
 	);
-	$timer->Start( 5 * SECONDS, 0 );
+	$timer->Start( 2 * SECONDS, 0 );
 
 	return;
 }
@@ -2099,7 +2104,7 @@ sub on_stc_style_needed {
 		return if defined $doc->{_text} and $doc->{_text} eq $text;
 		$doc->{_text} = $text;
 
-		$doc->colorize;
+		$doc->colorize(Padre::Current->editor->GetEndStyled, $event->GetPosition);
 	}
 
 }
@@ -2349,7 +2354,7 @@ sub on_last_visited_pane {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

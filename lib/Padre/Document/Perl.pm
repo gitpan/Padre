@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 our @ISA     = 'Padre::Document';
 
 
@@ -98,8 +98,13 @@ sub lexer {
 # Padre::Document GUI Integration
 
 sub colorize {
-	my ($self) = @_;
+	my $self = shift;
 	
+	# comment the next three lines to disable pshangov's experimental ppi lexer
+	require Padre::Document::Perl::Lexer;
+	Padre::Document::Perl::Lexer->colorize(@_);
+	return;
+
 	$self->remove_color;
 
 	my $editor = $self->editor;
@@ -373,16 +378,10 @@ sub _check_syntax_internals {
 	}
 }
 
-sub get_outline_in_background {
-	my $self  = shift;
-	my %args  = @_;
-	$args{background} = 1;
-	return $self->_get_outline_internals(\%args);
-}
-
-sub _get_outline_internals {
+sub get_outline {
 	my $self = shift;
-	my $args = shift;
+	my %args = @_;
+
 	my $text = $self->text_get;
 	unless ( defined $text and $text ne '' ) {
 		return [];
@@ -391,7 +390,7 @@ sub _get_outline_internals {
 	# Do we really need an update?
 	require Digest::MD5;
 	my $md5 = Digest::MD5::md5(Encode::encode_utf8($text));
-	unless ( $args->{force} ) {
+	unless ( $args{force} ) {
 		if (
 			defined($self->{last_checked_md5})
 			and
@@ -401,29 +400,22 @@ sub _get_outline_internals {
 		}
 	}
 	$self->{last_checked_md5} = $md5;
-	require Padre::Task::Outline::Perl;
+
 	my %check = (
 		editor   => $self->editor,
 		text     => $text,
 	);
-	if ( exists $args->{on_finish} ) {
-		$check{on_finish} = $args->{on_finish};
-	}
 	if ( $self->project ) {
 		$check{cwd} = $self->project->root;
 		$check{perl_cmd} = [ '-Ilib' ];
 	}
+
+	require Padre::Task::Outline::Perl;
 	my $task = Padre::Task::Outline::Perl->new( %check );
-	if ( $args->{background} ) {
-		# asynchronous execution (see on_finish hook)
-		$task->schedule;
-		return;
-	} else {
-		# serial execution, returning the result
-		return if $task->prepare =~ /^break$/;
-		$task->run;
-		return $task->{outline};
-	}
+
+	# asynchronous execution (see on_finish hook)
+	$task->schedule;
+	return;
 }
 
 sub comment_lines_str {
@@ -559,9 +551,39 @@ sub autocomplete {
 	return (length($prefix), @words);
 }
 
+sub event_on_char {
+	my ( $self, $editor, $event ) = @_;
+
+	my $key = $event->GetUnicodeKey;
+
+	if ( Padre->ide->config->autocomplete_brackets ) {
+		# these are:   (    )    <    >    [    ]     {    }
+		my %table = ( 40 => 41, 60 => 62, 91 => 93, 123 => 125, );
+		my $pos = $editor->GetCurrentPos;
+		foreach my $code ( keys %table ) {
+			if ( $key == $code ) {
+				my $nextChar;
+				if ( $editor->GetTextLength > $pos ) {
+					$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
+				}
+				unless (
+					defined($nextChar)
+					&& ord($nextChar) == $table{$code}
+				) {
+					$editor->AddText( chr( $table{$code} ) );
+					$editor->CharLeft;
+					last;
+				}
+			}
+		}
+	}
+
+	return;
+}
+
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -7,7 +7,7 @@ use Params::Util   qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 our @ISA     = 'Wx::TreeCtrl';
 
 sub new {
@@ -18,8 +18,9 @@ sub new {
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTR_DEFAULT_STYLE
+		Wx::wxTR_HIDE_ROOT | Wx::wxTR_SINGLE | Wx::wxTR_HAS_BUTTONS  
 	);
+	$self->SetIndent(10);
 	$self->{force_next} = 0;
 
 	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
@@ -146,7 +147,7 @@ sub on_timer {
 
 	my $document = $self->main->current->document or return;
 
-	unless ( $document->can('get_outline_in_background') ) {
+	unless ( $document->can('get_outline') ) {
 		$self->clear;
 		return;
 	}
@@ -156,7 +157,7 @@ sub on_timer {
 		$self->force_next(0);
 	}
 
-	$document->get_outline_in_background(force => $force);
+	$document->get_outline(force => $force);
 
 	if ( defined($event) ) {
 		$event->Skip(0);
@@ -167,7 +168,7 @@ sub on_timer {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -12,13 +12,14 @@ use Carp                   ();
 use File::Spec             ();
 use File::Copy             ();
 use File::HomeDir          ();
+use File::Path             ();
 use Params::Util           qw{ _POSINT _INSTANCE };
 use Padre::Config::Setting ();
 use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION   = '0.26';
+our $VERSION   = '0.27';
 
 # Master storage of the settings
 our %SETTING   = ();
@@ -336,6 +337,12 @@ setting(
 	default => 0,
 );
 setting(
+	name    => 'autocomplete_brackets',
+	type    => BOOLEAN,
+	store   => HUMAN,
+	default => 0,
+);
+setting(
 	# By default use background threads unless profiling
 	# TODO - Make the default actually change
 	name    => 'threads',
@@ -412,7 +419,7 @@ setting(
 
 sub default_dir {
 	unless ( -e $DEFAULT_DIR ) {
-		mkdir($DEFAULT_DIR) or
+		File::Path::mkpath($DEFAULT_DIR) or
 		die "Cannot create config dir '$DEFAULT_DIR' $!";
 	}
 	return $DEFAULT_DIR;
@@ -634,7 +641,7 @@ sub _INTEGER ($) {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

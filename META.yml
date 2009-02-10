@@ -10,7 +10,7 @@ build_requires:
   Test::NoWarnings: 0.084
   Test::Script: 1.03
 distribution_type: module
-generated_by: 'Module::Install version 0.77'
+generated_by: 'Module::Install version 0.79'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -18,16 +18,12 @@ meta-spec:
 name: Padre
 no_index:
   directory:
-    - t
-    - xt
     - eg
-    - share
     - inc
     - privinc
     - share
-    - share
-    - inc
     - t
+    - xt
 requires:
   App::Ack: 1.86
   Carp: 0
@@ -78,6 +74,7 @@ requires:
   Probe::Perl: 0.01
   Storable: 2.15
   Term::ReadLine: 0
+  Text::Balanced: 0
   Text::Diff: 0.35
   Text::FindIndent: 0.03
   Thread::Queue: 2.11
@@ -94,4 +91,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.26
+version: 0.27

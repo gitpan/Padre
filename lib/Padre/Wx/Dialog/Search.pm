@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.26';
+our $VERSION = '0.27';
 
 
 
@@ -222,7 +222,7 @@ sub _show_panel {
 	# since they might have been updated by find dialog
 	my $config = Padre->ide->config;
 	$self->{case}->SetValue( $config->find_case ? 0 : 1 );
-	$self->{regex}->SetValue( $config->find_regex );
+	$self->{regex}->SetValue( $config->find_regex ? 0 : 1 );
 
 	# You probably want to use the Find
 	$self->{entry}->SetFocus;
@@ -295,7 +295,7 @@ sub _on_regex_checked {
 	my $self = shift;
 	Padre->ide->config->set(
 		'find_regex',
-		$self->{regex}->GetValue,
+		$self->{regex}->GetValue ? 0 : 1,
 	);
 	$self->{restart} = 1;
 	$self->_find;
@@ -304,7 +304,7 @@ sub _on_regex_checked {
 
 1;
 
-# Copyright 2008 Gabor Szabo.
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
