@@ -6,7 +6,7 @@ use PPI::Document;
 use PPI::Dumper;
 use Text::Balanced;
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 sub class_to_color {
 	my $class = shift;
@@ -33,6 +33,7 @@ sub class_to_color {
 		'Quote'         => 9,
 		'Single'        => 9,
 		'Double'        => 9,
+		'Backtick'      => 9,	
 		'Interpolate'   => 9,
 		'QuoteLike'     => 7,
 		'Regexp'        => 7,
@@ -50,8 +51,12 @@ sub class_to_color {
 		'Octal'         => 0,
 		'Hex'           => 0,
 		'Literal'       => 0,
+		'Version'       => 0,
 	);
 	
+	if (not defined $colors{$css}) {
+		warn "No color defined for '$css' or '$class'\n";
+	}
 	return $colors{$css};
 }
 
@@ -60,10 +65,6 @@ sub colorize {
 	
 	my $doc = Padre::Current->document;
 	my $editor = $doc->editor;
-	
-	# DEBUG
-	# my $dp = Padre->ide->wx->main_window->{debugpane};
-	# $dp->Clear;
 	
 	# start and end position for styling, as sent from Wx::STC
 	# the algorithm used by Wx::STC to determine what needs styling
@@ -84,21 +85,22 @@ sub colorize {
 	# rather than starting to parse and style from the position sent by Wx::STC,
 	# we will shift the start and end position to the start of the first line and
 	# end of the last line respectively
-	$start_line = $editor->LineFromPosition($start_pos);
-	$end_line = $editor->LineFromPosition($end_pos);
+	$start_line        = $editor->LineFromPosition($start_pos);
+	$end_line          = $editor->LineFromPosition($end_pos);
 	$styling_start_pos = $editor->PositionFromLine($start_line);
-	$styling_end_pos = $editor->GetLineEndPosition($end_line);
-	$line_count = $editor->GetLineCount();
-	$last_char = $editor->GetLineEndPosition($line_count-1);
+	$styling_end_pos   = $editor->GetLineEndPosition($end_line);
+	$line_count        = $editor->GetLineCount();
+	$last_char         = $editor->GetLineEndPosition($line_count-1);
+	my $inital_text    = $editor->GetTextRange($start_pos, $end_pos);
 	
 	# basically we let PPI start parsing the text within the start and end
 	# positions we just determined, unless there is a chance that our start
-	# ro end position is within some multiline token - a quotelike expression
+	# or end position is within some multiline token - a quotelike expression
 	# or POD
 	
 	# this check is not necessary if we are on the first line of text	
 	if ($start_line > 0) {
-		
+
 		# get first char on the preceding line, but skip newline symbols
 		my $previous_char = $styling_start_pos-1; 
 		while ($editor->GetCharAt($previous_char) == 10 or $editor->GetCharAt($previous_char) == 13) {
@@ -118,14 +120,15 @@ sub colorize {
 			while ($editor->GetStyleAt($start_of_previous_token) == $previous_style) {
 				$start_of_previous_token--;
 				last if $start_of_previous_token <= 0;
-			}
-			$start_of_previous_token++;
+			}			$start_of_previous_token++;
 			
 			# get the text of the previous token
 			my $prev_token_text = $editor->GetTextRange($start_of_previous_token, $styling_start_pos-1);
+			
 			my $prev_ppi_doc = PPI::Document->new( \$prev_token_text );
 			
 			if ($prev_ppi_doc) {
+			
 				# check if the previous token is a quotelike
 				my @tokens = $prev_ppi_doc->tokens;	
 				my $prev_token = $tokens[-1];
@@ -157,33 +160,35 @@ sub colorize {
 			last if $next_char >= $last_char;
 		}
 		
-		
-		if ($next_char < $last_char) {
-				
+		if ($next_char < $last_char) {			
 			my $next_style = $editor->GetStyleAt($next_char);
-		
-			my $end_of_next_token = $next_char;
-		
-			while ($editor->GetStyleAt($end_of_next_token) == $next_style) {
-				$end_of_next_token++;
-				last if $end_of_next_token == $last_char;
-			}
-			$end_of_next_token--;
+			if ($next_style == 9 or $next_style == 2) {
+				$styling_end_pos = $last_char;
+			} else {			
+				my $end_of_next_token = $next_char;
 			
-			
-			my $next_token_text = $editor->GetTextRange($styling_end_pos + 1, $end_of_next_token);
-			my $next_ppi_doc = PPI::Document->new( \$next_token_text );
-			
-			if ($next_ppi_doc) {
-				my @tokens = $next_ppi_doc->tokens;	
-				my $next_token = $tokens[0];
+				while ($editor->GetStyleAt($end_of_next_token) == $next_style) {
+					$end_of_next_token++;
+					last if $end_of_next_token == $last_char;
+				}
+				$end_of_next_token--;
 				
-				if ( $next_token->isa("PPI::Token::Quote") 
-					or $next_token->isa("PPI::Token::QuoteLike") 
-					or $next_token->isa("PPI::Token::Regexp") 
-					or $next_token->isa("PPI::Token::Pod")
-				) {
-					$styling_end_pos = $end_of_next_token;
+				my $next_token_text = $editor->GetTextRange($styling_end_pos + 1, $end_of_next_token);
+				
+				my $next_ppi_doc = PPI::Document->new( \$next_token_text );
+				
+				if ($next_ppi_doc) {
+					
+					my @tokens = $next_ppi_doc->tokens;	
+					my $next_token = $tokens[0];
+					
+					if ( $next_token->isa("PPI::Token::Quote") 
+						or $next_token->isa("PPI::Token::QuoteLike") 
+						or $next_token->isa("PPI::Token::Regexp") 
+						or $next_token->isa("PPI::Token::Pod")
+					) {
+						$styling_end_pos = $end_of_next_token;
+					}
 				}
 			}
 		}
@@ -200,19 +205,12 @@ sub colorize {
 
 	return unless $text;
 	
-	
-	
 	# now that we have determined the proper starting position,
 	# feed the text to PPI
 	my $ppi_doc = PPI::Document->new( \$text );	
 	
-	# DEBUG
-	# $dp->AppendText($text);
-	# $dp->AppendText("\n" . '='x10 . "\n");
-	# my $dumper = PPI::Dumper->new($ppi_doc);
-	# $dp->AppendText($dumper->string);
-	
 	if ($ppi_doc) {
+	
 		my @tokens = $ppi_doc->tokens;
 		$ppi_doc->index_locations;
 		
@@ -257,12 +255,17 @@ sub colorize {
 			}
 		} elsif ($last_token->isa("PPI::Token::Pod")) {
 			# get the position at which this token starts
-			my ($row, $rowchar, $col) = @{ $last_token->location };
-			my $token_start_line = $start_line+$row-1;
-			my $new_start_pos = ($editor->PositionFromLine($token_start_line)+ $rowchar-1);
+			#my ($row, $rowchar, $col) = @{ $last_token->location };
+			#my $token_start_line = $start_line+$row-1;
+			#my $new_start_pos = ($editor->PositionFromLine($token_start_line)+ $rowchar-1);
 				
 			# get the line at which it ends
-			my $token_end_line = ($editor->LineFromPosition($new_start_pos + $last_token->length));
+			#my $token_end_line = ($editor->LineFromPosition($new_start_pos + $last_token->length));
+			
+			my @prepared_pod_token = prepare_tokens($styling_start_pos, $last_token);
+			my $new_start_pos = $prepared_pod_token[0]->{start};
+			my $token_start_line = $editor->LineFromPosition($new_start_pos);
+			my $token_end_line = $editor->LineFromPosition($new_start_pos +  $prepared_pod_token[0]->{length});
 			
 			# if we are in the first line of pod, start searching for the next line;
 			# otherwise start searching from the last line of the pod token
@@ -275,6 +278,7 @@ sub colorize {
 				 last if $pod_last_line =~ /^=cut\s/;
 				 $pod_end++;
 			}
+			$pod_end = $last_char if $pod_end > $last_char;
 			
 			my $extra_text = $editor->GetTextRange($new_start_pos, $editor->GetLineEndPosition($pod_end));
 			clear_style($new_start_pos, $editor->GetLineEndPosition($pod_end));
@@ -305,7 +309,7 @@ sub prepare_tokens {
 
 	my $start_line = $editor->LineFromPosition($offset);
 	my $offset_from_start_line = ($offset - $editor->PositionFromLine($start_line));
-	
+
 	foreach my $t (@tokens) {
 		my ($row, $rowchar, $col) = @{ $t->location };
 		
@@ -319,6 +323,17 @@ sub prepare_tokens {
 			length => ($t->length + $new_lines),
 			color  => class_to_color($t),
 		);
+		# workarounds for a bug in PPI ?
+		if ($t->isa('PPI::Token::Comment') and 
+			($start == 1 or $editor->GetCharAt($start-1) == 10 or $editor->GetCharAt($start-1) == 13)) {
+			$token{length}--;
+		}
+		# to color the first # character in the whole document (the sh-bang):
+		if ($start == 1) {
+			$token{start} = 0;
+		}
+
+		#print "$offset $start $token{length} $token{color} '$t' " . ref($t) . "\n" if $token{start} < 180;
 		
 		push @prepared_tokens, \%token;
 	}
@@ -410,7 +425,7 @@ sub class_to_css {
 	# Normal coloring
 	my $css = ref $Token;
 	$css =~ s/^.+:://;
-	$css;
+	return $css;
 }
 
 1;

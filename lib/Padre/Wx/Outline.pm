@@ -7,7 +7,7 @@ use Params::Util   qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Wx::TreeCtrl';
 
 sub new {
@@ -136,7 +136,7 @@ sub on_tree_item_activated {
 
 	$line_number--;
 	$page->EnsureVisible($line_number);
-	$page->GotoPos( $page->GetLineIndentPosition($line_number) );
+	$page->goto_pos_centerize( $page->GetLineIndentPosition($line_number) );
 	$page->SetFocus;
 
 	return;

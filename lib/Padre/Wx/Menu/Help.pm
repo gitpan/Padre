@@ -11,7 +11,7 @@ use Padre::Wx             ();
 use Padre::Wx::Menu       ();
 use Padre::Wx::DocBrowser ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -154,6 +154,7 @@ sub about {
 
 	$about->AddDeveloper("Adam Kennedy");
 	$about->AddDeveloper("Ahmad Zawawi - أحمد محمد زواوي");
+    $about->AddDeveloper("Breno G. de Oliveira");
 	$about->AddDeveloper("Brian Cassidy");
 	$about->AddDeveloper("Chris Dolan");
 	$about->AddDeveloper("Claudio Ramirez");
@@ -181,6 +182,7 @@ sub about {
 	$about->AddTranslator("Dutch - Dirk De Nijs");
 	$about->AddTranslator("Portuguese (BR) - Breno G. de Oliveira");
 	$about->AddTranslator("Spanish - Paco Alguacil");
+	$about->AddTranslator("Spanish - Enrique Nell");	
 
 	Wx::AboutBox( $about );
 	return;

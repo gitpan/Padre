@@ -52,7 +52,7 @@ requires:
   Getopt::Long: 0
   HTML::Entities: 3.57
   HTML::Parser: 3.58
-  IO::Scalar: 0
+  IO::Scalar: 2.110
   IO::Socket: 1.30
   IO::String: 1.08
   IPC::Cmd: 0.42
@@ -80,10 +80,9 @@ requires:
   Thread::Queue: 2.11
   URI: 0
   Wx: 0.89
-  Wx::Perl::Dialog: 0.04
   Wx::Perl::ProcessStream: 0.11
   YAML::Tiny: 1.32
-  perl: 5.008001
+  perl: 5.008005
   threads: 1.71
   threads::shared: 1.26
 resources:
@@ -91,4 +90,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.27
+version: 0.28

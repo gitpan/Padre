@@ -6,7 +6,8 @@ BEGIN {
 	$^W = 1;
 }
 
-use Test::More tests => 114;
+# Move of Debug to Run Menu
+use Test::More tests => 120;
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
 use File::Temp ();

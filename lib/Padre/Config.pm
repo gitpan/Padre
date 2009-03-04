@@ -19,7 +19,7 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION   = '0.27';
+our $VERSION   = '0.28';
 
 # Master storage of the settings
 our %SETTING   = ();
@@ -101,6 +101,28 @@ setting(
 	store   => HUMAN,
 	default => '',
 );
+
+
+# for Module::Starter
+setting(
+	name    => 'license',
+	type    => ASCII,
+	store   => HUMAN,
+	default => '',
+);
+setting(
+	name    => 'builder',
+	type    => ASCII,
+	store   => HUMAN,
+	default => '',
+);
+setting(
+	name    => 'module_start_directory',
+	type    => ASCII,
+	store   => HUMAN,
+	default => '',
+);
+
 
 # Indent Settings
 # Allow projects to forcefully override personal settings
@@ -330,6 +352,7 @@ setting(
 	store   => HUMAN,
 	default => 'same',
 );
+# Move of stacktrace to run menu: will be removed (run_stacktrace)
 setting(
 	name    => 'run_stacktrace',
 	type    => BOOLEAN,

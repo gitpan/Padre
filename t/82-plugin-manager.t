@@ -11,7 +11,7 @@ BEGIN {
 	}
 }
 
-plan tests => 23;
+plan tests => 29;
 
 use FindBin      qw($Bin);
 use File::Spec   ();
@@ -78,4 +78,31 @@ SCOPE: {
 	# try load again
 	my $st = $manager->load_plugin('TestPlugin');
 	is( $st, undef );
+}
+
+# TODO: let the plugin manager do this: (so we'll also test it)
+my $path = File::Spec->catfile( $Bin, 'files', 'plugins' );
+#diag $path;
+unshift @INC, $path;
+#diag $ENV{PADRE_HOME};
+SCOPE: {
+	my $manager  = Padre::PluginManager->new($padre);
+	$manager->load_plugin('A');
+	is $manager->plugins->{'A'}->{status}, 'error', 'error in loading A';
+	like $manager->plugins->{'A'}->errstr, 
+		qr/^Plugin:A - Failed to load module: Global symbol "\$syntax_error" requires explicit package name at/,
+		'text of error message';
+
+	$manager->load_plugin('B');
+	is $manager->plugins->{'B'}->{status}, 'error', 'error in loading B';
+	is $manager->plugins->{'B'}->errstr,
+		'Plugin:B - Not compatible with Padre::Plugin API. Need to be subclass of Padre::Plugin',
+		'text of error message';
+
+	$manager->load_plugin('C');
+	is $manager->plugins->{'C'}->{status}, 'disabled', 'disabled in loading C';
+	is $manager->plugins->{'C'}->errstr,
+		'Plugin:C - Does not have menus',
+		'text of error message';
+
 }

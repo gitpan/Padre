@@ -29,7 +29,7 @@ use FindBin    ();
 use File::Spec ();
 use List::Util qw(first);
 
-our $VERSION   = '0.27';
+our $VERSION   = '0.28';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches _T);
 
@@ -209,7 +209,16 @@ sub svn_directory_revision {
 
 sub share {
 	return File::Spec->catdir( $FindBin::Bin, File::Spec->updir, 'share' ) if $ENV{PADRE_DEV};
-	return File::Spec->catdir( $ENV{PADRE_PAR_PATH}, 'inc', 'share' )      if $ENV{PADRE_PAR_PATH};
+	if (defined $ENV{PADRE_PAR_PATH}) {
+		# File::ShareDir new style path
+		my $path = File::Spec->catdir( $ENV{PADRE_PAR_PATH}, 'inc', 'auto','share', 'dist', 'Padre' );
+		return $path if -d $path;
+		# File::ShareDir old style path
+		$path = File::Spec->catdir( $ENV{PADRE_PAR_PATH}, 'inc', 'share' );
+		return $path if -d $path;
+	}
+
+	# rely on automatic handling of everything
 	require File::ShareDir::PAR;
 	return File::ShareDir::PAR::dist_dir('Padre');
 }
@@ -221,6 +230,24 @@ sub sharedir {
 sub sharefile {
 	File::Spec->catfile( share(), @_ );
 }
+
+sub find_perldiag_translations {
+	my %languages;
+	foreach my $path (@INC) {
+		my $dir = File::Spec->catdir( $path, 'POD2' );
+		next if not -e $dir;
+		if (opendir my $dh, $dir) {
+			while (my $lang = readdir $dh) {
+				next if $lang eq '.' or $lang eq '..';
+				if (-e File::Spec->catfile( $dir, $lang, 'perldiag.pod' )) {
+					$languages{$lang} = 1;
+				}
+			}
+		}
+	}
+	return sort keys %languages;
+}
+
 
 package Px;
 

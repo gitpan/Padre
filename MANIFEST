@@ -1,7 +1,6 @@
 Changes
 eg/cmd.pl
 eg/cyrillic_test.pl
-eg/hangman.p6
 eg/hello.p6
 eg/hello.pasm
 eg/hello_foo.pl
@@ -136,6 +135,10 @@ lib/Padre/Wx/RightClick.pm
 lib/Padre/Wx/StatusBar.pm
 lib/Padre/Wx/Syntax.pm
 lib/Padre/Wx/ToolBar.pm
+lib/Wx/Perl/Dialog.pm
+lib/Wx/Perl/Dialog/Frame.pm
+lib/Wx/Perl/Dialog/Simple.pm
+lib/Wx/Perl/Dialog/SingleChoice.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
@@ -252,6 +255,9 @@ t/files/missing_brace_1.pl
 t/files/missing_semicolon.pl
 t/files/no_strict.pl
 t/files/one_char.pl
+t/files/plugins/Padre/Plugin/A.pm
+t/files/plugins/Padre/Plugin/B.pm
+t/files/plugins/Padre/Plugin/C.pm
 t/lib/Padre.pm
 t/lib/Padre/Editor.pm
 t/lib/Padre/Plugin/Test/Plugin.pm

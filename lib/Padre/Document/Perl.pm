@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Padre::Document';
 
 
@@ -99,11 +99,13 @@ sub lexer {
 
 sub colorize {
 	my $self = shift;
-	
-	# comment the next three lines to disable pshangov's experimental ppi lexer
-	require Padre::Document::Perl::Lexer;
-	Padre::Document::Perl::Lexer->colorize(@_);
-	return;
+
+	# use pshangov's experimental ppi lexer only when running in development mode
+	if ($ENV{PADRE_DEV}) {
+		require Padre::Document::Perl::Lexer;
+		Padre::Document::Perl::Lexer->colorize(@_);
+		return;
+	}
 
 	$self->remove_color;
 
@@ -141,6 +143,7 @@ sub colorize {
 		'Quote'         => 9,
 		'Single'        => 9,
 		'Double'        => 9,
+		'Backtick'      => 9,
 		'Interpolate'   => 9,
 		'QuoteLike'     => 7,
 		'Regexp'        => 7,
@@ -270,6 +273,7 @@ sub get_function_regex {
 
 sub get_command {
 	my $self     = shift;
+	my $debug    = shift;
 
 	# Check the file name
 	my $filename = $self->filename;
@@ -283,7 +287,7 @@ sub get_command {
 
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
-	return Padre->ide->config->run_stacktrace
+	return $debug
 		? qq{"$perl" -Mdiagnostics(-traceonly) "$filename"}
 		: qq{"$perl" "$filename"};
 }
@@ -332,17 +336,17 @@ sub _check_syntax_internals {
 
 	# Do we really need an update?
 	require Digest::MD5;
-	my $md5 = Digest::MD5::md5(Encode::encode_utf8($text));
+	my $md5 = Digest::MD5::md5_hex(Encode::encode_utf8($text));
 	unless ( $args->{force} ) {
 		if (
-			defined($self->{last_checked_md5})
+			defined($self->{last_syncheck_md5})
 			and
-			$self->{last_checked_md5} eq $md5
+			$self->{last_syncheck_md5} eq $md5
 		) {
 			return;
 		}
 	}
-	$self->{last_checked_md5} = $md5;
+	$self->{last_syncheck_md5} = $md5;
 	
 	my $nlchar = "\n";
 	if ( $self->get_newline_type eq 'WIN' ) {
@@ -389,17 +393,17 @@ sub get_outline {
 
 	# Do we really need an update?
 	require Digest::MD5;
-	my $md5 = Digest::MD5::md5(Encode::encode_utf8($text));
+	my $md5 = Digest::MD5::md5_hex(Encode::encode_utf8($text));
 	unless ( $args{force} ) {
 		if (
-			defined($self->{last_checked_md5})
+			defined($self->{last_outline_md5})
 			and
-			$self->{last_checked_md5} eq $md5
+			$self->{last_outline_md5} eq $md5
 		) {
 			return;
 		}
 	}
-	$self->{last_checked_md5} = $md5;
+	$self->{last_outline_md5} = $md5;
 
 	my %check = (
 		editor   => $self->editor,
@@ -553,31 +557,54 @@ sub autocomplete {
 
 sub event_on_char {
 	my ( $self, $editor, $event ) = @_;
+	$editor->Freeze;
+
+	my $selection_exists = 0;
+	my $text = $editor->GetSelectedText;
+	if ( defined($text) && length($text) > 0 ) {
+		$selection_exists = 1;
+	}
 
 	my $key = $event->GetUnicodeKey;
 
 	if ( Padre->ide->config->autocomplete_brackets ) {
-		# these are:   (    )    <    >    [    ]     {    }
-		my %table = ( 40 => 41, 60 => 62, 91 => 93, 123 => 125, );
+		my %table = (
+			34 => 34,   # " "
+			39 => 39,   # ' '
+			40 => 41,   # ( )
+			60 => 62,   # < >
+			91 => 93,   # [ ]
+			123 => 125, # { }
+		);
 		my $pos = $editor->GetCurrentPos;
 		foreach my $code ( keys %table ) {
 			if ( $key == $code ) {
-				my $nextChar;
-				if ( $editor->GetTextLength > $pos ) {
-					$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
-				}
-				unless (
-					defined($nextChar)
-					&& ord($nextChar) == $table{$code}
-				) {
+				if ( $selection_exists ) {
+					my $start = $editor->GetSelectionStart;
+					my $end   = $editor->GetSelectionEnd;
+					$editor->GotoPos($end);
 					$editor->AddText( chr( $table{$code} ) );
-					$editor->CharLeft;
-					last;
+					$editor->GotoPos($start);
+				}
+				else {
+					my $nextChar;
+					if ( $editor->GetTextLength > $pos ) {
+						$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
+					}
+					unless (
+						defined($nextChar)
+						&& ord($nextChar) == $table{$code}
+					) {
+						$editor->AddText( chr( $table{$code} ) );
+						$editor->CharLeft;
+						last;
+					}
 				}
 			}
 		}
 	}
 
+	$editor->Thaw;
 	return;
 }
 

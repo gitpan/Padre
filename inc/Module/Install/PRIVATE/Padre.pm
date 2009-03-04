@@ -23,7 +23,11 @@ sub setup_padre {
 exe :: all
 \t\$(NOECHO) \$(PERL) -Iprivinc "-M$inc_class" -e "make_exe()"
 
+ppm :: ppd all
+\t\$(NOECHO) tar czf Padre.tar.gz blib/
+
 END_MAKEFILE
+
 
 }
 
@@ -61,6 +65,23 @@ sub check_wx_version {
 	print "Found wxWidgets $widgets_human\n";
 	unless ( $widgets >= 2.008008 ) {
 		nono("Padre needs at least version 2.8.8 of wxWidgets. You have wxWidgets $widgets_human");
+	}
+
+	# this part still needs the DISPLAY 
+	# so check only if there is one
+	if ( $ENV{DISPLAY} or $^O =~ /win32/i ) {
+		eval {
+			require Wx;
+			Wx->import;
+		};
+		if ($@) {
+			# If we don't have the Wx installed,
+			# we should just pass through to EU:MM
+			return;
+		}
+		unless ( Wx::wxUNICODE() ) {
+			nono("Padre needs wxWidgest to be compile with Unicode support (--enable-unicode)");
+		}
 	}
 
 	return;
@@ -129,23 +150,21 @@ sub get_libs {
 sub get_modules {
 	my @modules;
 	my @files;
-	local *FILE;
-	unless ( open(FILE, '<', 'MANIFEST') ) {
+	open(my $fh, '<', 'MANIFEST') or
 		die("Do you need to run 'make manifest'? Could not open MANIFEST for reading: $!");
-	}
-	while ( my $line = <FILE> ) {
+	while ( my $line = <$fh> ) {
 		chomp $line;
-		if ( $line =~ m{^lib/} ) {
+		if ( $line =~ m{^lib/.*\.pm$} ) {
 			$line = substr($line, 4, -3);
 			$line =~ s{/}{::}g;
-			if ($line =~ //) {
-				push @modules, $line;
-			} else {
-				push @files, $line;
-			}
+			push @modules, $line;
+		}
+		if ( $line =~ m{^lib/.*\.pod$} ) {
+			push @files, $line;
 		}
 		if ( $line =~ m{^share/} ) {
-			push @files, $line;
+			(my $newpath = $line) =~ s{^share}{lib/auto/share/dist/Padre};
+			push @files, "$line;$newpath";
 		}
 	}
 

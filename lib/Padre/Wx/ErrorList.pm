@@ -8,7 +8,7 @@ use Padre::Locale            ();
 use Padre::Task::ErrorParser ();
 use Parse::ErrorString::Perl ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor
@@ -97,6 +97,7 @@ sub populate {
 	my $lang = $self->config->locale_perldiag;
 	$lang =~ s/^\s*//;
 	$lang =~ s/\s*$//;
+	$lang = '' if $lang eq 'EN';
 	my $old = $self->lang;
 	$self->{lang} = $lang;
 

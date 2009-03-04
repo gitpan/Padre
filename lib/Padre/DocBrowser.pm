@@ -8,7 +8,7 @@ use Scalar::Util           ();
 use Class::Autouse         ();
 use Padre::DocBrowser::POD ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 use Class::XSAccessor
 	getters => {
@@ -26,7 +26,7 @@ use Class::XSAccessor
 
 =head1 NAME
 
-Padre::DocBrowser
+Padre::DocBrowser -- documentation browser for Padre
 
 =head1 DESCRIPTION
 

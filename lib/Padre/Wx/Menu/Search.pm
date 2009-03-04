@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -75,12 +75,6 @@ sub new {
 		},
 	);
 		
-	$self->AppendSeparator;
-
-
-
-
-
 	# Quick Find: Press F3 to start search with selected text
 	$self->{quick_find} = $self->AppendCheckItem( -1,
 		Wx::gettext("Quick Find")
@@ -96,6 +90,8 @@ sub new {
 		},
 	);
 	$self->{quick_find}->Check( Padre->ide->config->find_quick );
+
+	$self->AppendSeparator;
 
 #We should be able to remove F4 and shift-F4 and hook this functionality to F3 and shift-F3
 	# Incremental find (#60)

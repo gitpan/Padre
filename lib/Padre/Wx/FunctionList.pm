@@ -7,7 +7,7 @@ use Params::Util   qw{ _STRING };
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Wx::ListCtrl';
 
 
@@ -58,6 +58,8 @@ sub new {
 			$self->on_list_item_activated($_[1]);
 		}
 	);
+
+	$self->Hide;
 
 	return $self;
 }

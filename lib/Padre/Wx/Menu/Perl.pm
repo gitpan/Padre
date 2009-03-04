@@ -13,7 +13,7 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -260,19 +260,19 @@ sub new {
 			return;
 		}
 	);
-
-	# Make it easier to access stack traces
-	$self->{run_stacktrace} = $self->AppendCheckItem( -1,
-		Wx::gettext("Run Scripts with Stack Trace")
-	);	
-	Wx::Event::EVT_MENU( $main, $self->{run_stacktrace},
-		sub {
-			# Update the saved config setting
-			my $config = Padre->ide->config;
-			$config->set( run_stacktrace => $_[1]->IsChecked ? 1 : 0 );
-			$self->refresh;
-		}
-	);
+# Move of stacktrace to Run
+#	# Make it easier to access stack traces
+#	$self->{run_stacktrace} = $self->AppendCheckItem( -1,
+#		Wx::gettext("Run Scripts with Stack Trace")
+#	);	
+#	Wx::Event::EVT_MENU( $main, $self->{run_stacktrace},
+#		sub {
+#			# Update the saved config setting
+#			my $config = Padre->ide->config;
+#			$config->set( run_stacktrace => $_[1]->IsChecked ? 1 : 0 );
+#			$self->refresh;
+#		}
+#	);
 
 	$self->{autocomplete_brackets} = $self->AppendCheckItem(
 		-1,
@@ -294,7 +294,7 @@ sub refresh {
 	my $config = $self->{config};
 
 	$self->{ppi_highlight}->Check( $config->ppi_highlight );
-	$self->{run_stacktrace}->Check( $config->run_stacktrace );
+	#$self->{run_stacktrace}->Check( $config->run_stacktrace );
 	$self->{autocomplete_brackets}->Check( $config->autocomplete_brackets );
 
 	no warnings 'once'; # TODO eliminate?
@@ -496,15 +496,20 @@ sub open_config {
 	my $main = shift;
 
 	# Locate the CPAN config file(s)
-	require CPAN;
-	my $default_dir = $INC{'CPAN.pm'};
-	$default_dir =~ s/\.pm$//is; # remove .pm
+	my $default_dir = '';
+	eval {
+		require CPAN;
+		$default_dir = $INC{'CPAN.pm'};
+		$default_dir =~ s/\.pm$//is; # remove .pm
+	};
 
 	# Load the main config first
-	my $core = File::Spec->catfile($default_dir, 'Config.pm');
-	if ( -e $core ) {
-		$main->setup_editors($core);
-		return;
+	if ( $default_dir ne '' ) {
+		my $core = File::Spec->catfile($default_dir, 'Config.pm');
+		if ( -e $core ) {
+			$main->setup_editors($core);
+			return;
+		}
 	}
 
 	# Fallback to a personal config

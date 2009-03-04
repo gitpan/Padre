@@ -1,5 +1,11 @@
 package Padre::Wx::Main;
 
+=head1 NAME
+
+Padre::Wx::Main - Main window of Padre
+
+=cut
+
 use 5.008;
 use strict;
 use warnings;
@@ -35,7 +41,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -214,11 +220,13 @@ sub new {
 		my $code = $event->GetKeyCode;
 
 		# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
-		$mod = $mod & (Wx::wxMOD_ALT + Wx::wxMOD_CMD + Wx::wxMOD_SHIFT);
+		# () needed after the constants as they are functions in Perl and 
+		# without constants perl will call only the first one.
+		$mod = $mod & (Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT());
 		if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
 			# Ctrl-TAB  #TODO it is already in the menu
 			$self->on_next_pane if $code == Wx::WXK_TAB;
-		} elsif ( $mod == Wx::wxMOD_CMD + Wx::wxMOD_SHIFT) { # Ctrl-Shift
+		} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT()) { # Ctrl-Shift
 			# Ctrl-Shift-TAB #TODO it is already in the menu
 			$self->on_prev_pane if $code == Wx::WXK_TAB;
 		}
@@ -624,6 +632,10 @@ sub relocale {
 	# The toolbar doesn't support relocale, replace it
 	$self->rebuild_toolbar;
 
+	if ( defined $self->find ) {
+		$self->find->relocale;
+	}
+
 	# Update window manager captions
 	$self->aui->relocale;
 
@@ -814,6 +826,7 @@ sub run_command {
 # This should really be somewhere else, but can stay here for now
 sub run_document {
 	my $self     = shift;
+	my $debug    = shift;	
 	my $document = $self->current->document;
 	unless ( $document ) {
 		return $self->error(Wx::gettext("No open document"));
@@ -834,7 +847,7 @@ sub run_document {
 		return $self->error(Wx::gettext("No execution mode was defined for this document"));
 	}
 
-	my $cmd = eval { $document->get_command };
+	my $cmd = eval { $document->get_command($debug) };
 	if ( $@ ) {
 		chomp $@;
 		$self->error($@);
@@ -926,8 +939,23 @@ sub fast_find {
 	return $self->{fast_find_panel};
 }
 
+sub prompt {
+	my $self     = shift;
+	my $title    = shift || "Prompt";
+	my $subtitle = shift || "Subtitle";
+	my $key      = shift || "GENERIC";
 
-
+	require Padre::Wx::History::TextDialog;
+	my $dialog = Padre::Wx::History::TextDialog->new(
+        $self, $title, $subtitle, $key,
+    );
+    if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+        return;
+    }
+    my $value = $dialog->GetValue;
+    $dialog->Destroy;
+	return $value;
+}
 
 
 #####################################################################
@@ -1242,6 +1270,14 @@ sub setup_editor {
 		}
 	}
 
+	if ( ! $doc->is_new ) {
+		Padre::DB::History->create(
+			type => 'files',
+			name => $doc->filename,
+		);
+		$self->menu->file->update_recentfiles;
+	}
+
 	my $id = $self->create_tab($editor, $file, $title);
 
 	$editor->padre_setup;
@@ -1352,7 +1388,9 @@ sub on_open_selection {
 
 sub on_open_all_recent_files {
 	my $files = Padre::DB::History->recent('files');
-	$_[0]->setup_editors( @$files );
+	# debatable: "reverse" keeps order in "recent files" submenu
+	# but editor tab ordering may "feel" wrong
+	$_[0]->setup_editors( reverse @$files );
 }
 
 sub on_open {
@@ -1447,6 +1485,12 @@ sub on_save_as {
 	$document->editor->padre_setup;
 	$document->rebless;
 
+	Padre::DB::History->create(
+		type => 'files',
+		name => $document->filename,
+	);
+	$self->menu->file->update_recentfiles;
+
 	$self->refresh;
 
 	return 1;
@@ -1504,10 +1548,6 @@ sub _save_buffer {
 		return;
 	}
 
-	Padre::DB::History->create(
-		type => 'files',
-		name => $doc->filename,
-	);
 	$page->SetSavePoint;
 	$self->refresh;
 
@@ -1566,6 +1606,7 @@ sub close {
 	$self->notebook->DeletePage($id);
 
 	$self->syntax->clear;
+	$self->outline->clear;
 
 	# Remove the entry from the Window menu
 	$self->menu->window->refresh($self->current);
@@ -1690,7 +1731,8 @@ sub on_preferences {
 	my $self = shift;
 
 	require Padre::Wx::Dialog::Preferences;
-	if ( Padre::Wx::Dialog::Preferences->run( $self )) {
+	my $prefDlg = Padre::Wx::Dialog::Preferences->new;
+	if ( $prefDlg->run($self) ) {
 		foreach my $editor ( $self->editors ) {
 			$editor->set_preferences;
 		}

@@ -51,7 +51,7 @@ use YAML::Tiny   ();
 use Padre::DB    ();
 use Padre::Wx    ();
 
-our $VERSION    = '0.27';
+our $VERSION    = '0.28';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
@@ -83,7 +83,7 @@ sub plugin_name {
 	my @words = $class =~ /(\w+)/gi;
 	my $name  = pop @words;
 	$name =~ s/([a-z])([A-Z])/$1 $2/g;
-	$name =~ s/([A-Z]+)([A-Z])/$1 $2/g;
+	$name =~ s/([A-Z]+)([A-Z][a-z]+)/$1 $2/g;
 	return $name;
 }
 

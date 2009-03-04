@@ -23,7 +23,7 @@ use Class::Autouse ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version        ();
 
-our $VERSION = '0.27';
+our $VERSION = '0.28';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -1020,12 +1020,6 @@ modify it under the same terms as Perl 5 itself.
 
 =head1 DISCLAIMER OF WARRANTY
 
-There is no warranty whatsoever. If you lose data or your hair because
-of this program, that's your problem because you clearly aren't using
-version control or backing up properly.
-
-=head1 DISCLAIMER OF WARRANTY
-
 BECAUSE THIS SOFTWARE IS LICENSED FREE OF CHARGE, THERE IS NO WARRANTY
 FOR THE SOFTWARE, TO THE EXTENT PERMITTED BY APPLICABLE LAW. EXCEPT WHEN
 OTHERWISE STATED IN WRITING THE COPYRIGHT HOLDERS AND/OR OTHER PARTIES
@@ -1049,6 +1043,8 @@ SUCH DAMAGES.
 
 =head1 ACKNOWLEDGEMENTS
 
+=encoding utf8
+
 =head2 The Padre development team
 
 The developers of Padre in alphabetical order:
@@ -1059,21 +1055,23 @@ Ahmad Zawawi أحمد محمد زواوي (AZAWAWI)
 
 Adam Kennedy (ADAMK) E<lt>adamk@cpan.orgE<gt>
 
+Breno G. de Oliveira (GARU)
+
 Brian Cassidy (BRICAS)
 
 Chris Dolan (CHRISDOLAN)
 
-Claudio Ramirez (CLAUDIO) L<padre.claudio@apt-get.be>
+Claudio Ramirez (CLAUDIO) E<lt>claudio@apt-get.beE<gt>
 
-Fayland Lam (FAYLAND) L<mailto:fayland@gmail.com>
+Fayland Lam (FAYLAND) E<lt>fayland@gmail.comE<gt>
 
-Gábor Szabó - גאבור סבו (SZABGAB) L<mailto:szabgab@gmail.com>
+Gábor Szabó - גאבור סבו (SZABGAB) E<lt>szabgab@gmail.comE<gt>
 
-Heiko Jansen (HJANSEN)
+Heiko Jansen (HJANSEN) E<lt>heiko_jansen@web.deE<gt>
 
-Jérôme Quelin (JQUELIN) L<mailto:jquelin@cpan.org>
+Jérôme Quelin (JQUELIN) E<lt>jquelin@cpan.orgE<gt>
 
-Kaare Rasmussen (KAARE) L<mailto:kaare@cpan.org>
+Kaare Rasmussen (KAARE) E<lt>kaare@cpan.orgE<gt>
 
 Keedi Kim - 김도형 (KEEDI)
 
@@ -1085,7 +1083,7 @@ Paweł Murias (PMURIAS)
 
 Petar Shangov (PSHANGOV)
 
-Steffen Müller (TSEE) L<mailto:smueller@cpan.org>
+Steffen Müller (TSEE) E<lt>smueller@cpan.orgE<gt>
 
 =head2 Translators
 
@@ -1113,7 +1111,7 @@ Russian - Andrew Shitov
 
 Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
 
-Spanish - Paco Alguacil (PacoLinux)
+Spanish - Paco Alguacil (PacoLinux), Enrique Nell (ENELL)
 
 =head2 Thanks
 
