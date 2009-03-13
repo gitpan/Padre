@@ -5,14 +5,15 @@ package Padre::Wx::Menu::Plugins;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Config   ();
-use Params::Util    ();
-use Padre::Wx       ();
-use Padre::Wx::Menu ();
-use Padre::Current  qw{_CURRENT};
+use Padre::Config              ();
+use Padre::Config::Constants   qw{ $PADRE_CONFIG_DIR };
+use Params::Util               ();
+use Padre::Wx                  ();
+use Padre::Wx::Menu            ();
+use Padre::Current             qw{_CURRENT};
 
-our $VERSION = '0.28';
-our @ISA     = 'Padre::Wx::Menu';
+our $VERSION = '0.29';
+use base 'Padre::Wx::Menu';
 
 
 
@@ -48,7 +49,7 @@ sub new {
 		$tools->Append( -1, Wx::gettext("Edit My Plugin") ),
 		sub {
 			my $file = File::Spec->catfile(
-				Padre::Config->default_dir,
+				$PADRE_CONFIG_DIR,
 				qw{ plugins Padre Plugin My.pm }
 			);
 			return $self->error(
@@ -77,12 +78,8 @@ sub new {
 			);
 			if ( $ret == Wx::wxOK) {
 				my $manager = Padre->ide->plugin_manager;
-				my $target = File::Spec->catfile(
-					$manager->plugin_dir,
-					qw{ Padre Plugin My.pm }
-				);
 				$manager->unload_plugin("My");
-				Padre::Config->copy_original_My_plugin($target);
+				$manager->reset_my_plugin(1);
 				$manager->load_plugin("My");
 			}
 		},
@@ -94,6 +91,12 @@ sub new {
 			Padre->ide->plugin_manager->reload_plugins;
 		},
 	);
+	Wx::Event::EVT_MENU( $main,
+		$tools->Append( -1, Wx::gettext("(Re)load Current Plugin") ),
+		sub {
+			Padre->ide->plugin_manager->reload_current_plugin;
+		},
+	);	
 	Wx::Event::EVT_MENU( $main,
 		$tools->Append( -1, Wx::gettext("Test A Plugin From Local Dir") ),
 		sub {

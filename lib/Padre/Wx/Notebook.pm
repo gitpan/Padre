@@ -4,8 +4,8 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::AuiNotebook';
+our $VERSION = '0.29';
+use base 'Wx::AuiNotebook';
 
 sub new {
 	my $class = shift;

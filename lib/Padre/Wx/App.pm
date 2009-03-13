@@ -34,8 +34,8 @@ use Carp         ();
 use Params::Util qw{ _INSTANCE };
 use Padre::Wx    ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::App';
+our $VERSION = '0.29';
+use base 'Wx::App';
 
 
 

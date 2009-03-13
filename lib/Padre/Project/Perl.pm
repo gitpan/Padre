@@ -6,8 +6,8 @@ use strict;
 use warnings;
 use Padre::Project ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Padre::Project';
+our $VERSION = '0.29';
+use base 'Padre::Project';
 
 sub inspector {
 	my $self = shift;

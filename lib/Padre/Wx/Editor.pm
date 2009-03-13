@@ -4,18 +4,30 @@ use 5.008;
 use strict;
 use warnings;
 use YAML::Tiny                ();
+use Padre::Config::Constants  qw{ $PADRE_CONFIG_DIR };
 use Padre::Util               ();
 use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::StyledTextCtrl';
+our $VERSION = '0.29';
+use base 'Wx::StyledTextCtrl';
 
 our %mode = (
 	WIN  => Wx::wxSTC_EOL_CRLF,
 	MAC  => Wx::wxSTC_EOL_CR,
 	UNIX => Wx::wxSTC_EOL_LF,
+);
+
+# mapping for mime-type to the style name in the share/styles/default.yml file
+our %MIME_STYLE = (
+	'application/x-perl' => 'perl',
+	'text/x-patch'       => 'diff',
+	'text/x-makefile'    => 'make',
+	'text/x-yaml'        => 'yaml',
+	'text/css'           => 'css',
+#	'application/x-pasm' => 'pasm',
+	'application/x-php'  => 'perl', # temporary solution
 );
 
 my $data;
@@ -69,7 +81,7 @@ sub data {
 
 	my $file =
 		$private 
-		? File::Spec->catfile( Padre::Config->default_dir , 'styles', "$name.yml" )
+		? File::Spec->catfile( $PADRE_CONFIG_DIR, 'styles', "$name.yml" )
 		: Padre::Util::sharefile( 'styles', "$name.yml" );
 	my $tdata;
 	eval {
@@ -101,18 +113,8 @@ sub padre_setup {
 	# and Wx::wxUNICODE or wxUSE_UNICODE should be on
 
 	my $mimetype = $self->{Document}->get_mimetype;
-	if ($mimetype eq 'application/x-perl') {
-		$self->padre_setup_style('perl');
-	#} elsif ( $mimetype eq 'application/x-pasm' ) {
-	#	$self->padre_setup_style('pasm');
-	} elsif ( $mimetype eq 'text/x-patch' ) {
-		$self->padre_setup_style('diff');
-	} elsif ( $mimetype eq 'text/x-makefile' ) {
-		$self->padre_setup_style('make');
-	} elsif ( $mimetype eq 'text/x-yaml' ) {
-		$self->padre_setup_style('yaml');
-	} elsif ( $mimetype eq 'text/css' ) {
-		$self->padre_setup_style('css');
+	if ($MIME_STYLE{$mimetype}) {
+		$self->padre_setup_style( $MIME_STYLE{$mimetype} );
 	} elsif ( $mimetype eq 'text/plain' ) {
 		my $filename = $self->{Document}->filename || q{};
 		if ( $filename and $filename =~ /\.([^.]+)$/ ) {

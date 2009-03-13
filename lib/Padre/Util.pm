@@ -28,9 +28,10 @@ use Exporter   ();
 use FindBin    ();
 use File::Spec ();
 use List::Util qw(first);
+use File::Basename ();
 
-our $VERSION   = '0.28';
-our @ISA       = 'Exporter';
+our $VERSION   = '0.29';
+use base 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches _T);
 
 
@@ -246,6 +247,35 @@ sub find_perldiag_translations {
 		}
 	}
 	return sort keys %languages;
+}
+
+=pod
+
+=head2 get_project_dir
+
+Given a file it will try to locate the root directory 
+of the given project. This is a temporary work around till
+we get full project support but it is used by some (SVK)
+plugins.
+
+
+=cut
+
+sub get_project_dir {
+	my $filename = shift;
+
+	my $olddir = File::Basename::dirname($filename);
+	my $dir    = $olddir;
+	while (1) {
+#		print "DIR: $olddir\n     $dir\n";
+		return $dir if -e File::Spec->catfile($dir, 'Makefile.PL');
+		return $dir if -e File::Spec->catfile($dir, 'Build.PL');
+		$olddir = $dir;
+		$dir = File::Basename::dirname($dir);
+
+		last if $olddir eq $dir;
+	}
+	return;
 }
 
 

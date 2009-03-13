@@ -5,14 +5,14 @@ package Padre::DB::Patch;
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use DBI      ();
 use Exporter ();
 
-use vars qw{$VERSION @ISA @EXPORT $FILE};
+use base 'Exporter';
+our (@EXPORT, $FILE);
 BEGIN {
-	@ISA     = 'Exporter';
 	@EXPORT  = qw{
 		file
 		dbh

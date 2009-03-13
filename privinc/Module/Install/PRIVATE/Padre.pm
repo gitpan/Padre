@@ -9,7 +9,7 @@ use FindBin    ();
 use File::Find ();
 
 our $VERSION = '0.26';
-our @ISA     = qw{Module::Install::Base};
+use base qw{ Module::Install::Base };
 
 sub setup_padre {
 	my $self      = shift;
@@ -89,7 +89,7 @@ sub check_wx_version {
 sub nono {
 	my $msg = shift;
 	print STDERR "$msg\n";
-	exit(0);
+	exit(1);
 }
 
 sub make_exe {

@@ -7,7 +7,7 @@ use Params::Util      qw{_INSTANCE};
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 sub new {
 	my $class   = shift;
@@ -126,7 +126,7 @@ sub toggle_enabled {
 		$manager->_plugin_enable($name);
 	}
 	$self->update_labels($name);
-	$self->{parent}->menu->refresh;
+	$self->{parent}->menu->refresh(1);
 	$self->{parent}->Thaw;
 	return;
 }

@@ -7,8 +7,8 @@ use Params::Util   qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::TreeCtrl';
+our $VERSION = '0.29';
+use base 'Wx::TreeCtrl';
 
 sub new {
 	my $class = shift;

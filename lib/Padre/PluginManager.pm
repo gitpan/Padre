@@ -20,17 +20,22 @@ plugins, as well as providing part of the interface to plugin writers.
 
 use strict;
 use warnings;
+
 use Carp                     qw{croak};
+use File::Basename           qw{ dirname };
+use File::Copy               qw{ copy };
 use File::Path               ();
 use File::Spec               ();
+use File::Spec::Functions    qw{ catfile };
 use Scalar::Util             ();
 use Params::Util             qw{_IDENTIFIER _CLASS _INSTANCE};
+use Padre::Config::Constants qw{ :dirs };
 use Padre::Util              ();
 use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 
 
@@ -64,10 +69,13 @@ sub new {
 		parent       => $parent,
 		plugins      => {},
 		plugin_names => [],
-		plugin_dir   => Padre::Config->default_plugin_dir,
+		plugin_dir   => $PADRE_PLUGIN_DIR,
 		par_loaded   => 0,
 		@_,
 	}, $class;
+	
+	# initialize empty My Plugin if needed
+	$self->reset_my_plugin(0);
 
 	return $self;
 }
@@ -132,6 +140,29 @@ sub plugin_objects {
 
 #####################################################################
 # Bulk Plugin Operations
+
+#
+# $pluginmgr->reset_my_plugin( $overwrite );
+#
+# reset the my plugin if needed. if $overwrite is set, remove it first.
+#
+sub reset_my_plugin {
+	my ($self, $overwrite) = @_;
+
+	# do not overwrite it unless stated so.
+	my $dst = catfile( $PADRE_PLUGIN_LIBDIR, 'My.pm' );
+	return if -e $dst && !$overwrite;
+	
+	# find the My Plugin
+	my $src = catfile( dirname($INC{'Padre/Config.pm'}), 'Plugin', 'My.pm' );
+	die "Could not find the original My plugin" unless -e $src;
+
+	# copy the My Plugin
+	unlink $dst;
+	copy($src, $dst) or die "Could not copy the My plugin ($src) to $dst: $!";
+	chmod( 0644, $dst);
+}
+
 
 # Disable (but don't unload) all plugins when Padre exits.
 # Save the plugin enable/disable states for the next startup.
@@ -731,7 +762,58 @@ sub get_menu {
 	return ($label, $menu);
 }
 
+=pod
+
+=head2 reload_current_plugin
+
+When developing a plugin one usually edits the
+files belonging to the plugin (The Padre::Plugin::Wonder itself
+or Padre::Documents::Wonder located in the same project as the plugin
+itself.
+
+This call and the appropriate menu option should be able to load
+(or reload) that plugin.
+
+=cut
+
+sub reload_current_plugin {
+	my $self    = shift;
+	my $main    = $self->parent->wx->main;
+	my $config  = $self->parent->config;
+	my $plugins = $self->plugins;
+
+	return $main->error(Wx::gettext('No document open')) if not $main->current;
+	my $filename = $main->current->filename;
+	return $main->error(Wx::gettext('No filename')) if not $filename;
+
+	# TODO: locate project
+	my $dir = Padre::Util::get_project_dir($filename);
+	return $main->error(Wx::gettext('Could not locate project dir')) if not $dir;
+	$dir = File::Spec->catdir($dir, 'lib'); # TODO shall we relax the assumption of a lib subdir?
+
+	@INC = ($dir, grep {$_ ne $dir} @INC);
+	my ($plugin_filename) = glob File::Spec->catdir($dir, 'Padre', 'Plugin', '*.pm');
+
+	# Load plugin
+	my $plugin = File::Basename::basename($plugin_filename);
+	$plugin =~ s/\.pm$//;
+
+	if ($plugins->{$plugin}) {
+		$self->reload_plugin($plugin);
+	} else {
+		$self->load_plugin($plugin);
+		if ( $self->plugins->{$plugin}->{status} eq 'error' ) {
+			$main->error(sprintf(Wx::gettext("Failed to load the plugin '%s'\n%s"), 
+				$plugin, $self->plugins->{$plugin}->errstr));
+			return;
+		}
+	}
+
+	return;
+}
+
 # TODO: document this.
+# TODO: make it also reload the file?
 sub test_a_plugin {
 	my $self    = shift;
 	my $main    = $self->parent->wx->main;

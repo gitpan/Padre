@@ -1,5 +1,13 @@
 Changes for Perl Application Development and Refactoring Environment
 
+v0.29 2009.03.13
+
+    Initial support for directory browser based on the Outline code (SZABGAB)
+    Improving Padre::Util::get_project_dir (SZABGAB)
+    Eliminate a test failure on non-English locale. (SZABGAB)
+    Internal cleanups & documentation for configuration subsystem (JQUELIN)
+    Require Test::Most for the testing and bail_on compilation errors. (SZABGAB)
+
 v0.28 2009.03.04
 
     Move Wx::Perl::Dialog back to the Padre tree. (SZABGAB)
@@ -17,7 +25,7 @@ v0.27 2009.02.10
     Some fixes in the search menu.
     Improve file type (Perl 5 / Perl 6 ) recognition. (SZABGAB)
     Fix the Windows menu to be able to jump to files. (SZABGAB)
-    Statusbar show status kept accross startup (#200). (JQUELIN)
+    Statusbar visibility kept accross startup (#200). (JQUELIN)
 
 v0.26 2009.02.01
 
@@ -108,7 +116,7 @@ v0.23 2009.01.04
     Plugins now reload correctly (ADAMK)
     Created a basic stub Padre::Manual and moved the information in
         HACKING.txt into Padre::Manual::Hacking and
-	Padre::Manual::Translation (ADAMK)
+    Padre::Manual::Translation (ADAMK)
     Moved more bits of GUI code out of MainWindow and into their own
         classes (ADAMK)
 

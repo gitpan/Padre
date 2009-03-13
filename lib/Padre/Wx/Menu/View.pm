@@ -5,13 +5,14 @@ package Padre::Wx::Menu::View;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx       ();
-use Padre::Locale   ();
-use Padre::Wx::Menu ();
-use Padre::Current  qw{_CURRENT};
+use Padre::Config::Constants qw{ $PADRE_CONFIG_DIR };
+use Padre::Wx                ();
+use Padre::Locale            ();
+use Padre::Wx::Menu          ();
+use Padre::Current           qw{_CURRENT};
 
-our $VERSION = '0.28';
-our @ISA     = 'Padre::Wx::Menu';
+our $VERSION = '0.29';
+use base 'Padre::Wx::Menu';
 
 
 
@@ -86,6 +87,16 @@ sub new {
 		$self->{outline},
 		sub {
 			$_[0]->show_outline( $_[1]->IsChecked );
+		},
+	);
+
+	$self->{directory} = $self->AppendCheckItem( -1,
+		Wx::gettext("Show Directory tree")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{directory},
+		sub {
+			$_[0]->show_directory( $_[1]->IsChecked );
 		},
 	);
 
@@ -356,7 +367,7 @@ sub new {
 		);
 	}
 
-	my $dir = File::Spec->catdir( Padre::Config->default_dir , 'styles' );
+	my $dir = File::Spec->catdir( $PADRE_CONFIG_DIR, 'styles' );
 	my @private_styles =
 		map { substr File::Basename::basename($_), 0, -4 }
 		glob File::Spec->catdir( $dir, '*.yml' );
@@ -480,6 +491,7 @@ sub refresh {
 	$self->{ whitespaces       }->Check( $config->editor_whitespace );
 	$self->{ output            }->Check( $config->main_output );
 	$self->{ outline           }->Check( $config->main_outline );
+	$self->{ directory         }->Check( $config->main_directory );
 	$self->{ functions         }->Check( $config->main_functions );
 	$self->{ lockinterface     }->Check( $config->main_lockinterface );
 	$self->{ indentation_guide }->Check( $config->editor_indentationguides );

@@ -33,6 +33,7 @@ use Padre::Wx::Editor         ();
 use Padre::Wx::Output         ();
 use Padre::Wx::Syntax         ();
 use Padre::Wx::Outline        ();
+use Padre::Wx::Directory      ();
 use Padre::Wx::ToolBar        ();
 use Padre::Wx::Notebook       ();
 use Padre::Wx::StatusBar      ();
@@ -41,8 +42,8 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::Frame';
+our $VERSION = '0.29';
+use base 'Wx::Frame';
 
 use constant SECONDS => 1000;
 
@@ -64,6 +65,7 @@ use Class::XSAccessor
 		right       => 'right',
 		functions   => 'functions',
 		outline     => 'outline',
+		directory   => 'directory',
 		bottom      => 'bottom',
 		output      => 'output',
 		syntax      => 'syntax',
@@ -185,12 +187,6 @@ sub new {
 	# Create the status bar
 	my $statusbar = Padre::Wx::StatusBar->new($self);
 	$self->SetStatusBar($statusbar);
-	# show the statusbar if needed.
-	if ( $self->config->main_statusbar ) {
-		$statusbar->Show;
-	} else {
-		$statusbar->Hide;
-	}
 
 	# Create the three notebooks (document and tools) that
 	# serve as the main AUI manager GUI elements.
@@ -201,6 +197,7 @@ sub new {
 	# Creat the various tools that will live in the panes
 	$self->{functions} = Padre::Wx::FunctionList->new($self);
 	$self->{outline}   = Padre::Wx::Outline->new($self);
+	$self->{directory} = Padre::Wx::Directory->new($self);
 	$self->{output}    = Padre::Wx::Output->new($self);
 	$self->{syntax}    = Padre::Wx::Syntax->new($self);
 	$self->{errorlist} = Padre::Wx::ErrorList->new($self);
@@ -253,6 +250,7 @@ sub new {
 	# Show the tools that the configuration dictates
 	$self->show_functions( $self->config->main_functions );
 	$self->show_outline( $self->config->main_outline );
+	$self->show_directory( $self->config->main_directory );
 	$self->show_output( $self->config->main_output );
 
 	# Load the saved pane layout from last time (if any)
@@ -269,7 +267,9 @@ sub new {
 	# (we had an issue that if the default of main_statusbar was false it did not show
 	# the status bar which is ok, but then when we selected the menu to show it, it showed
 	# at the top)
+	# so now we always turn the status bar on at the beginning and hide it in the timer, if it was not needed
 	# TODO: there might be better ways to fix that issue...
+	$statusbar->Show;
 	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT );
 	Wx::Event::EVT_TIMER(
 		$self,
@@ -403,13 +403,17 @@ sub timer_post_init {
 	# Load all files and refresh the application so that it
 	# represents the loaded state.
 	$self->load_files;
-	$self->on_toggle_statusbar;
-	Padre->ide->plugin_manager->enable_editors_for_all;
-	if ( $self->menu->view->{show_syntaxcheck}->IsChecked ) {
-		$self->show_syntax(1);
+	# canot use the toggle sub here as that one reads from the Menu and 
+	# on some machines the Menu is not configured yet at this point.
+	if ( $self->config->main_statusbar ) {
+		$self->GetStatusBar->Show;
+	} else {
+		$self->GetStatusBar->Hide;
 	}
+	Padre->ide->plugin_manager->enable_editors_for_all;
 
-	if ( $self->menu->view->{show_errorlist}->IsChecked ) {
+	$self->show_syntax( $self->config->main_syntaxcheck );
+	if ($self->config->main_errorlist) {
 		$self->errorlist->enable;
 	}
 	
@@ -479,7 +483,7 @@ sub refresh {
 	my $guard = $self->freezer;
 
 	my $current = $self->current;
-	$self->refresh_menu($current);
+	$self->refresh_menu;
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 	$self->refresh_functions($current);
@@ -513,7 +517,7 @@ sub refresh_syntaxcheck {
 sub refresh_menu {
 	my $self = shift;
 	return if $self->no_refresh;
-	$self->menu->refresh($_[0] or $self->current);
+	$self->menu->refresh;
 }
 
 sub refresh_toolbar {
@@ -667,6 +671,7 @@ sub reconfig {
 	# Show or hide all the main gui elements
 	$self->show_functions( $config->main_functions   );
 	$self->show_outline(   $config->main_outline     );
+	$self->show_directory(   $config->main_directory );
 	$self->show_output(    $config->main_output      );
 	$self->show_syntax(    $config->main_syntaxcheck );
 
@@ -846,7 +851,8 @@ sub run_document {
 	unless ( $document->can('get_command') ) {
 		return $self->error(Wx::gettext("No execution mode was defined for this document"));
 	}
-
+	my $argv = $self->prompt("Command line parameters", "", "RUN_COMMAND_LINE_PARAMS") || '';
+	
 	my $cmd = eval { $document->get_command($debug) };
 	if ( $@ ) {
 		chomp $@;
@@ -855,6 +861,7 @@ sub run_document {
 	}
 	if ( $cmd ) {
 		if ($document->pre_process) {
+			$cmd .= " $argv";
 			$self->run_command( $cmd );
 		} else {
 			$self->error( $document->errstr );
@@ -1455,7 +1462,7 @@ sub on_save_as {
 			Wx::wxFD_SAVE,
 		);
 		if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-			return 0;
+			return;
 		}
 		my $filename = $dialog->GetFilename;
 		$self->{cwd} = $dialog->GetDirectory;
@@ -1496,16 +1503,21 @@ sub on_save_as {
 	return 1;
 }
 
+# returns true if document saved
+# returns fals if document was not could not save it.
 sub on_save {
 	my $self     = shift;
-	my $document = $self->current->document or return;
+	my $document = shift || $self->current->document;
+	return unless $document;
+	#print $document->filename, "\n";
 
+	my $pageid = $self->find_id_of_editor( $document->editor );
 	if ( $document->is_new ) {
+		# move focus to document to be saved
+		$self->on_nth_pane( $pageid );
 		return $self->on_save_as;
-	}
-	if ( $document->is_modified ) {
-		my $pageid = $self->notebook->GetSelection;
-		$self->_save_buffer($pageid);
+	} elsif ( $document->is_modified ) {
+		return $self->_save_buffer($pageid);
 	}
 
 	return;
@@ -1516,12 +1528,16 @@ sub on_save {
 sub on_save_all {
 	my $self = shift;
 	foreach my $id ( $self->pageids ) {
-		my $doc = $self->notebook->GetPage($id) or next;
-		$self->on_save( $doc ) or return 0;
+		my $editor = $self->notebook->GetPage($id) or next;
+		my $doc = $editor->{Document}; # TODO no accessor for document?
+		if ($doc->is_modified) {
+			$self->on_save( $doc ) or return 0;
+		}
 	}
 	return 1;
 }
 
+# returns true if buffer saved, fals if not
 sub _save_buffer {
 	my ($self, $id) = @_;
 
@@ -1551,7 +1567,7 @@ sub _save_buffer {
 	$page->SetSavePoint;
 	$self->refresh;
 
-	return;
+	return 1;
 }
 
 # Returns true if closed.
@@ -1607,6 +1623,7 @@ sub close {
 
 	$self->syntax->clear;
 	$self->outline->clear;
+	$self->directory->clear;
 
 	# Remove the entry from the Window menu
 	$self->menu->window->refresh($self->current);
@@ -1930,6 +1947,30 @@ sub show_outline {
 	return;
 }
 
+sub show_directory {
+	my $self = shift;
+	my $directory = $self->directory;
+
+	my $on   = ( @_ ? ($_[0] ? 1 : 0) : 1 );
+	unless ( $on == $self->menu->view->{directory}->IsChecked ) {
+		$self->menu->view->{directory}->Check($on);
+	}
+	$self->config->set( main_directory => $on );
+
+	if ( $on ) {
+		$self->right->show($directory);
+		$directory->update_gui;
+		#$directory->start unless $directory->running;
+	} else {
+		$self->right->hide($directory);
+		#$directory->stop if $directory->running;
+	}
+
+	$self->aui->Update;
+
+	return;
+}
+
 
 
 
@@ -2104,6 +2145,20 @@ sub find_editor_of_file {
 	return;
 }
 
+# TODO can this really work? What happens when we split a window?
+sub find_id_of_editor {
+	my $self     = shift;
+	my $editor   = shift;
+	my $notebook = $self->notebook;
+	foreach my $id ( $self->pageids ) {
+		if ($editor eq $notebook->GetPage($id)) {
+			return $id;
+		}
+	}
+	return;
+}
+
+
 sub run_in_padre {
 	my $self = shift;
 	my $doc  = $self->current->document or return;
@@ -2151,7 +2206,7 @@ sub on_stc_style_needed {
 
 }
 
-
+# called on every movement of the cursor
 sub on_stc_update_ui {
 	my $self    = shift;
 
@@ -2167,12 +2222,16 @@ sub on_stc_update_ui {
 
 	# avoid refreshing the subs as that takes a lot of time
 	# TODO maybe we should refresh it on every 20s hit or so
-	$self->refresh_menu($current);
+	$self->refresh_menu;
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 	#$self->refresh_functions;
 	#$self->refresh_syntaxcheck;
 
+	# TODO move this to a more appropriate place (when switching between buffers?)
+	if (my $directory = $self->directory) {
+		$directory->update_gui;
+	}
 	return;
 }
 

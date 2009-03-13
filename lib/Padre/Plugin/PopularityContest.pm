@@ -69,8 +69,8 @@ use strict;
 use warnings;
 use Padre::Plugin ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Padre::Plugin';
+our $VERSION = '0.29';
+use base 'Padre::Plugin';
 
 
 

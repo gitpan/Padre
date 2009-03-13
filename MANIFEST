@@ -35,6 +35,7 @@ inc/Module/Install/WriteAll.pm
 lib/Padre.pm
 lib/Padre/Autosave.pm
 lib/Padre/Config.pm
+lib/Padre/Config/Constants.pm
 lib/Padre/Config/Host.pm
 lib/Padre/Config/Human.pm
 lib/Padre/Config/Patch.pm
@@ -102,6 +103,7 @@ lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/Text.pm
+lib/Padre/Wx/Directory.pm
 lib/Padre/Wx/DocBrowser.pm
 lib/Padre/Wx/Editor.pm
 lib/Padre/Wx/ErrorList.pm

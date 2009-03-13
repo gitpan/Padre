@@ -5,8 +5,8 @@ use warnings;
 use Padre::Task    ();
 use Padre::Current ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Padre::Task';
+our $VERSION = '0.29';
+use base 'Padre::Task';
 
 =pod
 

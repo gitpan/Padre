@@ -1,5 +1,5 @@
 ---
-abstract: "Perl Application Development and Refactoring Environment\r"
+abstract: 'Perl Application Development and Refactoring Environment'
 author:
   - 'Gabor Szabo'
 build_requires:
@@ -7,6 +7,7 @@ build_requires:
   Test::Compile: 0.08
   Test::Exception: 0.27
   Test::More: 0.47
+  Test::Most: 0.21
   Test::NoWarnings: 0.084
   Test::Script: 1.03
 distribution_type: module
@@ -44,7 +45,7 @@ requires:
   File::Find::Rule: 0.30
   File::HomeDir: 0.82
   File::ShareDir: 1.00
-  File::ShareDir::PAR: 0.03
+  File::ShareDir::PAR: 0.04
   File::Spec: 3.2701
   File::Spec::Functions: 3.2701
   File::Which: 0.05
@@ -63,7 +64,7 @@ requires:
   Module::Starter: 1.50
   ORLite: 1.18
   ORLite::Migrate: 0.01
-  PAR: 0.970
+  PAR: 0.989
   POSIX: 0
   PPI: 1.203
   Params::Util: 0.33
@@ -90,4 +91,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.28
+version: 0.29

@@ -7,8 +7,8 @@ use warnings;
 use Padre::Wx             ();
 use Padre::Wx::HtmlWindow ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::Frame';
+our $VERSION = '0.29';
+use base 'Wx::Frame';
 
 sub new {
 	my $class = shift;

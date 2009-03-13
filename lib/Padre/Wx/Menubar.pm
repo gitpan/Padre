@@ -17,7 +17,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 
 
@@ -105,6 +105,8 @@ sub new {
 
 sub refresh {
 	my $self     = shift;
+	my $plugins  = shift;
+
 	my $current  = _CURRENT(@_);
 	my $menu     = $self->wx->GetMenuCount ne $self->{default};
 	my $document = !! _INSTANCE(
@@ -126,7 +128,12 @@ sub refresh {
 	$self->view->refresh($current);
 	$self->run->refresh($current);
 	$self->perl->refresh($current);
-	$self->plugins->refresh($current);
+	
+# plugin menu requires special flag as it was leaking memory
+# TODO eliminate the memory leak
+	if ( $plugins ) {
+		$self->plugins->refresh($current);
+	}
 	$self->window->refresh($current);
 	$self->help->refresh($current);
 

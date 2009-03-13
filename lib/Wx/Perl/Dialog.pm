@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 use Wx ':everything';
 
@@ -58,6 +58,12 @@ Where $win is the Wx::Frame of your application.
 
 This is still an alpha version of the code. It is used mainly by L<Padre> and its
 plugins. The API can change without any warning.
+
+
+Actually as of version 0.28 we have move this code back to the Padre distribution
+in order to make it easier for the Padre developers to improve it.
+
+
 
 
 =head1 DESCRIPTION

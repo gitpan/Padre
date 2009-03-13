@@ -12,8 +12,8 @@ use Encode       ();
 use Params::Util ();
 use Padre::Wx    ();
 
-our $VERSION = '0.28';
-our @ISA     = 'Wx::TextCtrl';
+our $VERSION = '0.29';
+use base 'Wx::TextCtrl';
 
 sub new {
 	my $class = shift;

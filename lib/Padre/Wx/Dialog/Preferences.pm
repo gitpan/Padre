@@ -8,7 +8,7 @@ use Padre::Current ();
 
 use base qw(Padre::Wx::Dialog);
 
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 sub _new_panel {
 	my ($self, $parent) = splice( @_, 0, 2 );
@@ -85,7 +85,7 @@ sub _behaviour_panel {
 	
 	Wx::Event::EVT_BUTTON( $panel,
 		$self->get_widget('_guess_'),
-		sub { warn Dumper([@_]); $self->guess_indentation_settings },
+		sub { $self->guess_indentation_settings },
 	);
 
 	return $panel;

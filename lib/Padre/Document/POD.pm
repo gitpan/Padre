@@ -4,8 +4,8 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.28';
-our @ISA     = 'Padre::Document';
+our $VERSION = '0.29';
+use base 'Padre::Document';
 
 1;
 # Copyright 2008-2009 The Padre development team as listed in Padre.pm.

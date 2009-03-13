@@ -19,6 +19,7 @@ use Data::Dumper qw(Dumper);
 use Test::NoWarnings;
 use t::lib::Padre;
 use Padre;
+use Padre::Config::Constants qw{ $PADRE_PLUGIN_DIR };
 use Padre::PluginManager;
 
 my $padre = Padre->new;
@@ -29,8 +30,8 @@ SCOPE: {
 	isa_ok( $manager, 'Padre::PluginManager' );
 	is(
 		$manager->plugin_dir,
-		Padre::Config->default_plugin_dir,
-		'->default_plugin_dir ok',
+		$PADRE_PLUGIN_DIR,
+		'->plugin_dir ok',
 	);
 	is( keys %{$manager->plugins}, 0, 'Found no plugins' );
 	ok(
@@ -89,14 +90,16 @@ SCOPE: {
 	my $manager  = Padre::PluginManager->new($padre);
 	$manager->load_plugin('A');
 	is $manager->plugins->{'A'}->{status}, 'error', 'error in loading A';
+	my $msg1 = qr/.*/;  # set to qr/Failed to load module/ if locale is English
 	like $manager->plugins->{'A'}->errstr, 
-		qr/^Plugin:A - Failed to load module: Global symbol "\$syntax_error" requires explicit package name at/,
+		qr/^Plugin:A - $msg1: Global symbol "\$syntax_error" requires explicit package name at/,
 		'text of error message';
 
 	$manager->load_plugin('B');
 	is $manager->plugins->{'B'}->{status}, 'error', 'error in loading B';
-	is $manager->plugins->{'B'}->errstr,
-		'Plugin:B - Not compatible with Padre::Plugin API. Need to be subclass of Padre::Plugin',
+	my $msg2 = qr/.*/; # set to qr/Not compatible with Padre::Plugin API. Need to be subclass of Padre::Plugin/
+	like $manager->plugins->{'B'}->errstr,
+		qr/^Plugin:B - $msg2/,
 		'text of error message';
 
 	$manager->load_plugin('C');

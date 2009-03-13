@@ -11,8 +11,8 @@ BEGIN {
 	}
 }
 # Move to Run menux
-#plan( tests => 63 );
-plan( tests => 62 );
+plan( tests => 63 );
+#plan( tests => 62 );
 use Test::NoWarnings;
 use t::lib::Padre;
 use Padre;
@@ -36,6 +36,7 @@ SCOPE: {
 	is( $config->main_functions           => 0              );
 	is( $config->main_functions_order     => 'alphabetical' );
 	is( $config->main_outline             => 0              );
+	is( $config->main_directory           => 0              );
 	is( $config->main_output              => 0              );
 	is( $config->main_output_ansi         => 1              );
 	is( $config->main_syntaxcheck         => 0              );
