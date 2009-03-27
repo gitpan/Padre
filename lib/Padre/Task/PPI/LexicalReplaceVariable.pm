@@ -3,7 +3,7 @@ package Padre::Task::PPI::LexicalReplaceVariable;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 use base 'Padre::Task::PPI';
 use Padre::Wx ();
@@ -78,8 +78,9 @@ sub process_ppi {
 		$self->{error} = "no declaration";
 		return;
 	}
-	my $scope = $declaration->parent;
-	while ( not $scope->isa('Padre::Document') and not $scope->isa('PPI::Structure::Block') ) {
+
+	my $scope = $declaration;
+	while ( not $scope->isa('PPI::Document') and not $scope->isa('PPI::Structure::Block') ) {
 		$scope = $scope->parent;
 	}
 
@@ -90,11 +91,20 @@ sub process_ppi {
 	# for finding symbols in quotelikes and regexes
 	my %unique;
 	my $finder_regexp = '(?:'
-	                    . join('|', map {quotemeta($_)} grep {!$unique{$_}++} ($varname, $token_str))
-	                    . ')';
+		. join(
+			'|',
+			map { quotemeta($_) }
+			grep { tr/$@%*// == 1 and !$unique{$_}++ }
+			map { my $name = $_; $name =~ s/^\$//; ($_, "\${$name}") }
+			($varname, $token_str)
+		)
+	. ')';
+
 	$finder_regexp = qr/$finder_regexp/;
 
 	my $replacement = $self->{replacement};
+	my $replacement_curlies = $replacement . "}";
+	$replacement_curlies =~ s/([\$@%\*])/$1\{/;
 
 	$scope->find(
 		sub {
@@ -107,7 +117,7 @@ sub process_ppi {
 			}
 			elsif ($node->isa("PPI::Token")) { # the case of potential quotelikes and regexes
 				my $str = $node->content;
-				if ($str =~ s/($finder_regexp)/$replacement/g) {
+				if ($str =~ s{($finder_regexp)}<$1 =~ tr/{// ? $replacement_curlies : $replacement>ge) {
 					# TODO do this without breaking encapsulation!
 					$node->{content} = $str;
 				}

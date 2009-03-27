@@ -8,7 +8,7 @@ use warnings;
 use Params::Util qw{_INSTANCE};
 use Padre::Wx    ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 # Due to an overly simplistic implementation at the C level,
 # Wx::AuiManager is only a SCALAR reference and cannot be
@@ -41,10 +41,10 @@ sub new {
 	return $self;
 }
 
-sub caption_gettext {
+sub caption {
 	my $self = shift;
 	$self->{caption}->{$_[0]} = $_[1];
-	$self->GetPane($_[0])->Caption( Wx::gettext($_[1]) );
+	$self->GetPane($_[0])->Caption( $_[1] );
 	return 1;
 }
 

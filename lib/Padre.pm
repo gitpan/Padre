@@ -19,11 +19,12 @@ use Getopt::Long   ();
 use YAML::Tiny     ();
 use DBI            ();
 use Class::Autouse ();
-# load this before things are messed up to produce versions like '0,76'! 
-# TODO: Bug report dispatched. Likely to be fixed in 0.77.
-use version        ();
 
-our $VERSION = '0.29';
+# load this before things are messed up to produce versions like '0,76'!
+# TODO: Bug report dispatched. Likely to be fixed in 0.77.
+use version ();
+
+our $VERSION = '0.30';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -78,22 +79,28 @@ use Class::Autouse qw{
 };
 
 # Generate faster accessors
-use Class::XSAccessor
-	getters => {
-		original_cwd   => 'original_cwd',
-		config         => 'config',
-		wx             => 'wx',
-		task_manager   => 'task_manager',
-		plugin_manager => 'plugin_manager',
-	};
+use Class::XSAccessor getters => {
+	original_cwd   => 'original_cwd',
+	config         => 'config',
+	wx             => 'wx',
+	task_manager   => 'task_manager',
+	plugin_manager => 'plugin_manager',
+};
 
-# Globally shared detection of the "curent" Perl
-sub perl_interpreter {
-	require Probe::Perl;
-	my $perl = Probe::Perl->find_perl_interpreter;
-	return $perl if $perl;
-	require File::Which;
-	return scalar File::Which::which('perl');
+# Globally shared detection of the "current" Perl
+{
+	my $perl_interpreter;
+
+	sub perl_interpreter {
+		return $perl_interpreter if defined $perl_interpreter;
+		require Probe::Perl;
+		my $perl = Probe::Perl->find_perl_interpreter;
+		$perl_interpreter = $perl, return $perl if defined $perl;
+		require File::Which;
+		$perl             = scalar File::Which::which('perl');
+		$perl_interpreter = $perl;
+		return $perl;
+	}
 }
 
 my $SINGLETON = undef;
@@ -110,14 +117,15 @@ sub new {
 
 	# Create the empty object
 	my $self = $SINGLETON = bless {
+
 		# Wx Attributes
-		wx             => undef,
+		wx => undef,
 
 		# Plugin Attributes
 		plugin_manager => undef,
 
 		# Project Attributes
-		project        => {},
+		project => {},
 	}, $class;
 
 	# Save the startup dir before anyone can move us.
@@ -133,9 +141,7 @@ sub new {
 	$self->{wx} = Padre::Wx::App->new($self);
 
 	# Create the task manager
-	$self->{task_manager} = Padre::TaskManager->new(
-		use_threads => $self->config->threads,
-	);
+	$self->{task_manager} = Padre::TaskManager->new( use_threads => $self->config->threads, );
 
 	return $self;
 }
@@ -144,18 +150,18 @@ sub run {
 	my $self = shift;
 
 	# Handle architectural command line options
-	foreach my $M ( grep { /^-M/ } @ARGV ) {
-		my $module = substr($M, 2);
-		eval "use $module"; ## no critic
+	foreach my $M ( grep {/^-M/} @ARGV ) {
+		my $module = substr( $M, 2 );
+		eval "use $module";    ## no critic
 		die $@ if $@;
 	}
-	@ARGV = grep { ! /^-M/ } @ARGV;
+	@ARGV = grep { !/^-M/ } @ARGV;
 
 	# FIXME: RT #1 This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
 	$self->plugin_manager->load_plugins;
 
-	$self->{ARGV} = [ map {File::Spec->rel2abs( $_, $self->{original_cwd} )} @ARGV ];
+	$self->{ARGV} = [ map { File::Spec->rel2abs( $_, $self->{original_cwd} ) } @ARGV ];
 
 	# Move our current dir to the user's documents directory by default
 	my $documents = File::HomeDir->my_documents;
@@ -178,10 +184,6 @@ sub save_config {
 	$_[0]->config->write;
 }
 
-
-
-
-
 #####################################################################
 # Project Management
 
@@ -190,9 +192,7 @@ sub project {
 	my $root = shift;
 	unless ( $self->{project}->{$root} ) {
 		my $class = Padre::Project->class($root);
-		$self->{project}->{$root} = $class->new(
-			root => $root,
-		);
+		$self->{project}->{$root} = $class->new( root => $root, );
 	}
 	return $self->{project}->{$root};
 }
@@ -1058,6 +1058,8 @@ Adam Kennedy (ADAMK) E<lt>adamk@cpan.orgE<gt>
 Breno G. de Oliveira (GARU)
 
 Brian Cassidy (BRICAS)
+
+Cezary Morga (THEREK) E<lt>cm@therek.netE<gt>
 
 Chris Dolan (CHRISDOLAN)
 

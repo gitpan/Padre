@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Wx::AuiNotebook';
 
 sub new {
@@ -39,7 +39,7 @@ sub new {
 			->Dockable(1)
 			->Layer(1)
 	);
-	$main->aui->caption_gettext('notebook' => 'Files');
+	$main->aui->caption('notebook' => Wx::gettext('Files'));
 
 	Wx::Event::EVT_AUINOTEBOOK_PAGE_CHANGED(
 		$self,

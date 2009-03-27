@@ -9,14 +9,13 @@ use strict;
 use warnings;
 
 use Carp          qw{ croak              };
-use File::Spec    qw{ catfile            };
 use Params::Util  qw{ _HASH0             };
 use Storable      qw{ dclone             };
 use YAML::Tiny    qw{ DumpFile LoadFile  };
 
 use Padre::Config::Constants qw{ $CONFIG_FILE_USER };
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 my $REVISION = 1;		# config schema revision
 

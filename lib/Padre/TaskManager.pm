@@ -66,7 +66,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 # According to Wx docs,
 # this MUST be loaded before Wx,
@@ -84,7 +84,6 @@ use Class::XSAccessor
 		task_queue     => 'task_queue',
 		reap_interval  => 'reap_interval',
 		use_threads    => 'use_threads',
-		running_tasks  => 'running_tasks',
 		max_no_workers => 'max_no_workers',
 	};
 
@@ -94,6 +93,9 @@ our $TASK_DONE_EVENT : shared = Wx::NewEventType;
 # This event is triggered by the worker thread main loop before
 # running a task.
 our $TASK_START_EVENT : shared = Wx::NewEventType;
+
+# remember whether the event handlers were initialized...
+our $EVENTS_INITIALIZED = 0;
 
 # Timer to reap dead workers every N milliseconds
 our $REAP_TIMER;
@@ -117,16 +119,19 @@ sub new {
 		@_,
 		workers        => [],
 		task_queue     => undef,
-		running_tasks  => 0,
+		running_tasks  => {},
 	}, $class;
 
 	$self->{use_threads} = 0 if Wx->VERSION < 0.89;
 
 	my $main = Padre->ide->wx->main;
 
-	Wx::Event::EVT_COMMAND($main, -1, $TASK_DONE_EVENT, \&on_task_done_event);
-	Wx::Event::EVT_COMMAND($main, -1, $TASK_START_EVENT, \&on_task_start_event);
-	Wx::Event::EVT_CLOSE($main, \&on_close);
+	if (not $EVENTS_INITIALIZED) {
+		Wx::Event::EVT_COMMAND($main, -1, $TASK_DONE_EVENT, \&on_task_done_event);
+		Wx::Event::EVT_COMMAND($main, -1, $TASK_START_EVENT, \&on_task_start_event);
+		Wx::Event::EVT_CLOSE($main, \&on_close);
+		$EVENTS_INITIALIZED = 1;
+	}
  
 	$self->{task_queue} = Thread::Queue->new;
 
@@ -159,9 +164,9 @@ proxy to this method for convenience.
 =cut
 
 sub schedule {
-	my $self    = shift;
-	my $process = shift;
-	if ( not ref($process) or not $process->isa("Padre::Task") ) {
+	my $self = shift;
+	my $task = shift;
+	if ( not ref($task) or not $task->isa("Padre::Task") ) {
 		die "Invalid task scheduled!"; # TODO: grace
 	}
 
@@ -169,13 +174,13 @@ sub schedule {
 	$self->reap();
 	
 	# prepare and stop if vetoes
-	my $return = $process->prepare();
-	if ($return and $return =~ /^break$/) {
+	my $return = $task->prepare();
+	if ($return and $return =~ /^break$/i) {
 		return;
 	}
 
 	my $string;
-	$process->serialize(\$string);
+	$task->serialize(\$string);
 	if ( $self->use_threads ) {
 		require Time::HiRes;
 		# This is to make sure we don't indefinitely fill the
@@ -275,6 +280,9 @@ sub reap {
 
 	foreach my $thread (@$workers) {
 		if ($thread->is_joinable()) {
+			my $tid = $thread->tid();
+			# clean up the running task if necessary (case of crashed thread)
+			$self->_stop_task($tid);
 			my $tmp = $thread->join();
 		}
 		else {
@@ -310,6 +318,29 @@ sub reap {
 	$self->setup_workers();
 
 	return 1;
+}
+
+
+sub _stop_task {
+	my $self = shift;
+	my $tid = shift;
+	my $task_type = shift;
+
+	my $running = $self->{running_tasks};
+
+	if (not defined $task_type) { # attempt cleanup after crash
+		foreach my $task_type (keys %$running) {
+			delete $running->{$task_type}{$tid};
+			delete $running->{$task_type} if not keys %{$running->{$task_type}};
+		}
+	}
+	else {
+		delete $running->{$task_type}{$tid};
+		delete $running->{$task_type} if not keys %{$running->{$task_type}};
+	}
+	
+	Padre->ide->wx->main->GetToolBar->update_task_status();
+	return(1);
 }
 
 =pod
@@ -362,6 +393,23 @@ regulary cleanup runs.
 Returns whether running in degraded mode (no threads, false)
 or normal operation (threads, true).
 
+=head2 running_tasks
+
+Returns the number of tasks that are currently being executed.
+
+=cut
+
+sub running_tasks {
+	my $self = shift;
+	my $n = 0;
+	foreach my $task_type_hash (values %{$self->{running_tasks}}) {
+		$n += keys %$task_type_hash;
+	}
+	return $n;
+}
+
+=pod
+
 =head2 workers
 
 Returns B<a list> of the worker threads.
@@ -390,9 +438,8 @@ sub on_close {
 	# TODO/FIXME:
 	# This should somehow get at the specific TaskManager object
 	# instead of going through the Padre globals!
-	Padre->ide->{task_manager}->cleanup();
+	Padre->ide->task_manager->cleanup();
 
-	# TODO: understand cargo cult
 	$event->Skip(1);
 }
 
@@ -411,15 +458,18 @@ because C<finish> most likely updates the GUI.)
 sub on_task_done_event {
 	my ($main, $event) = @_; @_ = (); # hack to avoid "Scalars leaked"
 	my $frozen = $event->GetData;
-	my $process = Padre::Task->deserialize( \$frozen );
+	my $task = Padre::Task->deserialize( \$frozen );
 
-	$process->finish($main);
+	$task->finish($main);
+	my $tid = $task->{__thread_id};
 
 	# TODO/FIXME:
 	# This should somehow get at the specific TaskManager object
 	# instead of going through the Padre globals!
-	Padre->ide->task_manager->{running_tasks}--;
-	$main->GetToolBar->update_task_status();
+	my $manager = Padre->ide->task_manager;
+	my $running = $manager->{running_tasks};
+	my $task_type = ref($task);
+	$manager->_stop_task($tid, $task_type);
 
 	return();
 }
@@ -439,10 +489,59 @@ sub on_task_start_event {
 	# TODO/FIXME:
 	# This should somehow get at the specific TaskManager object
 	# instead of going through the Padre globals!
-	Padre->ide->task_manager->{running_tasks}++;
+	my $manager = Padre->ide->task_manager;
+	my $tid_and_task_type = $event->GetData();
+	my ($tid, $task_type) = split /;/, $tid_and_task_type, 2;
+	$manager->{running_tasks}{$task_type}{$tid} = 1;
 	$main->GetToolBar->update_task_status();
 
 	return();
+}
+
+=pod
+
+=head2 on_dump_running_tasks
+
+Called by the toolbar task-status button.
+Dumps the list of running tasks to the output panel.
+
+=cut
+
+sub on_dump_running_tasks {
+	my $ide = Padre->ide;
+	my $manager = $ide->task_manager;
+	my $nrunning = $manager->running_tasks();
+
+	my $main = $ide->wx->main;
+	my $output = $main->output;
+	$main->show_output(1);
+	$output->style_neutral;
+
+	$output->AppendText("\n-----------------------------------------\n[" . localtime() . "] ");
+	if ($nrunning == 0) {
+		$output->AppendText("Currently, no background tasks are being executed.\n");
+		return();
+	}
+
+	my $running = $manager->{running_tasks};
+	my $text;
+	$text .= "The following tasks are currently executing in the background:\n";
+
+	foreach my $type (keys %$running) {
+		my $threads = $running->{$type};
+		my $n = keys %$threads;
+		$text .= "- $n of type '$type':\n";
+		$text .= "  (in thread(s) " . join(", ", sort {$a <=> $b} values %$threads) . ")\n";
+	}
+
+	$output->AppendText($text);
+
+	my $queue = $manager->task_queue;
+	my $pending = $queue->pending;
+
+	if ($pending) {
+		$output->AppendText("\nAdditionally, there are $pending tasks pending execution.\n");
+	}
 }
 
 ##########################
@@ -456,26 +555,27 @@ sub worker_loop {
 
 	#warn threads->tid() . " -- Hi, I'm a thread.";
 
-	while (my $task = $queue->dequeue ) {
+	while (my $frozen_task = $queue->dequeue ) {
 
 		#warn threads->tid() . " -- got task.";
 
 		#warn("THREAD TERMINATING"), return 1 if not ref($task) and $task eq 'STOP';
-		return 1 if not ref($task) and $task eq 'STOP';
+		return 1 if not ref($frozen_task) and $frozen_task eq 'STOP';
 
-		my $thread_start_event = Wx::PlThreadEvent->new( -1, $TASK_START_EVENT, 0 );
+		my $task = Padre::Task->deserialize( \$frozen_task );
+		$task->{__thread_id} = threads->tid();
+
+		my $thread_start_event = Wx::PlThreadEvent->new( -1, $TASK_START_EVENT, $task->{__thread_id} . ";" . ref($task) );
 		Wx::PostEvent($main, $thread_start_event);
-
-		my $process = Padre::Task->deserialize( \$task);
 		
 		# RUN
-		$process->run();
+		$task->run();
 
 		# FREEZE THE PROCESS AND PASS IT BACK
-		undef $task;
-		$process->serialize( \$task );
+		undef $frozen_task;
+		$task->serialize( \$frozen_task );
 
-		my $thread_done_event = Wx::PlThreadEvent->new( -1, $TASK_DONE_EVENT, $task );
+		my $thread_done_event = Wx::PlThreadEvent->new( -1, $TASK_DONE_EVENT, $frozen_task );
 		Wx::PostEvent($main, $thread_done_event);
 
 		#warn threads->tid() . " -- done with task.";

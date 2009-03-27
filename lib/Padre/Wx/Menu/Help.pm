@@ -11,7 +11,7 @@ use Padre::Wx                ();
 use Padre::Wx::Menu          ();
 use Padre::Wx::DocBrowser    ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Padre::Wx::Menu';
 
 
@@ -156,6 +156,7 @@ sub about {
 	$about->AddDeveloper("Ahmad Zawawi - أحمد محمد زواوي");
     $about->AddDeveloper("Breno G. de Oliveira");
 	$about->AddDeveloper("Brian Cassidy");
+	$about->AddDeveloper("Cezary Morga");
 	$about->AddDeveloper("Chris Dolan");
 	$about->AddDeveloper("Claudio Ramirez");
 	$about->AddDeveloper("Fayland Lam");

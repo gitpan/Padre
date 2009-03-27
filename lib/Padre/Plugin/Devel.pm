@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Padre::Plugin';
 
 
@@ -61,12 +61,16 @@ sub menu_plugins_simple {
 		'---'                       => undef,
 		'Dump Current Document'     => 'dump_document',
 		'Dump Top IDE Object'       => 'dump_padre',
-		'Dump %INC HASH'            => 'dump_inc',
+		'Dump %INC and @INC'        => 'dump_inc',
 		'---'                       => undef,
 		'Simulate Crash'            => 'simulate_crash',
+		'Simulate Crashing Bg Task' => 'simulate_task_crash',
 		'---'                       => undef,
 		'wxWidgets 2.8.8 Reference' => sub {
 			Wx::LaunchDefaultBrowser('http://docs.wxwidgets.org/2.8.8/');
+		},
+		'STC Reference' => sub {
+			Wx::LaunchDefaultBrowser('http://www.yellowbrain.com/stc/index.html');
 		},
 		'---'                       => undef,
 		'About'                     => 'show_about',
@@ -103,13 +107,19 @@ sub dump_padre {
 
 sub dump_inc {
 	my $self = shift;
-	return $self->_dump( \%INC );
+	return $self->_dump( \%INC, \@INC );
 }
 
 sub simulate_crash {
 	require POSIX;
 	POSIX::_exit();
 }
+
+sub simulate_task_crash {
+	require Padre::Task::Debug::Crashing;
+	Padre::Task::Debug::Crashing->new()->schedule();
+}
+
 
 sub show_about {
 	my $self  = shift;

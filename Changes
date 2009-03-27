@@ -1,5 +1,20 @@
 Changes for Perl Application Development and Refactoring Environment
 
+v0.30 2009.03.27
+
+    Remove Test::Compile from the prereqs as well as it is not in use. (SZABGAB)
+    New GUI for selecting and installing CPAN modules. (SZABGAB)
+    CPAN related menu items moved to new Perl5 plugin (SZABGAB)
+    (Re-)Storing cursor position in file (#206) (JQUELIN)
+    Reload file keeps cursor position (#220) (JQUELIN)
+    Preferences windows title should match its menu invocation (#270) (JQUELIN)
+    Fix error if passed a non-existent filename on command-line (#155) (JQUELIN)
+    New task_warn/task_print methods in background tasks to easily
+        print to the output pane (SMUELLER)
+    Fix bug in lexical variable declaration search that would prevent
+        it from finding variables declared in the main doc scope (SMUELLER)
+    Lexical variable replace works for foreach my $foo too. (SMUELLER)
+
 v0.29 2009.03.13
 
     Initial support for directory browser based on the Outline code (SZABGAB)
@@ -7,6 +22,7 @@ v0.29 2009.03.13
     Eliminate a test failure on non-English locale. (SZABGAB)
     Internal cleanups & documentation for configuration subsystem (JQUELIN)
     Require Test::Most for the testing and bail_on compilation errors. (SZABGAB)
+    Eliminated a huge memory leak by not updating the plugin menu on every keystroke. (SZABGAB)
 
 v0.28 2009.03.04
 

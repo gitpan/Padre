@@ -20,20 +20,20 @@ Padre::Plugin - Padre Plugin API 2.1
   
   # Declare the Padre interfaces this plugin uses
   sub padre_interfaces {
-      'Padre::Plugin'         => 0.19,
-      'Padre::Document::Perl' => 0.16,
-      'Padre::Wx::Main'       => 0.16,
-      'Padre::DB'             => 0.16,
+      'Padre::Plugin'         => 0.29,
+      'Padre::Document::Perl' => 0.29,
+      'Padre::Wx::Main'       => 0.29,
+      'Padre::DB'             => 0.29,
   }
   
   # The command structure to show in the Plugins menu
   sub menu_plugins_simple {
       my $self = shift;
-      'My Plugin' => [
-          About   => sub { $self->show_about },
-          Submenu => [
-              'Do Something' => sub { $self->do_something },
-          ],
+      return $self->plugin_name => [
+                'About'   => sub { $self->show_about },
+                'Submenu' => [
+                    'Do Something' => sub { $self->do_something },
+                ],
       ];
   }
   
@@ -51,7 +51,7 @@ use YAML::Tiny   ();
 use Padre::DB    ();
 use Padre::Wx    ();
 
-our $VERSION    = '0.29';
+our $VERSION    = '0.30';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
@@ -378,6 +378,8 @@ The method is passed a wx object that should be used as the wx parent.
           ],
           '---' => undef,        # Separator
           About => 'show_about', # Shorthand for sub { $self->show_about(@_) }
+          "Action\tCtrl+Shift+Z" => 'action', # Also use keyboard shortcuts 
+					      # to call sub { $self->show_about(@_) }
       ];
   }
 
@@ -390,6 +392,9 @@ key/value pairs that will be turned into menus.
 
 If the key is a string containing three hyphons (i.e. '---') the pair will be
 rendered as a menu seperator.
+
+If the key is a string containing a tab ("\t") and a keyboard shorcut combination
+the menu action will also be available through a keyboard shortcut.
 
 If the value is a Perl identifier, it will be treated as a method name to be
 called on the plugin object when the menu entry is triggered.

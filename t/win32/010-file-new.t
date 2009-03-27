@@ -3,56 +3,94 @@
 use strict;
 use warnings;
 use Test::More;
-use FindBin qw/$RealBin/;
-our @windows;
+use Data::Dumper;
+use Win32;
+#use FindBin qw/$RealBin/;
 
-BEGIN {
-    eval 'use Win32::GuiTest qw(:ALL);'; ## no critic (ProhibitStringyEval)
-    $@ and plan skip_all => 'Win32::GuiTest is required for this test';
-    
-    @windows = FindWindowLike(0, "^Padre");
-    scalar @windows or plan skip_all => 'You need open Padre then start this test';
+eval {
+	require Win32::GuiTest;
+	import Win32::GuiTest qw(:ALL);
 };
+if ($@) {
+	plan skip_all => 'Win32::GuiTest is required for this test';
+}
 
-plan tests => 2;
+use t::lib::Padre;
+require t::lib::Padre::Win32;
+my $padre = t::lib::Padre::Win32::setup();
+############################
 
-my $padre = $windows[0];
-SetForegroundWindow($padre);
-sleep 1;
+plan tests => 5;
+diag "Window id $padre";
+
 
 MenuSelect("&File|&New");
 sleep 1;
 
-Win32::GuiTest::SendKeys("If you're reading this inside Padre, ");
-Win32::GuiTest::SendKeys("we might consider this test succesful. ");
-Win32::GuiTest::SendKeys("Please wait.......");
+my $text = "If you're reading this inside Padre, ";
+$text   .= "we might consider this test succesful. ";
+$text   .= "Please wait.......";
 
-my $dir = $RealBin;
+my $dir      = Win32::GetLongPathName($ENV{PADRE_HOME});
+my $save_to  = "$dir/$$.txt";
+my $save_tox = "$dir/x$$.txt";
 # Stupid Save box don't accpect '/' in the input
-$dir =~ s/\//\\/g;
+$save_to =~ s/\//\\/g;
+$save_tox =~ s/\//\\/g;
+diag "Save to '$save_to'";
 
-MenuSelect("&File|&Save");
-sleep 1;
+{
+	SendKeys($text);
+	MenuSelect("&File|&Save");
+	sleep 1;
 
-my $save_to = "$$.txt";
-unlink("$dir/$save_to");
+	SendKeys($save_to);
+	SendKeys("%{S}");
+	sleep 1;
 
-# Stupid Save box don't accpect '/' in the input
-SendKeys("$dir\\$save_to");
-SendKeys("%{S}");
-sleep 1;
+	ok(-e $save_to, "file '$save_to' saved");
+	my $text_in_file = slurp($save_to);
+	is($text_in_file, $text, 'correct text in file');
+}
 
-# check the file
-ok(-e "$dir/$save_to", 'file saved');
+{
+	my $t = "Text in second line...";
+	SendKeys("{ENTER}");
+	SendKeys($t);
+	$text .= "\n$t";
+	SendKeys("^{s}");  # Ctrl-s
+	sleep 1;
+	my $text_in_file = slurp($save_to);
+	is($text_in_file, $text, 'correct text in file');
+}
 
-open(my $fh, '<', "$dir/$save_to");
-local $/;
-my $text = <$fh>;
-close($fh);
-like($text, qr/inside Padre/);
+{
+	SendKeys("{F12}");  # Save As
+	sleep 1;
+
+	SendKeys($save_tox);
+	SendKeys("%{S}");
+	sleep 1;
+
+	ok(-e $save_tox, "file '$save_tox' saved");
+	my $text_in_file = slurp($save_tox);
+	is($text_in_file, $text, 'correct text in file');	
+}
 
 # restore
 MenuSelect("&File|&Close");
-unlink("$dir/$save_to");
 
-1;
+SendKeys("%{F4}");  # Alt-F4 to exit
+sleep 1;
+
+
+
+sub slurp {
+	if (open(my $fh, '<', $save_to)) {
+		local $/;
+		return <$fh>;
+	} else {
+		warn("Could not open file $save_to  $!");
+		return;
+	}
+}

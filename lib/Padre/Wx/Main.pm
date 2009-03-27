@@ -42,7 +42,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -820,8 +820,17 @@ sub run_command {
 
 	# Start the command
 	$self->{command} = Wx::Perl::ProcessStream->OpenProcess( $cmd, 'MyName1', $self );
+	
+	# TODO: It appears that Wx::Perl::ProcessStream's OpenProcess()
+	# does not honour the docs, as we don't get to this cleanup code
+	# even if we try to run a program that doesn't exist.
 	unless ( $self->{command} ) {
 		# Failed to start the command. Clean up.
+		Wx::MessageBox(
+            sprintf(Wx::gettext("Failed to start '%s' command"), $cmd), 
+            Wx::gettext("Error"), 
+            Wx::wxOK, $self
+        );
 		$self->menu->run->enable;
 	}
 
@@ -831,7 +840,7 @@ sub run_command {
 # This should really be somewhere else, but can stay here for now
 sub run_document {
 	my $self     = shift;
-	my $debug    = shift;	
+	my $debug    = shift;
 	my $document = $self->current->document;
 	unless ( $document ) {
 		return $self->error(Wx::gettext("No open document"));
@@ -841,11 +850,11 @@ sub run_document {
 	# TODO: Make this code suck less
 	my $config = $self->config;
 	if ( $config->run_save eq 'same' ) {
-		$self->on_save;
+		$self->on_save or return;
 	} elsif ( $config->run_save eq 'all_files' ) {
-		$self->on_save_all;
+		$self->on_save_all or return;
 	} elsif ( $config->run_save eq 'all_buffer' ) {
-		$self->on_save_all;
+		$self->on_save_all or return;
 	}
 
 	unless ( $document->can('get_command') ) {
@@ -954,13 +963,13 @@ sub prompt {
 
 	require Padre::Wx::History::TextDialog;
 	my $dialog = Padre::Wx::History::TextDialog->new(
-        $self, $title, $subtitle, $key,
-    );
-    if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-        return;
-    }
-    my $value = $dialog->GetValue;
-    $dialog->Destroy;
+		$self, $title, $subtitle, $key,
+	);
+	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		return;
+	}
+	my $value = $dialog->GetValue;
+	$dialog->Destroy;
 	return $value;
 }
 
@@ -1291,6 +1300,8 @@ sub setup_editor {
 
 	Wx::Event::EVT_MOTION( $editor, \&Padre::Wx::Editor::on_mouse_motion );
 
+	$doc->restore_cursor_position;
+
 	return $id;
 }
 
@@ -1432,8 +1443,12 @@ sub on_open {
 sub on_reload_file {
 	my $self     = shift;
 	my $document = $self->current->document or return;
+	my $editor   = $document->editor;
+
+	$document->store_cursor_position;
 	if ( $document->reload ) {
 		$document->editor->configure_editor($document);
+		$document->restore_cursor_position;
 	} else {
 		$self->error( sprintf(
 			Wx::gettext("Could not reload file: %s"),
@@ -1619,6 +1634,10 @@ sub close {
 			return 0;
 		}
 	}
+	
+	#
+	$doc->store_cursor_position;
+	
 	$self->notebook->DeletePage($id);
 
 	$self->syntax->clear;
@@ -2067,8 +2086,8 @@ sub on_toggle_lockinterface {
 
 sub on_insert_from_file {
 	my $self = shift;
-	my $id   = $self->notebook->GetSelection;
-	return if $id == -1;
+	my $editor   = Padre::Current->editor;
+	return if not $editor;
 
 	# popup the window
 	my $last_filename = $self->current->filename;
@@ -2093,25 +2112,9 @@ sub on_insert_from_file {
 	$self->{cwd} = $dialog->GetDirectory;
 	
 	my $file = File::Spec->catfile($self->cwd, $filename);
-	
-	my $text;
-	if ( open(my $fh, '<', $file) ) {
-		binmode($fh);
-		local $/ = undef;
-		$text = <$fh>;
-	} else {
-		return;
-	}
-	
-	my $data = Wx::TextDataObject->new;
-	$data->SetText($text);
-	my $length = $data->GetTextLength;
-	
-	my $editor = $self->notebook->GetPage($id);
-	$editor->ReplaceSelection('');
-	my $pos = $editor->GetCurrentPos;
-	$editor->InsertText( $pos, $text );
-	$editor->GotoPos( $pos + $length - 1 );
+	$editor->insert_from_file($file);
+
+	return;
 }
 
 sub convert_to {
@@ -2452,6 +2455,87 @@ sub on_last_visited_pane {
 		$self->refresh_toolbar($self->current);
 	}
 }
+
+sub on_new_from_template {
+	my ($self, $extension) = @_;
+
+	$self->on_new();
+
+	my $editor = Padre::Current->editor;
+	return if not $editor;
+
+	my $file = File::Spec->catfile(Padre::Util::sharedir('templates'), "template.$extension");
+	$editor->insert_from_file($file);
+
+	my $document = $editor->{Document};
+	$document->set_mimetype( $document->mime_type_by_extension($extension) );
+	$document->editor->padre_setup;
+	$document->rebless;
+
+	return;
+}
+
+#####################################################################
+# Auxiliary Methods
+
+sub install_cpan {
+	my $main = shift;
+	my $module = shift;
+
+	# Validation?
+	#$main->setup_bindings;
+	# Run with the same Perl that launched Padre
+	#my $perl = Padre->perl_interpreter;
+	#my $cmd = qq{"$perl" "-MCPAN" "-e" "install $module"};
+	local $ENV{AUTOMATED_TESTING} = 1;
+	my $cpan = Padre::CPAN->new;
+	$cpan->install($module);
+	#Wx::Perl::ProcessStream->OpenProcess( $cmd, 'CPAN_mod', $main );
+
+	return;
+}
+
+sub setup_bindings {
+    my $main = shift;
+
+	# If this is the first time a command has been run,
+	# set up the ProcessStream bindings.
+	unless ( $Wx::Perl::ProcessStream::VERSION ) {
+		require Wx::Perl::ProcessStream;
+		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDOUT(
+			$main,
+			sub {
+				$_[1]->Skip(1);
+				$_[0]->output->AppendText( $_[1]->GetLine . "\n" );
+				return;
+			},
+		);
+		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDERR(
+			$main,
+			sub {
+				$_[1]->Skip(1);
+				$_[0]->output->AppendText( $_[1]->GetLine . "\n" );
+				return;
+			},
+		);
+		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_EXIT(
+			$main,
+			sub {
+				$_[1]->Skip(1);
+				$_[1]->GetProcess->Destroy;
+				$main->menu->run->enable;
+			},
+		);
+	}
+
+	# Prepare the output window
+	$main->show_output(1);
+	$main->output->clear;
+	$main->menu->run->disable;
+
+	return;
+}
+
 
 1;
 

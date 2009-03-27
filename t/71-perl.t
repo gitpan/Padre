@@ -68,7 +68,7 @@ SCOPE: {
 
 
 
-# tests for Padre::PPI::find_variable_declaration
+# first block of tests for Padre::PPI::find_variable_declaration
 # and ...find_token_at_location
 SCOPE: {
 	my $infile = catfile( $files, 'find_variable_declaration_1.pm' );
@@ -78,16 +78,7 @@ SCOPE: {
 	isa_ok($doc, "PPI::Document");
 	$doc->index_locations;
   
-	my $elem;
-	$doc->find_first(
-		sub {
-			return 0 if not $_[1]->isa('PPI::Token::Symbol')
-			         or not $_[1]->content eq '$n_threads_to_kill'
-			         or not $_[1]->location->[0] == 137;
-			$elem = $_[1];
-			return 1;
-		}
-	);
+	my $elem = find_var_simple($doc, '$n_threads_to_kill', 137);
 	isa_ok( $elem, 'PPI::Token::Symbol' );
  
 	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
@@ -117,7 +108,65 @@ SCOPE: {
 	BEGIN { $tests += 6; }
 }
 
+# second block of tests for Padre::PPI::find_variable_declaration
+# and ...find_token_at_location
+SCOPE: {
+	my $infile = catfile( $files, 'find_variable_declaration_2.pm' );
+	my $text = do { local $/=undef; open my $fh, '<', $infile or die $!; <$fh> };
+  
+	my $doc = PPI::Document->new( \$text );
+	isa_ok($doc, "PPI::Document");
+	$doc->index_locations;
+  
+	# Test foreach my $i
+	my $elem = find_var_simple($doc, '$i', 8); # search $i in line 8
+	isa_ok( $elem, 'PPI::Token::Symbol' );
+ 
+	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
+	my $cmp_elem = Padre::PPI::find_token_at_location($doc, [8, 5, 5]);
+	ok( $elem == $cmp_elem, 'find_token_at_location returns the same token as a manual search' );
 
+	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
+	my $declaration = Padre::PPI::find_token_at_location($doc, [7, 14, 14]);
+	isa_ok( $declaration, 'PPI::Token::Symbol' );
+	my $prev_sibling = $declaration->sprevious_sibling();
+	ok(
+		(defined($prev_sibling) and $prev_sibling->isa('PPI::Token::Word')
+		and $prev_sibling->content() =~ /^(?:my|our)$/),
+		"Find variable declaration in foreach"
+	);
+  
+	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
+	my $result_declaration = Padre::PPI::find_variable_declaration($elem);
+	ok( $declaration == $result_declaration, 'Correct declaration found');
+
+	# Now the same for "for our $k"
+	$elem = find_var_simple($doc, '$k', 11); # search $k in line 11 
+	isa_ok( $elem, 'PPI::Token::Symbol' );
+ 
+	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
+	$cmp_elem = Padre::PPI::find_token_at_location($doc, [11, 5, 5]);
+	ok( $elem == $cmp_elem, 'find_token_at_location returns the same token as a manual search' );
+
+	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
+	$declaration = Padre::PPI::find_token_at_location($doc, [10, 11, 11]);
+	isa_ok( $declaration, 'PPI::Token::Symbol' );
+	$prev_sibling = $declaration->sprevious_sibling();
+	ok(
+		(defined($prev_sibling) and $prev_sibling->isa('PPI::Token::Word')
+		and $prev_sibling->content() =~ /^(?:my|our)$/),
+		"Find variable declaration in foreach"
+	);
+  
+	$doc->flush_locations(); # TODO: This shouldn't have to be here. But remove it and things break -- Adam?
+	TODO: {
+		local $TODO = "PPI parses 'for our \$foo (...){}' wrongly";
+		$result_declaration = Padre::PPI::find_variable_declaration($elem);
+		ok( $declaration == $result_declaration, 'Correct declaration found');
+	}
+
+	BEGIN { $tests += 11; }
+}
 
 
 
@@ -143,3 +192,25 @@ SCOPE: {
 	);
 	BEGIN { $tests += 1; }
 }
+
+
+
+sub find_var_simple {
+	my $doc = shift;
+	my $varname = shift;
+	my $line = shift;
+
+	my $elem;
+	$doc->find_first(
+		sub {
+			return 0 if not $_[1]->isa('PPI::Token::Symbol')
+			         or not $_[1]->content eq $varname
+			         or not $_[1]->location->[0] == $line;
+			$elem = $_[1];
+			return 1;
+		}
+	);
+	return $elem;
+}
+
+

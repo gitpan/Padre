@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use PPI;
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 
 
@@ -151,18 +151,43 @@ sub find_variable_declaration {
 
 	my $document = $cursor->top();
 	my $declaration;
-	while ( $cursor = $cursor->parent ) {
-		last if $cursor == $document;
-		if ($cursor->isa("PPI::Structure::Block")) {
+	my $prev_cursor;
+	while ( 1 ) {
+		$prev_cursor = $cursor;
+		$cursor = $cursor->parent;
+		if ($cursor->isa("PPI::Structure::Block") or $cursor == $document) {
 			my @elems = $cursor->elements;
 			foreach my $elem (@elems) {
+				# Stop scanning this scope if we're at the branch we're coming
+				# from. This is to ignore declarations later in the block.
+				last if $elem == $prev_cursor;
+
 				if ($elem->isa("PPI::Statement::Variable")
 				    and grep {$_ eq $varname} $elem->variables) {
 					$declaration = $elem;
 					last;
 				}
+                                
 			}
-			last if $declaration;
+			last if $declaration or $cursor == $document;
+		}
+                # this is for "foreach my $i ..."
+		elsif ($cursor->isa("PPI::Statement::Compound") and $cursor->type() =~ /^for/) {
+			my @elems = $cursor->elements;
+			foreach my $elem (@elems) {
+				# Stop scanning this scope if we're at the branch we're coming
+				# from. This is to ignore declarations later in the block.
+				last if $elem == $prev_cursor;
+
+				if ($elem->isa("PPI::Token::Word") and $elem->content() =~ /^(?:my|our)$/) {
+					my $nelem = $elem->snext_sibling();
+					if (defined $nelem and $nelem->isa("PPI::Token::Symbol")) {
+						$declaration = $nelem;
+						last;
+					}
+				}
+			}
+			last if $declaration or $cursor == $document;
 		}
 	} # end while not top level
 

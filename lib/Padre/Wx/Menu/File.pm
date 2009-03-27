@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::Wx::Menu ();
 use Padre::Current     qw{_CURRENT};
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Padre::Wx::Menu';
 
 
@@ -48,6 +48,38 @@ sub new {
 		Wx::gettext("New..."),
 		$file_new,
 	);
+	Wx::Event::EVT_MENU( $main,
+		$file_new->Append( -1,
+			Wx::gettext('Perl 5 script')
+		),
+		sub {
+			$_[0]->on_new_from_template('pl');
+		},
+	);
+	Wx::Event::EVT_MENU( $main,
+		$file_new->Append( -1,
+			Wx::gettext('Perl 5 module')
+		),
+		sub {
+			$_[0]->on_new_from_template('pm');
+		},
+	);
+	Wx::Event::EVT_MENU( $main,
+		$file_new->Append( -1,
+			Wx::gettext('Perl 5 test')
+		),
+		sub {
+			$_[0]->on_new_from_template('t');
+		},
+	);
+	Wx::Event::EVT_MENU( $main,
+		$file_new->Append( -1,
+			Wx::gettext('Perl 6 script')
+		),
+		sub {
+			$_[0]->on_new_from_template('p6');
+		},
+	);	
 	Wx::Event::EVT_MENU( $main,
 		$file_new->Append( -1,
 			Wx::gettext('Perl Distribution (Module::Starter)')

@@ -41,11 +41,13 @@ lib/Padre/Config/Human.pm
 lib/Padre/Config/Patch.pm
 lib/Padre/Config/Project.pm
 lib/Padre/Config/Setting.pm
+lib/Padre/CPAN.pm
 lib/Padre/Current.pm
 lib/Padre/DB.pm
 lib/Padre/DB/Bookmark.pm
 lib/Padre/DB/History.pm
 lib/Padre/DB/HostConfig.pm
+lib/Padre/DB/LastPositionInFile.pm
 lib/Padre/DB/Patch.pm
 lib/Padre/DB/Plugin.pm
 lib/Padre/DB/Session.pod
@@ -63,6 +65,7 @@ lib/Padre/Manual/Hacking.pod
 lib/Padre/Plugin.pm
 lib/Padre/Plugin/Devel.pm
 lib/Padre/Plugin/My.pm
+lib/Padre/Plugin/Perl5.pm
 lib/Padre/Plugin/PopularityContest.pm
 lib/Padre/PluginBuilder.pm
 lib/Padre/PluginHandle.pm
@@ -74,6 +77,7 @@ lib/Padre/Project/Null.pm
 lib/Padre/Project/Perl.pm
 lib/Padre/SingleInstance.pm
 lib/Padre/Task.pm
+lib/Padre/Task/Debug/Crashing.pm
 lib/Padre/Task/DocBrowser.pm
 lib/Padre/Task/ErrorParser.pm
 lib/Padre/Task/Examples/WxEvent.pm
@@ -92,6 +96,8 @@ lib/Padre/Wx/Ack.pm
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/AuiManager.pm
 lib/Padre/Wx/Bottom.pm
+lib/Padre/Wx/CPAN.pm
+lib/Padre/Wx/CPAN/Listview.pm
 lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
 lib/Padre/Wx/Dialog/Find.pm
@@ -99,6 +105,7 @@ lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/PluginManager2.pm
+lib/Padre/Wx/Dialog/PluginManager3.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/Snippets.pm
@@ -163,6 +170,7 @@ share/icons/gnome218/16x16/actions/go-previous.png
 share/icons/gnome218/README.txt
 share/icons/padre/16x16/actions/x-document-close.png
 share/icons/padre/16x16/status/padre-fallback-icon.png
+share/icons/padre/16x16/status/padre-plugin.png
 share/icons/padre/16x16/status/padre-syntax-error.png
 share/icons/padre/16x16/status/padre-syntax-warning.png
 share/icons/padre/16x16/status/padre-tasks-idle.png
@@ -200,6 +208,7 @@ share/styles/default.yml
 share/styles/night.yml
 share/styles/notepad.yml
 share/styles/ultraedit.yml
+share/templates/template.p6
 share/templates/template.pl
 share/templates/template.pm
 share/templates/template.t
@@ -209,6 +218,7 @@ share/timeline/migrate-3.pl
 share/timeline/migrate-4.pl
 share/timeline/migrate-5.pl
 share/timeline/migrate-6.pl
+share/timeline/migrate-7.pl
 t/00-compile.t
 t/01-load.t
 t/02-new.t
@@ -252,6 +262,7 @@ t/files/beginner/warning.pl
 t/files/error_near.pl
 t/files/error_stack.pl
 t/files/find_variable_declaration_1.pm
+t/files/find_variable_declaration_2.pm
 t/files/hello_with_warn.pl
 t/files/missing_brace_1.pl
 t/files/missing_semicolon.pl
@@ -265,6 +276,7 @@ t/lib/Padre/Editor.pm
 t/lib/Padre/Plugin/Test/Plugin.pm
 t/lib/Padre/Plugin/TestPlugin.pm
 t/lib/Padre/Task/Test.pm
+t/lib/Padre/Win32.pm
 t/win32/002-menu.t
 t/win32/010-file-new.t
 t/win32/011-file-open.t

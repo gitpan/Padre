@@ -6,7 +6,7 @@ use Padre::DB ();
 use Padre::Wx ();
 use Padre::Wx::Dialog;
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 # TODO - Don't store run-time data in package lexicals
@@ -60,8 +60,7 @@ sub dialog {
 		parent   => $main,
 		title    => $title,
 		layout   => $layout,
-		width    => [ -1, -1 ],
-		# width    => [ 300, 50 ],
+		width    => [ 300, 50 ],
 	);
 	if ( $dialog->{_widgets_}->{entry} ) {
 		$dialog->{_widgets_}->{entry}->SetSize(10 * length $text, -1);
@@ -127,9 +126,11 @@ sub set_bookmark {
 	# Ask the user for the bookmark name
 	my $line     = $editor->GetCurrentLine;
 	my $file     = File::Basename::basename($path || '');
+	my ($text)   = $editor->GetLine($line);
+	$text =~ s/\r?\n?$//;
 	my $dialog   = $class->dialog(
 		$main,
-		sprintf(Wx::gettext("%s line %s"), $file, $line)
+		sprintf(Wx::gettext("%s line %s: %s"), $file, $line, $text)
 	);
 	$dialog->show_modal or return;
 

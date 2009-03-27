@@ -4,7 +4,6 @@ author:
   - 'Gabor Szabo'
 build_requires:
   ExtUtils::MakeMaker: 6.11
-  Test::Compile: 0.08
   Test::Exception: 0.27
   Test::More: 0.47
   Test::Most: 0.21
@@ -43,7 +42,7 @@ requires:
   File::Basename: 0
   File::Copy::Recursive: 0.37
   File::Find::Rule: 0.30
-  File::HomeDir: 0.82
+  File::HomeDir: 0.84
   File::ShareDir: 1.00
   File::ShareDir::PAR: 0.04
   File::Spec: 3.2701
@@ -91,4 +90,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.29
+version: 0.30

@@ -38,7 +38,7 @@ requires       'Encode'                   => '2.26';
 requires       'File::Basename'           => 0;
 requires       'File::Copy::Recursive'    => '0.37';
 requires       'File::Find::Rule'         => '0.30';
-requires       'File::HomeDir'            => '0.82';
+requires       'File::HomeDir'            => '0.84';
 requires       'File::ShareDir'           => '1.00';
 requires       'File::ShareDir::PAR'      => '0.04';
 requires       'File::Spec'               => '3.2701';
@@ -82,13 +82,15 @@ requires       'Wx'                       => '0.89';
 #requires       'Wx::Perl::Dialog'         => '0.04'; # in Padre now
 requires       'Wx::Perl::ProcessStream'  => '0.11';
 requires       'YAML::Tiny'               => '1.32';
-test_requires  'Test::Compile'            => '0.08' unless win32;
 test_requires  'Test::More'               => '0.47';
 test_requires  'Test::Most'               => '0.21';
 test_requires  'Test::Script'             => '1.03';
 test_requires  'Test::Exception'          => '0.27';
 test_requires  'Test::NoWarnings'         => '0.084';
 # test_requires  'Test::NeedsDisplay'       => '1.07';
+
+tests     't/*.t t/win32/*.t'  if win32;
+
 no_index       'directory'                => qw{ t xt eg share inc privinc };
 homepage       'http://padre.perlide.org/';
 bugtracker     'http://padre.perlide.org/';

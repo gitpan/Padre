@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Wx::AuiNotebook';
 
 sub new {
@@ -53,7 +53,7 @@ sub new {
 	);
 
 	# Set the locale-aware caption
-	$self->aui->caption_gettext('bottom' => 'Output View');
+	$self->aui->caption('bottom' => Wx::gettext('Output View'));
 
 	return $self;
 }

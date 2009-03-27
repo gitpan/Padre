@@ -8,7 +8,7 @@ use Padre::Current ();
 
 use base qw(Padre::Wx::Dialog);
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 sub _new_panel {
 	my ($self, $parent) = splice( @_, 0, 2 );
@@ -301,7 +301,7 @@ sub dialog {
 	my $dialog = Wx::Dialog->new(
 		$win,
 		-1,
-		'Settings',
+		Wx::gettext('Preferences'),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxCAPTION | Wx::wxRESIZE_BORDER | Wx::wxCLOSE_BOX | Wx::wxSYSTEM_MENU,

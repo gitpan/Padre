@@ -11,15 +11,16 @@ use Padre::Util             ();
 use Padre::Wx               ();
 use Padre::Wx::Dialog::HTML ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 use base 'Padre::Wx::Dialog::HTML';
 
 sub new {
-	my $class = shift;
-	my $self  = $class->SUPER::new( @_,
+	my ($class, $parent, $manager) = @_;
+	my $self  = $class->SUPER::new(
 		title => Wx::gettext('Plugin Manager'),
 	);
 
+	$self->{manager} = $manager;
 	unless ( _INSTANCE($self->{manager}, 'Padre::PluginManager') ) {
 		Carp::croak("Missing or invalid Padre::PluginManager object");
 	}
@@ -27,13 +28,22 @@ sub new {
 	return $self;
 }
 
+
+# update html and show dialog
+sub show {
+	my $self = shift;
+	$self->refresh;
+	$self->Show;
+}
+
 # Render the content of the dialog based on the plugins
 sub html {
 	my $self    = shift;
 	my $manager = $self->{manager};
+	return '' unless defined $manager;
 
 	my @rows = ();
-	my $file = Padre::Util::sharefile('plugin.gif');
+	my $file = Padre::Util::sharefile('plugin.png');
 	unless ( -f $file ) {
 		die "Failed to find $file";
 	}
@@ -41,10 +51,11 @@ sub html {
 	foreach my $name ( $manager->plugin_names ) {
 		my $plugin   = $manager->_plugin($name);
 		my $namehtml = "<b>"  . $plugin->plugin_name . "</b>";
+		my $version  = $plugin->version || '???';
 		my $cellhtml = "<td bgcolor='#FFFFFF'>"
 			. $namehtml
 			. "&nbsp;&nbsp;&nbsp;"
-			. $plugin->version
+			. $version
 			. "</td>";
 		my $rowhtml  = "<tr>"
 			. "<td width='52'><img src='$icon' height='32' width='32'></td>"

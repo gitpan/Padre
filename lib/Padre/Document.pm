@@ -53,14 +53,10 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
-
-
-
-
 
 #####################################################################
 # Document Registration
@@ -68,42 +64,10 @@ my $unsaved_number = 0;
 # This is the list of binary files
 # (which we don't support loading in fallback text mode)
 our %EXT_BINARY = (
-	aiff  => 1,
-	au    => 1,
-	avi   => 1,
-	bmp   => 1,
-	cache => 1,
-	dat   => 1,
-	doc   => 1,
-	gif   => 1,
-	gz    => 1,
-	icns  => 1,
-	jar   => 1,
-	jpeg  => 1,
-	jpg   => 1,
-	m4a   => 1,
-	mov   => 1,
-	mp3   => 1,
-	mpg   => 1,
-	ogg   => 1,
-	pdf   => 1,
-	png   => 1,
-	pnt   => 1,
-	ppt   => 1,
-	qt    => 1,
-	ra    => 1,
-	svg   => 1,
-	svgz  => 1,
-	svn   => 1,
-	swf   => 1,
-	tar   => 1,
-	tgz   => 1,
-	tif   => 1,
-	tiff  => 1,
-	wav   => 1,
-	xls   => 1,
-	xlw   => 1,
-	zip   => 1,
+	aiff => 1, au   => 1, avi => 1, bmp => 1, cache => 1, dat  => 1, doc => 1, gif => 1, gz  => 1, icns => 1,
+	jar  => 1, jpeg => 1, jpg => 1, m4a => 1, mov   => 1, mp3  => 1, mpg => 1, ogg => 1, pdf => 1, png  => 1,
+	pnt  => 1, ppt  => 1, qt  => 1, ra  => 1, svg   => 1, svgz => 1, svn => 1, swf => 1, tar => 1, tgz  => 1,
+	tif  => 1, tiff => 1, wav => 1, xls => 1, xlw   => 1, zip  => 1,
 );
 
 # This is the primary file extension to mime-type mapping
@@ -157,90 +121,83 @@ our %EXT_MIME = (
 # to confirm that the MIME type is either the official type, or the primary
 # one in use by the relevant language community.
 our %MIME_LEXER = (
-	'text/x-adasrc'          => Wx::wxSTC_LEX_ADA,       # CONFIRMED
-	'text/x-asm'             => Wx::wxSTC_LEX_ASM,       # CONFIRMED
+	'text/x-adasrc' => Wx::wxSTC_LEX_ADA,    # CONFIRMED
+	'text/x-asm'    => Wx::wxSTC_LEX_ASM,    # CONFIRMED
 
 	# application/x-msdos-program includes .exe and .com, so don't use it
-	'application/x-bat'      => Wx::wxSTC_LEX_BATCH,     # CONFIRMED
+	'application/x-bat' => Wx::wxSTC_LEX_BATCH,    # CONFIRMED
 
-	'text/x-c++src'          => Wx::wxSTC_LEX_CPP,       # CONFIRMED
-	'text/css'               => Wx::wxSTC_LEX_CSS,       # CONFIRMED
-	'text/x-patch'           => Wx::wxSTC_LEX_DIFF,      # CONFIRMED
-	'text/x-eiffel'          => Wx::wxSTC_LEX_EIFFEL,    # CONFIRMED
-	'text/x-forth'           => Wx::wxSTC_LEX_FORTH,     # CONFIRMED
-	'text/x-fortran'         => Wx::wxSTC_LEX_FORTRAN,   # CONFIRMED
-	'text/html'              => Wx::wxSTC_LEX_HTML,      # CONFIRMED
-	'application/javascript' => Wx::wxSTC_LEX_ESCRIPT,   # CONFIRMED
-	'application/json'       => Wx::wxSTC_LEX_ESCRIPT,   # CONFIRMED
-	'application/x-latex'    => Wx::wxSTC_LEX_LATEX,     # CONFIRMED
-	'application/x-lisp'     => Wx::wxSTC_LEX_LISP,      # CONFIRMED
+	'text/x-c++src'             => Wx::wxSTC_LEX_CPP,          # CONFIRMED
+	'text/css'                  => Wx::wxSTC_LEX_CSS,          # CONFIRMED
+	'text/x-patch'              => Wx::wxSTC_LEX_DIFF,         # CONFIRMED
+	'text/x-eiffel'             => Wx::wxSTC_LEX_EIFFEL,       # CONFIRMED
+	'text/x-forth'              => Wx::wxSTC_LEX_FORTH,        # CONFIRMED
+	'text/x-fortran'            => Wx::wxSTC_LEX_FORTRAN,      # CONFIRMED
+	'text/html'                 => Wx::wxSTC_LEX_HTML,         # CONFIRMED
+	'application/javascript'    => Wx::wxSTC_LEX_ESCRIPT,      # CONFIRMED
+	'application/json'          => Wx::wxSTC_LEX_ESCRIPT,      # CONFIRMED
+	'application/x-latex'       => Wx::wxSTC_LEX_LATEX,        # CONFIRMED
+	'application/x-lisp'        => Wx::wxSTC_LEX_LISP,         # CONFIRMED
 	'application/x-shellscript' => Wx::wxSTC_LEX_BASH,
-	'text/x-lua'             => Wx::wxSTC_LEX_LUA,       # CONFIRMED
-	'text/x-makefile'        => Wx::wxSTC_LEX_MAKEFILE,  # CONFIRMED
-	'text/x-matlab'          => Wx::wxSTC_LEX_MATLAB,    # CONFIRMED
-	'text/x-pascal'          => Wx::wxSTC_LEX_PASCAL,    # CONFIRMED
-	'application/x-perl'     => Wx::wxSTC_LEX_PERL,      # CONFIRMED
-	'text/x-python'          => Wx::wxSTC_LEX_PYTHON,    # CONFIRMED
-	'application/x-php'      => Wx::wxSTC_LEX_PHPSCRIPT, # CONFIRMED
-	'application/x-ruby'     => Wx::wxSTC_LEX_RUBY,      # CONFIRMED
-	'text/x-sql'             => Wx::wxSTC_LEX_SQL,       # CONFIRMED
-	'application/x-tcl'      => Wx::wxSTC_LEX_TCL,       # CONFIRMED
-	'text/vbscript'          => Wx::wxSTC_LEX_VBSCRIPT,  # CONFIRMED
+	'text/x-lua'                => Wx::wxSTC_LEX_LUA,          # CONFIRMED
+	'text/x-makefile'           => Wx::wxSTC_LEX_MAKEFILE,     # CONFIRMED
+	'text/x-matlab'             => Wx::wxSTC_LEX_MATLAB,       # CONFIRMED
+	'text/x-pascal'             => Wx::wxSTC_LEX_PASCAL,       # CONFIRMED
+	'application/x-perl'        => Wx::wxSTC_LEX_PERL,         # CONFIRMED
+	'text/x-python'             => Wx::wxSTC_LEX_PYTHON,       # CONFIRMED
+	'application/x-php'         => Wx::wxSTC_LEX_PHPSCRIPT,    # CONFIRMED
+	'application/x-ruby'        => Wx::wxSTC_LEX_RUBY,         # CONFIRMED
+	'text/x-sql'                => Wx::wxSTC_LEX_SQL,          # CONFIRMED
+	'application/x-tcl'         => Wx::wxSTC_LEX_TCL,          # CONFIRMED
+	'text/vbscript'             => Wx::wxSTC_LEX_VBSCRIPT,     # CONFIRMED
 
 	# text/xml specifically means "human-readable XML".
 	# This is prefered to the more generic application/xml
-	'text/xml'               => Wx::wxSTC_LEX_XML,       # CONFIRMED
+	'text/xml' => Wx::wxSTC_LEX_XML,                           # CONFIRMED
 
-	'text/x-yaml'            => Wx::wxSTC_LEX_YAML,      # CONFIRMED
-	'application/x-pir'      => Wx::wxSTC_LEX_CONTAINER, # CONFIRMED
-	'application/x-pasm'     => Wx::wxSTC_LEX_CONTAINER, # CONFIRMED
-	'application/x-perl6'    => Wx::wxSTC_LEX_CONTAINER, # CONFIRMED
-	'text/plain'             => Wx::wxSTC_LEX_NULL,      # CONFIRMED
+	'text/x-yaml'         => Wx::wxSTC_LEX_YAML,               # CONFIRMED
+	'application/x-pir'   => Wx::wxSTC_LEX_CONTAINER,          # CONFIRMED
+	'application/x-pasm'  => Wx::wxSTC_LEX_CONTAINER,          # CONFIRMED
+	'application/x-perl6' => Wx::wxSTC_LEX_CONTAINER,          # CONFIRMED
+	'text/plain'          => Wx::wxSTC_LEX_NULL,               # CONFIRMED
 );
 
 # This is the mime-type to document class mapping
-our %MIME_CLASS = (
-	'application/x-perl' => 'Padre::Document::Perl',
-	'text/x-pod'         => 'Padre::Document::POD',
-);
+our %MIME_CLASS = ( 'application/x-perl' => 'Padre::Document::Perl', 'text/x-pod' => 'Padre::Document::POD', );
 
 sub menu_view_mimes {
-	'00Plain Text' => 'text/plain',
-	'01Perl'       => 'application/x-perl',
-	'02Shell'      => 'application/x-shellscript',
-	'03HTML'       => 'text/html',
-	'05JavaScript' => 'application/javascript',
-	'07CSS'        => 'text/css',
-	'09Python'     => 'text/x-python',
-	'11Ruby'       => 'application/x-ruby',
-	'13PHP'        => 'application/x-php',
-	'15YAML'       => 'text/x-yaml',
-	'17VBScript'   => 'text/vbscript',
-	'19SQL'        => 'text/x-sql',
-	'21Perl6'      => 'application/x-perl6',
+	'00Plain Text'     => 'text/plain',
+		'01Perl'       => 'application/x-perl',
+		'02Shell'      => 'application/x-shellscript',
+		'03HTML'       => 'text/html',
+		'05JavaScript' => 'application/javascript',
+		'07CSS'        => 'text/css',
+		'09Python'     => 'text/x-python',
+		'11Ruby'       => 'application/x-ruby',
+		'13PHP'        => 'application/x-php',
+		'15YAML'       => 'text/x-yaml',
+		'17VBScript'   => 'text/vbscript',
+		'19SQL'        => 'text/x-sql',
+		'21Perl6'      => 'application/x-perl6',
+		;
 }
-
-
-
-
 
 #####################################################################
 # Constructor and Accessors
 
-use Class::XSAccessor
-	getters => {
-		editor           => 'editor',
-		filename         => 'filename', # TODO is this read_only or what?
-		get_mimetype     => 'mimetype',
-		get_newline_type => 'newline_type',
-		errstr           => 'errstr',
+use Class::XSAccessor getters => {
+	editor           => 'editor',
+	filename         => 'filename',       # TODO is this read_only or what?
+	get_mimetype     => 'mimetype',
+	get_newline_type => 'newline_type',
+	errstr           => 'errstr',
 	},
 	setters => {
-		_set_filename    => 'filename', # TODO temporary hack
-		set_newline_type => 'newline_type',
-		set_mimetype     => 'mimetype',
-		set_errstr       => 'errstr',
-		set_editor       => 'editor',
+	_set_filename    => 'filename',       # TODO temporary hack
+	set_newline_type => 'newline_type',
+	set_mimetype     => 'mimetype',
+	set_errstr       => 'errstr',
+	set_editor       => 'editor',
 	};
 
 =pod
@@ -259,7 +216,7 @@ mime-type is defined by the guess_mimetype function
 
 sub new {
 	my $class = shift;
-	my $self  = bless { @_ }, $class;
+	my $self = bless {@_}, $class;
 
 	if ( $self->{filename} ) {
 		$self->load_file;
@@ -281,11 +238,11 @@ sub rebless {
 	my ($self) = @_;
 
 	# Rebless as either to a subclass if there is a mime-type or
-	# to the the base class, 
+	# to the the base class,
 	# This isn't exactly the most elegant way to do this, but will
 	# do for a first implementation.
-	my $subclass = $MIME_CLASS{$self->get_mimetype} || __PACKAGE__;
-	if ( $subclass ) {
+	my $subclass = $MIME_CLASS{ $self->get_mimetype } || __PACKAGE__;
+	if ($subclass) {
 		Class::Autouse->autouse($subclass);
 		bless $self, $subclass;
 	}
@@ -296,10 +253,6 @@ sub rebless {
 sub last_sync {
 	return $_[0]->{_timestamp};
 }
-
-
-
-
 
 #####################################################################
 # Bad/Ugly/Broken Methods
@@ -315,7 +268,7 @@ sub guess_mimetype {
 
 	# Default mime-type of new files, should be configurable in the GUI
 	# TODO: Make it configurable in the GUI :)
-	unless ( $filename ) {
+	unless ($filename) {
 		return 'application/x-perl';
 	}
 
@@ -328,6 +281,7 @@ sub guess_mimetype {
 		my $ext = lc $1;
 		if ( $EXT_MIME{$ext} ) {
 			if ( $EXT_MIME{$ext} eq 'application/x-perl' ) {
+
 				# Sometimes Perl 6 will look like Perl 5
 				if ( is_perl6($text) ) {
 					return 'application/x-perl6';
@@ -339,7 +293,7 @@ sub guess_mimetype {
 
 	# Try derive the mime type from the basename
 	my $basename = File::Basename::basename($filename);
-	if ( $basename ) {
+	if ($basename) {
 		return 'text/x-makefile' if $basename =~ /^Makefile\.?/i;
 	}
 
@@ -348,6 +302,7 @@ sub guess_mimetype {
 	# are obvious.
 	# TODO: Add support for plugins being able to do something here.
 	if ( $text and $text =~ /\A#!/m ) {
+
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
 			return is_perl6($text) ? 'application/x-perl6' : 'application/x-perl';
@@ -359,6 +314,11 @@ sub guess_mimetype {
 
 	# Fall back to a null value
 	return '';
+}
+
+sub mime_type_by_extension {
+	my ( $self, $ext ) = @_;
+	return $EXT_MIME{$ext};
 }
 
 # For ts without a newline type
@@ -392,13 +352,10 @@ sub _mixed_newlines {
 # MAC|UNIX|WIN convert them to the appropriate type
 sub _auto_convert {
 	my ($self) = @_;
+
 	# TODO get from config
 	return 0;
 }
-
-
-
-
 
 #####################################################################
 # Disk Interaction Methods
@@ -406,15 +363,15 @@ sub _auto_convert {
 # filesystem.
 
 sub is_new {
-	return !! ( not defined $_[0]->filename );
+	return !!( not defined $_[0]->filename );
 }
 
 sub is_modified {
-	return !! ( $_[0]->editor->GetModify );
+	return !!( $_[0]->editor->GetModify );
 }
 
 sub is_saved {
-	return !! ( defined $_[0]->filename and not $_[0]->is_modified );
+	return !!( defined $_[0]->filename and not $_[0]->is_modified );
 }
 
 # Returns true if this is a new document that is too insignificant to
@@ -428,7 +385,7 @@ sub is_unused {
 	return '';
 }
 
-# Returns true if file has changed on the disk 
+# Returns true if file has changed on the disk
 # since load time or the last time we saved it.
 # Check if the file on the disk has changed
 # 1) when document gets the focus (gvim, notepad++)
@@ -444,7 +401,7 @@ sub has_changed_on_disk {
 sub time_on_file {
 	return 0 if not defined $_[0]->filename;
 	return 0 if not -e $_[0]->filename;
-	return (stat($_[0]->filename))[9];
+	return ( stat( $_[0]->filename ) )[9];
 }
 
 =pod
@@ -469,9 +426,24 @@ sub load_file {
 	my ($self) = @_;
 
 	my $file = $self->{filename};
+
+	# check if file exists
+	if ( !-e $file ) {
+
+		# file doesn't exist, try to create an empty one
+		if ( not open my $fh, '>', $file ) {
+
+			# oops, error creating file. abort operation
+			print ">>$file $!\n";
+			$self->set_errstr($!);
+			return;
+		}
+	}
+
+	# load file
 	$self->set_errstr('');
 	my $content;
-	if (open my $fh, '<', $file) {
+	if ( open my $fh, '<', $file ) {
 		binmode($fh);
 		local $/ = undef;
 		$content = <$fh>;
@@ -484,7 +456,9 @@ sub load_file {
 	# if guess encoding fails then use 'utf-8'
 	require Padre::Locale;
 	$self->{encoding} = Padre::Locale::encoding_from_string($content);
-	$content = Encode::decode($self->{encoding}, $content);
+
+	#warn $self->{encoding};
+	$content = Encode::decode( $self->{encoding}, $content );
 
 	$self->{original_content} = $content;
 
@@ -494,33 +468,37 @@ sub load_file {
 sub newline_type {
 	my ($self) = @_;
 
-	my $file = $self->{filename};
+	my $file         = $self->{filename};
 	my $newline_type = $self->_get_default_newline_type;
 	my $convert_to;
 	my $current_type = Padre::Util::newline_type( $self->{original_content} );
-	if ($current_type eq 'None') {
+	if ( $current_type eq 'None' ) {
+
 		# keep default
-	} elsif ($current_type eq 'Mixed') {
+	} elsif ( $current_type eq 'Mixed' ) {
 		my $mixed = $self->_mixed_newlines();
-		if ( $mixed eq 'Ask') {
+		if ( $mixed eq 'Ask' ) {
 			warn "TODO ask the user what to do with $file";
+
 			# $convert_to = $newline_type = ;
 		} elsif ( $mixed eq 'Keep' ) {
 			warn "TODO probably we should not allow keeping garbage ($file) \n";
 		} else {
+
 			#warn "TODO converting $file";
 			$convert_to = $newline_type = $mixed;
 		}
 	} else {
 		$convert_to = $self->_auto_convert;
 		if ($convert_to) {
+
 			#warn "TODO call converting on $file";
 			$newline_type = $convert_to;
 		} else {
 			$newline_type = $current_type;
 		}
 	}
-	return ($newline_type, $convert_to);
+	return ( $newline_type, $convert_to );
 }
 
 sub save_file {
@@ -535,13 +513,13 @@ sub save_file {
 	$self->{encoding} ||= Padre::Locale::encoding_from_string($content);
 
 	my $encode = '';
-	if (defined $self->{encoding}) {
+	if ( defined $self->{encoding} ) {
 		$encode = ":raw:encoding($self->{encoding})";
 	} else {
 		warn "encoding is not set, (couldn't get from contents) when saving file $filename\n";
 	}
-	
-	if (open my $fh,  ">$encode", $filename ) {
+
+	if ( open my $fh, ">$encode", $filename ) {
 		print {$fh} $content;
 	} else {
 		$self->set_errstr($!);
@@ -570,9 +548,6 @@ sub reload {
 	return $self->load_file;
 }
 
-
-
-
 #####################################################################
 # Basic Content Manipulation
 
@@ -581,17 +556,47 @@ sub text_get {
 }
 
 sub text_set {
-	$_[0]->editor->SetText($_[1]);
+	$_[0]->editor->SetText( $_[1] );
 }
 
 sub text_like {
 	my $self = shift;
-	return !! ( $self->text_get =~ /$_[0]/m );
+	return !!( $self->text_get =~ /$_[0]/m );
 }
 
+# --
 
+#
+# $doc->store_cursor_position()
+#
+# store document's current cursor position in padre's db.
+# no params, no return value.
+#
+sub store_cursor_position {
+	my $self     = shift;
+	my $filename = $self->filename;
+	my $editor   = $self->editor;
+	return unless $filename && $editor;
+	my $pos = $editor->GetCurrentPos;
+	Padre::DB::LastPositionInFile->set_last_pos( $filename, $pos );
+}
 
-
+#
+# $doc->restore_cursor_position()
+#
+# restore document's cursor position from padre's db.
+# no params, no return value.
+#
+sub restore_cursor_position {
+	my $self     = shift;
+	my $filename = $self->filename;
+	my $editor   = $self->editor;
+	return unless $filename && $editor;
+	my $pos = Padre::DB::LastPositionInFile->get_last_pos($filename);
+	return unless $pos;
+	$editor->SetCurrentPos($pos);
+	$editor->SetSelection( $pos, $pos );
+}
 
 #####################################################################
 # GUI Integration Methods
@@ -600,7 +605,7 @@ sub text_like {
 sub lexer {
 	my $self = shift;
 	return Wx::wxSTC_LEX_AUTOMATIC unless $self->get_mimetype;
-	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{$self->get_mimetype};
+	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{ $self->get_mimetype };
 
 	# If mime type is not sufficient to figure out file type
 	# than use suffix for lexer
@@ -614,7 +619,7 @@ sub lexer {
 		}
 	}
 
-	return $MIME_LEXER{$self->get_mimetype};
+	return $MIME_LEXER{ $self->get_mimetype };
 }
 
 # What should be shown in the notebook tab
@@ -623,7 +628,7 @@ sub get_title {
 	if ( $self->{filename} ) {
 		return File::Basename::basename( $self->{filename} );
 	} else {
-		my $str = sprintf(Wx::gettext("Unsaved %d"), $unsaved_number);
+		my $str = sprintf( Wx::gettext("Unsaved %d"), $unsaved_number );
 
 		# A bug in Wx requires a space at the front of the title
 		# (For reasons I don't understand yet)
@@ -635,10 +640,11 @@ sub remove_color {
 	my ($self) = @_;
 
 	my $editor = $self->editor;
+
 	# TODO this is strange, do we really need to do it with all?
-	for my $i ( 0..31 ) {
-		$editor->StartStyling(0, $i);
-		$editor->SetStyling($editor->GetLength, 0);
+	for my $i ( 0 .. 31 ) {
+		$editor->StartStyling( 0, $i );
+		$editor->SetStyling( $editor->GetLength, 0 );
 	}
 
 	return;
@@ -646,24 +652,24 @@ sub remove_color {
 
 # TODO: experimental
 sub get_indentation_style {
-	my $self = shift;
+	my $self   = shift;
 	my $config = Padre->ide->config;
 
 	# TODO: (document >) project > config
 
 	my $style;
 	if ( $config->editor_indent_auto ) {
+
 		# TODO: This should be cached? What's with newish documents then?
 		$style = $self->guess_indentation_style;
-	}
-	else {
+	} else {
 		$style = {
 			use_tabs    => $config->editor_indent_tab,
 			tabwidth    => $config->editor_indent_tab_width,
 			indentwidth => $config->editor_indent_width,
 		};
 	}
-	
+
 	return $style;
 }
 
@@ -690,9 +696,9 @@ sub set_indentation_style {
 	$editor->SetIndent( $style->{indentwidth} );
 
 	# Use tabs for indentation where possible?
-	$editor->SetUseTabs(  $style->{use_tabs} );
+	$editor->SetUseTabs( $style->{use_tabs} );
 
-	return();
+	return ();
 }
 
 =head2 guess_indentation_style
@@ -707,34 +713,32 @@ to C<set_indendentation_style>.
 =cut
 
 sub guess_indentation_style {
-	my $self  = shift;
+	my $self = shift;
 
 	require Text::FindIndent;
-	my $indentation = Text::FindIndent->parse($self->text_get);
+	my $indentation = Text::FindIndent->parse( $self->text_get );
 
 	my $style;
-	if ($indentation =~ /^t\d+/) { # we only do ONE tab
+	if ( $indentation =~ /^t\d+/ ) {    # we only do ONE tab
 		$style = {
 			use_tabs    => 1,
 			tabwidth    => 8,
 			indentwidth => 8,
 		};
-	}
-	elsif ($indentation =~ /^s(\d+)/) {
+	} elsif ( $indentation =~ /^s(\d+)/ ) {
 		$style = {
 			use_tabs    => 0,
 			tabwidth    => 8,
 			indentwidth => $1,
 		};
-	}
-	elsif ($indentation =~ /^m(\d+)/) {
+	} elsif ( $indentation =~ /^m(\d+)/ ) {
 		$style = {
 			use_tabs    => 1,
 			tabwidth    => 8,
 			indentwidth => $1,
 		};
-	}
-	else {
+	} else {
+
 		# fallback
 		my $config = Padre->ide->config;
 		$style = {
@@ -743,7 +747,7 @@ sub guess_indentation_style {
 			indentwidth => $config->editor_indent_width,
 		};
 	}
-	
+
 	return $style;
 }
 
@@ -780,9 +784,6 @@ Returns nothing.
 
 =cut
 
-
-
-
 #####################################################################
 # Project Integration Methods
 
@@ -798,8 +799,8 @@ sub project {
 
 sub project_dir {
 	my $self = shift;
-	$self->{project_dir} or
-	$self->{project_dir} = $self->project_find;
+	$self->{project_dir}
+		or $self->{project_dir} = $self->project_find;
 }
 
 sub project_find {
@@ -811,30 +812,24 @@ sub project_find {
 	}
 
 	# Search upwards from the file to find the project root
-	my ($v, $d, $f) = File::Spec->splitpath( $self->filename );
+	my ( $v, $d, $f ) = File::Spec->splitpath( $self->filename );
 	my @d = File::Spec->splitdir($d);
 	pop @d if $d[-1] eq '';
 	my $dirs = List::Util::first {
 		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
-		or
-		-f File::Spec->catpath( $v, $_, 'Build.PL' )
-		or
-		-f File::Spec->catpath( $v, $_, 'padre.yml' )
-	} map {
-		File::Spec->catdir(@d[0 .. $_])
-	} reverse ( 0 .. $#d );
+			or -f File::Spec->catpath( $v, $_, 'Build.PL' )
+			or -f File::Spec->catpath( $v, $_, 'padre.yml' );
+	}
+	map { File::Spec->catdir( @d[ 0 .. $_ ] ) } reverse( 0 .. $#d );
 
 	unless ( defined $dirs ) {
+
 		# This document is part of the null project
 		return File::Spec->catpath( $v, $d, '' );
 	}
 
 	return File::Spec->catpath( $v, $dirs, '' );
 }
-
-
-
-
 
 #####################################################################
 # Document Analysis Methods
@@ -860,31 +855,30 @@ sub pre_process {
 
 sub stats {
 	my ($self) = @_;
-	
-	my ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly )
-		= (0) x 5;
+
+	my ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly ) = (0) x 5;
 
 	my $editor = $self->editor;
-	my $src = $editor->GetSelectedText;
+	my $src    = $editor->GetSelectedText;
 	my $code;
-	if ( $src ) {
+	if ($src) {
 		$code = $src;
 
-		my $code2 = $code; # it's ugly, need improvement
+		my $code2 = $code;    # it's ugly, need improvement
 		$code2 =~ s/\r\n/\n/g;
-		$lines = 1; # by default
+		$lines = 1;           # by default
 		$lines++ while ( $code2 =~ /[\r\n]/g );
 		$chars_with_space = length($code);
 	} else {
 		$code = $self->text_get;
 
 		# I trust editor more
-		$lines = $editor->GetLineCount();
+		$lines            = $editor->GetLineCount();
 		$chars_with_space = $editor->GetTextLength();
-		$is_readonly = $editor->GetReadOnly();
+		$is_readonly      = $editor->GetReadOnly();
 	}
 
-	$words++ while ( $code =~ /\b\w+\b/g );
+	$words++               while ( $code =~ /\b\w+\b/g );
 	$chars_without_space++ while ( $code =~ /\S/g );
 
 	my $filename = $self->filename;
@@ -893,8 +887,10 @@ sub stats {
 	require Padre::Locale;
 	$self->{encoding} ||= Padre::Locale::encoding_from_string($src);
 
-	return ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly, 
-			$filename, $self->{newline_type}, $self->{encoding} );
+	return (
+		$lines, $chars_with_space, $chars_without_space, $words, $is_readonly, $filename, $self->{newline_type},
+		$self->{encoding}
+	);
 }
 
 =pod
@@ -967,9 +963,6 @@ the C<force =E<gt> 1> parameter to override this.
 
 =cut
 
-
-
-
 #####################################################################
 # Document Manipulation Methods
 
@@ -983,11 +976,7 @@ the C<force =E<gt> 1> parameter to override this.
 #
 # TODO Remove this base method, and compensate by disabling the menu entries
 # if the document class does not define this method.
-sub comment_lines_str {}
-
-
-
-
+sub comment_lines_str { }
 
 #####################################################################
 # Unknown Methods
@@ -999,7 +988,7 @@ sub comment_lines_str {}
 # return ($error_message)
 # in case of some error
 sub autocomplete {
-	my $self   = shift;
+	my $self = shift;
 
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
@@ -1007,12 +996,12 @@ sub autocomplete {
 	my $first  = $editor->PositionFromLine($line);
 
 	# line from beginning to current position
-	my $prefix = $editor->GetTextRange($first, $pos);
-	   $prefix =~ s{^.*?(\w+)$}{$1};
-	my $last   = $editor->GetLength();
-	my $text   = $editor->GetTextRange(0, $last);
-	my $pre_text  = $editor->GetTextRange(0, $first+length($prefix)); 
-	my $post_text = $editor->GetTextRange($first, $last); 
+	my $prefix = $editor->GetTextRange( $first, $pos );
+	$prefix =~ s{^.*?(\w+)$}{$1};
+	my $last      = $editor->GetLength();
+	my $text      = $editor->GetTextRange( 0, $last );
+	my $pre_text  = $editor->GetTextRange( 0, $first + length($prefix) );
+	my $post_text = $editor->GetTextRange( $first, $last );
 
 	my $regex;
 	eval { $regex = qr{\b($prefix\w+)\b} };
@@ -1022,14 +1011,14 @@ sub autocomplete {
 
 	my %seen;
 	my @words;
-	push @words ,grep { ! $seen{$_}++ } reverse ($pre_text =~ /$regex/g);
-	push @words , grep { ! $seen{$_}++ } ($post_text =~ /$regex/g);
+	push @words, grep { !$seen{$_}++ } reverse( $pre_text =~ /$regex/g );
+	push @words, grep { !$seen{$_}++ } ( $post_text =~ /$regex/g );
 
-	if (@words > 20) {
-		@words = @words[0..19];
+	if ( @words > 20 ) {
+		@words = @words[ 0 .. 19 ];
 	}
 
-	return (length($prefix), @words);
+	return ( length($prefix), @words );
 }
 
 1;
