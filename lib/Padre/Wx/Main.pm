@@ -42,11 +42,12 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.30';
+our $VERSION = '0.32';
 use base 'Wx::Frame';
 
 use constant SECONDS => 1000;
 
+my %run_argv;
 
 
 
@@ -766,6 +767,25 @@ sub on_run_command {
 	return;
 }
 
+sub on_run_tests {
+	my $self   = shift;
+	
+	my $doc = Padre::Current->document;
+	return $self->error(Wx::gettext("No document open")) if not $doc;
+	my $filename = $doc->filename;
+	
+	# TODO probably should fetch the current project name
+	return $self->error(Wx::gettext("Current document has no filename")) if not $filename;
+
+	my $project_dir = Padre::Util::get_project_dir($filename);
+	return $self->error(Wx::gettext("Could not find project root")) if not $project_dir;
+
+	my $dir = Cwd::cwd;
+	chdir $project_dir;
+	$self->run_command("prove -b $project_dir/t");
+	chdir $dir;
+}
+
 sub run_command {
 	my $self   = shift;
 	my $cmd    = shift;
@@ -848,19 +868,23 @@ sub run_document {
 
 	# Apply the user's save-on-run policy
 	# TODO: Make this code suck less
-	my $config = $self->config;
-	if ( $config->run_save eq 'same' ) {
-		$self->on_save or return;
-	} elsif ( $config->run_save eq 'all_files' ) {
-		$self->on_save_all or return;
-	} elsif ( $config->run_save eq 'all_buffer' ) {
-		$self->on_save_all or return;
+	unless ( $document->is_saved ) {
+		my $config = $self->config;
+		if ( $config->run_save eq 'same' ) {
+			$self->on_save or return;
+		} elsif ( $config->run_save eq 'all_files' ) {
+			$self->on_save_all or return;
+		} elsif ( $config->run_save eq 'all_buffer' ) {
+			$self->on_save_all or return;
+		}
 	}
 
 	unless ( $document->can('get_command') ) {
 		return $self->error(Wx::gettext("No execution mode was defined for this document"));
 	}
-	my $argv = $self->prompt("Command line parameters", "", "RUN_COMMAND_LINE_PARAMS") || '';
+	
+	my $filename = File::Basename::fileparse( $self->current->filename );
+	$run_argv{$filename} = '' unless ( $run_argv{$filename} );
 	
 	my $cmd = eval { $document->get_command($debug) };
 	if ( $@ ) {
@@ -870,12 +894,26 @@ sub run_document {
 	}
 	if ( $cmd ) {
 		if ($document->pre_process) {
-			$cmd .= " $argv";
+			$cmd .= " $run_argv{$filename}";
 			$self->run_command( $cmd );
 		} else {
 			$self->error( $document->errstr );
 		}
 	}
+	return;
+}
+
+sub run_document_parameters {
+	my $self	= shift;
+	my $document	= $self->current->document;
+
+	if ( $document->is_new ) {
+		return $self->error(Wx::gettext("Save the file first"));
+	}
+
+	my $filename = File::Basename::fileparse( $self->current->filename );
+	$run_argv{$filename} =$self->prompt("Command line parameters", "", "RUN_COMMAND_LINE_PARAMS_$filename");
+
 	return;
 }
 

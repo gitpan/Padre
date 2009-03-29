@@ -1,5 +1,20 @@
 Changes for Perl Application Development and Refactoring Environment
 
+v0.32 2009.03.29
+    Trying to fix again the skipping of Padre::CPAN under the CPAN shell.
+
+v0.31 2009.03.29
+
+    Avoid creating the ~/.padre during testing by two more tests. (SZABGAB, thanks to AYILMAZ)
+    Skip testing Padre::CPAN as it cannot be loaded under CPAN. (SZABGAB, thanks to AYILMAZ)
+    Fix the Directory browser to switch between projects. (SZABGAB)
+    Add "Run Tests" menu options to, err run tests. (SZABGAB)
+    Work around painful segmentation faults from multiply freeing
+        AuiManagers (SMUELLER)
+    Lexical variable replace works for arrays and hashes in all their
+        ugly incantations now (SMUELLER)
+    Re-enable the taskmanager tests after fixing them. (SMUELLER)
+
 v0.30 2009.03.27
 
     Remove Test::Compile from the prereqs as well as it is not in use. (SZABGAB)

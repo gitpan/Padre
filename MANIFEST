@@ -81,6 +81,7 @@ lib/Padre/Task/Debug/Crashing.pm
 lib/Padre/Task/DocBrowser.pm
 lib/Padre/Task/ErrorParser.pm
 lib/Padre/Task/Examples/WxEvent.pm
+lib/Padre/Task/HTTPClient.pm
 lib/Padre/Task/Outline.pm
 lib/Padre/Task/Outline/Perl.pm
 lib/Padre/Task/PPI.pm
@@ -170,6 +171,11 @@ share/icons/gnome218/16x16/actions/go-previous.png
 share/icons/gnome218/README.txt
 share/icons/padre/16x16/actions/x-document-close.png
 share/icons/padre/16x16/status/padre-fallback-icon.png
+share/icons/padre/16x16/status/padre-plugin-crashed.png
+share/icons/padre/16x16/status/padre-plugin-disabled.png
+share/icons/padre/16x16/status/padre-plugin-enabled.png
+share/icons/padre/16x16/status/padre-plugin-error.png
+share/icons/padre/16x16/status/padre-plugin-incompatible.png
 share/icons/padre/16x16/status/padre-plugin.png
 share/icons/padre/16x16/status/padre-syntax-error.png
 share/icons/padre/16x16/status/padre-syntax-warning.png

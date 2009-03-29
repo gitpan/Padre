@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.30';
+our $VERSION = '0.32';
 use base 'Padre::Document';
 
 
@@ -449,20 +449,20 @@ sub _get_current_symbol {
 	my $pos          = $editor->GetCurrentPos;
 	my $line         = $editor->LineFromPosition($pos);
 	my $line_start   = $editor->PositionFromLine($line);
-	my $cursor_col   = $pos-$line_start; # TODO: let's hope this is the physical column
+	my $cursor_col   = $pos-$line_start;
 	my $line_end     = $editor->GetLineEndPosition($line);
 	my $line_content = $editor->GetTextRange($line_start, $line_end);
 	my $col          = $cursor_col;
 
 	# find start of symbol TODO: This could be more robust, no?
 	while (1) {
-		if ($col == 0 or substr($line_content, $col, 1) =~ /^[^\w:\']$/) {
+		if ($col == 0 or substr($line_content, $col, 1) =~ /^[^#\w:\']$/) {
 			last;
 		}
 		$col--;
 	}
 
-	if ( $col == 0 or substr($line_content, $col+1, 1) !~ /^[\w:\']$/ ) {
+	if ( $col == 0 or substr($line_content, $col+1, 1) !~ /^[#\w:\']$/ ) {
 		return ();
 	}
 	return [$line+1, $col+1];

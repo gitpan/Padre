@@ -3,7 +3,7 @@ package Padre::Task::PPI::LexicalReplaceVariable;
 use strict;
 use warnings;
 
-our $VERSION = '0.30';
+our $VERSION = '0.32';
 
 use base 'Padre::Task::PPI';
 use Padre::Wx ();
@@ -85,39 +85,63 @@ sub process_ppi {
 	}
 
 	my $token_str = $token->content;
-	my $varname = $token->canonical;
+	my $varname = $token->symbol;
+	#warn "VARNAME: $varname";
 
 	# TODO: This could be part of PPI somehow?
-	# for finding symbols in quotelikes and regexes
+	# The following string of hacks is simply for finding symbols in quotelikes and regexes
+	my $type = substr($varname, 0, 1);
+	my $brace = $type eq '@' ? '[' : ($type eq '%' ? '{' : '');
+
+	my @patterns;
+	if ($type eq '@') {
+		my $accessv = $varname;
+		$accessv =~ s/^\Q$type\E/\$/;
+		@patterns = (
+			quotemeta(_curlify($varname)), quotemeta($varname),
+			quotemeta($accessv).'(?='.quotemeta($brace).')',
+		);
+		if ($type eq '%') {
+			my $slicev = $varname;
+			$slicev =~ s/^\%/\@/;
+			push @patterns, quotemeta($slicev).'(?='.quotemeta($brace).')';
+		}
+		elsif ($type eq '@') {
+			my $indexv = $varname;
+			$indexv =~ s/^\@/\$\#/;
+			push @patterns, quotemeta($indexv);
+		}
+	}
+	else  {
+		@patterns = ( quotemeta(_curlify($varname)), quotemeta($varname)."(?![\[\{])" );
+	}
 	my %unique;
-	my $finder_regexp = '(?:'
-		. join(
-			'|',
-			map { quotemeta($_) }
-			grep { tr/$@%*// == 1 and !$unique{$_}++ }
-			map { my $name = $_; $name =~ s/^\$//; ($_, "\${$name}") }
-			($varname, $token_str)
-		)
-	. ')';
+	my $finder_regexp = '(?:' . join( '|', grep { !$unique{$_}++ } @patterns ) . ')';
 
-	$finder_regexp = qr/$finder_regexp/;
+	$finder_regexp = qr/$finder_regexp/; # used to find symbols in quotelikes and regexes
+	#warn $finder_regexp;
 
-	my $replacement = $self->{replacement};
-	my $replacement_curlies = $replacement . "}";
-	$replacement_curlies =~ s/([\$@%\*])/$1\{/;
+	my $replacement = substr($self->{replacement}, 1);
 
 	$scope->find(
 		sub {
 			my $node = $_[1];
 			if ($node->isa("PPI::Token::Symbol")) {
-				return 0 unless $node->canonical eq $varname
-				or $node->content eq $token_str; # <--- probably not necessary
+				return 0 unless $node->symbol eq $varname;
 				# TODO do this without breaking encapsulation!
-				$node->{content} = $replacement;
+				$node->{content} = substr($node->content(), 0, 1) . $replacement;
+			}
+			if ($node->isa("PPI::Token::ArrayIndex")) { # $#foo
+				return 0 unless substr($node->content, 2) eq substr($varname, 1);
+				# TODO do this without breaking encapsulation!
+				$node->{content} = '$#' . $replacement;
 			}
 			elsif ($node->isa("PPI::Token")) { # the case of potential quotelikes and regexes
 				my $str = $node->content;
-				if ($str =~ s{($finder_regexp)}<$1 =~ tr/{// ? $replacement_curlies : $replacement>ge) {
+				if ($str =~ s{($finder_regexp)([\[\{]?)}<
+				        if ($1 =~ tr/{//) { substr($1, 0, ($1=~tr/#//)+1) . "{$replacement}$2" }
+				        else              { substr($1, 0, ($1=~tr/#//)+1) . "$replacement$2" }
+				    >ge) {
 					# TODO do this without breaking encapsulation!
 					$node->{content} = $str;
 				}
@@ -130,6 +154,14 @@ sub process_ppi {
 	# TODO: passing this back and forth is probably hyper-inefficient, but such is life.
 	$self->{updated_document_string} = $ppi->serialize;
 
+	return();
+}
+
+sub _curlify {
+	my $var = shift;
+	if ($var =~ s/^([\$\@\%])(.+)$/${1}{$2}/) {
+		return($var);
+	}
 	return();
 }
 

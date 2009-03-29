@@ -66,7 +66,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.30';
+our $VERSION = '0.32';
 
 # According to Wx docs,
 # this MUST be loaded before Wx,
@@ -121,8 +121,6 @@ sub new {
 		task_queue     => undef,
 		running_tasks  => {},
 	}, $class;
-
-	$self->{use_threads} = 0 if Wx->VERSION < 0.89;
 
 	my $main = Padre->ide->wx->main;
 

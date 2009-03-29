@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  qw{_CURRENT};
 
-our $VERSION = '0.30';
+our $VERSION = '0.32';
 use base 'Padre::Wx::Menu';
 
 
@@ -39,7 +39,17 @@ sub new {
 			$_[0]->run_document;
 		},
 	);
-	
+
+	$self->{run_document_parameters} = $self->Append( -1,
+		Wx::gettext("Run Parameters\tShift-Ctrl-F5")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{run_document_parameters},
+		sub {
+			$_[0]->run_document_parameters;
+		},
+	);
+
 	$self->{run_document_debug} = $self->Append( -1,
 		Wx::gettext("Run Script (debug info)\tShift-F5")
 	);
@@ -60,6 +70,15 @@ sub new {
 		},
 	);
 
+	$self->{run_tests} = $self->Append( -1,
+		Wx::gettext("Run Tests")
+	);
+	Wx::Event::EVT_MENU( $main,
+		$self->{run_tests},
+		sub {
+			$_[0]->on_run_tests;
+		},
+	);
 	$self->AppendSeparator;
 
 	$self->{stop} = $self->Append( -1,
@@ -93,7 +112,17 @@ sub refresh {
 			? $self->{run_command}->IsEnabled
 			: 0
 	);
+	$self->{run_document_parameters}->Enable(
+		$document
+			? $self->{run_command}->IsEnabled
+			: 0
+	);
 	$self->{run_document_debug}->Enable(
+		$document
+			? $self->{run_command}->IsEnabled
+			: 0
+	);
+	$self->{run_tests}->Enable(
 		$document
 			? $self->{run_command}->IsEnabled
 			: 0
@@ -112,6 +141,7 @@ sub refresh {
 sub enable {
 	my $self = shift;
 	$self->{run_document}->Enable(1);
+	$self->{run_document_parameters}->Enable(1);
 	$self->{run_document_debug}->Enable(1);
 	$self->{run_command}->Enable(1);
 	$self->{stop}->Enable(0);
@@ -121,6 +151,7 @@ sub enable {
 sub disable {
 	my $self = shift;
 	$self->{run_document}->Enable(0);
+	$self->{run_document_parameters}->Enable(0);
 	$self->{run_document_debug}->Enable(0);
 	$self->{run_command}->Enable(0);
 	$self->{stop}->Enable(1);

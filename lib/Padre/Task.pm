@@ -3,7 +3,7 @@ package Padre::Task;
 use strict;
 use warnings;
 
-our $VERSION = '0.30';
+our $VERSION = '0.32';
 
 require Padre;
 require Padre::Wx;
@@ -56,7 +56,7 @@ task:
           return 1;
   }
 
-  # This is run in a worker thread and make take a long-ish
+  # This is run in a worker thread and may take a long-ish
   # time to finish. It must not touch the GUI, except through
   # Wx events. TODO: explain how this works
   sub run {
