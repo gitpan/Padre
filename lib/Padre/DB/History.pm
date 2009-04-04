@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Params::Util ();
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 sub recent {
 	my $class  = shift;
@@ -22,7 +22,7 @@ sub recent {
 
 sub previous {
 	my $class = shift;
-	my @list  = $class->recent($_[0], 1);
+	my @list = $class->recent( $_[0], 1 );
 	return $list[0];
 }
 

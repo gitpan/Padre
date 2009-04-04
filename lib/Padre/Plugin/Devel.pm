@@ -7,19 +7,14 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 use base 'Padre::Plugin';
-
-
-
-
 
 #####################################################################
 # Padre::Plugin Methods
 
 sub padre_interfaces {
-	'Padre::Plugin'   => 0.26,
-	'Padre::Wx::Main' => 0.26,
+	'Padre::Plugin' => 0.26, 'Padre::Wx::Main' => 0.26,;
 }
 
 sub plugin_name {
@@ -40,13 +35,13 @@ sub plugin_enable {
 }
 
 sub plugin_disable {
-	my $self   = shift;
+	my $self = shift;
 
 	# Save our configuration
 	# (Used for testing purposes)
 	if ( $self->{config} ) {
 		$self->{config}->{foo}++;
-		$self->config_write( delete($self->{config}) );
+		$self->config_write( delete( $self->{config} ) );
 	} else {
 		$self->config_write( { foo => 1 } );
 	}
@@ -63,6 +58,14 @@ sub menu_plugins_simple {
 		'Dump Top IDE Object'       => 'dump_padre',
 		'Dump %INC and @INC'        => 'dump_inc',
 		'---'                       => undef,
+		# TODO
+		# Should be checkbox but I am too lazy to turn the whole 
+		# menu_plugins_simple into a menu_plugins
+		'Enable logging'            => sub { set_logging(1); },
+		'Disable logging'           => sub { set_logging(0); },
+		'Enable trace when logging' => sub { set_trace(1); },
+		'Disable trace'             => sub { set_trace(0); },
+		'---'                       => undef,
 		'Simulate Crash'            => 'simulate_crash',
 		'Simulate Crashing Bg Task' => 'simulate_task_crash',
 		'---'                       => undef,
@@ -72,20 +75,38 @@ sub menu_plugins_simple {
 		'STC Reference' => sub {
 			Wx::LaunchDefaultBrowser('http://www.yellowbrain.com/stc/index.html');
 		},
-		'---'                       => undef,
-		'About'                     => 'show_about',
+		'---'   => undef,
+		'About' => 'show_about',
 	];
 }
-
-
-
-
 
 #####################################################################
 # Plugin Methods
 
+sub set_logging {
+	my ($on) = @_;
+
+	Padre->ide->wx->config->set( logging => $on );
+	Padre::Util::set_logging($on);
+	Padre::Util::debug("After setting debugging to '$on'");
+	Padre->ide->wx->main->refresh;
+
+	return;
+}
+
+sub set_trace {
+	my ($on) = @_;
+
+	Padre->ide->wx->config->set( logging_trace => $on );
+	Padre::Util::set_trace($on);
+	Padre::Util::debug("After setting trace to '$on'");
+	Padre->ide->wx->main->refresh;
+
+	return;
+}
+
 sub eval_document {
-	my $self     = shift;
+	my $self = shift;
 	my $document = Padre::Current->document or return;
 	return $self->_dump_eval( $document->text_get );
 }
@@ -93,11 +114,11 @@ sub eval_document {
 sub dump_document {
 	my $self     = shift;
 	my $document = Padre::Current->document;
-	unless ( $document ) {
+	unless ($document) {
 		Padre::Current->main->message( 'No file is open', 'Info' );
 		return;
 	}
-	return $self->_dump( $document );
+	return $self->_dump($document);
 }
 
 sub dump_padre {
@@ -120,15 +141,12 @@ sub simulate_task_crash {
 	Padre::Task::Debug::Crashing->new()->schedule();
 }
 
-
 sub show_about {
 	my $self  = shift;
 	my $about = Wx::AboutDialogInfo->new;
 	$about->SetName('Padre::Plugin::Devel');
-	$about->SetDescription(
-		"A set of unrelated tools used by the Padre developers\n"
-	);
-	Wx::AboutBox( $about );
+	$about->SetDescription("A set of unrelated tools used by the Padre developers\n");
+	Wx::AboutBox($about);
 	return;
 }
 
@@ -138,15 +156,13 @@ sub _dump_eval {
 	my $code = shift;
 
 	# Evecute the code and handle errors
-	my @rv = eval $code; ## no critic
-	if ( $@ ) {
-		Padre::Current->main->error(
-			sprintf(Wx::gettext("Error: %s"), $@)
-		);
+	my @rv = eval $code;    ## no critic
+	if ($@) {
+		Padre::Current->main->error( sprintf( Wx::gettext("Error: %s"), $@ ) );
 		return;
 	}
 
-	return $self->_dump( @rv );
+	return $self->_dump(@rv);
 }
 
 sub _dump {
@@ -157,9 +173,9 @@ sub _dump {
 	$main->output->SetValue(
 		Devel::Dumpvar->new(
 			to => 'return',
-		)->dump(@_)
+			)->dump(@_)
 	);
-	$main->output->SetSelection(0, 0);
+	$main->output->SetSelection( 0, 0 );
 	$main->show_output(1);
 
 	return;

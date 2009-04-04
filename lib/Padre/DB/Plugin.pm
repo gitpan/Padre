@@ -3,11 +3,11 @@ package Padre::DB::Plugin;
 use strict;
 use warnings;
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 # Finds and returns a single element by name
 sub fetch_name {
-	return ($_[0]->select('where name = ?', $_[1]))[0];
+	return ( $_[0]->select( 'where name = ?', $_[1] ) )[0];
 }
 
 # Set enabled for an object

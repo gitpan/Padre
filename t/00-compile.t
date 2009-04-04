@@ -13,6 +13,7 @@ bail_on_fail;
 
 use File::Find::Rule;
 use File::Temp;
+use POSIX qw(locale_h);
 
 $ENV{PADRE_HOME} = File::Temp::tempdir( CLEANUP => 1 );
 
@@ -21,11 +22,15 @@ my $err = File::Spec->catfile($ENV{PADRE_HOME}, 'err.txt');
 
 my @files = File::Find::Rule->relative->file->name('*.pm')->in('lib');
 plan tests => 2 * @files;
+diag "Detected locale: " . setlocale(LC_CTYPE);
+
 foreach my $file ( @files ) {
 		my $module = $file;
 		$module =~ s/[\/\\]/::/g;
 		$module =~ s/\.pm$//;
-		if (($ENV{CPAN_SHELL_LEVEL} or $ENV{PERL5_CPAN_IS_RUNNING}) and $module eq 'Padre::CPAN') {
+#		if (($ENV{CPAN_SHELL_LEVEL} or $ENV{PERL5_CPAN_IS_RUNNING} or $ENV{PERL5_CPANPLUS_IS_RUNNING}) and $module eq 'Padre::CPAN') {
+# always skip the CPAN testing as it talks too much on some systems
+		if ($module eq 'Padre::CPAN') {
 			Test::Most->builder->skip ("Cannot load CPAN shell under the CPAN shell") for 1..2;
 			next;
 		}

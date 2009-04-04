@@ -4,21 +4,17 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Config::Constants qw( $PADRE_CONFIG_DIR );
-use Padre::Wx                  ();
-use Padre::Plugin              ();
+use Padre::Wx     ();
+use Padre::Plugin ();
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 use base 'Padre::Plugin';
-
-
-
-
 
 #####################################################################
 # Padre::Plugin Methods
 
 sub padre_interfaces {
-	'Padre::Plugin' => 0.24
+	'Padre::Plugin' => 0.24;
 }
 
 sub plugin_name {
@@ -29,16 +25,13 @@ sub menu_plugins_simple {
 	my $self = shift;
 	return $self->plugin_name => [
 		'About' => sub { $self->show_about },
+
 		# 'Another Menu Entry' => sub { $self->about },
 		# 'A Sub-Menu...' => [
 		#     'Sub-Menu Entry' => sub { $self->about },
 		# ],
 	];
 }
-
-
-
-
 
 #####################################################################
 # Custom Methods
@@ -67,12 +60,34 @@ Open it with with Padre and you'll see an explanation on how to add items.
 END_MESSAGE
 
 	# Show the About dialog
-	Wx::AboutBox( $about );
+	Wx::AboutBox($about);
 
 	return;
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Padre::Plugin::My - my personal plugin
+
+
+=head1 DESCRIPTION
+
+This is your personal plugin. Update it to fit your needs. And if it
+does interesting stuff, please consider sharing it on CPAN!
+
+
+=head1 COPYRIGHT & LICENSE
+
+Currently it's copyright (c) 2008-2009 The Padre develoment team as
+listed in Padre.pm... But update it and it will become Copyright (c) you
+C<< you@your-domain.com> >>! How exciting! :-)
+
+
+=cut
 
 # Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE

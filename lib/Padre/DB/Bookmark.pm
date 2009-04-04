@@ -3,17 +3,15 @@ package Padre::DB::Bookmark;
 use strict;
 use warnings;
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 sub select_names {
-	Padre::DB->selectcol_arrayref(
-		'select name from bookmark order by name'
-	);
+	Padre::DB->selectcol_arrayref('select name from bookmark order by name');
 }
 
 # Finds and returns a single element by name
 sub fetch_name {
-	return ($_[0]->select('where name = ?', $_[1]))[0];
+	return ( $_[0]->select( 'where name = ?', $_[1] ) )[0];
 }
 
 1;

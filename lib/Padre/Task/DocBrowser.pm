@@ -7,19 +7,17 @@ use threads;
 
 use base 'Padre::Task';
 
-our $VERSION = '0.32';
-
-use Data::Dumper;
+our $VERSION = '0.33';
 
 sub run {
 	my ($self) = @_;
 
-	$self->{browser} ||=  Padre::DocBrowser->new();
+	$self->{browser} ||= Padre::DocBrowser->new();
 	my $type = $self->{type} || 'error';
 	if ( $type eq 'error' ) {
 		return "BREAK";
 	}
-	unless ( $self->{browser}->can( $type ) ) {
+	unless ( $self->{browser}->can($type) ) {
 		return "BREAK";
 	}
 
@@ -36,6 +34,7 @@ sub finish {
 }
 
 1;
+
 # Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or

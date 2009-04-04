@@ -24,7 +24,7 @@ use Class::Autouse ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -148,14 +148,6 @@ sub new {
 
 sub run {
 	my $self = shift;
-
-	# Handle architectural command line options
-	foreach my $M ( grep {/^-M/} @ARGV ) {
-		my $module = substr( $M, 2 );
-		eval "use $module";    ## no critic
-		die $@ if $@;
-	}
-	@ARGV = grep { !/^-M/ } @ARGV;
 
 	# FIXME: RT #1 This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
@@ -1110,6 +1102,8 @@ Italian - Simone Blandino (SBLANDIN)
 Korean - Keedi Kim - 김도형 (KEEDI)
 
 Russian - Andrew Shitov
+
+Polish - Cezary Morga (THEREK)
 
 Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
 

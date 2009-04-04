@@ -9,8 +9,10 @@ build_requires:
   Test::Most: 0.21
   Test::NoWarnings: 0.084
   Test::Script: 1.03
+configure_requires:
+  ExtUtils::MakeMaker: 6.50
 distribution_type: module
-generated_by: 'Module::Install version 0.79'
+generated_by: 'Module::Install version 0.81'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -90,4 +92,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.32
+version: 0.33

@@ -8,27 +8,26 @@ package Padre::DB::LastPositionInFile;
 use strict;
 use warnings;
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 sub get_last_pos {
-	my ($class, $name) = @_;
+	my ( $class, $name ) = @_;
 	my $recent = Padre::DB->selectcol_arrayref(
-	"select position from last_position_in_file where name = ?",
+		"select position from last_position_in_file where name = ?",
 		{}, $name,
 	);
 	return $recent->[0];
 }
 
 sub set_last_pos {
-	my ($class, $name, $pos) = @_;
+	my ( $class, $name, $pos ) = @_;
 
-	$class->delete('where name = ?', $name);
+	$class->delete( 'where name = ?', $name );
 	$class->create(
 		name     => $name,
 		position => $pos,
 	);
 }
-
 
 1;
 

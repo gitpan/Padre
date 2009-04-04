@@ -106,7 +106,6 @@ lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/PluginManager2.pm
-lib/Padre/Wx/Dialog/PluginManager3.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/Snippets.pm
@@ -203,12 +202,14 @@ share/locale/ko.po
 share/locale/messages.pot
 share/locale/nl-nl.mo
 share/locale/nl-nl.po
+share/locale/pl.mo
+share/locale/pl.po
 share/locale/pt-br.mo
 share/locale/pt-br.po
 share/locale/ru.mo
 share/locale/ru.po
-share/locale/zh_cn.mo
-share/locale/zh_cn.po
+share/locale/zh-cn.mo
+share/locale/zh-cn.po
 share/ppm/README.txt
 share/styles/default.yml
 share/styles/night.yml
@@ -231,6 +232,7 @@ t/02-new.t
 t/03-wx.t
 t/04-config.t
 t/05-project.t
+t/06-utils.t
 t/10-copyright.t
 t/50-docbrowser.t
 t/60-db.t
@@ -281,6 +283,7 @@ t/lib/Padre.pm
 t/lib/Padre/Editor.pm
 t/lib/Padre/Plugin/Test/Plugin.pm
 t/lib/Padre/Plugin/TestPlugin.pm
+t/lib/Padre/Task/PPITest.pm
 t/lib/Padre/Task/Test.pm
 t/lib/Padre/Win32.pm
 t/win32/002-menu.t
@@ -289,3 +292,4 @@ t/win32/011-file-open.t
 t/win32/012-file-open-selection.t
 xt/90-pod.t
 xt/99-critic.t
+xt/files/lexical_replace_stress_test.pl

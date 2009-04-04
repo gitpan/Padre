@@ -46,20 +46,16 @@ use strict;
 use warnings;
 use Carp         ();
 use Scalar::Util ();
-use Params::Util ('_HASH0', '_INSTANCE');
+use Params::Util ( '_HASH0', '_INSTANCE' );
 use YAML::Tiny   ();
 use Padre::DB    ();
 use Padre::Wx    ();
 
-our $VERSION    = '0.32';
+our $VERSION    = '0.33';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
 my %IDE = ();
-
-
-
-
 
 ######################################################################
 # Static Methods
@@ -79,15 +75,26 @@ of the plugin.
 =cut
 
 sub plugin_name {
-	my $class = ref($_[0]) || $_[0];
+	my $class = ref( $_[0] ) || $_[0];
 	my @words = $class =~ /(\w+)/gi;
-	my $name  = pop @words;
+	my $name = pop @words;
 	$name =~ s/([a-z])([A-Z])/$1 $2/g;
 	$name =~ s/([A-Z]+)([A-Z][a-z]+)/$1 $2/g;
 	return $name;
 }
 
 =pod
+
+=head2 plugin_icon
+
+The C<plugin_icon> method will be called by Padre when it needs an
+icon to display in the user interface. It should return a 16x16
+C<Wx::Bitmap> object.
+
+There is no default default implementation, meaning that a default
+plugin icon will be displayed for the plugin.
+
+
 
 =head2 padre_interfaces
 
@@ -124,10 +131,6 @@ sub padre_interfaces {
 	return ();
 }
 
-
-
-
-
 ######################################################################
 # Default Constructor
 
@@ -149,7 +152,7 @@ object.
 sub new {
 	my $class = shift;
 	my $ide   = shift;
-	unless ( _INSTANCE($ide, 'Padre') ) {
+	unless ( _INSTANCE( $ide, 'Padre' ) ) {
 		Carp::croak("Did not provide a Padre ide object");
 	}
 
@@ -157,18 +160,14 @@ sub new {
 	my $self = bless {}, $class;
 
 	# Store the link back to the IDE
-	$IDE{Scalar::Util::refaddr($self)} = $ide;
+	$IDE{ Scalar::Util::refaddr($self) } = $ide;
 
 	return $self;
 }
 
 sub DESTROY {
-	delete $IDE{Scalar::Util::refaddr($_[0])};
+	delete $IDE{ Scalar::Util::refaddr( $_[0] ) };
 }
-
-
-
-
 
 #####################################################################
 # Instance Methods
@@ -297,7 +296,7 @@ configuration for the plugin.
 =cut
 
 sub config_read {
-	my $self  = shift;
+	my $self = shift;
 
 	# Retrieve the config string from the database
 	my $class = Scalar::Util::blessed($self);
@@ -308,8 +307,8 @@ sub config_read {
 	return undef unless defined $row[0];
 
 	# Parse the config from the string
-	my @config = YAML::Tiny::Load($row[0]);
-	unless ( _HASH0($config[0]) ) {
+	my @config = YAML::Tiny::Load( $row[0] );
+	unless ( _HASH0( $config[0] ) ) {
 		Carp::croak('Config for plugin was not a HASH refence');
 	}
 
@@ -339,7 +338,7 @@ sub config_write {
 	}
 
 	# Convert the config to a string
-	my $string = YAML::Tiny::Dump( $config );
+	my $string = YAML::Tiny::Dump($config);
 
 	# Write the config string to the database
 	my $class = Scalar::Util::blessed($self);
@@ -405,6 +404,7 @@ sub-menu containing further menu items.
 =cut
 
 sub menu_plugins_simple {
+
 	# Plugins returning no data will not
 	# be visible in the plugin menu.
 	return ();
@@ -449,7 +449,7 @@ sub menu_plugins {
 	my @simple = $self->menu_plugins_simple or return ();
 	my $label  = $simple[0];
 	my $menu   = $self->_menu_plugins_submenu( $main, $simple[1] ) or return ();
-	return ($label, $menu);
+	return ( $label, $menu );
 }
 
 sub _menu_plugins_submenu {
@@ -462,7 +462,7 @@ sub _menu_plugins_submenu {
 
 	# Fill the menu
 	my $menu = Wx::Menu->new;
-	while ( @$items ) {
+	while (@$items) {
 		my $label = shift @$items;
 		my $value = shift @$items;
 
@@ -477,6 +477,7 @@ sub _menu_plugins_submenu {
 
 		# Method Name
 		if ( Params::Util::_IDENTIFIER($value) ) {
+
 			# Convert to a function reference
 			my $method = $value;
 			$value = sub { $self->$method(@_) };
@@ -507,10 +508,6 @@ sub _menu_plugins_submenu {
 
 	return $menu;
 }
-
-
-
-
 
 ######################################################################
 # Event Handlers
@@ -582,10 +579,6 @@ sub editor_disable {
 	return 1;
 }
 
-
-
-
-
 #####################################################################
 # Padre Integration Methods
 
@@ -600,7 +593,7 @@ method.
 =cut
 
 sub ide {
-	$IDE{Scalar::Util::refaddr($_[0])};
+	$IDE{ Scalar::Util::refaddr( $_[0] ) };
 }
 
 =pod
@@ -613,7 +606,7 @@ L<Padre::Wx::Main> (main window) object.
 =cut
 
 sub main {
-	$IDE{Scalar::Util::refaddr($_[0])}->wx->main;
+	$IDE{ Scalar::Util::refaddr( $_[0] ) }->wx->main;
 }
 
 1;

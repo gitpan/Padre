@@ -5,10 +5,10 @@ use strict;
 use warnings;
 use Padre::Project ();
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 use base 'Padre::Project';
 
-use overload 'bool' => sub () { 0 };
+use overload 'bool' => sub () {0};
 
 1;
 

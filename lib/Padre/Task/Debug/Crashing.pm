@@ -5,7 +5,7 @@ use warnings;
 
 use base 'Padre::Task';
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 sub run {
 	my ($self) = @_;
@@ -22,6 +22,7 @@ sub finish {
 }
 
 1;
+
 # Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or

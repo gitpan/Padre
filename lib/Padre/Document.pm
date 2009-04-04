@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.32';
+our $VERSION = '0.33';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -242,6 +242,7 @@ sub rebless {
 	# This isn't exactly the most elegant way to do this, but will
 	# do for a first implementation.
 	my $subclass = $MIME_CLASS{ $self->get_mimetype } || __PACKAGE__;
+	Padre::Util::debug("Reblessing to mimetype: '$subclass'");
 	if ($subclass) {
 		Class::Autouse->autouse($subclass);
 		bless $self, $subclass;
@@ -427,6 +428,8 @@ sub load_file {
 
 	my $file = $self->{filename};
 
+	Padre::Util::debug("Loading file '$file'");
+
 	# check if file exists
 	if ( !-e $file ) {
 
@@ -607,6 +610,7 @@ sub lexer {
 	return Wx::wxSTC_LEX_AUTOMATIC unless $self->get_mimetype;
 	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{ $self->get_mimetype };
 
+	Padre::Util::debug("Trying to determine the lexer");
 	# If mime type is not sufficient to figure out file type
 	# than use suffix for lexer
 	my $filename = $self->filename || q{};
@@ -619,6 +623,7 @@ sub lexer {
 		}
 	}
 
+	Padre::Util::debug("Lexer will be based on mymetype " . $self->get_mimetype);
 	return $MIME_LEXER{ $self->get_mimetype };
 }
 
