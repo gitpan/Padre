@@ -11,6 +11,7 @@ use POSIX qw(locale_h);
 
 
 
+
 #####################################################################
 # Normal Boring Commands
 
@@ -58,14 +59,15 @@ requires       'List::Util'               => '1.18';
 requires       'Module::Inspector'        => '0.04';
 requires       'Module::Refresh'          => '0.13';
 requires       'Module::Starter'          => '1.50';
-requires       'ORLite'                   => '1.18';
-requires       'ORLite::Migrate'          => '0.01';
+requires       'ORLite'                   => '1.20';
+requires       'ORLite::Migrate'          => '0.03';
 requires       'PAR'                      => '0.989';
 requires       'Params::Util'             => '0.33';
 requires       'Parse::ErrorString::Perl' => '0.11';
 requires       'Pod::POM'                 => '0.17';
 requires       'Pod::Simple'              => '3.07';
 requires       'Pod::Simple::XHTML'       => '3.04';
+requires       'Portable'                 => '0.12' if win32;
 requires       'POSIX'                    => 0;
 requires       'PPI'                      => '1.203';
 requires       'Probe::Perl'              => '0.01';
@@ -87,7 +89,7 @@ test_requires  'Test::Most'               => '0.21';
 test_requires  'Test::Script'             => '1.03';
 test_requires  'Test::Exception'          => '0.27';
 test_requires  'Test::NoWarnings'         => '0.084';
-# test_requires  'Test::NeedsDisplay'       => '1.07';
+#test_requires  'Test::NeedsDisplay'       => '1.07';
 
 my $locale = setlocale(LC_CTYPE);
 print "Locale detected: $locale\n";
@@ -99,7 +101,7 @@ no_index       'directory'                => qw{ t xt eg share inc privinc };
 homepage       'http://padre.perlide.org/';
 bugtracker     'http://padre.perlide.org/';
 repository     'http://svn.perlide.org/padre/trunk/Padre/';
-# MailingList  'http://mail.perlide.org/mailman/listinfo/padre-dev';
+#MailingList    'http://mail.perlide.org/mailman/listinfo/padre-dev';
 install_script 'script/padre';
 install_share;
 
@@ -111,6 +113,8 @@ install_share;
 # Padre-Specific Oddities
 
 # Padre requires threads
+# First we should check if the perl is threaded so the users 
+# won't waste time installing modules on a perl without thread support.
 use Config;
 unless ( $Config{usethreads} ) {
 	warn("Padre requires a perl built using threads\n");

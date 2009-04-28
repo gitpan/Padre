@@ -8,27 +8,28 @@ use strict;
 use warnings;
 
 use Carp qw{ croak };
-use Class::XSAccessor
-	accessors => {
-	_button      => '_button',         # general-purpose button
-	_butprefs    => '_butprefs',       # preferences button
-	_currow      => '_currow',         # current list row number
-	_curplugin   => '_curplugin',      # current plugin selected
-	_hbox        => '_hbox',           # the window hbox sizer
-	_imagelist   => '_imagelist',      # image list for the listctrl
-	_label       => '_label',          # label at top of right pane
-	_list        => '_list',           # list on the left of the pane
-	_manager     => '_manager',        # ref to plugin manager
-	_parent      => '_parent',         # parent window
-	_sortcolumn  => '_sortcolumn',     # column used for list sorting
-	_sortreverse => '_sortreverse',    # list sorting is reversed
-	_whtml       => '_whtml',          # html space for plugin doc
+use Class::XSAccessor accessors => {
+	_action       => '_action',          # action of default button
+	_button       => '_button',          # general-purpose button
+	_butprefs     => '_butprefs',        # preferences button
+	_currow       => '_currow',          # current list row number
+	_curplugin    => '_curplugin',       # current plugin selected
+	_hbox         => '_hbox',            # the window hbox sizer
+	_imagelist    => '_imagelist',       # image list for the listctrl
+	_label        => '_label',           # label at top of right pane
+	_list         => '_list',            # list on the left of the pane
+	_manager      => '_manager',         # ref to plugin manager
+	_plugin_names => '_plugin_names',    # mapping of short/full plugin names
+	_sortcolumn   => '_sortcolumn',      # column used for list sorting
+	_sortreverse  => '_sortreverse',     # list sorting is reversed
+	_whtml        => '_whtml',           # html space for plugin doc
 };
 use Padre::Wx::Icon;
+use Padre::Wx ();
 
 use base 'Wx::Frame';
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # -- constructor
 
@@ -45,7 +46,8 @@ sub new {
 		Wx::wxDEFAULT_FRAME_STYLE,
 	);
 	$self->SetIcon( Wx::GetWxPerlIcon() );
-	$self->_parent($parent);
+	$self->_sortcolumn(0);
+	$self->_sortreverse(0);
 
 	# store plugin manager
 	croak "Missing or invalid Padre::PluginManager object"
@@ -65,7 +67,9 @@ sub show {
 
 	$self->_refresh_list;
 
-	# select first item in the list
+	# select first item in the list. we don't need to test if
+	# there's at least a plugin, since there will always be
+	# 'my plugin'
 	my $list = $self->_list;
 	my $item = $list->GetItem(0);
 	$item->SetState(Wx::wxLIST_STATE_SELECTED);
@@ -83,7 +87,7 @@ sub show {
 #
 sub _on_butclose_clicked {
 	my $self = shift;
-	$self->Hide;
+	$self->Destroy;
 }
 
 #
@@ -105,13 +109,7 @@ sub _on_button_clicked {
 	my $self = shift;
 
 	# find method to call
-	my $label  = $self->_button->GetLabel;
-	my %method = (
-		Wx::gettext('Disable')            => '_plugin_disable',
-		Wx::gettext('Enable')             => '_plugin_enable',
-		Wx::gettext('Show error message') => '_plugin_show_error_msg',
-	);
-	my $method = $method{$label};
+	my $method = $self->_action;
 
 	# call method
 	$self->$method;
@@ -126,12 +124,12 @@ sub _on_list_col_click {
 	my ( $self, $event ) = @_;
 	my $col = $event->GetColumn;
 
-	my $prevcol  = $self->_sortcolumn  || 0;
-	my $reversed = $self->_sortreverse || 0;
+	my $prevcol  = $self->_sortcolumn;
+	my $reversed = $self->_sortreverse;
 	$reversed = $col == $prevcol ? !$reversed : 0;
 	$self->_sortcolumn($col);
 	$self->_sortreverse($reversed);
-	$self->_refresh_list( $col, $reversed );
+	$self->_refresh_list;
 }
 
 #
@@ -157,8 +155,9 @@ sub _on_list_col_click {
 sub _on_list_item_selected {
 	my ( $self, $event ) = @_;
 
-	my $name   = $event->GetLabel;
-	my $plugin = $self->_manager->plugins->{$name};
+	my $fullname = $event->GetLabel;
+	my $name     = $self->_plugin_names->{$fullname};
+	my $plugin   = $self->_manager->plugins->{$name};
 	$self->_curplugin($plugin);            # storing selected plugin
 	$self->_currow( $event->GetIndex );    # storing selected row
 
@@ -277,8 +276,10 @@ sub _create_right_pane {
 	# the plugin documentation
 	my $whtml = Wx::HtmlWindow->new($self);
 	$vbox->Add(
-		$whtml,                                           1, Wx::wxALL | Wx::wxALIGN_TOP |
-			Wx::wxALIGN_CENTER_HORIZONTAL | Wx::wxEXPAND, 1
+		$whtml,
+		1,
+		Wx::wxALL | Wx::wxALIGN_TOP | Wx::wxALIGN_CENTER_HORIZONTAL | Wx::wxEXPAND,
+		1
 	);
 	$self->_whtml($whtml);
 
@@ -310,7 +311,7 @@ sub _plugin_disable {
 	my $self = shift;
 
 	my $plugin = $self->_curplugin;
-	my $parent = $self->_parent;
+	my $parent = $self->GetParent;
 
 	# disable plugin
 	$parent->Freeze;
@@ -332,7 +333,7 @@ sub _plugin_enable {
 	my $self = shift;
 
 	my $plugin = $self->_curplugin;
-	my $parent = $self->_parent;
+	my $parent = $self->GetParent;
 
 	# enable plugin
 	$parent->Freeze;
@@ -359,14 +360,13 @@ sub _plugin_show_error_msg {
 }
 
 #
-# $dialog->_refresh_list($column, $reverse);
+# $dialog->_refresh_list;
 #
 # refresh list of plugins and their associated state. list is sorted
-# according to $column (default to first column), and may be reversed
-# (default to no).
+# according to current sort criterion.
 #
 sub _refresh_list {
-	my ( $self, $column, $reverse ) = @_;
+	my ($self) = @_;
 
 	my $list    = $self->_list;
 	my $manager = $self->_manager;
@@ -374,8 +374,8 @@ sub _refresh_list {
 	my $imglist = $self->_imagelist;
 
 	# default sorting
-	$column  ||= 0;
-	$reverse ||= 0;
+	my $column  = $self->_sortcolumn;
+	my $reverse = $self->_sortreverse;
 
 	# clear image list & fill it again
 	$imglist->RemoveAll;
@@ -408,10 +408,14 @@ sub _refresh_list {
 
 	# clear plugin list & fill it again
 	$list->DeleteAllItems;
+	my %plugin_names = ();
 	foreach my $plugin ( reverse @plugins ) {
-		my $name    = $plugin->name;
-		my $version = $plugin->version || '???';
-		my $status  = $plugin->status;
+		my $name       = $plugin->name;
+		my $fullname   = $plugin->plugin_name;
+		my $version    = $plugin->version || '???';
+		my $status     = $plugin->status;
+		my $l10nstatus = $plugin->status_localized;
+		$plugin_names{$fullname} = $name;
 
 		# check if plugin is supplying its own icon
 		my $iconidx = 0;
@@ -422,11 +426,13 @@ sub _refresh_list {
 		}
 
 		# inserting the plugin in the list
-		my $idx = $list->InsertStringImageItem( 0, $name, $iconidx );
+		my $idx = $list->InsertStringImageItem( 0, $fullname, $iconidx );
 		$list->SetItem( $idx, 1, $version );
-		$list->SetItem( $idx, 2, $status, $icon{$status} );
-		$list->SetItemData( $idx, 1 );
+		$list->SetItem( $idx, 2, $l10nstatus, $icon{$status} );
 	}
+
+	# store mapping of full plugin names / short plugin names
+	$self->_plugin_names( \%plugin_names );
 
 	# auto-resize columns
 	$list->SetColumnWidth( $_, Wx::wxLIST_AUTOSIZE ) for 0 .. 2;
@@ -457,6 +463,7 @@ sub _update_plugin_state {
 
 		# plugin is in error state
 		$button->SetLabel( Wx::gettext('Show error message') );
+		$self->_action('_plugin_show_error_msg');
 		$butprefs->Disable;
 		$item->SetText( Wx::gettext('error') );
 		$item->SetImage(3);
@@ -466,6 +473,7 @@ sub _update_plugin_state {
 
 		# plugin is incompatible
 		$button->SetLabel( Wx::gettext('Show error message') );
+		$self->_action('_plugin_show_error_msg');
 		$butprefs->Disable;
 		$item->SetText( Wx::gettext('incompatible') );
 		$item->SetImage(5);
@@ -479,6 +487,7 @@ sub _update_plugin_state {
 
 			# ... and enabled
 			$button->SetLabel( Wx::gettext('Disable') );
+			$self->_action('_plugin_disable');
 			$button->Enable;
 			$item->SetText( Wx::gettext('enabled') );
 			$item->SetImage(1);
@@ -488,6 +497,7 @@ sub _update_plugin_state {
 
 			# ... and disabled
 			$button->SetLabel( Wx::gettext('Enable') );
+			$self->_action('_plugin_enable');
 			$button->Enable;
 			$item->SetText( Wx::gettext('disabled') );
 			$item->SetImage(2);

@@ -8,7 +8,7 @@ use warnings;
 use Params::Util qw{_INSTANCE};
 use Padre::Wx ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # Due to an overly simplistic implementation at the C level,
 # Wx::AuiManager is only a SCALAR reference and cannot be
@@ -53,7 +53,7 @@ sub relocale {
 
 	# Update the pane captions
 	foreach my $name ( sort keys %{ $self->{caption} } ) {
-		Padre::Util::debug( "relocale $name" );
+		Padre::Util::debug("relocale $name");
 		my $pane = $self->GetPane($name) or next;
 		$pane->Caption( Wx::gettext( $self->{caption}->{$name} ) );
 	}

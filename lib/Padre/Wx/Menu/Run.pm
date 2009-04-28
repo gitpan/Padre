@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use base 'Padre::Wx::Menu';
 
 #####################################################################
@@ -35,18 +35,6 @@ sub new {
 		$self->{run_document},
 		sub {
 			$_[0]->run_document;
-		},
-	);
-
-	$self->{run_document_parameters} = $self->Append(
-		-1,
-		Wx::gettext("Run Parameters\tShift-Ctrl-F5")
-	);
-	Wx::Event::EVT_MENU(
-		$main,
-		$self->{run_document_parameters},
-		sub {
-			$_[0]->run_document_parameters;
 		},
 	);
 
@@ -120,11 +108,6 @@ sub refresh {
 		? $self->{run_command}->IsEnabled
 		: 0
 	);
-	$self->{run_document_parameters}->Enable(
-		  $document
-		? $self->{run_command}->IsEnabled
-		: 0
-	);
 	$self->{run_document_debug}->Enable(
 		  $document
 		? $self->{run_command}->IsEnabled
@@ -145,7 +128,6 @@ sub refresh {
 sub enable {
 	my $self = shift;
 	$self->{run_document}->Enable(1);
-	$self->{run_document_parameters}->Enable(1);
 	$self->{run_document_debug}->Enable(1);
 	$self->{run_command}->Enable(1);
 	$self->{stop}->Enable(0);
@@ -155,7 +137,6 @@ sub enable {
 sub disable {
 	my $self = shift;
 	$self->{run_document}->Enable(0);
-	$self->{run_document_parameters}->Enable(0);
 	$self->{run_document_debug}->Enable(0);
 	$self->{run_command}->Enable(0);
 	$self->{stop}->Enable(1);

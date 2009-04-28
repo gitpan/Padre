@@ -1,5 +1,19 @@
 Changes for Perl Application Development and Refactoring Environment
 
+v0.34 009.04.28
+
+    Fix crash in plugin manager when changing locale while window opened (#298) (JQUELIN)
+    Support for plugin l10n in place (JQUELIN)
+    Added Preferences->Run Parameters panel instead of Perl->Run Parameters menu option. (THEREK)
+    Stop refreshing the menues on every keystroke. Instead when the menu is being accessed. (SZABGAB)
+    Sessions support (#123) (JQUELIN)
+    Enable tooltips on the toolbar on Windows as well (SZABGAB)
+    Fix localization change in the Syntax window (#198) (SZABGAB)
+    Plugin manager correctly localized at startup (JQUELIN)
+    Plugin manager displaying full plugin names (JQUELIN)
+    Set file size limit to 500_000 to avoid loading too big files. (#186) (SZABGAB)
+    Double-clicking on an error now selects the line (#214) (JQUELIN)
+
 v0.33 2009.04.04
 
     Fix bug in relative path showing in the Windows menu. (GARU)

@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use base 'Padre::Document';
 
 #####################################################################
@@ -82,8 +82,8 @@ sub lexer {
 	my $self   = shift;
 	my $config = Padre->ide->config;
 
-	Padre::Util::debug("Setting highlighter for Perl 5 code. length: " . $self->editor->GetTextLength);
-	Padre::Util::debug("Limit " . $config->ppi_highlight_limit);
+	Padre::Util::debug( "Setting highlighter for Perl 5 code. length: " . $self->editor->GetTextLength );
+	Padre::Util::debug( "Limit " . $config->ppi_highlight_limit );
 	if ( $config->ppi_highlight and $self->editor->GetTextLength < $config->ppi_highlight_limit ) {
 		Padre::Util::debug("Setting ppi highlighting");
 		return Wx::wxSTC_LEX_CONTAINER;
@@ -99,6 +99,7 @@ sub colorize {
 	my $self = shift;
 
 	Padre::Util::debug("colorize called");
+
 	# use pshangov's experimental ppi lexer only when running in development mode
 	if ( $ENV{PADRE_DEV} ) {
 		require Padre::Document::Perl::Lexer;
@@ -274,22 +275,35 @@ sub get_command {
 	my $self  = shift;
 	my $debug = shift;
 
-	# Check the file name
-	my $filename = $self->filename;
+	my $config = Padre->ide->config;
 
-	#	unless ( $filename and $filename =~ /\.pl$/i ) {
-	#		die "Only .pl files can be executed\n";
-	#	}
+	# Use a temporary file if run_save is set to 'unsaved'
+	my $filename
+		= $config->run_save eq 'unsaved' && !$self->is_saved
+		? $self->store_in_tempfile
+		: $self->filename;
 
 	# Run with the same Perl that launched Padre
 	# TODO: get preferred Perl from configuration
 	my $perl = Padre->perl_interpreter;
 
+	# Set default arguments
+	my %run_args = (
+		interpreter => $config->run_interpreter_args_default,
+		script      => $config->run_script_args_default,
+	);
+
+	# Overwrite default arguments with the ones preferred for given document
+	foreach my $arg ( keys %run_args ) {
+		my $type = "run_${arg}_args_" . File::Basename::fileparse($filename);
+		$run_args{$arg} = Padre::DB::History->previous($type) if Padre::DB::History->previous($type);
+	}
+
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
 	return $debug
-		? qq{"$perl" -Mdiagnostics(-traceonly) "$filename"}
-		: qq{"$perl" "$filename"};
+		? qq{"$perl" -Mdiagnostics(-traceonly) $run_args{interpreter} "$filename" $run_args{script}}
+		: qq{"$perl" $run_args{interpreter} "$filename" $run_args{script}};
 }
 
 sub pre_process {

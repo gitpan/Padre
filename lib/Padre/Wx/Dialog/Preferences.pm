@@ -8,7 +8,7 @@ use Padre::Current ();
 
 use base qw(Padre::Wx::Dialog);
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 sub _new_panel {
 	my ( $self, $parent ) = splice( @_, 0, 2 );
@@ -35,6 +35,11 @@ sub _behaviour_panel {
 	my $table = [
 		[   [   'Wx::CheckBox', 'editor_wordwrap', ( $config->editor_wordwrap ? 1 : 0 ),
 				Wx::gettext('Default word wrap on for each file')
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox', 'editor_fold_pod', ( $config->editor_fold_pod ? 1 : 0 ),
+				Wx::gettext('Auto-fold POD markup when code folding enabled')
 			],
 			[]
 		],
@@ -293,6 +298,106 @@ sub _add_plugins {
 	return;
 }
 
+sub _run_params_panel {
+	my ( $self, $treebook ) = @_;
+
+	my $config   = Padre->ide->config;
+	my $document = Padre::Current->document;
+
+	my $intrp_args_text = Wx::gettext(<<'END_TEXT');
+i.e.
+	include directory:  -I<dir>
+	enable tainting checks:  -T
+	enable many useful warnings:  -w
+	enable all warnings:  -W
+	disable all warnings:  -X
+END_TEXT
+
+	# Default values stored in host configuration
+	my $defaults_table = [
+		[   [ 'Wx::StaticText', undef,                          Wx::gettext('Interpreter arguments:') ],
+			[ 'Wx::TextCtrl',   'run_interpreter_args_default', $config->run_interpreter_args_default ]
+		],
+		[   [ 'Wx::StaticText', undef, '' ],
+			[ 'Wx::StaticText', undef, $intrp_args_text ]
+		],
+		[   [ 'Wx::StaticText', undef,                     Wx::gettext('Script arguments:') ],
+			[ 'Wx::TextCtrl',   'run_script_args_default', $config->run_script_args_default ]
+		],
+	];
+
+	# Per document values (overwrite defaults) stored in history
+	my $doc_flag = 0;                        # value of 1 means that there is no document currently open
+	my $filename = Wx::gettext('Unsaved');
+	my $path     = Wx::gettext('N/A');
+	my %run_args = (
+		interpreter => '',
+		script      => '',
+	);
+
+	# Trap exception if there is no document currently open
+	eval {
+		unless ( $document->is_new )
+		{
+			( $filename, $path ) = File::Basename::fileparse( Padre::Current->filename );
+			foreach my $arg ( keys %run_args ) {
+				my $type = "run_${arg}_args_${filename}";
+				$run_args{$arg} = Padre::DB::History->previous($type)
+					if Padre::DB::History->previous($type);
+			}
+		}
+	};
+	if ($@) {
+		$filename = Wx::gettext('No Document');
+		$doc_flag = 1;
+	}
+
+	my $currentdoc_table = [
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Document name:') ],
+			[ 'Wx::TextCtrl', undef, $filename, Wx::wxTE_READONLY ]
+		],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Document location:') ],
+			[ 'Wx::TextCtrl', undef, $path, Wx::wxTE_READONLY ]
+		],
+		[   [ 'Wx::StaticText', undef,                            Wx::gettext('Interpreter arguments:') ],
+			[ 'Wx::TextCtrl',   "run_interpreter_args_$filename", $run_args{interpreter} ]
+		],
+		[   [ 'Wx::StaticText', undef, '' ],
+			[ 'Wx::StaticText', undef, $intrp_args_text ]
+		],
+		[   [ 'Wx::StaticText', undef,                       Wx::gettext('Script arguments:') ],
+			[ 'Wx::TextCtrl',   "run_script_args_$filename", $run_args{script} ]
+		],
+	];
+
+	my $panel = Wx::Panel->new(
+		$treebook,
+		-1,
+		Wx::wxDefaultPosition,
+		Wx::wxDefaultSize,
+		Wx::wxTAB_TRAVERSAL | Wx::wxVSCROLL | Wx::wxHSCROLL,
+	);
+	my $main_sizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
+
+	my $notebook = Wx::Notebook->new($panel);
+
+	my $defaults_subpanel = $self->_new_panel($notebook);
+	$self->fill_panel_by_table( $defaults_subpanel, $defaults_table );
+	$notebook->AddPage( $defaults_subpanel, Wx::gettext('Default') );
+
+	my $currentdoc_subpanel = $self->_new_panel($notebook);
+	$self->fill_panel_by_table( $currentdoc_subpanel, $currentdoc_table ) unless $doc_flag;
+	$notebook->AddPage(
+		$currentdoc_subpanel,
+		sprintf( Wx::gettext('Current Document: %s'), $filename )
+	);
+
+	$main_sizer->Add( $notebook, 1, Wx::wxGROW );
+	$panel->SetSizerAndFit($main_sizer);
+
+	return $panel;
+}
+
 sub dialog {
 	my ( $self, $win, $main_startup, $editor_autoindent, $main_functions_order, $perldiag_locales ) = @_;
 
@@ -329,6 +434,10 @@ sub dialog {
 
 	my $appearance = $self->_appearance_panel($tb);
 	$tb->AddPage( $appearance, Wx::gettext('Appearance') );
+	$tb->AddPage(
+		$self->_run_params_panel($tb),
+		Wx::gettext('Run Parameters')
+	);
 
 	#my $plugin_manager = $self->_pluginmanager_panel($tb);
 	#$tb->AddPage( $plugin_manager, Wx::gettext('Plugin Manager') );
@@ -484,6 +593,10 @@ sub run {
 		$data->{editor_wordwrap} ? 1 : 0
 	);
 	$config->set(
+		'editor_fold_pod',
+		$data->{editor_fold_pod} ? 1 : 0
+	);
+	$config->set(
 		'editor_beginner',
 		$data->{editor_beginner} ? 1 : 0
 	);
@@ -503,6 +616,32 @@ sub run {
 		'main_output_ansi',
 		$data->{main_output_ansi} ? 1 : 0
 	);
+	$config->set(
+		'run_interpreter_args_default',
+		$data->{run_interpreter_args_default}
+	);
+	$config->set(
+		'run_script_args_default',
+		$data->{run_script_args_default}
+	);
+
+	# Quite like in _run_params_panel, trap exception if there
+	# is no document currently open
+	eval {
+		unless ( Padre::Current->document->is_new )
+		{
+
+			# These are a bit different as run_* variable name depends
+			# on current document's filename
+			foreach ( grep { /^run_/ && !/_default$/ } ( keys %$data ) ) {
+				next if Padre::DB::History->previous($_) eq $data->{$_};
+				Padre::DB::History->create(
+					type => $_,
+					name => $data->{$_},
+				);
+			}
+		}
+	};
 
 	# The slightly different one
 	my $editor_currentline_color = $data->{editor_currentline_color};

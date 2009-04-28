@@ -48,7 +48,7 @@ use Padre::Wx     ();
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => File::Spec->rel2abs( Padre::Util::sharedir('locale') );
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -360,12 +360,12 @@ BEGIN {
 		},
 
 		'zh' => {
-			gettext  => _T('Chinese'),
-			utf8text => 'Chinese',
-			iso639   => 'zh',
-			iso3166  => undef,
-			wxid     => Wx::wxLANGUAGE_CHINESE,
-			fallback => [ 'zh-cn', 'zh-tw', 'en-us' ],
+			gettext   => _T('Chinese'),
+			utf8text  => 'Chinese',
+			iso639    => 'zh',
+			iso3166   => undef,
+			wxid      => Wx::wxLANGUAGE_CHINESE,
+			fallback  => [ 'zh-cn', 'zh-tw', 'en-us' ],
 			supported => 0,
 		},
 

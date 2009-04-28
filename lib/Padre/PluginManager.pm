@@ -30,12 +30,13 @@ use File::Spec::Functions qw{ catfile };
 use Scalar::Util ();
 use Params::Util qw{_IDENTIFIER _CLASS _INSTANCE};
 use Padre::Config::Constants qw{ :dirs };
+use Padre::Current           ();
 use Padre::Util              ();
 use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 #####################################################################
 # Constructor and Accessors
@@ -122,11 +123,39 @@ sub plugin_names {
 }
 
 sub plugin_objects {
-	grep { $_[0]->{plugins}->{$_} } $_[0]->plugin_names;
+	map { $_[0]->{plugins}->{$_} } $_[0]->plugin_names;
 }
 
 #####################################################################
 # Bulk Plugin Operations
+
+#
+# $pluginmgr->relocale;
+#
+# update padre's locale object to handle new plugin l10n.
+#
+sub relocale {
+	my ($self) = @_;
+	my $locale = Padre::Current->main->{locale};
+
+	foreach my $plugin ( $self->plugin_objects ) {
+
+		# only process enabled plugins
+		next unless $plugin->status eq 'enabled';
+
+		# add the plugin locale dir to search path
+		my $object    = $plugin->{object};
+		my $localedir = $object->plugin_locale_directory
+			if $object->can('plugin_locale_directory');
+		$locale->AddCatalogLookupPathPrefix($localedir)
+			if defined $localedir && -d $localedir;
+
+		# add the plugin catalog to the locale
+		my $name = $plugin->name;
+		my $code = Padre::Locale::rfc4646();
+		$locale->AddCatalog("$name-$code");
+	}
+}
 
 #
 # $pluginmgr->reset_my_plugin( $overwrite );
@@ -530,6 +559,14 @@ sub _load_plugin {
 		return;
 	}
 
+	# add a new directory for locale to search translation catalogs.
+	my $localedir = $object->plugin_locale_directory
+		if $object->can('plugin_locale_directory');
+	if ( defined $localedir && -d $localedir ) {
+		my $locale = Padre::Current->main->{locale};
+		$locale->AddCatalogLookupPathPrefix($localedir);
+	}
+
 	# FINALLY we are clear to enable the plugin
 	$plugin->enable;
 
@@ -831,8 +868,13 @@ sub test_a_plugin {
 		unshift @INC, $default_dir;
 	}
 
-	# Load plugin
-	delete $plugins->{$filename};
+	# Unload any previously existant plugin with the same name
+	if ( $plugins->{$filename} ) {
+		$self->unload_plugin($filename);
+		delete $plugins->{$filename};
+	}
+
+	# Load the selected plugin
 	$self->load_plugin($filename);
 	if ( $self->plugins->{$filename}->{status} eq 'error' ) {
 		$main->error(

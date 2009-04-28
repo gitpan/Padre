@@ -42,12 +42,10 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use base 'Wx::Frame';
 
 use constant SECONDS => 1000;
-
-my %run_argv;
 
 #####################################################################
 # Constructor and Accessors
@@ -93,8 +91,8 @@ sub new {
 	Wx::InitAllImageHandlers();
 	Wx::Log::SetActiveTarget( Wx::LogStderr->new );
 	Padre::Util::set_logging( $config->logging );
-	Padre::Util::set_trace( $config->logging_trace );	
-	Padre::Util::debug( 'Logging started' );
+	Padre::Util::set_trace( $config->logging_trace );
+	Padre::Util::debug('Logging started');
 
 	# Determine the window title
 	my $title = 'Padre';
@@ -111,7 +109,7 @@ sub new {
 	}
 
 	# Determine the initial frame style
-	my $style  = Wx::wxDEFAULT_FRAME_STYLE;
+	my $style = Wx::wxDEFAULT_FRAME_STYLE;
 	if ( $config->main_maximized ) {
 		$style |= Wx::wxMAXIMIZE;
 		$style |= Wx::wxCLIP_CHILDREN;
@@ -208,25 +206,7 @@ sub new {
 	# Special Key Handling
 	Wx::Event::EVT_KEY_UP(
 		$self,
-		sub {
-			my ( $self, $event ) = @_;
-			my $mod = $event->GetModifiers || 0;
-			my $code = $event->GetKeyCode;
-
-			# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
-			# () needed after the constants as they are functions in Perl and
-			# without constants perl will call only the first one.
-			$mod = $mod & ( Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() );
-			if ( $mod == Wx::wxMOD_CMD ) {    # Ctrl
-				                              # Ctrl-TAB  #TODO it is already in the menu
-				$self->on_next_pane if $code == Wx::WXK_TAB;
-			} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) {    # Ctrl-Shift
-				    # Ctrl-Shift-TAB #TODO it is already in the menu
-				$self->on_prev_pane if $code == Wx::WXK_TAB;
-			}
-			$event->Skip();
-			return;
-		}
+		\&key_up
 	);
 
 	# Deal with someone closing the window
@@ -328,8 +308,27 @@ sub load_files {
 	my $self    = shift;
 	my $config  = $self->config;
 	my $startup = $config->main_startup;
+	my $ide     = Padre->ide;
 
-	# An explicit list on the command line overrides configuration
+	# explicit session on command line takes precedence
+	if ( defined $ide->opts->{session} ) {
+
+		# try to find the wanted session...
+		my ($session) = Padre::DB::Session->select( 'where name = ?', $ide->opts->{session} );
+
+		# ... and open it.
+		if ( defined $session ) {
+			$self->open_session($session);
+		} else {
+			my $error
+				= sprintf Wx::gettext('No such session %s'),
+				$ide->opts->{session};
+			$self->error($error);
+		}
+		return;
+	}
+
+	# otherwise, an explicit list on the command line overrides configuration
 	my $files = Padre->ide->{ARGV};
 	if ( Params::Util::_ARRAY($files) ) {
 		$self->setup_editors(@$files);
@@ -339,25 +338,9 @@ sub load_files {
 	# Config setting 'last' means startup with all the files from the
 	# previous time we used Padre open (if they still exist)
 	if ( $startup eq 'last' ) {
-		my @session = Padre::DB::Session->select;
-		if (@session) {
-			my $focus = undef;
-			foreach my $document (@session) {
-				Padre::Util::debug("Opening '" . $document->file . "' for $document");
-				my $filename = $document->file;
-				next unless -f $filename;
-				my $id = $self->setup_editor($filename);
-				Padre::Util::debug("Setting focus on $filename");
-				if ( $document->focus ) {
-					$focus = $id;
-				}
-
-				# TODO - Go to the line/character
-			}
-			if ( defined $focus ) {
-				$self->on_nth_pane($focus);
-			}
-		}
+		my $session = Padre::DB::Session->last_padre_session;
+		$self->open_session($session) if defined($session);
+		return;
 	}
 
 	# Config setting 'nothing' means startup with nothing open
@@ -480,7 +463,8 @@ sub refresh {
 	my $guard = $self->freezer;
 
 	my $current = $self->current;
-	$self->refresh_menu;
+
+	#$self->refresh_menu;
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 	$self->refresh_functions($current);
@@ -600,7 +584,7 @@ sub change_locale {
 	unless ( defined $name ) {
 		$name = Padre::Locale::system_rfc4646();
 	}
-	Padre::Util::debug( "Changing locale to '$name'" );
+	Padre::Util::debug("Changing locale to '$name'");
 
 	# Save the locale to the config
 	$self->config->set( locale => $name );
@@ -625,6 +609,9 @@ sub change_locale {
 sub relocale {
 	my $self = shift;
 
+	# relocale the plugins
+	Padre::Current->ide->plugin_manager->relocale;
+
 	# The menu doesn't support relocale, replace it
 	delete $self->{menu};
 	$self->{menu} = Padre::Wx::Menubar->new($self);
@@ -642,6 +629,7 @@ sub relocale {
 
 	$self->bottom->relocale;
 	$self->right->relocale;
+	$self->syntax->relocale;
 
 	return;
 }
@@ -872,9 +860,6 @@ sub run_document {
 		return $self->error( Wx::gettext("No execution mode was defined for this document") );
 	}
 
-	my $filename = File::Basename::fileparse( $self->current->filename );
-	$run_argv{$filename} = '' unless ( $run_argv{$filename} );
-
 	my $cmd = eval { $document->get_command($debug) };
 	if ($@) {
 		chomp $@;
@@ -883,26 +868,11 @@ sub run_document {
 	}
 	if ($cmd) {
 		if ( $document->pre_process ) {
-			$cmd .= " $run_argv{$filename}";
 			$self->run_command($cmd);
 		} else {
 			$self->error( $document->errstr );
 		}
 	}
-	return;
-}
-
-sub run_document_parameters {
-	my $self     = shift;
-	my $document = $self->current->document;
-
-	if ( $document->is_new ) {
-		return $self->error( Wx::gettext("Save the file first") );
-	}
-
-	my $filename = File::Basename::fileparse( $self->current->filename );
-	$run_argv{$filename} = $self->prompt( Wx::gettext("Command line parameters"), Wx::gettext("Run parameters"), "RUN_COMMAND_LINE_PARAMS_$filename" );
-
 	return;
 }
 
@@ -1108,39 +1078,17 @@ sub on_close_window {
 	my $event  = shift;
 	my $padre  = Padre->ide;
 	my $config = $padre->config;
-	
+
 	Padre::Util::debug("on_close_window");
 
 	# Capture the current session, before we start the interactive
 	# part of the shutdown which will mess it up. Don't save it to
 	# the config yet, because we haven't committed to the shutdown
 	# until we get past the interactive phase.
-	my @session  = ();
-	my $notebook = $self->notebook;
-	my $current  = $self->current->filename;
-	foreach my $pageid ( $self->pageids ) {
-		next unless defined $pageid;
-		my $editor   = $notebook->GetPage($pageid);
-		my $document = $editor->{Document} or next;
-		my $file     = $editor->{Document}->filename;
-		next unless defined $file;
-		my $position  = $editor->GetCurrentPos;
-		my $line      = $editor->GetCurrentLine;
-		my $start     = $editor->PositionFromLine($line);
-		my $character = $position - $start;
-		my $focus     = ( defined $current and $current eq $file ) ? 1 : 0;
-		push @session,
-			Padre::DB::Session->new(
-			file      => $file,
-			line      => $line,
-			character => $character,
-			clue      => undef,
-			focus     => $focus,
-			);
-	}
+	my @session = $self->capture_session;
 
 	Padre::Util::debug("went over list of files");
-	
+
 	# Check that all files have been saved
 	if ( $event->CanVeto ) {
 		if ( $config->main_startup eq 'same' ) {
@@ -1198,11 +1146,10 @@ sub on_close_window {
 
 	# Write the session to the database
 	Padre::DB->begin;
-	Padre::DB::Session->truncate;
-	foreach my $file (@session) {
-		$file->insert;
-	}
+	my $session = Padre::DB::Session->last_padre_session;
+	Padre::DB::SessionFile->delete( 'where session = ?', $session->id );
 	Padre::DB->commit;
+	$self->save_session( $session, @session );
 
 	# Write the configuration to disk
 	$padre->save_config;
@@ -1284,26 +1231,42 @@ sub on_new {
 # current file otherwise open a new buffer and open the file there.
 sub setup_editor {
 	my ( $self, $file ) = @_;
+	my $config = $self->config;
 
-	Padre::Util::debug("setup_editor called for '" . ($file || '') .  "'");
+	Padre::Util::debug( "setup_editor called for '" . ( $file || '' ) . "'" );
 	if ($file) {
-		$file = Cwd::realpath($file); # get absolute path
+		$file = Cwd::realpath($file);    # get absolute path
 		my $id = $self->find_editor_of_file($file);
 		if ( defined $id ) {
 			$self->on_nth_pane($id);
 			return;
 		}
+
+		# if file does not exist, create it so that future access
+		# (such as size checking) won't warn / blow up padre
+		if ( not -f $file ) {
+			open my $fh, '>', $file;
+			close $fh;
+		}
+		if ( -s $file > $config->editor_file_size_limit ) {
+			return $self->error(
+				sprintf(
+					Wx::gettext(
+						"Cannot open %s as it is over the arbitrary file size limit of Padre which is currently %s"),
+					$file,
+					$config->editor_file_size_limit
+				)
+			);
+		}
 	}
 
 	local $self->{_no_refresh} = 1;
-
-	my $config = $self->config;
 
 	my $doc = Padre::Document->new(
 		filename => $file,
 	);
 
-	$file ||= ''; #to avoid warnings
+	$file ||= '';    #to avoid warnings
 	if ( $doc->errstr ) {
 		warn $doc->errstr . " when trying to open '$file'";
 		return;
@@ -1330,7 +1293,7 @@ sub setup_editor {
 	}
 
 	if ( !$doc->is_new ) {
-		Padre::Util::debug("Adding new file to history: " . $doc->filename);
+		Padre::Util::debug( "Adding new file to history: " . $doc->filename );
 		Padre::DB::History->create(
 			type => 'files',
 			name => $doc->filename,
@@ -1357,6 +1320,92 @@ sub create_tab {
 	my $id = $self->notebook->GetSelection;
 	$self->refresh;
 	return $id;
+}
+
+#
+# my @session = $self->capture_session;
+#
+# capture list of opened files, with information. return a list of
+# Padre::DB::SessionFile objects.
+#
+sub capture_session {
+	my ($self) = @_;
+
+	my @session  = ();
+	my $notebook = $self->notebook;
+	my $current  = $self->current->filename;
+	foreach my $pageid ( $self->pageids ) {
+		next unless defined $pageid;
+		my $editor   = $notebook->GetPage($pageid);
+		my $document = $editor->{Document} or next;
+		my $file     = $editor->{Document}->filename;
+		next unless defined $file;
+		my $position = $editor->GetCurrentPos;
+		my $focus    = ( defined $current and $current eq $file ) ? 1 : 0;
+		my $obj      = Padre::DB::SessionFile->new(
+			file     => $file,
+			position => $position,
+			focus    => $focus,
+		);
+		push @session, $obj;
+	}
+
+	return @session;
+}
+
+#
+# $self->open_session( $session );
+#
+# try to close all files, then open all files referenced in the given
+# $session (a padre::db::session object). no return value.
+#
+sub open_session {
+	my ( $self, $session ) = @_;
+
+	# prevent redrawing until we're done
+	$self->Freeze;
+
+	# close all files
+	$self->on_close_all;
+
+	# get list of files in the session
+	my @files = $session->files;
+	return unless @files;
+
+	# opening documents
+	my $focus    = undef;
+	my $notebook = $self->notebook;
+	foreach my $document (@files) {
+		Padre::Util::debug( "Opening '" . $document->file . "' for $document" );
+		my $filename = $document->file;
+		next unless -f $filename;
+		my $id = $self->setup_editor($filename);
+		next unless $id;    # documents already opened have undef $id
+		Padre::Util::debug("Setting focus on $filename");
+		$focus = $id if $document->focus;
+		$notebook->GetPage($id)->goto_pos_centerize( $document->position );
+	}
+	$self->on_nth_pane($focus) if defined $focus;
+
+	# now we can redraw
+	$self->Thaw;
+}
+
+#
+# $self->save_session( $session, @session );
+#
+# try to save @session files (Padre::DB::SessionFile objects) to DB,
+# associated to $session. note that $session should already exist.
+#
+sub save_session {
+	my ( $self, $session, @session ) = @_;
+
+	Padre::DB->begin;
+	foreach my $file (@session) {
+		$file->{session} = $session->id;
+		$file->insert;
+	}
+	Padre::DB->commit;
 }
 
 # try to open in various ways
@@ -1691,6 +1740,7 @@ sub close {
 
 	#
 	$doc->store_cursor_position;
+	$doc->remove_tempfile if $doc->tempfile;
 
 	$self->notebook->DeletePage($id);
 
@@ -1854,9 +1904,7 @@ sub on_toggle_code_folding {
 
 	foreach my $editor ( $self->editors ) {
 		$editor->show_folding( $config->editor_folding );
-		unless ( $config->editor_folding ) {
-			$editor->unfold_all;
-		}
+		$editor->fold_pod if ( $config->editor_folding && $config->editor_fold_pod );
 	}
 
 	return;
@@ -2275,12 +2323,13 @@ sub on_stc_update_ui {
 	# Check for brace, on current position, higlight the matching brace
 	my $current = $self->current;
 	my $editor  = $current->editor;
+	return if not defined $editor;
 	$editor->highlight_braces;
 	$editor->show_calltip;
 
 	# avoid refreshing the subs as that takes a lot of time
 	# TODO maybe we should refresh it on every 20s hit or so
-	$self->refresh_menu;
+	#$self->refresh_menu;
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 
@@ -2289,7 +2338,9 @@ sub on_stc_update_ui {
 
 	# TODO move this to a more appropriate place (when switching between buffers?)
 	if ( my $directory = $self->directory ) {
-		$directory->update_gui;
+		if ( $self->menu->view->{directory}->IsChecked ) {
+			$directory->update_gui;
+		}
 	}
 	return;
 }
@@ -2345,9 +2396,9 @@ sub on_doc_stats {
 	) = $doc->stats;
 
 	my @messages = (
-		sprintf( Wx::gettext("Words: %d"),                $words ),
+		sprintf( Wx::gettext("Words: %s"),                $words ),
 		sprintf( Wx::gettext("Lines: %d"),                $lines ),
-		sprintf( Wx::gettext("Chars without spaces: %d"), $chars_without_space ),
+		sprintf( Wx::gettext("Chars without spaces: %s"), $chars_without_space ),
 		sprintf( Wx::gettext("Chars with spaces: %d"),    $chars_with_space ),
 		sprintf( Wx::gettext("Newline type: %s"),         $newline_type ),
 		sprintf( Wx::gettext("Encoding: %s"),             $encoding ),
@@ -2598,7 +2649,8 @@ sub setup_bindings {
 # this is Perl specific but for now we could not
 # find a better place for this
 sub set_ppi_highlight {
-	my ($self, $on) = @_;
+	my ( $self, $on ) = @_;
+
 	# Update the saved config setting
 	my $config = Padre->ide->config;
 	$config->set( ppi_highlight => $on );
@@ -2614,24 +2666,25 @@ sub set_ppi_highlight {
 	foreach my $editor ( $self->editors ) {
 		my $doc = $editor->{Document};
 		next unless $doc->isa('Padre::Document::Perl');
-		Padre::Util::debug("Set ppi to $on for $doc in file " . ($doc->filename || ''));
+		Padre::Util::debug( "Set ppi to $on for $doc in file " . ( $doc->filename || '' ) );
 		my $lexer = $doc->lexer;
-		$editor->SetLexer( $lexer );
+		$editor->SetLexer($lexer);
+
 		# TODO maybe the document should have a method that tells us if it was setup
 		# to be colored by ppi or not instead of fetching the lexer again.
 		Padre::Util::debug("lexer: $lexer");
 
-		if ($editor eq $current_editor) {
+		if ( $editor eq $current_editor ) {
 			$editor->needs_manual_colorize(0);
 			$editor->needs_stc_colorize(0);
-			if ( $config->ppi_highlight and $lexer == Wx::wxSTC_LEX_CONTAINER) {
+			if ( $config->ppi_highlight and $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 				$doc->colorize;
 			} else {
 				$doc->remove_color;
 				$editor->Colourise( 0, $editor->GetLength );
 			}
 		} else {
-			if ( $config->ppi_highlight and $lexer == Wx::wxSTC_LEX_CONTAINER) {
+			if ( $config->ppi_highlight and $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 				$editor->needs_manual_colorize(1);
 				$editor->needs_stc_colorize(0);
 			} else {
@@ -2640,6 +2693,45 @@ sub set_ppi_highlight {
 			}
 		}
 	}
+	return;
+}
+
+sub key_up {
+	my ( $self, $event ) = @_;
+	my $mod = $event->GetModifiers || 0;
+	my $code = $event->GetKeyCode;
+
+	# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
+	# () needed after the constants as they are functions in Perl and
+	# without constants perl will call only the first one.
+	$mod = $mod & ( Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() );
+	if ( $mod == Wx::wxMOD_CMD ) {    # Ctrl
+		                              # Ctrl-TAB  #TODO it is already in the menu
+		$self->on_next_pane if $code == Wx::WXK_TAB;
+	} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) {    # Ctrl-Shift
+		                                                         # Ctrl-Shift-TAB #TODO it is already in the menu
+		$self->on_prev_pane if $code == Wx::WXK_TAB;
+	} elsif ( $mod == Wx::wxMOD_ALT() ) {
+
+		#		my $current_focus = Wx::Window::FindFocus();
+		#		Padre::Util::debug("Current focus: $current_focus");
+		#		# TODO this should be fine tuned later
+		#		if ($code == Wx::WXK_UP) {
+		#			# TODO get the list of panels at the bottom from some other place
+		#			if (my $editor = Padre::Current->editor) {
+		#				if ($current_focus->isa('Padre::Wx::Output') or
+		#					$current_focus->isa('Padre::Wx::ErrorList') or
+		#					$current_focus->isa('Padre::Wx::Syntax')
+		#				) {
+		#					$editor->SetFocus;
+		#				}
+		#			}
+		#		} elsif ($code == Wx::WXK_DOWN) {
+		#			#Padre::Util::debug("Selection: " . $self->bottom->GetSelection);
+		#			#$self->bottom->GetSelection;
+		#		}
+	}
+	$event->Skip();
 	return;
 }
 

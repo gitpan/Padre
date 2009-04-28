@@ -21,7 +21,7 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -97,10 +97,12 @@ my %settings = (
 		[ 'editor_calltips',          $BOOLEAN, 0 ],
 		[ 'editor_autoindent',        $ASCII,   'deep' ],
 		[ 'editor_folding',           $BOOLEAN, 0 ],
+		[ 'editor_fold_pod',          $BOOLEAN, 0 ],
 		[ 'editor_currentline',       $BOOLEAN, 1 ],
 		[ 'editor_currentline_color', $ASCII,   'FFFF04' ],
 		[ 'editor_beginner',          $BOOLEAN, 1 ],
 		[ 'editor_wordwrap',          $BOOLEAN, 0 ],
+		[ 'editor_file_size_limit',   $POSINT,  500_000 ],
 		[ 'find_case',                $BOOLEAN, 1 ],
 		[ 'find_regex',               $BOOLEAN, 0 ],
 		[ 'find_reverse',             $BOOLEAN, 0 ],
@@ -114,7 +116,8 @@ my %settings = (
 		# When running a script from the application some of the files might have
 		# not been saved yet. There are several option what to do before running the
 		# script:
-		# none - don't save anything
+		# none - don't save anything (the script will be run without current modifications)
+		# unsaved - as above but including modifications present in the buffer
 		# same - save the file in the current buffer
 		# all_files - all the files (but not buffers that have no filenames)
 		# all_buffers - all the buffers even if they don't have a name yet
@@ -147,8 +150,14 @@ my %settings = (
 		[ 'main_width',     $POSINT,  600 ],
 		[ 'main_height',    $POSINT,  400 ],
 
-		[ 'logging',        $BOOLEAN, 0 ],
-		[ 'logging_trace',  $BOOLEAN, 0 ],
+		[ 'logging',       $BOOLEAN, 0 ],
+		[ 'logging_trace', $BOOLEAN, 0 ],
+
+		# -- default run parameters
+		[ 'run_interpreter_args_default', $ASCII, '' ],
+		[ 'run_script_args_default',      $ASCII, '' ],
+
+		#[ 'run_default_workdir',          $ASCII, '' ],
 	],
 );
 my %store = (

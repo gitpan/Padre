@@ -44,14 +44,16 @@ Padre::Plugin - Padre Plugin API 2.1
 use 5.008;
 use strict;
 use warnings;
-use Carp         ();
-use Scalar::Util ();
-use Params::Util ( '_HASH0', '_INSTANCE' );
-use YAML::Tiny   ();
-use Padre::DB    ();
-use Padre::Wx    ();
+use Carp ();
+use File::Spec::Functions qw{ catdir };
+use File::ShareDir ();
+use Scalar::Util   ();
+use Params::Util   ( '_HASH0', '_INSTANCE' );
+use YAML::Tiny     ();
+use Padre::DB      ();
+use Padre::Wx      ();
 
-our $VERSION    = '0.33';
+our $VERSION    = '0.34';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
@@ -95,6 +97,31 @@ There is no default default implementation, meaning that a default
 plugin icon will be displayed for the plugin.
 
 
+
+=head2 plugin_locale_directory
+
+The C<plugin_directory_locale()> method will be called by Padre to
+know where to look for your plugin l10n catalog.
+
+It defaults to C<$sharedir/locale> (with C<$sharedir> as defined by
+C<File::ShareDir>), and thus should work as is for your plugin if you're
+using the C<install_share> command of C<Module::Install>.
+
+Your plugin catalogs should be named C<$plugin-$locale.po> (or C<.mo>
+for the compiled form). That is, C<Vi-de.po> for the german locale of
+C<Padre::Plugin::Vi>.
+
+=cut
+
+sub plugin_locale_directory {
+	my ($self) = @_;
+	my $pkg = ref($self) || $self;
+	$pkg =~ s/::/-/g;
+
+	my $distdir;
+	eval { $distdir = File::ShareDir::dist_dir($pkg); };
+	return $@ ? undef : catdir( $distdir, 'share', 'locale' );
+}
 
 =head2 padre_interfaces
 
@@ -613,9 +640,6 @@ sub main {
 
 =pod
 
-=head1 AUTHOR
-
-Adam Kennedy C<adamk@cpan.org>
 
 =head1 SEE ALSO
 

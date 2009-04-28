@@ -5,10 +5,12 @@ eg/hello.p6
 eg/hello.pasm
 eg/hello_foo.pl
 eg/hello_world.pl
+eg/outline_test.p6
 eg/perl5.pod
 eg/perl5_with_perl6_example.pod
 eg/perl6.pod
 eg/Perl6Class.pm
+eg/Perl6Grammar.p6
 eg/shell.pl
 eg/sleep.pl
 eg/stderr.pl
@@ -48,9 +50,9 @@ lib/Padre/DB/Bookmark.pm
 lib/Padre/DB/History.pm
 lib/Padre/DB/HostConfig.pm
 lib/Padre/DB/LastPositionInFile.pm
-lib/Padre/DB/Patch.pm
 lib/Padre/DB/Plugin.pm
-lib/Padre/DB/Session.pod
+lib/Padre/DB/Session.pm
+lib/Padre/DB/SessionFile.pm
 lib/Padre/DB/Snippets.pod
 lib/Padre/DocBrowser.pm
 lib/Padre/DocBrowser/POD.pm
@@ -60,6 +62,7 @@ lib/Padre/Document/Perl/Beginner.pm
 lib/Padre/Document/Perl/Lexer.pm
 lib/Padre/Document/POD.pm
 lib/Padre/Locale.pm
+lib/Padre/Log.pm
 lib/Padre/Manual.pod
 lib/Padre/Manual/Hacking.pod
 lib/Padre/Plugin.pm
@@ -105,9 +108,10 @@ lib/Padre/Wx/Dialog/Find.pm
 lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
-lib/Padre/Wx/Dialog/PluginManager2.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Search.pm
+lib/Padre/Wx/Dialog/SessionManager.pm
+lib/Padre/Wx/Dialog/SessionSave.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/Text.pm
 lib/Padre/Wx/Directory.pm
@@ -133,6 +137,7 @@ lib/Padre/Wx/Menu/Search.pm
 lib/Padre/Wx/Menu/View.pm
 lib/Padre/Wx/Menu/Window.pm
 lib/Padre/Wx/Menubar.pm
+lib/Padre/Wx/Net.pm
 lib/Padre/Wx/Notebook.pm
 lib/Padre/Wx/Outline.pm
 lib/Padre/Wx/Output.pm
@@ -226,6 +231,7 @@ share/timeline/migrate-4.pl
 share/timeline/migrate-5.pl
 share/timeline/migrate-6.pl
 share/timeline/migrate-7.pl
+share/timeline/migrate-8.pl
 t/00-compile.t
 t/01-load.t
 t/02-new.t
@@ -233,6 +239,7 @@ t/03-wx.t
 t/04-config.t
 t/05-project.t
 t/06-utils.t
+t/07-log.t
 t/10-copyright.t
 t/50-docbrowser.t
 t/60-db.t
@@ -290,6 +297,8 @@ t/win32/002-menu.t
 t/win32/010-file-new.t
 t/win32/011-file-open.t
 t/win32/012-file-open-selection.t
-xt/90-pod.t
-xt/99-critic.t
+xt/95_critic.t
+xt/97_meta.t
+xt/98_pod.t
+xt/99_pmv.t
 xt/files/lexical_replace_stress_test.pl

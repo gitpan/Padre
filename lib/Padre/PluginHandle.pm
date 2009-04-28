@@ -5,8 +5,10 @@ use strict;
 use warnings;
 use Carp 'croak';
 use Params::Util qw{_IDENTIFIER _CLASS _INSTANCE};
+use Padre::Current ();
+use Padre::Locale  ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 use overload
 	'bool' => sub {1},
@@ -58,6 +60,22 @@ sub status {
 		$self->{status} = $_[0];
 	}
 	return $self->{status};
+}
+
+sub status_localized {
+	my ($self) = @_;
+
+	# we're forced to have a hash of translation so that gettext
+	# tools can extract those to be localized.
+	my %translation = (
+		error        => Wx::gettext('error'),
+		unloaded     => Wx::gettext('unloaded'),
+		loaded       => Wx::gettext('loaded'),
+		incompatible => Wx::gettext('incompatible'),
+		disabled     => Wx::gettext('disabled'),
+		enabled      => Wx::gettext('enabled'),
+	);
+	return $translation{ $self->{status} };
 }
 
 sub error {
@@ -135,6 +153,12 @@ sub enable {
 	unless ( $self->can_enable ) {
 		croak("Cannot enable plugin '$self'");
 	}
+
+	# add the plugin catalog to the locale
+	my $locale = Padre::Current->main->{locale};
+	my $code   = Padre::Locale::rfc4646();
+	my $name   = $self->name;
+	$locale->AddCatalog("$name-$code");
 
 	# Call the enable method for the object
 	eval { $self->object->plugin_enable; };

@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -72,6 +72,7 @@ our %EXT_BINARY = (
 
 # This is the primary file extension to mime-type mapping
 our %EXT_MIME = (
+	abc   => 'text/x-abc',
 	ada   => 'text/x-adasrc',
 	asm   => 'text/x-asm',
 	bat   => 'text/x-bat',
@@ -121,6 +122,8 @@ our %EXT_MIME = (
 # to confirm that the MIME type is either the official type, or the primary
 # one in use by the relevant language community.
 our %MIME_LEXER = (
+	'text/x-abc' => Wx::wxSTC_LEX_CONTAINER,
+
 	'text/x-adasrc' => Wx::wxSTC_LEX_ADA,    # CONFIRMED
 	'text/x-asm'    => Wx::wxSTC_LEX_ASM,    # CONFIRMED
 
@@ -191,6 +194,7 @@ use Class::XSAccessor getters => {
 	get_mimetype     => 'mimetype',
 	get_newline_type => 'newline_type',
 	errstr           => 'errstr',
+	tempfile         => 'tempfile',
 	},
 	setters => {
 	_set_filename    => 'filename',       # TODO temporary hack
@@ -198,6 +202,7 @@ use Class::XSAccessor getters => {
 	set_mimetype     => 'mimetype',
 	set_errstr       => 'errstr',
 	set_editor       => 'editor',
+	set_tempfile     => 'tempfile',
 	};
 
 =pod
@@ -333,10 +338,9 @@ sub is_perl6 {
 	my ($text) = @_;
 	return if not $text;
 	return 1 if $text =~ /^=begin\s+pod/msx;
-	return   if $text =~ /^=head[12]/msx;
-
+	return   if $text =~ /^=head[12]/msx;                               # needed for eg/perl5_with_perl6_example.pod
 	return 1 if $text =~ /^\s*use\s+v6;/msx;
-	return 1 if $text =~ /^\s*class\s+\w/msx;
+	return 1 if $text =~ /^\s*(?:class|grammar|module|role)\s+\w/msx;
 	return;
 }
 
@@ -551,6 +555,35 @@ sub reload {
 	return $self->load_file;
 }
 
+# Copies document content to a temporary file.
+# Returns temporary file name.
+sub store_in_tempfile {
+	my $self = shift;
+
+	$self->create_tempfile unless $self->tempfile;
+
+	open FH, ">", $self->tempfile;
+	print FH $self->text_get;
+	close FH;
+
+	return $self->tempfile;
+}
+
+sub create_tempfile {
+	use File::Temp;
+
+	my $tempfile = File::Temp->new( UNLINK => 0 );
+	$_[0]->set_tempfile( $tempfile->filename );
+	close $tempfile;
+
+	return;
+}
+
+sub remove_tempfile {
+	unlink $_[0]->tempfile;
+	return;
+}
+
 #####################################################################
 # Basic Content Manipulation
 
@@ -611,6 +644,7 @@ sub lexer {
 	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{ $self->get_mimetype };
 
 	Padre::Util::debug("Trying to determine the lexer");
+
 	# If mime type is not sufficient to figure out file type
 	# than use suffix for lexer
 	my $filename = $self->filename || q{};
@@ -623,7 +657,7 @@ sub lexer {
 		}
 	}
 
-	Padre::Util::debug("Lexer will be based on mymetype " . $self->get_mimetype);
+	Padre::Util::debug( "Lexer will be based on mymetype " . $self->get_mimetype );
 	return $MIME_LEXER{ $self->get_mimetype };
 }
 
@@ -883,8 +917,15 @@ sub stats {
 		$is_readonly      = $editor->GetReadOnly();
 	}
 
-	$words++               while ( $code =~ /\b\w+\b/g );
-	$chars_without_space++ while ( $code =~ /\S/g );
+	# avoid slow calculation on large files
+	# TODO or improve them ?
+	if ( length($code) < 100_000 ) {
+		$words++               while ( $code =~ /\b\w+\b/g );
+		$chars_without_space++ while ( $code =~ /\S/g );
+	} else {
+		$words               = Wx::gettext("Skipped for large files");
+		$chars_without_space = Wx::gettext("Skipped for large files");
+	}
 
 	my $filename = $self->filename;
 

@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use base 'Padre::Wx::Menu';
 
 #####################################################################
@@ -223,7 +223,7 @@ sub get_common_prefix {
 		}
 
 		my $i = 0;
-		while ($i < @prefix) {
+		while ( $i < @prefix ) {
 			last if $prefix[$i] ne $label[$i];
 			$i++;
 		}

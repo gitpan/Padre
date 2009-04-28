@@ -10,7 +10,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use base 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -179,6 +179,11 @@ sub padre_setup_style {
 	$self->StyleSetBackground( $_, _color( $data->{$name}->{background} ) ) for ( 0 .. Wx::wxSTC_STYLE_DEFAULT );
 	$self->setup_style_from_config($name);
 
+	# if mimetype is known, then it might
+	# be Perl with in-line POD
+	my $config = Padre->ide->config;
+	$self->fold_pod if ( $config->editor_folding && $config->editor_fold_pod );
+
 	return;
 }
 
@@ -343,6 +348,7 @@ sub show_folding {
 
 		# deactivate
 		$self->SetProperty( 'fold' => 1 );
+		$self->unfold_all;
 	}
 
 	return;
@@ -756,27 +762,32 @@ sub unfold_all {
 	return;
 }
 
+# when the focus is received by the editor
 sub on_focus {
 	my ( $self, $event ) = @_;
 	my $doc = Padre::Current->document;
 
-	Padre::Util::debug("Focus received file: " . ($doc->filename || ''));
+	Padre::Util::debug( "Focus received file: " . ( $doc->filename || '' ) );
 
-	if ($self->needs_manual_colorize) {
+	# to show/hide the document specific Perl menu
+	$self->main->refresh_menu;
+
+	if ( $self->needs_manual_colorize ) {
+
 		#Padre::Util::debug("needs manual");
 		$doc->colorize;
 		$self->needs_manual_colorize(0);
-	} elsif ($self->needs_stc_colorize) {
+	} elsif ( $self->needs_stc_colorize ) {
+
 		#Padre::Util::debug("needs stc");
 		$doc->remove_color;
 		$self->Colourise( 0, $self->GetLength );
 		$self->needs_stc_colorize(0);
 	}
 
-	
-	$event->Skip(1); # so the cursor will show up
+	$event->Skip(1);    # so the cursor will show up
 	return;
-}	
+}
 
 sub on_char {
 	my ( $self, $event ) = @_;
@@ -1014,6 +1025,28 @@ sub uncomment_lines {
 	return;
 }
 
+sub fold_pod {
+	my ($self) = @_;
+
+	my $currentLine = 0;
+	my $lastLine    = $self->GetLineCount;
+
+	while ( $currentLine <= $lastLine ) {
+		if ( $self->_get_line_by_number($currentLine) =~ /^=(pod|head)/ ) {
+			if ( $self->GetFoldExpanded($currentLine) ) {
+				$self->ToggleFold($currentLine);
+				my $foldLevel = $self->GetFoldLevel($currentLine);
+				$currentLine = $self->GetLastChild( $currentLine, $foldLevel );
+			}
+			$currentLine++;
+		} else {
+			$currentLine++;
+		}
+	}
+
+	return;
+}
+
 sub configure_editor {
 	my ( $self, $doc ) = @_;
 
@@ -1055,8 +1088,11 @@ sub goto_pos_centerize {
 	$self->SetSelection( $pos, $pos );
 	$self->SearchAnchor;
 
-	$self->ScrollToLine( $self->GetCurrentLine - ( $self->LinesOnScreen / 2 ) );
+	my $line = $self->GetCurrentLine;
+	$self->ScrollToLine( $line - ( $self->LinesOnScreen / 2 ) );
+	$self->EnsureVisible($line);
 	$self->EnsureCaretVisible;
+	$self->SetFocus;
 }
 
 sub insert_text {
@@ -1093,6 +1129,7 @@ sub insert_from_file {
 
 sub vertically_align {
 	my ($editor) = @_;
+
 	# Get the selected lines
 	my $begin = $editor->LineFromPosition( $editor->GetSelectionStart );
 	my $end   = $editor->LineFromPosition( $editor->GetSelectionEnd );
@@ -1158,13 +1195,14 @@ sub vertically_align {
 }
 
 sub needs_manual_colorize {
-	if (defined $_[1]) {
+	if ( defined $_[1] ) {
 		$_[0]->{needs_manual_colorize} = $_[1];
 	}
 	return $_[0]->{needs_manual_colorize};
 }
+
 sub needs_stc_colorize {
-	if (defined $_[1]) {
+	if ( defined $_[1] ) {
 		$_[0]->{needs_stc_colorize} = $_[1];
 	}
 	return $_[0]->{needs_stc_colorize};

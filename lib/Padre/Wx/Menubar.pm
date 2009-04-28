@@ -17,7 +17,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 
 #####################################################################
 # Construction, Setup, and Accessors
@@ -78,6 +78,13 @@ sub new {
 	$self->wx->Append( $self->window->wx,  Wx::gettext("&Window") );
 	$self->wx->Append( $self->help->wx,    Wx::gettext("&Help") );
 
+	Wx::Event::EVT_MENU_OPEN(
+		$main,
+		sub {
+			Padre->ide->wx->main->menu->refresh();
+		}
+	);
+
 	my $config = Padre->ide->config;
 	if ( $config->experimental ) {
 
@@ -109,7 +116,7 @@ sub refresh {
 
 	# Add/Remove the Perl menu
 	if ( $document and not $menu ) {
-		$self->wx->Insert( 4, $self->perl->wx, '&Perl' );
+		$self->wx->Insert( 4, $self->perl->wx, Wx::gettext("&Perl") );
 	} elsif ( $menu and not $document ) {
 		$self->wx->Remove(4);
 	}

@@ -7,7 +7,7 @@ use Params::Util qw{ _STRING };
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.33';
+our $VERSION = '0.34';
 use base 'Wx::ListCtrl';
 
 #####################################################################
@@ -133,9 +133,7 @@ sub on_list_item_activated {
 	}
 
 	# Move the selection to the sub location
-	$editor->GotoPos($start);
-	$editor->ScrollToLine( $editor->GetCurrentLine - ( $editor->LinesOnScreen / 2 ) );
-	$editor->SetFocus;
+	$editor->goto_pos_centerize($start);
 
 	return;
 }

@@ -63,8 +63,8 @@ requires:
   Module::Inspector: 0.04
   Module::Refresh: 0.13
   Module::Starter: 1.50
-  ORLite: 1.18
-  ORLite::Migrate: 0.01
+  ORLite: 1.20
+  ORLite::Migrate: 0.03
   PAR: 0.989
   POSIX: 0
   PPI: 1.203
@@ -92,4 +92,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.33
+version: 0.34
