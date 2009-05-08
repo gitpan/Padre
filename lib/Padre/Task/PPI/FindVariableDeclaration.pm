@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use base 'Padre::Task::PPI';
 
@@ -55,8 +55,6 @@ sub prepare {
 }
 
 sub process_ppi {
-
-	# find bad braces
 	my $self     = shift;
 	my $ppi      = shift or return;
 	my $location = $self->{location};

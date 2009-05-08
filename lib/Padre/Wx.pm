@@ -19,7 +19,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 #####################################################################
 # Defines for sidebar marker; others may be needed for breakpoint
@@ -39,6 +39,7 @@ sub ID_TIMER_OUTLINE   {30004}
 #####################################################################
 # Convenience Functions
 
+# Colour constructor
 sub color {
 	my $rgb = shift;
 	my @c = ( 0xFF, 0xFF, 0xFF );    # Some default
@@ -52,6 +53,14 @@ sub color {
 		# Carp::cluck("invalid color '$rgb'");
 	}
 	return Wx::Colour->new(@c);
+}
+
+# Fire and forget background version of Wx::LaunchDefaultBrowser
+sub LaunchDefaultBrowser {
+	require Padre::Task::LaunchDefaultBrowser;
+	Padre::Task::LaunchDefaultBrowser->new(
+		url => $_[0],
+	)->schedule;
 }
 
 1;

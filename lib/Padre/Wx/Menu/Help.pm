@@ -11,8 +11,8 @@ use Padre::Wx             ();
 use Padre::Wx::Menu       ();
 use Padre::Wx::DocBrowser ();
 
-our $VERSION = '0.34';
-use base 'Padre::Wx::Menu';
+our $VERSION = '0.35';
+our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -69,7 +69,7 @@ sub new {
 		$main,
 		$self->Append( -1, Wx::gettext('Visit the PerlMonks') ),
 		sub {
-			Wx::LaunchDefaultBrowser('http://perlmonks.org/');
+			Padre::Wx::LaunchDefaultBrowser('http://perlmonks.org/');
 		},
 	);
 
@@ -79,14 +79,14 @@ sub new {
 		$main,
 		$self->Append( -1, Wx::gettext("Report a New &Bug") ),
 		sub {
-			Wx::LaunchDefaultBrowser('http://padre.perlide.org/wiki/Tickets');
+			Padre::Wx::LaunchDefaultBrowser('http://padre.perlide.org/wiki/Tickets');
 		},
 	);
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append( -1, Wx::gettext("View All &Open Bugs") ),
 		sub {
-			Wx::LaunchDefaultBrowser('http://padre.perlide.org/report/1');
+			Padre::Wx::LaunchDefaultBrowser('http://padre.perlide.org/report/1');
 		},
 	);
 
@@ -168,6 +168,7 @@ sub about {
 	$about->AddDeveloper("Jérôme Quelin");
 	$about->AddDeveloper("Kaare Rasmussen");
 	$about->AddDeveloper("Keedi Kim - 김도형");
+	$about->AddDeveloper("Kenichi Ishigaki - 石垣憲一");
 	$about->AddDeveloper("Max Maischein");
 	$about->AddDeveloper("Patrick Donelan");
 	$about->AddDeveloper("Paweł Murias");
@@ -181,6 +182,7 @@ sub about {
 	$about->AddTranslator("Hebrew - Shlomi Fish - שלומי פיש");
 	$about->AddTranslator("Hungarian - György Pásztor");
 	$about->AddTranslator("Italian - Simone Blandino");
+	$about->AddTranslator("Japanese - Kenichi Ishigaki - 石垣憲一");
 	$about->AddTranslator("Korean - Keedi Kim - 김도형");
 	$about->AddTranslator("Russian - Andrew Shitov");
 	$about->AddTranslator("Dutch - Dirk De Nijs");

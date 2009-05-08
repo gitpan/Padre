@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 use base 'Wx::Perl::Dialog';
 
@@ -177,6 +177,8 @@ sub get_widget_value {
 			return $w->GetPath;
 		} elsif ( $w->isa('Wx::FilePickerCtrl') ) {
 			return $w->GetPath;
+		} elsif ( $w->isa('Wx::ComboBox') ) {
+			return $w->GetValue;
 		} elsif ( $w->isa('Wx::Choice') ) {
 			return $w->GetSelection;
 		} elsif ( $w->isa('Wx::FontPickerCtrl') ) {

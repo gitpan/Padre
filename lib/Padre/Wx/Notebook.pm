@@ -4,8 +4,11 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.34';
-use base 'Wx::AuiNotebook';
+our $VERSION = '0.35';
+our @ISA     = 'Wx::AuiNotebook';
+
+######################################################################
+# Constructor and Accessors
 
 sub new {
 	my $class = shift;
@@ -46,6 +49,26 @@ sub new {
 
 sub main {
 	$_[0]->GetParent;
+}
+
+######################################################################
+# Main Methods
+
+# Search for and display the page for a specified file name.
+# Returns true if found and displayed, false otherwise.
+sub show_file {
+	my $self = shift;
+	my $file = shift or return;
+	foreach my $i ( 0 .. $self->GetPageCount - 1 ) {
+		my $editor   = $self->GetPage($i)  or next;
+		my $document = $editor->{Document} or next;
+		my $filename = $document->filename;
+		if ( defined $file and $file eq $filename ) {
+			$self->SetSelection($i);
+			return 1;
+		}
+	}
+	return;
 }
 
 ######################################################################

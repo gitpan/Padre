@@ -66,7 +66,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 # According to Wx docs,
 # this MUST be loaded before Wx,
@@ -533,7 +533,7 @@ sub on_dump_running_tasks {
 		my $threads = $running->{$type};
 		my $n       = keys %$threads;
 		$text .= "- $n of type '$type':\n";
-		$text .= "  (in thread(s) " . join( ", ", sort { $a <=> $b } values %$threads ) . ")\n";
+		$text .= "  (in thread(s) " . join( ", ", sort { $a <=> $b } keys %$threads ) . ")\n";
 	}
 
 	$output->AppendText($text);

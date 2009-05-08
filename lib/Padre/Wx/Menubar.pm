@@ -17,7 +17,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 #####################################################################
 # Construction, Setup, and Accessors
@@ -139,6 +139,26 @@ sub refresh {
 
 	if ( $self->experimental ) {
 		$self->experimental->refresh($current);
+	}
+
+	return 1;
+}
+
+sub refresh_top {
+	my $self = shift;
+
+	my $current  = _CURRENT(@_);
+	my $menu     = $self->wx->GetMenuCount ne $self->{default};
+	my $document = !!_INSTANCE(
+		$current->document,
+		'Padre::Document::Perl'
+	);
+
+	# Add/Remove the Perl menu
+	if ( $document and not $menu ) {
+		$self->wx->Insert( 4, $self->perl->wx, Wx::gettext("&Perl") );
+	} elsif ( $menu and not $document ) {
+		$self->wx->Remove(4);
 	}
 
 	return 1;

@@ -1,8 +1,8 @@
+package Padre::Config;
+
 #
 # Configuration subsystem for Padre
 #
-
-package Padre::Config;
 
 # To help force the break from the first-generate HASH based configuration
 # over to the second-generation method based configuration, initially we
@@ -12,7 +12,6 @@ package Padre::Config;
 use 5.008;
 use strict;
 use warnings;
-
 use Carp qw{ croak };
 use Params::Util qw{ _POSINT _INSTANCE };
 use Padre::Config::Constants qw{ :stores :types $PADRE_CONFIG_DIR };
@@ -21,7 +20,7 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -77,6 +76,7 @@ my %settings = (
 		#   nothing    - nothing to open
 		#   last       - the files that were open last time
 		[ 'main_startup',         $ASCII,   'new' ],
+		[ 'main_singleinstance',  $BOOLEAN, 0 ],
 		[ 'main_lockinterface',   $BOOLEAN, 1 ],
 		[ 'main_functions',       $BOOLEAN, 0 ],
 		[ 'main_functions_order', $ASCII,   'alphabetical' ],
@@ -281,7 +281,7 @@ sub write {
 
 	# Save the user configuration
 	$self->[$HUMAN]->{version} = $REVISION;
-	$self->[$HUMAN]->write();
+	$self->[$HUMAN]->write;
 
 	# Save the host configuration
 	$self->[$HOST]->{version} = $REVISION;

@@ -12,8 +12,8 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.34';
-use base 'Padre::Wx::Menu';
+our $VERSION = '0.35';
+our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -48,7 +48,8 @@ sub new {
 		$main,
 		$self->Append( -1, Wx::gettext("All available plugins on CPAN") ),
 		sub {
-			Wx::LaunchDefaultBrowser('http://cpan.uwinnipeg.ca/search?query=Padre%3A%3APlugin%3A%3A&mode=dist');
+			Padre::Wx::LaunchDefaultBrowser(
+				'http://cpan.uwinnipeg.ca/search?query=Padre%3A%3APlugin%3A%3A&mode=dist' );
 		},
 	);
 

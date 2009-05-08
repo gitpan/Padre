@@ -8,7 +8,7 @@ use Padre::Current ();
 
 use base qw(Padre::Wx::Dialog);
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 sub _new_panel {
 	my ( $self, $parent ) = splice( @_, 0, 2 );
@@ -19,7 +19,7 @@ sub _new_panel {
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTAB_TRAVERSAL | Wx::wxVSCROLL | Wx::wxHSCROLL,
+		Wx::wxTAB_TRAVERSAL,
 	);
 	my $fgs = Wx::FlexGridSizer->new( 0, $cols, 0, 0 );
 	$panel->SetSizer($fgs);
@@ -27,8 +27,48 @@ sub _new_panel {
 	return $panel;
 }
 
+sub _indentation_panel {
+	my ( $self, $treebook, $editor_autoindent ) = @_;
+
+	my $config = Padre->ide->config;
+
+	my $table = [
+		[   [   'Wx::CheckBox', 'editor_indent_auto', ( $config->editor_indent_auto ? 1 : 0 ),
+				Wx::gettext('Automatic indentation style detection')
+			],
+			[]
+		],
+		[   [ 'Wx::CheckBox', 'editor_indent_tab', ( $config->editor_indent_tab ? 1 : 0 ), Wx::gettext('Use Tabs') ],
+			[]
+		],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('TAB display size (in spaces):') ],
+			[ 'Wx::SpinCtrl', 'editor_indent_tab_width', $config->editor_indent_tab_width, 0, 32 ]
+		],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Indentation width (in columns):') ],
+			[ 'Wx::SpinCtrl', 'editor_indent_width', $config->editor_indent_width, 0, 32 ]
+		],
+		[   [ 'Wx::StaticText', undef,     Wx::gettext('Guess from current document:') ],
+			[ 'Wx::Button',     '_guess_', Wx::gettext('Guess') ]
+		],
+		[   [ 'Wx::StaticText', undef,               Wx::gettext('Autoindent:') ],
+			[ 'Wx::Choice',     'editor_autoindent', $editor_autoindent ]
+		],
+	];
+
+	my $panel = $self->_new_panel($treebook);
+	$self->fill_panel_by_table( $panel, $table );
+
+	Wx::Event::EVT_BUTTON(
+		$panel,
+		$self->get_widget('_guess_'),
+		sub { $self->guess_indentation_settings },
+	);
+
+	return $panel;
+}
+
 sub _behaviour_panel {
-	my ( $self, $treebook, $main_startup, $editor_autoindent, $main_functions_order, $perldiag_locales ) = @_;
+	my ( $self, $treebook, $main_startup, $main_functions_order, $perldiag_locales ) = @_;
 
 	my $config = Padre->ide->config;
 
@@ -48,28 +88,13 @@ sub _behaviour_panel {
 			],
 			[]
 		],
-		[   [   'Wx::CheckBox', 'editor_indent_auto', ( $config->editor_indent_auto ? 1 : 0 ),
-				Wx::gettext('Automatic indentation style')
-			],
-			[]
-		],
-		[   [ 'Wx::CheckBox', 'editor_indent_tab', ( $config->editor_indent_tab ? 1 : 0 ), Wx::gettext('Use Tabs') ],
-			[]
-		],
-		[   [ 'Wx::StaticText', undef, Wx::gettext('TAB display size (in spaces):') ],
-			[ 'Wx::SpinCtrl', 'editor_indent_tab_width', $config->editor_indent_tab_width, 0, 32 ]
-		],
-		[   [ 'Wx::StaticText', undef, Wx::gettext('Indentation width (in columns):') ],
-			[ 'Wx::SpinCtrl', 'editor_indent_width', $config->editor_indent_width, 0, 32 ]
-		],
-		[   [ 'Wx::StaticText', undef,     Wx::gettext('Guess from current document:') ],
-			[ 'Wx::Button',     '_guess_', Wx::gettext('Guess') ]
-		],
-		[   [ 'Wx::StaticText', undef,               Wx::gettext('Autoindent:') ],
-			[ 'Wx::Choice',     'editor_autoindent', $editor_autoindent ]
-		],
 		[   [ 'Wx::StaticText', undef,          Wx::gettext('Open files:') ],
 			[ 'Wx::Choice',     'main_startup', $main_startup ]
+		],
+		[   [   'Wx::CheckBox', 'main_singleinstance', ( $config->main_singleinstance ? 1 : 0 ),
+				Wx::gettext('Open files in existing Padre')
+			],
+			[]
 		],
 		[   [ 'Wx::StaticText', undef,                  Wx::gettext('Methods order:') ],
 			[ 'Wx::Choice',     'main_functions_order', $main_functions_order ]
@@ -81,12 +106,6 @@ sub _behaviour_panel {
 
 	my $panel = $self->_new_panel($treebook);
 	$self->fill_panel_by_table( $panel, $table );
-
-	Wx::Event::EVT_BUTTON(
-		$panel,
-		$self->get_widget('_guess_'),
-		sub { $self->guess_indentation_settings },
-	);
 
 	return $panel;
 }
@@ -101,7 +120,7 @@ sub _appearance_panel {
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTAB_TRAVERSAL | Wx::wxVSCROLL | Wx::wxHSCROLL,
+		Wx::wxTAB_TRAVERSAL,
 	);
 	my $main_sizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
 
@@ -225,6 +244,7 @@ END_TEXT
 	Wx::Event::EVT_RIGHT_DOWN( $editor, undef );
 	Wx::Event::EVT_LEFT_UP( $editor, undef );
 	Wx::Event::EVT_CHAR( $editor, undef );
+	Wx::Event::EVT_SET_FOCUS( $editor, undef );
 
 	return;
 }
@@ -375,7 +395,7 @@ END_TEXT
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTAB_TRAVERSAL | Wx::wxVSCROLL | Wx::wxHSCROLL,
+		Wx::wxTAB_TRAVERSAL,
 	);
 	my $main_sizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
 
@@ -426,7 +446,6 @@ sub dialog {
 	my $behaviour = $self->_behaviour_panel(
 		$tb,
 		$main_startup,
-		$editor_autoindent,
 		$main_functions_order,
 		$perldiag_locales,
 	);
@@ -438,6 +457,9 @@ sub dialog {
 		$self->_run_params_panel($tb),
 		Wx::gettext('Run Parameters')
 	);
+
+	my $indentation = $self->_indentation_panel( $tb, $editor_autoindent );
+	$tb->AddPage( $indentation, Wx::gettext('Indentation') );
 
 	#my $plugin_manager = $self->_pluginmanager_panel($tb);
 	#$tb->AddPage( $plugin_manager, Wx::gettext('Plugin Manager') );
@@ -599,6 +621,10 @@ sub run {
 	$config->set(
 		'editor_beginner',
 		$data->{editor_beginner} ? 1 : 0
+	);
+	$config->set(
+		'main_singleinstance',
+		$data->{main_singleinstance} ? 1 : 0
 	);
 	$config->set(
 		'editor_autoindent',

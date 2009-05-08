@@ -1,6 +1,20 @@
 Changes for Perl Application Development and Refactoring Environment
 
-v0.34 009.04.28
+v0.35 2009.05.08
+
+    Add Japanese translation (ISHIGAKI)
+    Implemented experimental Single Instance support (#117) (ADAMK)
+    Implemented context-sensitive right-click menu for Perl documents (SMUELLER)
+    Ctrl-left-click on a Perl variable will jump to its definition (SMUELLER)
+    Ctrl-left-click on a Perl function callwill jump to its definition (SMUELLER)
+    Left-clicks into documents can now be hooked by the document class (SMUELLER)
+    Fix to the thread-status display (SMUELLER)
+    Fixed ticket #300: disabled EVT_SET_FOCUS in preview (THEREK)
+    Fixed ticket #289: Scrolling in preference window (PZSCHMIDT)
+    Fixed ticket #301: Fix wx assertion failures (JQUELIN, SMUELLER)
+    Launching a browser now happens in the background (ADAMK)
+
+v0.34 2009.04.28
 
     Fix crash in plugin manager when changing locale while window opened (#298) (JQUELIN)
     Support for plugin l10n in place (JQUELIN)

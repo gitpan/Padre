@@ -13,8 +13,8 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.34';
-use base 'Padre::Wx::Menu';
+our $VERSION = '0.35';
+our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -74,13 +74,10 @@ sub new {
 				Wx::gettext("Replacement"),
 				'$foo',
 			);
-			if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-				return;
-			}
+			return if $dialog->ShowModal == Wx::wxID_CANCEL;
 			my $replacement = $dialog->GetValue;
 			$dialog->Destroy;
 			return unless defined $replacement;
-
 			$doc->lexical_variable_replacement($replacement);
 		},
 	);

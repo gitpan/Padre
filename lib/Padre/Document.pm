@@ -53,7 +53,7 @@ use Padre::Util    ();
 use Padre::Wx      ();
 use Padre          ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -63,12 +63,12 @@ my $unsaved_number = 0;
 
 # This is the list of binary files
 # (which we don't support loading in fallback text mode)
-our %EXT_BINARY = (
-	aiff => 1, au   => 1, avi => 1, bmp => 1, cache => 1, dat  => 1, doc => 1, gif => 1, gz  => 1, icns => 1,
-	jar  => 1, jpeg => 1, jpg => 1, m4a => 1, mov   => 1, mp3  => 1, mpg => 1, ogg => 1, pdf => 1, png  => 1,
-	pnt  => 1, ppt  => 1, qt  => 1, ra  => 1, svg   => 1, svgz => 1, svn => 1, swf => 1, tar => 1, tgz  => 1,
-	tif  => 1, tiff => 1, wav => 1, xls => 1, xlw   => 1, zip  => 1,
-);
+our %EXT_BINARY = map { $_ => 1 } qw{
+	aiff  au    avi  bmp  cache  dat   doc  gif  gz   icns
+	jar   jpeg  jpg  m4a  mov    mp3   mpg  ogg  pdf  png
+	pnt   ppt   qt   ra   svg    svgz  svn  swf  tar  tgz
+	tif   tiff  wav  xls  xlw    zip
+};
 
 # This is the primary file extension to mime-type mapping
 our %EXT_MIME = (
@@ -166,7 +166,10 @@ our %MIME_LEXER = (
 );
 
 # This is the mime-type to document class mapping
-our %MIME_CLASS = ( 'application/x-perl' => 'Padre::Document::Perl', 'text/x-pod' => 'Padre::Document::POD', );
+our %MIME_CLASS = (
+	'application/x-perl' => 'Padre::Document::Perl',
+	'text/x-pod'         => 'Padre::Document::POD',
+);
 
 sub menu_view_mimes {
 	'00Plain Text'     => 'text/plain',
@@ -323,8 +326,7 @@ sub guess_mimetype {
 }
 
 sub mime_type_by_extension {
-	my ( $self, $ext ) = @_;
-	return $EXT_MIME{$ext};
+	$EXT_MIME{ $_[1] };
 }
 
 # For ts without a newline type
@@ -338,7 +340,10 @@ sub is_perl6 {
 	my ($text) = @_;
 	return if not $text;
 	return 1 if $text =~ /^=begin\s+pod/msx;
-	return   if $text =~ /^=head[12]/msx;                               # needed for eg/perl5_with_perl6_example.pod
+
+	# Needed for eg/perl5_with_perl6_example.pod
+	return if $text =~ /^=head[12]/msx;
+
 	return 1 if $text =~ /^\s*use\s+v6;/msx;
 	return 1 if $text =~ /^\s*(?:class|grammar|module|role)\s+\w/msx;
 	return;
@@ -818,6 +823,19 @@ additional options.
 
 Parameters retrieved are the objects for the document, the editor, the 
 context menu (C<Wx::Menu>) and the event.
+
+Returns nothing.
+
+=head2 event_on_left_up
+
+NOT IMPLEMENTED IN THE BASE CLASS
+
+This method - if implemented - is called when a user left-clicks in an 
+editor. This can be used to implement context-sensitive actions if
+the user presses modifier keys while clicking.
+
+Parameters retrieved are the objects for the document, the editor,
+and the event.
 
 Returns nothing.
 

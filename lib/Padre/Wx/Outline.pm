@@ -7,8 +7,12 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 use base 'Wx::TreeCtrl';
+
+use Class::XSAccessor accessors => {
+	force_next => 'force_next',
+};
 
 sub new {
 	my $class = shift;
@@ -59,17 +63,6 @@ sub clear {
 	return;
 }
 
-sub force_next {
-	my $self = shift;
-
-	if ( defined $_[0] ) {
-		$self->{force_next} = $_[0];
-		return $self->{force_next};
-	} else {
-		return $self->{force_next};
-	}
-}
-
 #####################################################################
 # Timer Control
 
@@ -97,7 +90,7 @@ sub start {
 	$self->{timer}->Start(1000);
 	$self->on_timer( undef, 1 );
 
-	return;
+	return ();
 }
 
 sub stop {
@@ -114,7 +107,7 @@ sub stop {
 
 	# TODO: GUI on-stop cleanup here
 
-	return;
+	return ();
 }
 
 sub running {

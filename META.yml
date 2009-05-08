@@ -3,16 +3,16 @@ abstract: 'Perl Application Development and Refactoring Environment'
 author:
   - 'Gabor Szabo'
 build_requires:
-  ExtUtils::MakeMaker: 6.11
+  ExtUtils::MakeMaker: 6.42
   Test::Exception: 0.27
   Test::More: 0.47
   Test::Most: 0.21
   Test::NoWarnings: 0.084
   Test::Script: 1.03
 configure_requires:
-  ExtUtils::MakeMaker: 6.50
+  ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.81'
+generated_by: 'Module::Install version 0.87'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -92,4 +92,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.34
+version: 0.35

@@ -10,8 +10,8 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.34';
-use base 'Wx::StyledTextCtrl';
+our $VERSION = '0.35';
+our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
 	WIN  => Wx::wxSTC_EOL_CRLF,
@@ -44,7 +44,7 @@ sub new {
 	my $self = $class->SUPER::new($notebook);
 
 	# TODO: Make this suck less
-	$data = data('default');
+	$data = data( Padre->ide->config->editor_style );
 
 	# Set the code margins a little larger than the default.
 	# This seems to noticably reduce eye strain.
@@ -56,7 +56,8 @@ sub new {
 	$self->SetMarginWidth( 1, 0 );
 	$self->SetMarginWidth( 2, 0 );
 
-	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
+	require Padre::Wx::RightClick;
+	Wx::Event::EVT_RIGHT_DOWN( $self, \&Padre::Wx::RightClick::on_right_down );
 	Wx::Event::EVT_LEFT_UP( $self, \&on_left_up );
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
@@ -114,9 +115,12 @@ sub padre_setup {
 	if ( $MIME_STYLE{$mimetype} ) {
 		$self->padre_setup_style( $MIME_STYLE{$mimetype} );
 	} elsif ( $mimetype eq 'text/plain' ) {
+		$self->padre_setup_plain;
 		my $filename = $self->{Document}->filename || q{};
 		if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 			my $ext = lc $1;
+
+			# re-setup if file extension is .conf
 			$self->padre_setup_style('conf') if $ext eq 'conf';
 		}
 	} elsif ($mimetype) {
@@ -127,7 +131,7 @@ sub padre_setup {
 	} else {
 
 		# if mimetype is not known, then no coloring for now
-		# but mimimal conifuration should apply here too
+		# but mimimal configuration should apply here too
 		$self->padre_setup_plain;
 	}
 
@@ -355,17 +359,14 @@ sub show_folding {
 }
 
 sub set_font {
-	my ($self) = @_;
-
+	my $self   = shift;
 	my $config = Padre->ide->config;
-
-	my $font = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
+	my $font   = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
 	if ( defined $config->editor_font && length $config->editor_font > 0 ) {    # empty default...
 		$font->SetNativeFontInfoUserDesc( $config->editor_font );
 	}
 	$self->SetFont($font);
 	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
-
 	return;
 }
 
@@ -554,176 +555,6 @@ sub _get_line_by_number {
 	return $self->GetTextRange( $start, $end );
 }
 
-sub on_right_down {
-	my $self  = shift;
-	my $event = shift;
-	my $main  = $self->main;
-	my $pos   = $self->GetCurrentPos;
-
-	#my $line  = $self->LineFromPosition($pos);
-	#print "right down: $pos\n"; # this is the position of the cursor and not that of the mouse!
-	#my $p = $event->GetLogicalPosition;
-	#print "x: ", $p->x, "\n";
-
-	my $menu = Wx::Menu->new;
-	my $undo = $menu->Append( Wx::wxID_UNDO, '' );
-	if ( not $self->CanUndo ) {
-		$undo->Enable(0);
-	}
-	my $z = Wx::Event::EVT_MENU(
-		$main,    # Ctrl-Z
-		$undo,
-		sub {
-			my $editor = Padre::Current->editor;
-			if ( $editor->CanUndo ) {
-				$editor->Undo;
-			}
-			return;
-		},
-	);
-	my $redo = $menu->Append( Wx::wxID_REDO, '' );
-	if ( not $self->CanRedo ) {
-		$redo->Enable(0);
-	}
-
-	Wx::Event::EVT_MENU(
-		$main,    # Ctrl-Y
-		$redo,
-		sub {
-			my $editor = Padre::Current->editor;
-			if ( $editor->CanRedo ) {
-				$editor->Redo;
-			}
-			return;
-		},
-	);
-	$menu->AppendSeparator;
-
-	my $selection_exists = 0;
-	my $id               = $main->notebook->GetSelection;
-	if ( $id != -1 ) {
-		my $text = $main->notebook->GetPage($id)->GetSelectedText;
-		if ( defined($text) && length($text) > 0 ) {
-			$selection_exists = 1;
-		}
-	}
-
-	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
-	if ( not $main->notebook->GetPage($id)->GetTextLength > 0 ) {
-		$sel_all->Enable(0);
-	}
-	Wx::Event::EVT_MENU(
-		$main,    # Ctrl-A
-		$sel_all,
-		sub { \&text_select_all(@_) },
-	);
-	$menu->AppendSeparator;
-
-	my $copy = $menu->Append( Wx::wxID_COPY, '' );
-	if ( not $selection_exists ) {
-		$copy->Enable(0);
-	}
-	Wx::Event::EVT_MENU(
-		$main,    # Ctrl-C
-		$copy,
-		sub {
-			Padre::Current->editor->Copy;
-		}
-	);
-
-	my $cut = $menu->Append( Wx::wxID_CUT, '' );
-	if ( not $selection_exists ) {
-		$cut->Enable(0);
-	}
-	Wx::Event::EVT_MENU(
-		$main,    # Ctrl-X
-		$cut,
-		sub {
-			Padre::Current->editor->Cut;
-		}
-	);
-
-	my $paste = $menu->Append( Wx::wxID_PASTE, '' );
-	my $text = get_text_from_clipboard();
-
-	if ( length($text) && $main->notebook->GetPage($id)->CanPaste ) {
-		Wx::Event::EVT_MENU(
-			$main,    # Ctrl-V
-			$paste,
-			sub {
-				Padre::Current->editor->Paste;
-			},
-		);
-	} else {
-		$paste->Enable(0);
-	}
-
-	$menu->AppendSeparator;
-
-	my $commentToggle = $menu->Append( -1, Wx::gettext("&Toggle Comment\tCtrl-Shift-C") );
-	Wx::Event::EVT_MENU(
-		$main, $commentToggle,
-		\&Padre::Wx::Main::on_comment_toggle_block,
-	);
-	my $comment = $menu->Append( -1, Wx::gettext("&Comment Selected Lines\tCtrl-M") );
-	Wx::Event::EVT_MENU(
-		$main, $comment,
-		\&Padre::Wx::Main::on_comment_out_block,
-	);
-	my $uncomment = $menu->Append( -1, Wx::gettext("&Uncomment Selected Lines\tCtrl-Shift-M") );
-	Wx::Event::EVT_MENU(
-		$main, $uncomment,
-		\&Padre::Wx::Main::on_uncomment_block,
-	);
-
-	$menu->AppendSeparator;
-
-	if ( $event->isa('Wx::MouseEvent')
-		and Padre->ide->config->editor_folding )
-	{
-		my $mousePos         = $event->GetPosition;
-		my $line             = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
-		my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
-
-		if (   $mousePos->x < $firstPointInLine->x
-			&& $mousePos->x > ( $firstPointInLine->x - 18 ) )
-		{
-			my $fold = $menu->Append( -1, Wx::gettext("Fold all") );
-			Wx::Event::EVT_MENU(
-				$main, $fold,
-				sub {
-					$_[0]->current->editor->fold_all;
-				},
-			);
-			my $unfold = $menu->Append( -1, Wx::gettext("Unfold all") );
-			Wx::Event::EVT_MENU(
-				$main, $unfold,
-				sub {
-					$_[0]->current->editor->unfold_all;
-				},
-			);
-			$menu->AppendSeparator;
-		}
-	}
-
-	Wx::Event::EVT_MENU(
-		$main,
-		$menu->Append( -1, Wx::gettext("&Split window") ),
-		\&Padre::Wx::Main::on_split_window,
-	);
-
-	my $doc = $self->{Document};
-	if ( $doc->can('event_on_right_down') ) {
-		$doc->event_on_right_down( $self, $menu, $event );
-	}
-
-	if ( $event->isa('Wx::MouseEvent') ) {
-		$self->PopupMenu( $menu, $event->GetX, $event->GetY );
-	} else {    #Wx::CommandEvent
-		$self->PopupMenu( $menu, 50, 50 );    # TODO better location
-	}
-}
-
 sub fold_all {
 	my ($self) = @_;
 
@@ -811,6 +642,11 @@ sub on_left_up {
 		Wx::wxTheClipboard->UsePrimarySelection(1);
 		$self->put_text_to_clipboard($text);
 		Wx::wxTheClipboard->UsePrimarySelection(0);
+	}
+
+	my $doc = $self->{Document};
+	if ( $doc->can('event_on_left_up') ) {
+		$doc->event_on_left_up( $self, $event );
 	}
 
 	$event->Skip;
@@ -935,6 +771,9 @@ sub put_text_to_clipboard {
 }
 
 sub get_text_from_clipboard {
+
+	# This is to be used as a method even if we don't use $self!
+	#my $self = shift;
 	Wx::wxTheClipboard->Open;
 	my $text = '';
 	if ( Wx::wxTheClipboard->IsSupported(Wx::wxDF_TEXT) ) {
@@ -1085,13 +924,13 @@ sub goto_pos_centerize {
 	$pos = $max if $pos > $max;
 
 	$self->SetCurrentPos($pos);
-	$self->SetSelection( $pos, $pos );
 	$self->SearchAnchor;
 
 	my $line = $self->GetCurrentLine;
 	$self->ScrollToLine( $line - ( $self->LinesOnScreen / 2 ) );
 	$self->EnsureVisible($line);
 	$self->EnsureCaretVisible;
+	$self->SetSelection( $pos, $pos );
 	$self->SetFocus;
 }
 

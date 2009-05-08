@@ -21,7 +21,7 @@ use File::Spec  ();
 use Padre::Util ();
 use Padre::Wx   ();
 
-our $VERSION = '0.34';
+our $VERSION = '0.35';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -42,7 +42,7 @@ our $DEFAULT_ICON;
 #####################################################################
 # Icon Resolver
 
-# For now, assume the people using this are competant and don't
+# For now, assume the people using this are competent and don't
 # bother to check params.
 # TODO: Clearly this assumption can't last...
 sub find {
