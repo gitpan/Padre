@@ -3,14 +3,14 @@ package Padre::Wx::Editor;
 use 5.008;
 use strict;
 use warnings;
-use YAML::Tiny ();
-use Padre::Config::Constants qw{ $PADRE_CONFIG_DIR };
+use YAML::Tiny                ();
+use Padre::Constant           ();
 use Padre::Util               ();
 use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -26,9 +26,7 @@ our %MIME_STYLE = (
 	'text/x-makefile'    => 'make',
 	'text/x-yaml'        => 'yaml',
 	'text/css'           => 'css',
-
-	#	'application/x-pasm' => 'pasm',
-	'application/x-php' => 'perl',    # temporary solution
+	'application/x-php'  => 'perl',    # temporary solution
 );
 
 my $data;
@@ -56,8 +54,7 @@ sub new {
 	$self->SetMarginWidth( 1, 0 );
 	$self->SetMarginWidth( 2, 0 );
 
-	require Padre::Wx::RightClick;
-	Wx::Event::EVT_RIGHT_DOWN( $self, \&Padre::Wx::RightClick::on_right_down );
+	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
 	Wx::Event::EVT_LEFT_UP( $self, \&on_left_up );
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
@@ -82,7 +79,10 @@ sub data {
 
 	my $file
 		= $private
-		? File::Spec->catfile( $PADRE_CONFIG_DIR, 'styles', "$name.yml" )
+		? File::Spec->catfile(
+		Padre::Constant::CONFIG_DIR,
+		'styles', "$name.yml"
+		)
 		: Padre::Util::sharefile( 'styles', "$name.yml" );
 	my $tdata;
 	eval { $tdata = YAML::Tiny::LoadFile($file); };
@@ -108,8 +108,9 @@ sub padre_setup {
 	# See: http://www.yellowbrain.com/stc/keymap.html
 	#$self->CmdKeyAssign(Wx::wxSTC_KEY_ESCAPE, 0, Wx::wxSTC_CMD_CUT);
 
-	$self->SetCodePage(65001);    # which is supposed to be Wx::wxSTC_CP_UTF8
-	                              # and Wx::wxUNICODE or wxUSE_UNICODE should be on
+	# This is supposed to be Wx::wxSTC_CP_UTF8
+	# and Wx::wxUNICODE or wxUSE_UNICODE should be on
+	$self->SetCodePage(65001);
 
 	my $mimetype = $self->{Document}->get_mimetype;
 	if ( $MIME_STYLE{$mimetype} ) {
@@ -224,7 +225,7 @@ sub setup_style_from_config {
 
 sub _color {
 	my $rgb = shift;
-	my @c = ( 0xFF, 0xFF, 0xFF );    # some default
+	my @c = ( 0xFF, 0xFF, 0xFF );
 	if ( not defined $rgb ) {
 
 		#Carp::cluck("undefined color");
@@ -234,8 +235,6 @@ sub _color {
 
 		#Carp::cluck("invalid color '$rgb'");
 	}
-
-	#print "@c\n";
 	return Wx::Colour->new(@c);
 }
 
@@ -653,6 +652,189 @@ sub on_left_up {
 	return;
 }
 
+sub on_right_down {
+	my $self  = shift;
+	my $event = shift;
+	my $main  = $self->main;
+	my $pos   = $self->GetCurrentPos;
+
+	#my $line  = $self->LineFromPosition($pos);
+	#print "right down: $pos\n"; # this is the position of the cursor and not that of the mouse!
+	#my $p = $event->GetLogicalPosition;
+	#print "x: ", $p->x, "\n";
+
+	my $menu = Wx::Menu->new;
+	my $undo = $menu->Append( Wx::wxID_UNDO, '' );
+	if ( not $self->CanUndo ) {
+		$undo->Enable(0);
+	}
+	my $z = Wx::Event::EVT_MENU(
+		$main,    # Ctrl-Z
+		$undo,
+		sub {
+			my $editor = Padre::Current->editor;
+			if ( $editor->CanUndo ) {
+				$editor->Undo;
+			}
+			return;
+		},
+	);
+	my $redo = $menu->Append( Wx::wxID_REDO, '' );
+	if ( not $self->CanRedo ) {
+		$redo->Enable(0);
+	}
+
+	Wx::Event::EVT_MENU(
+		$main,    # Ctrl-Y
+		$redo,
+		sub {
+			my $editor = Padre::Current->editor;
+			if ( $editor->CanRedo ) {
+				$editor->Redo;
+			}
+			return;
+		},
+	);
+	$menu->AppendSeparator;
+
+	my $selection_exists = 0;
+	my $id               = $main->notebook->GetSelection;
+	if ( $id != -1 ) {
+		my $text = $main->notebook->GetPage($id)->GetSelectedText;
+		if ( defined($text) && length($text) > 0 ) {
+			$selection_exists = 1;
+		}
+	}
+
+	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
+	if ( not $main->notebook->GetPage($id)->GetTextLength > 0 ) {
+		$sel_all->Enable(0);
+	}
+	Wx::Event::EVT_MENU(
+		$main,    # Ctrl-A
+		$sel_all,
+		sub { \&text_select_all(@_) },
+	);
+	$menu->AppendSeparator;
+
+	my $copy = $menu->Append( Wx::wxID_COPY, Wx::gettext("&Copy\tCtrl-C") );
+	if ( not $selection_exists ) {
+		$copy->Enable(0);
+	}
+	Wx::Event::EVT_MENU(
+		$main,    # Ctrl-C
+		$copy,
+		sub {
+			Padre::Current->editor->Copy;
+		}
+	);
+
+	my $cut = $menu->Append( Wx::wxID_CUT, Wx::gettext("Cu&t\tCtrl-X") );
+	if ( not $selection_exists ) {
+		$cut->Enable(0);
+	}
+	Wx::Event::EVT_MENU(
+		$main,    # Ctrl-X
+		$cut,
+		sub {
+			Padre::Current->editor->Cut;
+		}
+	);
+
+	my $paste = $menu->Append( Wx::wxID_PASTE, Wx::gettext("&Paste\tCtrl-V") );
+	my $text = $self->get_text_from_clipboard();
+
+	if ( length($text) && $main->notebook->GetPage($id)->CanPaste ) {
+		Wx::Event::EVT_MENU(
+			$main,    # Ctrl-V
+			$paste,
+			sub {
+				Padre::Current->editor->Paste;
+			},
+		);
+	} else {
+		$paste->Enable(0);
+	}
+
+	$menu->AppendSeparator;
+
+	my $commentToggle = $menu->Append( -1, Wx::gettext("&Toggle Comment\tCtrl-Shift-C") );
+	Wx::Event::EVT_MENU(
+		$main,
+		$commentToggle,
+		sub {
+			Padre::Wx::Main::on_comment_toggle_block(@_);
+		},
+	);
+	my $comment = $menu->Append( -1, Wx::gettext("&Comment Selected Lines\tCtrl-M") );
+	Wx::Event::EVT_MENU(
+		$main, $comment,
+		sub {
+			Padre::Wx::Main::on_comment_out_block(@_);
+		},
+	);
+	my $uncomment = $menu->Append( -1, Wx::gettext("&Uncomment Selected Lines\tCtrl-Shift-M") );
+	Wx::Event::EVT_MENU(
+		$main,
+		$uncomment,
+		sub {
+			Padre::Wx::Main::on_uncomment_block(@_);
+		},
+	);
+
+	$menu->AppendSeparator;
+
+	if ( $event->isa('Wx::MouseEvent')
+		and Padre->ide->config->editor_folding )
+	{
+		my $mousePos         = $event->GetPosition;
+		my $line             = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
+		my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
+
+		if (   $mousePos->x < $firstPointInLine->x
+			&& $mousePos->x > ( $firstPointInLine->x - 18 ) )
+		{
+			my $fold = $menu->Append( -1, Wx::gettext("Fold all") );
+			Wx::Event::EVT_MENU(
+				$main, $fold,
+				sub {
+					$_[0]->current->editor->fold_all;
+				},
+			);
+			my $unfold = $menu->Append( -1, Wx::gettext("Unfold all") );
+			Wx::Event::EVT_MENU(
+				$main, $unfold,
+				sub {
+					$_[0]->current->editor->unfold_all;
+				},
+			);
+			$menu->AppendSeparator;
+		}
+	}
+
+	Wx::Event::EVT_MENU(
+		$main,
+		$menu->Append( -1, Wx::gettext("&Split window") ),
+		sub {
+			Padre::Wx::Main::on_split_window(@_);
+		},
+	);
+
+	my $doc = $self->{Document};
+	if ( $doc->can('event_on_right_down') ) {
+		$doc->event_on_right_down( $self, $menu, $event );
+	}
+
+	# Let the plugins have a go
+	Padre->ide->plugin_manager->on_context_menu( $doc, $self, $menu, $event );
+
+	if ( $event->isa('Wx::MouseEvent') ) {
+		$self->PopupMenu( $menu, $event->GetX, $event->GetY );
+	} else {    #Wx::CommandEvent
+		$self->PopupMenu( $menu, 50, 50 );    # TODO better location
+	}
+}
+
 sub on_mouse_motion {
 	my ( $self, $event ) = @_;
 
@@ -669,11 +851,17 @@ sub on_mouse_motion {
 		$offset2 += 18;
 	}
 
-	if (   $mousePos->x < ( $firstPointInLine->x - $offset1 )
-		&& $mousePos->x > ( $firstPointInLine->x - $offset2 ) )
+	if (    $mousePos->x < ( $firstPointInLine->x - $offset1 )
+		and $mousePos->x > ( $firstPointInLine->x - $offset2 ) )
 	{
-		$self->CallTipCancel, return unless $self->MarkerGet($line);
-		$self->CallTipShow( $self->PositionFromLine($line), $self->{synchk_calltips}->{$line} );
+		unless ( $self->MarkerGet($line) ) {
+			$self->CallTipCancel;
+			return;
+		}
+		$self->CallTipShow(
+			$self->PositionFromLine($line),
+			$self->{synchk_calltips}->{$line}
+		);
 	} else {
 		$self->CallTipCancel;
 	}
@@ -762,6 +950,7 @@ sub current_paragraph {
 
 sub put_text_to_clipboard {
 	my ( $self, $text ) = @_;
+	@_ = ();    # Feeble attempt to kill Scalars Leaked
 
 	Wx::wxTheClipboard->Open;
 	Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($text) );
@@ -773,13 +962,12 @@ sub put_text_to_clipboard {
 sub get_text_from_clipboard {
 
 	# This is to be used as a method even if we don't use $self!
-	#my $self = shift;
-	Wx::wxTheClipboard->Open;
+	# my $self = shift;
 	my $text = '';
+	Wx::wxTheClipboard->Open;
 	if ( Wx::wxTheClipboard->IsSupported(Wx::wxDF_TEXT) ) {
 		my $data = Wx::TextDataObject->new;
-		my $ok   = Wx::wxTheClipboard->GetData($data);
-		if ($ok) {
+		if ( Wx::wxTheClipboard->GetData($data) ) {
 			$text = $data->GetText;
 		}
 	}
@@ -909,10 +1097,7 @@ sub configure_editor {
 }
 
 sub goto_line_centerize {
-	my ( $self, $line ) = @_;
-
-	my $pos = $self->PositionFromLine($line);
-	$self->goto_pos_centerize($pos);
+	$_[0]->goto_pos_centerize( $_[0]->PositionFromLine( $_[1] ) );
 }
 
 # borrowed from Kephra
@@ -967,7 +1152,7 @@ sub insert_from_file {
 }
 
 sub vertically_align {
-	my ($editor) = @_;
+	my $editor = shift;
 
 	# Get the selected lines
 	my $begin = $editor->LineFromPosition( $editor->GetSelectionStart );

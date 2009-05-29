@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -25,7 +25,7 @@ sub new {
 	# Add additional properties
 	$self->{main} = $main;
 
-	# Search and Replace
+	# Search
 	$self->{find} = $self->Append(
 		Wx::wxID_FIND,
 		Wx::gettext("&Find\tCtrl-F")
@@ -62,7 +62,7 @@ sub new {
 		},
 	);
 
-	# This currently mainly exists to make Ctrl-R work
+	# Search and Replace
 	$self->{replace} = $self->Append(
 		-1,
 		Wx::gettext("Replace\tCtrl-R")
@@ -71,7 +71,7 @@ sub new {
 		$main,
 		$self->{replace},
 		sub {
-			$_[0]->find->find(@_);
+			$_[0]->replace->find(@_);
 		},
 	);
 
@@ -128,9 +128,12 @@ sub new {
 		$main,
 		$self->Append(
 			-1,
-			Wx::gettext("Ac&k Search")
+			Wx::gettext("Find in fi&les...")
 		),
-		\&Padre::Wx::Ack::on_ack,
+		sub {
+			require Padre::Wx::Ack;
+			Padre::Wx::Ack::on_ack(@_);
+		},
 	);
 
 	return $self;

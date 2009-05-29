@@ -5,12 +5,11 @@ package Padre::Config::Setting;
 use 5.008;
 use strict;
 use warnings;
+use Carp            ();
+use Params::Util    ();
+use Padre::Constant ();
 
-use Carp ();
-use Padre::Config::Constants qw{ :stores :types };
-use Params::Util ();
-
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Class::XSAccessor getters => {
 	name    => 'name',

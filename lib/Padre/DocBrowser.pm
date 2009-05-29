@@ -5,10 +5,9 @@ use strict;
 use warnings;
 use Carp                   ();
 use Scalar::Util           ();
-use Class::Autouse         ();
 use Padre::DocBrowser::POD ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Class::XSAccessor getters => {
 	get_providers => 'providers',
@@ -46,7 +45,7 @@ B<NOTE> i think all the method names are wrong. blast it.
   
   my $docs = $browser->docs( $source );
   # $docs provided by DocBrowser::POD->generate
-  #  should be Padre::Document , application/x-pod
+  #  should be Padre::DocBrowser::document , application/x-pod
   
   my $output = $browser->browse( $docs );
   # $output provided by DocBrowser::POD->render
@@ -159,7 +158,10 @@ sub new {
 sub load_provider {
 	my ( $self, $class ) = @_;
 
-	Class::Autouse->autouse($class);
+	unless ( $class->VERSION ) {
+		eval "require $class;";
+		die("Failed to load $class: $@") if $@;
+	}
 	if ( $class->can('provider_for') ) {
 		$self->register_providers( $_ => $class ) for $class->provider_for;
 	} else {
@@ -177,7 +179,10 @@ sub load_provider {
 
 sub load_viewer {
 	my ( $self, $class ) = @_;
-	Class::Autouse->autouse($class);
+	unless ( $class->VERSION ) {
+		eval "require $class;";
+		die("Failed to load $class: $@") if $@;
+	}
 	if ( $class->can('viewer_for') ) {
 		$self->register_viewers( $_ => $class ) for $class->viewer_for;
 	}
@@ -198,7 +203,10 @@ sub register_viewers {
 	my ( $self, %viewers ) = @_;
 	while ( my ( $type, $class ) = each %viewers ) {
 		$self->get_viewers->{$type} = $class;
-		Class::Autouse->autouse($class);
+		unless ( $class->VERSION ) {
+			eval "require $class;";
+			die("Failed to load $class: $@") if $@;
+		}
 	}
 	$self;
 }
@@ -247,16 +255,17 @@ sub viewer_for {
 
 sub docs {
 	my ( $self, $doc ) = @_;
-	if ( my $provider = $self->provider_for( $doc->get_mimetype ) ) {
+	if ( my $provider = $self->provider_for( $doc->guess_mimetype ) ) {
 		my $docs = $provider->generate($doc);
 		return $docs;
 	}
-	warn "No provider for " . $doc->get_mimetype;
+
+	#warn "No provider for " . $doc->mimetype;
 	return;
 }
 
 sub resolve {
-	my ( $self, $ref ) = @_;
+	my ( $self, $ref, $hints ) = @_;
 	my @refs;
 	if ( Scalar::Util::blessed($ref) and $ref->isa('URI') ) {
 		return $self->resolve_uri($ref);
@@ -265,8 +274,9 @@ sub resolve {
 	# TODO this doubles up if a provider subscribes to multi
 	# mimetypes .
 	foreach my $class ( values %{ $self->get_providers } ) {
-		my $resp = $class->resolve($ref);
+		my $resp = $class->resolve( $ref, $hints );
 		push @refs, $resp if $resp;
+		last if $resp;
 	}
 	return $refs[0];
 }
@@ -280,7 +290,7 @@ sub resolve_uri {
 
 sub browse {
 	my ( $self, $docs ) = @_;
-	if ( my $viewer = $self->viewer_for( $docs->get_mimetype ) ) {
+	if ( my $viewer = $self->viewer_for( $docs->mimetype ) ) {
 		return $viewer->render($docs);
 	}
 	return;

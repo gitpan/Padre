@@ -2,14 +2,15 @@ package Padre::Current;
 
 # A context object, for centralising the concept of what is "current"
 
+use 5.008;
 use strict;
 use warnings;
-use Carp     ();
-use Exporter ();
-use Params::Util qw{_INSTANCE};
+use Carp         ();
+use Exporter     ();
+use Params::Util ();
 
-our $VERSION = '0.35';
-use base 'Exporter';
+our $VERSION   = '0.36';
+our @ISA       = 'Exporter';
 our @EXPORT_OK = '_CURRENT';
 
 #####################################################################
@@ -25,14 +26,15 @@ sub _CURRENT {
 	unless ( defined $_[0] ) {
 		return Padre::Current->new;
 	}
-	if ( _INSTANCE( $_[0], 'Padre::Current' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Current' ) ) {
 		return shift;
 	}
 
 	# Fallback options
-	if ( _INSTANCE( $_[0], 'Padre::Document' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Document' ) ) {
 		return Padre::Current->new( document => shift );
 	}
+
 	return Padre::Current->new;
 }
 
@@ -178,18 +180,16 @@ sub ide {
 
 __END__
 
+=pod
+
 =head1 NAME
 
 Padre::Current - convenient access to current objects within Padre
-
-
 
 =head1 SYNOPSIS
 
 	my $main = Padre::Current->main;
 	...
-
-
 
 =head1 DESCRIPTION
 
@@ -201,8 +201,6 @@ Instead of poking directly with the various classes to find the object
 you need, C<Padre::Current> provides a bunch of handy methods to
 retrieve whatever current object you need.
 
-
-
 =head1 PUBLIC METHODS
 
 =head2 Constructor
@@ -213,10 +211,7 @@ retrieve whatever current object you need.
 
 Create and return a C<Padre::Current> object. No params.
 
-
 =back
-
-
 
 =head2 Current stuff
 
@@ -225,9 +220,7 @@ methods, calling them as class methods is ok. For example:
 
 	my $doc = Padre::Current->document;
 
-
 Here's the list of methods provided to get access to current something:
-
 
 =over 4
 
@@ -235,55 +228,43 @@ Here's the list of methods provided to get access to current something:
 
 Return the current C<Padre::Config> object from the main window.
 
-
 =item document()
 
 Return the current C<Padre::Document> object in use.
-
 
 =item editor()
 
 Return the current C<Padre::Editor> object in use.
 
-
 =item filename()
 
 Return the filename of the current opened document.
-
 
 =item ide()
 
 Return the current C<Padre> object in use.
 
-
 =item main()
 
 Return the current C<Padre::Wx::Main> object in use.
-
 
 =item notebook()
 
 Return the current C<Padre::Wx::Notebook> object in use.
 
-
 =item project()
 
 Return the current C<Padre::Project> object in use.
-
 
 =item text()
 
 Return the current selected text.
 
-
 =item title()
 
 Return the title of current editor window.
 
-
 =back
-
-
 
 =head1 COPYRIGHT & LICENSE
 
@@ -296,7 +277,6 @@ The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
-
 
 # Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE

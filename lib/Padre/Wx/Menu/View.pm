@@ -5,16 +5,14 @@ package Padre::Wx::Menu::View;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Config::Constants qw{ $PADRE_CONFIG_DIR };
-use Padre::Wx       ();
-use Padre::Locale   ();
-use Padre::Wx::Menu ();
+use File::Glob      ();
+use Padre::Constant ();
 use Padre::Current qw{_CURRENT};
+use Padre::Wx       ();
+use Padre::Wx::Menu ();
+use Padre::Locale   ();
 
-# Fix win32 globbing problem with spaces in paths
-use File::Glob ();
-
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -214,6 +212,7 @@ sub new {
 				'editor_calltips',
 				$_[1]->IsChecked ? 1 : 0,
 			);
+			$_[0]->config->write;
 		},
 	);
 
@@ -330,6 +329,7 @@ sub new {
 		$main,
 		$self->{bookmark_set},
 		sub {
+			require Padre::Wx::Dialog::Bookmarks;
 			Padre::Wx::Dialog::Bookmarks->set_bookmark( $_[0] );
 		},
 	);
@@ -342,6 +342,7 @@ sub new {
 		$main,
 		$self->{bookmark_goto},
 		sub {
+			require Padre::Wx::Dialog::Bookmarks;
 			Padre::Wx::Dialog::Bookmarks->goto_bookmark( $_[0] );
 		},
 	);
@@ -377,12 +378,12 @@ sub new {
 		);
 	}
 
-	my $dir = File::Spec->catdir( $PADRE_CONFIG_DIR, 'styles' );
-	my @private_styles
+	my $dir = File::Spec->catdir( Padre::Constant::CONFIG_DIR, 'styles' );
+	my @private
 		= map { substr( File::Basename::basename($_), 0, -4 ) } File::Glob::glob( File::Spec->catdir( $dir, '*.yml' ) );
-	if (@private_styles) {
+	if (@private) {
 		$self->AppendSeparator;
-		foreach my $name (@private_styles) {
+		foreach my $name (@private) {
 			my $label = $name;
 			my $radio = $self->{style}->AppendRadioItem( -1, $label );
 			if ( $config->editor_style and $config->editor_style eq $name ) {

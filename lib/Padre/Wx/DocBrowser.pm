@@ -4,16 +4,20 @@ use 5.008;
 use strict;
 use warnings;
 use URI                   ();
+use Encode                ();
 use Scalar::Util          ();
-use Class::Autouse        ();
+use List::MoreUtils       ();
 use Padre::Wx             ();
 use Padre::Wx::HtmlWindow ();
 use Scalar::Util          ();
-use Params::Util '_INSTANCE';
+use Params::Util qw(
+	_INSTANCE _INVOCANT _CLASSISA _HASH _STRING
+);
 use Padre::Wx::AuiManager   ();
 use Padre::Task::DocBrowser ();
+use Padre::Util qw( _T );
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Wx::Frame';
 
 use Class::XSAccessor accessors => {
@@ -22,8 +26,8 @@ use Class::XSAccessor accessors => {
 };
 
 our %VIEW = (
-	'text/xhtml'  => 'Padre::Wx::HtmlWindow',
 	'text/html'   => 'Padre::Wx::HtmlWindow',
+	'text/xhtml'  => 'Padre::Wx::HtmlWindow',
 	'text/x-html' => 'Padre::Wx::HtmlWindow',
 );
 
@@ -31,7 +35,7 @@ our %VIEW = (
 
 =head1 NAME
 
-Padre::Wx::DowBrowser - Wx front-end for Padre::DocBrowser
+Padre::Wx::DocBrowser - Wx front-end for Padre::DocBrowser
 
 =head1 Welcome to Padre DocBrowser
 
@@ -58,7 +62,6 @@ displayed in a new tab.
 
 TO BE COMPLETED
 
-
 =head1 SEE ALSO
 
 L<Padre::DocBrowser> L<Padre::Task::DocBrowser>
@@ -76,6 +79,7 @@ sub new {
 		[ 750, 700 ],
 	);
 
+	require Padre::DocBrowser;
 	$self->{provider} = Padre::DocBrowser->new;
 
 	my $top_s = Wx::BoxSizer->new(Wx::wxVERTICAL);
@@ -92,7 +96,7 @@ sub new {
 
 	my $entry = Wx::TextCtrl->new(
 		$self, -1,
-		'search terms..',
+		'search terms...',
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxTE_PROCESS_ENTER
@@ -117,57 +121,66 @@ sub new {
 	$top_s->Add( $notebook, 1, Wx::wxGROW );
 	$self->SetSizer($top_s);
 	$self->SetAutoLayout(1);
-	$self->_setup_welcome;
+
+	#$self->_setup_welcome;
 
 	return $self;
 }
 
 # Bad - this looks like a virtual, really a eventhandler
 sub OnLinkClicked {
-	my ( $self, $event ) = @_;
-	my $htmlinfo = $event->GetLinkInfo;
-	my $href     = $htmlinfo->GetHref;
-
-	my $uri    = URI->new($href);
-	my $scheme = $uri->scheme;
-	$self->debug("Link clicked is $uri");
-	if ( $self->provider->accept($scheme) ) {
+	my $self = shift;
+	my $uri  = URI->new( $_[0]->GetLinkInfo->GetHref );
+	if ( $self->provider->accept( $uri->scheme ) ) {
 		$self->help($uri);
 	} else {
-		Padre::Wx::LaunchDefaultBrowser($uri);
+		Padre::Wx::launch_browser($uri);
 	}
-
 }
 
 sub on_search_text_enter {
-	my ( $self, $event ) = @_;
-	$self->debug("SEARCH $self - $event ");
-	my $text = $event->GetValue;
-	$self->help($text);
-
+	my $self = shift;
+	my $text = $_[0]->GetValue;
+	$self->ResolveRef($text);
 }
 
-# Compat with old PodFrame help ?
-sub show {
-	shift->help(@_);
+sub _hints {
+	return (
+		lang               => Padre::Locale::iso639(),
+		title_from_section => Wx::gettext('NAME'),
+	);
 }
 
 sub help {
-	my ( $self, $query, %hints ) = @_;
-	my $type;
-	if ( Scalar::Util::blessed($query) && $query->can('get_mimetype') ) {
-		$self->debug( "Help from mimetype, " . $query->get_mimetype );
+	my ( $self, $query, $hint ) = @_;
+
+	if ( _INSTANCE( $query, 'Padre::Document' ) ) {
+		$query = $self->padre2docbrowser($query);
+	}
+
+	my %hints = (
+		$self->_hints,
+		_HASH($hint) ? %$hint : (),
+	);
+	if ( _INVOCANT($query) and $query->can('mimetype') ) {
 		my $task = Padre::Task::DocBrowser->new(
-			document => $query, type => 'docs',
-			main_thread_only => sub { $self->display( $_[0], $query ) },
+			document         => $query,
+			type             => 'docs',
+			args             => \%hints,
+			main_thread_only => sub {
+				$self->display( $_[0], $query );
+			},
 		);
 		$task->schedule;
 		return 1;
 	} elsif ( defined $query ) {
-		$self->debug("resolve '$query'");
 		my $task = Padre::Task::DocBrowser->new(
-			document => $query, type => 'resolve',
-			main_thread_only => sub { $self->help( $_[0], referrer => $query ) }
+			document         => $query,
+			type             => 'resolve',
+			args             => \%hints,
+			main_thread_only => sub {
+				$self->help( $_[0], referrer => $query );
+			}
 		);
 		$task->schedule;
 		return 1;
@@ -178,14 +191,15 @@ sub help {
 
 sub ResolveRef {
 	my ( $self, $ref ) = @_;
-
-	#warn "Resolve ref '$ref'";
 	my $task = Padre::Task::DocBrowser->new(
-		document => $ref, type => 'resolve',
-		main_thread_only => sub { $self->display( $_[0], $ref ) }
+		document         => $ref,
+		type             => 'resolve',
+		args             => { $self->_hints },
+		main_thread_only => sub {
+			$self->display( $_[0], $ref );
+		}
 	);
 	$task->schedule;
-
 }
 
 # FIXME , add our own output panel
@@ -195,51 +209,64 @@ sub debug {
 
 sub display {
 	my ( $self, $docs, $query ) = @_;
-	if ( _INSTANCE( $docs, 'Padre::Document' ) ) {
-		$self->debug(
-			sprintf(
-				"Display %s results of query %s",
-				$docs->get_mimetype, $query
-			)
-		);
+	if ( _INSTANCE( $docs, 'Padre::DocBrowser::document' ) ) {
 		my $task = Padre::Task::DocBrowser->new(
-			document => $docs, type => 'browse',
-			main_thread_only => sub { $self->ShowPage( shift, $query ) }
-		);
-		$task->schedule;
-	} elsif ( _INSTANCE( $query, 'Padre::Document' ) ) {
-
-		#warn "TRY 2 render the query instead";
-		my $task = Padre::Task::DocBrowser->new(
-			document => $query, type => 'browse',
-			main_thread_only => sub { $self->ShowPage( shift || $query, $query ) }
+			document         => $docs,
+			type             => 'browse',
+			main_thread_only => sub {
+				$self->ShowPage( $_[0], $query );
+			}
 		);
 		$task->schedule;
 	}
 
+	#warn "Launched a 'browse' for $docs from query '$query'";
 }
 
 sub ShowPage {
 	my ( $self, $docs, $query ) = @_;
 
-	unless ( _INSTANCE( $docs, 'Padre::Document' ) ) {
+	#warn "Handed $docs from '$query' for display";
+	unless ( _INSTANCE( $docs, 'Padre::DocBrowser::document' ) ) {
 		return $self->not_found($query);
 	}
 
-	my $title = 'Untitled';
+	my $title = Wx::gettext('Untitled');
 	my $mime  = 'text/xhtml';
 
-	if ( Scalar::Util::blessed($query) and $query->isa("Padre::Document") ) {
-		$title = $query->get_title;
-	} else {
-		$title = $docs->get_title;
+	if ( _INSTANCE( $query, 'Padre::DocBrowser::document' ) ) {
+		$title = $query->title;
+	} elsif ( $docs->title ) {
+
+		#warn "title from documentation";
+		$title = $docs->title;
+	} elsif ( _STRING($query) ) {
+
+		#warn "title from scalar query";
+		$title = $query;
 	}
 
-	my $page = $self->NewPage( $docs->get_mimetype, $title );
-	$self->debug( sprintf( "Showpage '%s' from query %s", $title, $query ) );
-
-	$page->SetPage( $docs->{original_content} );
-
+	my $found = $self->notebook->GetPageCount;
+	my @opened;
+	my $i = 0;
+	while ( $i < $found ) {
+		my $page = $self->notebook->GetPage($i);
+		if ( $self->notebook->GetPageText($i) eq $title ) {
+			push @opened,
+				{
+				page  => $page,
+				index => $i,
+				};
+		}
+		$i++;
+	}
+	if ( my $last = pop @opened ) {
+		$last->{page}->SetPage( $docs->body );
+		$self->notebook->SetSelection( $last->{index} );
+	} else {
+		my $page = $self->NewPage( $docs->mimetype, $title );
+		$page->SetPage( $docs->body );
+	}
 }
 
 sub NewPage {
@@ -247,19 +274,36 @@ sub NewPage {
 	my $page = eval {
 		if ( exists $VIEW{$mime} )
 		{
-			Class::Autouse->autouse( $VIEW{$mime} );
-			my $panel = $VIEW{$mime}->new($self);
-			Wx::Event::EVT_HTML_LINK_CLICKED( $self, $panel, \&OnLinkClicked );
+			my $class = $VIEW{$mime};
+			unless ( $class->VERSION ) {
+				eval "require $class;";
+				die("Failed to load $class: $@") if $@;
+			}
+			my $panel = $class->new($self);
+			Wx::Event::EVT_HTML_LINK_CLICKED(
+				$self, $panel,
+				\&OnLinkClicked,
+			);
 			$self->notebook->AddPage( $panel, $title, 1 );
 			$panel;
 		} else {
-			$self->debug("NO VIEWER FOR $mime");
+			$self->debug("DocBrowser: no viewer for $mime");
 		}
 	};
-
 	$self->debug($@) if $@;
 	return $page;
 
+}
+
+sub padre2docbrowser {
+	my ( $class, $padredoc ) = @_;
+	my $doc = Padre::DocBrowser::document->new(
+		mimetype => $padredoc->get_mimetype,
+		title    => $padredoc->get_title,
+		filename => $padredoc->filename,
+	);
+	$doc->body( Encode::encode( 'utf8', $padredoc->{original_content} ) );
+	return $doc;
 }
 
 sub not_found {
@@ -277,25 +321,6 @@ sub not_found {
 	$self->notebook->AddPage( $frame, 'Not Found', 1 );
 	$frame->SetPage($html);
 
-}
-
-sub _setup_welcome {
-	my $self = shift;
-	$self->help( URI->new('perldoc:Padre::Wx::DocBrowser') );
-	return;
-	my $window = Padre::Wx::HtmlWindow->new($self);
-	$window->SetPage(
-		qq|
-<html><body>
-<h1>Welcome to Padre DocBrowser</h1>
-</body></html>
-|
-	);
-	$self->{notebook}->AddPage(
-		$window,
-		'Padre DocBrowser',
-		1
-	);
 }
 
 1;

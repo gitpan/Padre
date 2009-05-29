@@ -3,14 +3,14 @@ package Padre::Wx::Directory;
 use 5.008;
 use strict;
 use warnings;
-use Params::Util qw{_INSTANCE};
-use Padre::Wx      ();
-use Padre::Current ();
 use File::Basename ();
+use Params::Util qw{_INSTANCE};
+use Padre::Current ();
 use Padre::Util    ();
+use Padre::Wx      ();
 
-our $VERSION = '0.35';
-use base 'Wx::TreeCtrl';
+our $VERSION = '0.36';
+our @ISA     = 'Wx::TreeCtrl';
 
 my %CACHED;
 my $current_dir;
@@ -59,7 +59,6 @@ sub clear {
 
 sub force_next {
 	my $self = shift;
-
 	if ( defined $_[0] ) {
 		$self->{force_next} = $_[0];
 		return $self->{force_next};
@@ -96,7 +95,7 @@ sub list_dir {
 	my @data;
 	$depth ||= 1;
 
-	# avoid deep recursion
+	# Avoid deep recursion
 	# TODO: make this more clever then simply stopping after 10 levels
 	return if $depth > 10;
 	if ( opendir my $dh, $dir ) {
@@ -129,14 +128,14 @@ sub update_gui {
 	# TODO empty CACHE if forced ?
 	# TODO how to recognize real change in ?
 	return if $current_dir and $current_dir eq $dir;
-	if ( not $CACHED{$dir} ) {
+	unless ( $CACHED{$dir} ) {
 		$CACHED{$dir} = list_dir($dir);
 	}
 
-	return if not @{ $CACHED{$dir} };
+	return unless @{ $CACHED{$dir} };
 
-	my $directory = Padre->ide->wx->main->directory;
-	$directory->Freeze();
+	my $directory = $self->main->directory;
+	$directory->Freeze;
 	$directory->clear;
 
 	my $root = $directory->AddRoot(
@@ -161,16 +160,18 @@ sub update_gui {
 
 sub _on_tree_item_right_click {
 	my ( $dir, $event ) = @_;
-	my $showMenu = 0;
 
+	my $showMenu = 0;
 	my $menu     = Wx::Menu->new;
 	my $itemData = $dir->GetPlData( $event->GetItem );
 
-	if ( defined($itemData) ) {
+	if ( defined $itemData ) {
 		my $goTo = $menu->Append( -1, Wx::gettext("Open File") );
 		Wx::Event::EVT_MENU(
 			$dir, $goTo,
-			sub { $dir->on_tree_item_activated($event); },
+			sub {
+				$dir->on_tree_item_activated($event);
+			},
 		);
 		$showMenu++;
 	}
@@ -185,6 +186,7 @@ sub _on_tree_item_right_click {
 			sub {
 
 				# TODO Fix this wasting of objects (cf. Padre::Wx::Menu::Help)
+				require Padre::Wx::DocBrowser;
 				my $help = Padre::Wx::DocBrowser->new;
 				$help->help( $itemData->{name} );
 				$help->SetFocus;
@@ -200,13 +202,12 @@ sub _on_tree_item_right_click {
 		my $y = $event->GetPoint->y;
 		$dir->PopupMenu( $menu, $x, $y );
 	}
+
 	return;
 }
 
 sub _update_treectrl {
 	my ( $dir, $data, $root ) = @_;
-
-	#warn "_update_treectrl @_";
 
 	foreach my $pkg ( @{$data} ) {
 		if ( $pkg->{subdir} ) {
@@ -215,7 +216,7 @@ sub _update_treectrl {
 				$pkg->{name},
 				-1,
 				-1,
-				Wx::TreeItemData->new()
+				Wx::TreeItemData->new
 			);
 			_update_treectrl( $dir, $pkg->{subdir}, $type_elem );
 		} else {
@@ -233,9 +234,6 @@ sub _update_treectrl {
 			$dir->Expand($branch);
 		}
 	}
-
-	#	$dir->Expand($type_elem);
-	#	$dir->Collapse($type_elem);
 
 	return;
 }

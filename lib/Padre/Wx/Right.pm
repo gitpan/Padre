@@ -6,8 +6,8 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.35';
-use base 'Wx::AuiNotebook';
+our $VERSION = '0.36';
+our @ISA     = 'Wx::AuiNotebook';
 
 sub new {
 	my $class = shift;
@@ -27,7 +27,7 @@ sub new {
 		$main,
 		-1,
 		Wx::wxDefaultPosition,
-		Wx::Size->new( 300, 350 ),    # used when pane is floated
+		Wx::Size->new( 200, 500 ),    # used when pane is floated
 		$style,
 	);
 

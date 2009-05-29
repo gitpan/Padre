@@ -17,7 +17,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 #####################################################################
 # Construction, Setup, and Accessors
@@ -78,13 +78,6 @@ sub new {
 	$self->wx->Append( $self->window->wx,  Wx::gettext("&Window") );
 	$self->wx->Append( $self->help->wx,    Wx::gettext("&Help") );
 
-	Wx::Event::EVT_MENU_OPEN(
-		$main,
-		sub {
-			Padre->ide->wx->main->menu->refresh();
-		}
-	);
-
 	my $config = Padre->ide->config;
 	if ( $config->experimental ) {
 
@@ -97,6 +90,13 @@ sub new {
 		$self->{default}++;
 	}
 
+	Wx::Event::EVT_MENU_OPEN(
+		$main,
+		sub {
+			$self->refresh;
+		}
+	);
+
 	return $self;
 }
 
@@ -106,18 +106,17 @@ sub new {
 sub refresh {
 	my $self    = shift;
 	my $plugins = shift;
-
-	my $current  = _CURRENT(@_);
-	my $menu     = $self->wx->GetMenuCount ne $self->{default};
-	my $document = !!_INSTANCE(
-		$current->document,
-		'Padre::Document::Perl'
+	my $current = _CURRENT(@_);
+	my $menu    = $self->wx->GetMenuCount ne $self->{default};
+	my $perl    = !!(
+		   _INSTANCE( $current->document, 'Padre::Document::Perl' )
+		or _INSTANCE( $current->project, 'Padre::Project::Perl' )
 	);
 
 	# Add/Remove the Perl menu
-	if ( $document and not $menu ) {
+	if ( $perl and not $menu ) {
 		$self->wx->Insert( 4, $self->perl->wx, Wx::gettext("&Perl") );
-	} elsif ( $menu and not $document ) {
+	} elsif ( $menu and not $perl ) {
 		$self->wx->Remove(4);
 	}
 
@@ -127,7 +126,12 @@ sub refresh {
 	$self->search->refresh($current);
 	$self->view->refresh($current);
 	$self->run->refresh($current);
-	$self->perl->refresh($current);
+
+	# Don't do to the effort of refreshing the Perl menu
+	# unless we're actually showing it.
+	if ($perl) {
+		$self->perl->refresh($current);
+	}
 
 	# plugin menu requires special flag as it was leaking memory
 	# TODO eliminate the memory leak
@@ -145,19 +149,18 @@ sub refresh {
 }
 
 sub refresh_top {
-	my $self = shift;
-
-	my $current  = _CURRENT(@_);
-	my $menu     = $self->wx->GetMenuCount ne $self->{default};
-	my $document = !!_INSTANCE(
-		$current->document,
-		'Padre::Document::Perl'
+	my $self    = shift;
+	my $current = _CURRENT(@_);
+	my $menu    = $self->wx->GetMenuCount ne $self->{default};
+	my $perl    = !!(
+		   _INSTANCE( $current->document, 'Padre::Document::Perl' )
+		or _INSTANCE( $current->project, 'Padre::Project::Perl' )
 	);
 
 	# Add/Remove the Perl menu
-	if ( $document and not $menu ) {
+	if ( $perl and not $menu ) {
 		$self->wx->Insert( 4, $self->perl->wx, Wx::gettext("&Perl") );
-	} elsif ( $menu and not $document ) {
+	} elsif ( $menu and not $perl ) {
 		$self->wx->Remove(4);
 	}
 

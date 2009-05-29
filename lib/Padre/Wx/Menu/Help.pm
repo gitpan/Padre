@@ -6,12 +6,11 @@ use 5.008;
 use strict;
 use warnings;
 use utf8;
-use Padre::Config::Constants qw{ $PADRE_CONFIG_DIR };
-use Padre::Wx             ();
-use Padre::Wx::Menu       ();
-use Padre::Wx::DocBrowser ();
+use Padre::Constant ();
+use Padre::Wx       ();
+use Padre::Wx::Menu ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -58,18 +57,46 @@ sub new {
 		$self->Append( -1, Wx::gettext('Current Document') ),
 		sub {
 			$_[0]->menu->help->help( $_[0] );
-			my $doc = $_[0]->current->document;
-			$_[0]->{help}->help($doc);
+			$_[0]->{help}->help( $_[0]->current->document );
+		},
+	);
+
+	# Live Support
+	$self->AppendSeparator;
+
+	$self->{live} = Wx::Menu->new;
+	$self->Append(
+		-1,
+		Wx::gettext("Live Support"),
+		$self->{live}
+	);
+
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{live}->Append( -1, Wx::gettext('Padre Support') ),
+		sub {
+			Padre::Wx::launch_irc( 'irc.perl.org' => 'padre' );
+		},
+	);
+
+	$self->{live}->AppendSeparator;
+
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{live}->Append( -1, Wx::gettext('Perl Help (English)') ),
+		sub {
+			Padre::Wx::launch_irc( 'irc.freenode.net' => 'perl' );
 		},
 	);
 
 	# Add interesting and helpful websites
 	$self->AppendSeparator;
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append( -1, Wx::gettext('Visit the PerlMonks') ),
 		sub {
-			Padre::Wx::LaunchDefaultBrowser('http://perlmonks.org/');
+			Padre::Wx::launch_browser('http://perlmonks.org/');
 		},
 	);
 
@@ -79,14 +106,14 @@ sub new {
 		$main,
 		$self->Append( -1, Wx::gettext("Report a New &Bug") ),
 		sub {
-			Padre::Wx::LaunchDefaultBrowser('http://padre.perlide.org/wiki/Tickets');
+			Padre::Wx::launch_browser('http://padre.perlide.org/wiki/Tickets');
 		},
 	);
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append( -1, Wx::gettext("View All &Open Bugs") ),
 		sub {
-			Padre::Wx::LaunchDefaultBrowser('http://padre.perlide.org/report/1');
+			Padre::Wx::launch_browser('http://padre.perlide.org/report/1');
 		},
 	);
 
@@ -110,6 +137,7 @@ sub help {
 	my $main = shift;
 
 	unless ( $main->{help} ) {
+		require Padre::Wx::DocBrowser;
 		$main->{help} = Padre::Wx::DocBrowser->new;
 		Wx::Event::EVT_CLOSE(
 			$main->{help},
@@ -143,7 +171,8 @@ sub about {
 	$about->SetDescription( "Perl Application Development and Refactoring Environment\n\n"
 			. "Based on Wx.pm $Wx::VERSION and "
 			. Wx::wxVERSION_STRING . "\n"
-			. "Config at $PADRE_CONFIG_DIR\n"
+			. "Config at "
+			. Padre::Constant::CONFIG_DIR . "\n"
 			. "SQLite user_version at "
 			. Padre::DB->pragma('user_version')
 			. "\n" );
@@ -180,16 +209,20 @@ sub about {
 	$about->AddTranslator("French - Jérôme Quelin");
 	$about->AddTranslator("Hebrew - Omer Zak - עומר זק");
 	$about->AddTranslator("Hebrew - Shlomi Fish - שלומי פיש");
+	$about->AddTranslator("Hebrew - Amir E. Aharoni - אמיר א. אהרוני");
 	$about->AddTranslator("Hungarian - György Pásztor");
 	$about->AddTranslator("Italian - Simone Blandino");
 	$about->AddTranslator("Japanese - Kenichi Ishigaki - 石垣憲一");
 	$about->AddTranslator("Korean - Keedi Kim - 김도형");
+	$about->AddTranslator("Norwegian - Kjetil Skotheim");
 	$about->AddTranslator("Russian - Andrew Shitov");
 	$about->AddTranslator("Dutch - Dirk De Nijs");
 	$about->AddTranslator("Polish - Cezary Morga");
 	$about->AddTranslator("Portuguese (BR) - Breno G. de Oliveira");
 	$about->AddTranslator("Spanish - Paco Alguacil");
 	$about->AddTranslator("Spanish - Enrique Nell");
+	$about->AddTranslator("Czech - Marcela Mašláňová");
+	$about->AddTranslator("Chinese (Trad./TW) - BlueT - Matthew Lien - 練喆明");
 
 	Wx::AboutBox($about);
 	return;

@@ -2,14 +2,12 @@ package Padre::Wx::ErrorList;
 
 use strict;
 use warnings;
-use Encode                   ();
-use Padre::Wx                ();
-use Padre::Locale            ();
-use Padre::Task::ErrorParser ();
-use Parse::ErrorString::Perl ();
+use Encode        ();
+use Padre::Wx     ();
+use Padre::Locale ();
 
-our $VERSION = '0.35';
-use base 'Wx::TreeCtrl';
+our $VERSION = '0.36';
+our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor getters => {
 	root    => 'root',
@@ -106,6 +104,7 @@ sub populate {
 	$self->{data} = "";
 	return unless $data;
 
+	require Padre::Task::ErrorParser;
 	my $task = Padre::Task::ErrorParser->new(
 		parser   => $self->parser,
 		cur_lang => $lang,

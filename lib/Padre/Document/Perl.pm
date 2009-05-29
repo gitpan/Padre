@@ -10,8 +10,8 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.35';
-use base 'Padre::Document';
+our $VERSION = '0.36';
+our @ISA     = 'Padre::Document';
 
 #####################################################################
 # Padre::Document::Perl Methods
@@ -38,15 +38,11 @@ sub ppi_set {
 }
 
 sub ppi_find {
-	my $self     = shift;
-	my $document = $self->ppi_get;
-	return $document->find(@_);
+	shift->ppi_get->find(@_);
 }
 
 sub ppi_find_first {
-	my $self     = shift;
-	my $document = $self->ppi_get;
-	return $document->find_first(@_);
+	shift->ppi_get->find_first(@_);
 }
 
 sub ppi_transform {
@@ -166,8 +162,8 @@ sub colorize {
 
 	my @tokens = $ppi_doc->tokens;
 	$ppi_doc->index_locations;
-	my $first = $editor->GetFirstVisibleLine();
-	my $lines = $editor->LinesOnScreen();
+	my $first = $editor->GetFirstVisibleLine;
+	my $lines = $editor->LinesOnScreen;
 
 	#print "First $first lines $lines\n";
 	foreach my $t (@tokens) {
@@ -441,6 +437,7 @@ sub find_unmatched_brace {
 	my ($self) = @_;
 
 	# create a new object of the task class and schedule it
+	require Padre::Task::PPI::FindUnmatchedBrace;
 	Padre::Task::PPI::FindUnmatchedBrace->new(
 
 		# for parsing
@@ -463,19 +460,21 @@ sub _get_current_symbol {
 	$pos = $editor->GetCurrentPos if not defined $pos;
 	my $line         = $editor->LineFromPosition($pos);
 	my $line_start   = $editor->PositionFromLine($line);
-	my $cursor_col   = $pos - $line_start;
 	my $line_end     = $editor->GetLineEndPosition($line);
+	my $cursor_col   = $pos - $line_start;
 	my $line_content = $editor->GetTextRange( $line_start, $line_end );
-	my $col          = $cursor_col;
+	$cursor_col = length($line_content) - 1 if $cursor_col >= length($line_content);
+	my $col = $cursor_col;
 
 	# find start of symbol TODO: This could be more robust, no?
 	while (1) {
-		if ( $col == 0 or substr( $line_content, $col, 1 ) =~ /^[^#\w:\']$/ ) {
+		if ( $col <= 0 or substr( $line_content, $col, 1 ) =~ /^[^#\w:\']$/ ) {
 			last;
 		}
 		$col--;
 	}
 
+	return () if $col >= length($line_content);
 	if ( substr( $line_content, $col + 1, 1 ) !~ /^[#\w:\']$/ ) {
 		return ();
 	}
@@ -515,6 +514,7 @@ sub find_variable_declaration {
 	}
 
 	# create a new object of the task class and schedule it
+	require Padre::Task::PPI::FindVariableDeclaration;
 	Padre::Task::PPI::FindVariableDeclaration->new(
 		document => $self,
 		location => $location,
@@ -541,6 +541,7 @@ sub lexical_variable_replacement {
 	}
 
 	# create a new object of the task class and schedule it
+	require Padre::Task::PPI::LexicalReplaceVariable;
 	Padre::Task::PPI::LexicalReplaceVariable->new(
 		document    => $self,
 		location    => $location,
@@ -644,8 +645,15 @@ sub event_on_right_down {
 	my $menu   = shift;
 	my $event  = shift;
 
-	my $point = $event->GetPosition();
-	my $pos   = $editor->PositionFromPoint($point);
+	my $pos;
+	if ( $event->isa("Wx::MouseEvent") ) {
+		my $point = $event->GetPosition();
+		$pos = $editor->PositionFromPoint($point);
+	} else {
+
+		# Fall back to the cursor position
+		$editor->GetCurrentPos();
+	}
 
 	my ( $location, $token ) = _get_current_symbol( $self->editor, $pos );
 
@@ -675,7 +683,8 @@ sub event_on_right_down {
 				my $editor = shift;
 				my $doc    = $self;    # FIXME if Padre::Wx::Editor had a method to access its Document...
 				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
-				my $dialog = Padre::Wx::History::TextDialog->new(
+				require Padre::Wx::History::TextEntryDialog;
+				my $dialog = Padre::Wx::History::TextEntryDialog->new(
 					$editor->main,
 					Wx::gettext("Replacement"),
 					Wx::gettext("Replacement"),
@@ -698,8 +707,15 @@ sub event_on_left_up {
 
 	if ( $event->ControlDown ) {
 
-		my $point = $event->GetPosition();
-		my $pos   = $editor->PositionFromPoint($point);
+		my $pos;
+		if ( $event->isa("Wx::MouseEvent") ) {
+			my $point = $event->GetPosition();
+			$pos = $editor->PositionFromPoint($point);
+		} else {
+
+			# Fall back to the cursor position
+			$editor->GetCurrentPos();
+		}
 
 		my ( $location, $token ) = _get_current_symbol( $self->editor, $pos );
 
@@ -711,7 +727,7 @@ sub event_on_left_up {
 		}
 
 		# Does it look like a function?
-		else {
+		elsif ( defined $location ) {
 			my ( $start, $end ) = Padre::Util::get_matches(
 				$editor->GetText,
 				$self->get_function_regex($token),

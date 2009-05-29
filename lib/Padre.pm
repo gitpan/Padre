@@ -9,75 +9,28 @@ use utf8;
 
 # Non-Padre modules we need in order to show the initial
 # window should be loaded early to simplify the load order.
-use Carp           ();
-use Cwd            ();
-use File::Spec     ();
-use File::HomeDir  ();
-use List::Util     ();
-use Scalar::Util   ();
-use Getopt::Long   ();
-use YAML::Tiny     ();
-use Class::Autouse ();
-use DBI            ();
-use DBD::SQLite    ();
+use Carp          ();
+use Cwd           ();
+use File::Spec    ();
+use File::HomeDir ();
+use List::Util    ();
+use Scalar::Util  ();
+use Getopt::Long  ();
+use YAML::Tiny    ();
+use DBI           ();
+use DBD::SQLite   ();
 
 # load this before things are messed up to produce versions like '0,76'!
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
 use Padre::Util   ();
 use Padre::Config ();
 use Padre::DB     ();
-
-# Nudges to make Class::Autouse behave
-BEGIN {
-	$Class::Autouse::LOADED{'Wx::Object'} = 1;
-}
-
-# Modules to be run-time autoloaded.
-# This is more efficient than use'ing a module, but less efficient
-# than making a direct call to require.
-# This is for fully OO classes that are refered to in a number of
-# different places in the code, making the use of "require" tricky.
-# For modules that are only used in one or two places (such as
-# task-specific dialog boxes and so on) you should use require instead.
-# This section can also be used for classes which aren't called
-# directly by name. For example, a document type class is called from
-# $class->new variable obtained from a HASH mapping.
-# This should not be used for abstract parent classes that are never
-# refered to directly. Let them get loaded normally via the top level
-# module's "use base" (or similar) call.
-use Class::Autouse qw{
-	Padre::Document
-	Padre::Document::Perl
-	Padre::Document::POD
-	Padre::PPI
-	Padre::Project
-	Padre::Project::Null
-	Padre::Project::Perl
-	Padre::PluginManager
-	Padre::Task
-	Padre::Task::PPI
-	Padre::Task::PPI::FindUnmatchedBrace
-	Padre::Task::PPI::FindVariableDeclaration
-	Padre::Task::PPI::LexicalReplaceVariable
-	Padre::TaskManager
-	Padre::Wx::Popup
-	Padre::Wx::Editor
-	Padre::Wx::Menubar
-	Padre::Wx::Ack
-	Padre::Wx::App
-	Padre::Wx::Dialog::Bookmarks
-	Padre::Wx::Dialog::Find
-	Padre::Wx::Dialog::Search
-	Padre::Wx::Dialog::Snippets
-	Padre::Wx::History::TextDialog
-	Padre::Wx::Main
-};
 
 # Generate faster accessors
 use Class::XSAccessor getters => {
@@ -152,9 +105,9 @@ sub new {
 
 	# Connect to the server if we are running in single instance mode
 	if ( $self->config->main_singleinstance ) {
-		require IO::Socket;
 
 		# This blocks for about 1 second
+		require IO::Socket;
 		my $socket = IO::Socket::INET->new(
 			PeerAddr => '127.0.0.1',
 			PeerPort => 4444,
@@ -172,13 +125,19 @@ sub new {
 		}
 	}
 
+	# Load a few more bits and pieces now we know that we'll need them
+	require Padre::Project;
+
 	# Create the plugin manager
+	require Padre::PluginManager;
 	$self->{plugin_manager} = Padre::PluginManager->new($self);
 
 	# Create the main window
+	require Padre::Wx::App;
 	$self->{wx} = Padre::Wx::App->new($self);
 
 	# Create the task manager
+	require Padre::TaskManager;
 	$self->{task_manager} = Padre::TaskManager->new(
 		use_threads => $self->config->threads,
 	);
@@ -189,11 +148,12 @@ sub new {
 sub run {
 	my $self = shift;
 
+	# Clean arguments
+	$self->{ARGV} = [ map { File::Spec->rel2abs( $_, $self->{original_cwd} ) } @ARGV ];
+
 	# FIXME: RT #1 This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
 	$self->plugin_manager->load_plugins;
-
-	$self->{ARGV} = [ map { File::Spec->rel2abs( $_, $self->{original_cwd} ) } @ARGV ];
 
 	# Move our current dir to the user's documents directory by default
 	my $documents = File::HomeDir->my_documents;
@@ -228,6 +188,10 @@ sub project {
 	my $root = shift;
 	unless ( $self->{project}->{$root} ) {
 		my $class = Padre::Project->class($root);
+		unless ( $class->VERSION ) {
+			eval "require $class;";
+			die("Failed to load $class: $@") if $@;
+		}
 		$self->{project}->{$root} = $class->new( root => $root, );
 	}
 	return $self->{project}->{$root};
@@ -303,7 +267,6 @@ of existing and planned features.
 The application maintains its configuration information in a
 directory called F<.padre>.
 
-
 =head2 Files operations
 
 B<File/New> creates a new empty file. By default Padre assumes this is a perl script.
@@ -354,7 +317,6 @@ B<File/Doc Stats> - just random statistics about the current document.
 
 B<File/Quit> - Exits Padre.
 
-
 =head2 Simple editing
 
 The simple editing features (should) provide the expected behavior
@@ -372,7 +334,6 @@ B<Edit/Cut> Ctrl-X
 
 B<Edit/Paste> Ctrl-V
 
-
 (TODO What is Ctrl-D ?, duplicate the current line?)
 
 =head2 Mouse right click
@@ -380,7 +341,6 @@ B<Edit/Paste> Ctrl-V
 Click on the right button of the mouse brings up a context sensitive menu.
 It provides the basic editing functions and will provide other context
 sensitive options.
-
 
 =head2 Projects (TODO)
 
@@ -392,7 +352,6 @@ as a CPAN module. This does not mean that your project needs to end
 up on CPAN of course. But if your projects directory structure
 follows that of the modules on CPAN, Padre will be automatically
 recognize it.
-
 
 =head2 Module::Starter
 
@@ -462,7 +421,6 @@ bookmarks.
   Ctr-TAB        Next Pane
   Ctr-Shift-TAB  Previous Pane
   Alt-S          Jump to list of subs window
-
 
   Ctr-M Ctr-Shift-M  comment/uncomment selected lines of code
 
@@ -964,6 +922,8 @@ namespace. It is actually a plain subclass of L<Wx::Perl::Dialog>.
 
 =item L<Padre::Wx::Dialog::Find>
 
+Current Find and Replace widget.
+
 =item L<Padre::Wx::Dialog::ModuleStart>
 
 L<Module::Start> integration. Maybe it should be moved to be a plug-in.
@@ -992,7 +952,7 @@ Scintilla.
 
 =item L<Padre::Wx::History::ComboBox>
 
-=item L<Padre::Wx::History::TextDialog>
+=item L<Padre::Wx::History::TextEntryDialog>
 
 =item L<Padre::Wx::Main>
 
@@ -1131,6 +1091,8 @@ Arabic - Ahmad M. Zawawi - أحمد محمد زواوي (AZAWAWI)
 
 Chinese (Simplified) - Fayland Lam (FAYLAND)
 
+Chinese (Traditional) - BlueT - Matthew Lien - 練喆明 (BLUET) E<lt>bluet@cpan.orgE<gt>
+
 Dutch - Dirk De Nijs (ddn123456)
 
 English - Everyone on the team
@@ -1139,7 +1101,7 @@ French - Jérôme Quelin (JQUELIN)
 
 German - Heiko Jansen (HJANSEN)
 
-Hebrew - Omer Zak  - עומר זק and Shlomi Fish  - שלומי פיש (SHLOMIF)
+Hebrew - Omer Zak  - עומר זק, Shlomi Fish  - שלומי פיש (SHLOMIF) and Amir E. Aharoni - אמיר א. אהרוני
 
 Hungarian - György Pásztor (GYU)
 
@@ -1156,6 +1118,10 @@ Polish - Cezary Morga (THEREK)
 Portuguese (Brazilian) - Breno G. de Oliveira (GARU)
 
 Spanish - Paco Alguacil (PacoLinux), Enrique Nell (ENELL)
+
+Czech - Marcela Mašláňová (mmaslano)
+
+Norwegian - Kjetil Skotheim (KJETIL)
 
 =head2 Thanks
 

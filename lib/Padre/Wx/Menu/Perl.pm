@@ -5,15 +5,16 @@ package Padre::Wx::Menu::Perl;
 use 5.008;
 use strict;
 use warnings;
-use List::Util      ();
-use File::Spec      ();
-use File::HomeDir   ();
-use Params::Util    ();
-use Padre::Locale   ();
+use List::Util    ();
+use File::Spec    ();
+use File::HomeDir ();
+use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
+use Padre::Locale   ();
+use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -33,25 +34,30 @@ sub new {
 	$self->{config} = $main->config;
 
 	# Perl-Specific Searches
+	$self->{find_brace} = $self->Append(
+		-1,
+		Wx::gettext("Find Unmatched Brace")
+	);
 	Wx::Event::EVT_MENU(
 		$main,
-		$self->Append(
-			-1,
-			Wx::gettext("Find Unmatched Brace")
-		),
+		$self->{find_brace},
 		sub {
 			my $doc = $_[0]->current->document;
-			return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
+			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
 			$doc->find_unmatched_brace;
 		},
 	);
 
+	$self->{find_variable} = $self->Append(
+		-1,
+		Wx::gettext("Find Variable Declaration")
+	);
 	Wx::Event::EVT_MENU(
 		$main,
-		$self->Append( -1, Wx::gettext("Find Variable Declaration") ),
+		$self->{find_variable},
 		sub {
 			my $doc = $_[0]->current->document;
-			return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
+			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
 			$doc->find_variable_declaration;
 		},
 	);
@@ -59,16 +65,18 @@ sub new {
 	$self->AppendSeparator;
 
 	# Perl-Specific Refactoring
+	$self->{rename_variable} = $self->Append(
+		-1,
+		Wx::gettext("Lexically Rename Variable")
+	);
 	Wx::Event::EVT_MENU(
 		$main,
-		$self->Append(
-			-1,
-			Wx::gettext("Lexically Rename Variable")
-		),
+		$self->{rename_variable},
 		sub {
 			my $doc = $_[0]->current->document;
-			return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
-			my $dialog = Padre::Wx::History::TextDialog->new(
+			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+			require Padre::Wx::History::TextEntryDialog;
+			my $dialog = Padre::Wx::History::TextEntryDialog->new(
 				$_[0],
 				Wx::gettext("Replacement"),
 				Wx::gettext("Replacement"),
@@ -142,12 +150,19 @@ sub new {
 }
 
 sub refresh {
-	my $self   = shift;
-	my $config = $self->{config};
+	my $self    = shift;
+	my $current = _CURRENT(@_);
+	my $config  = $current->config;
+	my $perl    = !!( _INSTANCE( $current->document, 'Padre::Document::Perl' ) );
 
+	# Disable document-specific entries if we are in a Perl project
+	# but not in a Perl document.
+	$self->{find_brace}->Enable($perl);
+	$self->{find_variable}->Enable($perl);
+	$self->{rename_variable}->Enable($perl);
+
+	# Apply config-driven state
 	$self->{ppi_highlight}->Check( $config->ppi_highlight );
-
-	#$self->{run_stacktrace}->Check( $config->run_stacktrace );
 	$self->{autocomplete_brackets}->Check( $config->autocomplete_brackets );
 
 	return;

@@ -7,8 +7,8 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.35';
-use base 'Padre::Plugin';
+our $VERSION = '0.36';
+our @ISA     = 'Padre::Plugin';
 
 #####################################################################
 # Padre::Plugin Methods
@@ -43,7 +43,6 @@ sub menu_plugins_simple {
 			Wx::gettext("Install Remote Distribution") => 'install__url',
 			'---'                                      => undef,
 			Wx::gettext("Open CPAN Config File")       => 'open_config',
-			'About'                                    => 'show_about',
 		],
 	];
 }
@@ -173,15 +172,6 @@ sub install_with_pip {
 	local $ENV{AUTOMATED_TESTING} = 1;
 	Wx::Perl::ProcessStream->OpenProcess( $cmd, 'CPAN_mod', $main );
 
-	return;
-}
-
-sub show_about {
-	my $self  = shift;
-	my $about = Wx::AboutDialogInfo->new;
-	$about->SetName(__PACKAGE__);
-	$about->SetDescription("Perl 5 related tools\n");
-	Wx::AboutBox($about);
 	return;
 }
 

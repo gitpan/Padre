@@ -7,8 +7,8 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.35';
-use base 'Wx::TreeCtrl';
+our $VERSION = '0.36';
+our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor accessors => {
 	force_next => 'force_next',
@@ -67,7 +67,7 @@ sub clear {
 # Timer Control
 
 sub start {
-	my $self = shift;
+	my $self = shift; @_ = ();    # Feeble attempt to kill Scalars Leaked ($self is leaking)
 
 	# TODO: GUI on-start initialisation here
 

@@ -44,15 +44,15 @@ Padre::Plugin - Padre Plugin API 2.1
 use 5.008;
 use strict;
 use warnings;
-use Carp ();
-use File::Spec::Functions qw{ catdir };
+use Carp         ();
+use File::Spec   ();
 use Scalar::Util ();
-use Params::Util ( '_HASH0', '_INSTANCE' );
-use YAML::Tiny   ();
-use Padre::DB    ();
-use Padre::Wx    ();
+use Params::Util qw{_HASH0 _INSTANCE};
+use YAML::Tiny ();
+use Padre::DB  ();
+use Padre::Wx  ();
 
-our $VERSION    = '0.35';
+our $VERSION    = '0.36';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
@@ -76,7 +76,7 @@ of the plugin.
 =cut
 
 sub plugin_name {
-	my $class = ref( $_[0] ) || $_[0];
+	my $class = ref $_[0] || $_[0];
 	my @words = $class =~ /(\w+)/gi;
 	my $name = pop @words;
 	$name =~ s/([a-z])([A-Z])/$1 $2/g;
@@ -95,8 +95,6 @@ C<Wx::Bitmap> object.
 There is no default default implementation, meaning that a default
 plugin icon will be displayed for the plugin.
 
-
-
 =head2 plugin_locale_directory
 
 The C<plugin_directory_locale()> method will be called by Padre to
@@ -114,15 +112,20 @@ C<Padre::Plugin::Vi>.
 =cut
 
 sub plugin_locale_directory {
-	my ($self) = @_;
-	my $pkg = ref($self) || $self;
+	my $pkg = ref $_[0] || $_[0];
 	$pkg =~ s/::/-/g;
 
+	# Find the distribution directory
 	require File::ShareDir::PAR;
-	my $distdir;
-	eval { $distdir = File::ShareDir::PAR::dist_dir($pkg); };
-	return $@ ? undef : catdir( $distdir, 'share', 'locale' );
+	my $distdir = eval { File::ShareDir::PAR::dist_dir($pkg); };
+	return undef if $@;
+
+	return File::Spec->catdir(
+		$distdir, 'share', 'locale',
+	);
 }
+
+=pod
 
 =head2 padre_interfaces
 
@@ -236,6 +239,22 @@ sub registered_documents {
 }
 
 =pod
+
+=head2 event_on_context_menu
+
+If implemented in a plugin, this method will be called when a
+context menu is about to be displayed either because the user
+pressed the right mouse button in the editor window (C<Wx::MouseEvent>)
+or because the C<Right-click> menu entry was selected in the C<Window>
+menu (C<Wx::CommandEvent>). The context menu object was created
+and populated by the Editor and then possibly augmented by the
+C<Padre::Document> type (see L<Padre::Document/event_on_right_down>).
+
+Parameters retrieved are the objects for the document, the editor, the 
+context menu (C<Wx::Menu>) and the event.
+
+Have a look at the implementation in L<Padre::Document::Perl> for
+an example.
 
 =head2 plugin_enable
 

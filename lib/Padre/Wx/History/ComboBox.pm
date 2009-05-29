@@ -6,9 +6,9 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::DB ();
-use Wx        ();
+use Padre::Wx ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 1;
 

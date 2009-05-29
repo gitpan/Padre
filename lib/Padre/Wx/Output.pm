@@ -12,8 +12,8 @@ use Encode       ();
 use Params::Util ();
 use Padre::Wx    ();
 
-our $VERSION = '0.35';
-use base 'Wx::TextCtrl';
+our $VERSION = '0.36';
+our @ISA     = 'Wx::TextCtrl';
 
 sub new {
 	my $class = shift;
@@ -35,7 +35,9 @@ sub new {
 	# Do custom startup stuff here
 	$self->clear;
 	$self->set_font;
-	$self->AppendText( Wx::gettext('No output') );
+
+	# see #351: output should be blank by default at startup.
+	#$self->AppendText( Wx::gettext('No output') );
 
 	return $self;
 }

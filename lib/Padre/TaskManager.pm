@@ -66,14 +66,16 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
+
+use Params::Util qw{_INSTANCE};
 
 # According to Wx docs,
 # this MUST be loaded before Wx,
 # so this also happens in the script.
 use threads;
 use threads::shared;
-use Thread::Queue;
+use Thread::Queue 2.11;
 
 require Padre;
 use Padre::Task;
@@ -122,14 +124,13 @@ sub new {
 		running_tasks => {},
 	}, $class;
 
-	my $main = Padre->ide->wx->main;
-
-	if ( not $EVENTS_INITIALIZED ) {
-		Wx::Event::EVT_COMMAND( $main, -1, $TASK_DONE_EVENT,  \&on_task_done_event );
-		Wx::Event::EVT_COMMAND( $main, -1, $TASK_START_EVENT, \&on_task_start_event );
-		Wx::Event::EVT_CLOSE( $main, \&on_close );
-		$EVENTS_INITIALIZED = 1;
+	# Special case for profiling mode
+	if ( defined( $INC{"Devel/NYTProf.pm"} ) ) {
+		$self->{use_threads} = 0;
 	}
+
+	my $main = Padre->ide->wx->main;
+	_init_events($main);
 
 	$self->{task_queue} = Thread::Queue->new;
 
@@ -149,6 +150,29 @@ sub new {
 	return $self;
 }
 
+# This is separated out to its own routine in order to
+# squash the "Scalars Leaked" warning (or at least one of them).
+# Previously, the warning pointed to the "my $main = ..." line.
+# This move of the event setup was a wild guess that changing the
+# scope might help. --Steffen
+sub _init_events {
+	my $main = shift;
+	@_ = ();
+	unless ($EVENTS_INITIALIZED) {
+		Wx::Event::EVT_COMMAND(
+			$main, -1,
+			$TASK_DONE_EVENT,
+			\&on_task_done_event,
+		);
+		Wx::Event::EVT_COMMAND(
+			$main, -1,
+			$TASK_START_EVENT,
+			\&on_task_start_event,
+		);
+		$EVENTS_INITIALIZED = 1;
+	}
+}
+
 =pod
 
 =head1 INSTANCE METHODS
@@ -164,15 +188,13 @@ proxy to this method for convenience.
 
 sub schedule {
 	my $self = shift;
-	my $task = shift;
-	if ( not ref($task) or not $task->isa("Padre::Task") ) {
-		die "Invalid task scheduled!";    # TODO: grace
-	}
+	my $task = _INSTANCE( shift, 'Padre::Task' )
+		or die "Invalid task scheduled!";    # TODO: grace
 
-	# cleanup old threads and refill the pool
+	# Cleanup old threads and refill the pool
 	$self->reap();
 
-	# prepare and stop if vetoes
+	# Prepare and stop if vetoes
 	my $return = $task->prepare();
 	if ( $return and $return =~ /^break$/i ) {
 		return;
@@ -220,9 +242,10 @@ typically need to call this.
 
 sub setup_workers {
 	my $self = shift;
+	@_ = ();    # Avoid "Scalars leaked"
+
 	return unless $self->use_threads;
 
-	@_ = ();    # avoid "Scalars leaked"
 	my $main = Padre->ide->wx->main;
 
 	# Ensure minimum no. workers
@@ -246,7 +269,7 @@ sub setup_workers {
 sub _make_worker_thread {
 	my $self = shift;
 	my $main = shift;
-	return if not $self->use_threads;
+	return unless $self->use_threads;
 
 	@_ = ();    # avoid "Scalars leaked"
 	my $worker = threads->create( { 'exit' => 'thread_only' }, \&worker_loop, $main, $self->task_queue );
@@ -341,7 +364,7 @@ sub _stop_task {
 		delete $running->{$task_type} if not keys %{ $running->{$task_type} };
 	}
 
-	Padre->ide->wx->main->GetToolBar->update_task_status();
+	Padre->ide->wx->main->GetStatusBar->refresh;
 	return (1);
 }
 
@@ -427,26 +450,6 @@ sub workers {
 
 =head1 EVENT HANDLERS
 
-=head2 on_close
-
-Registered to be executed on editor shutdown.
-Executes the cleanup method.
-
-=cut
-
-sub on_close {
-	my ( $main, $event ) = @_; @_ = ();    # hack to avoid "Scalars leaked"
-
-	# TODO/FIXME:
-	# This should somehow get at the specific TaskManager object
-	# instead of going through the Padre globals!
-	Padre->ide->task_manager->cleanup();
-
-	$event->Skip(1);
-}
-
-=pod
-
 =head2 on_task_done_event
 
 This event handler is called when a background task has
@@ -495,7 +498,7 @@ sub on_task_start_event {
 	my $tid_and_task_type = $event->GetData();
 	my ( $tid, $task_type ) = split /;/, $tid_and_task_type, 2;
 	$manager->{running_tasks}{$task_type}{$tid} = 1;
-	$main->GetToolBar->update_task_status();
+	$main->GetStatusBar->refresh;
 
 	return ();
 }
@@ -519,21 +522,25 @@ sub on_dump_running_tasks {
 	$main->show_output(1);
 	$output->style_neutral;
 
-	$output->AppendText( "\n-----------------------------------------\n[" . localtime() . "] " );
+	$output->AppendText( "\n-----------------------------------------\n["
+			. localtime() . "] "
+			. sprintf( Wx::gettext("%s worker threads are running.\n"), scalar( $manager->workers ) ) );
 	if ( $nrunning == 0 ) {
-		$output->AppendText("Currently, no background tasks are being executed.\n");
+		$output->AppendText( Wx::gettext("Currently, no background tasks are being executed.\n") );
 		return ();
 	}
 
 	my $running = $manager->{running_tasks};
 	my $text;
-	$text .= "The following tasks are currently executing in the background:\n";
+	$text .= Wx::gettext("The following tasks are currently executing in the background:\n");
 
 	foreach my $type ( keys %$running ) {
 		my $threads = $running->{$type};
 		my $n       = keys %$threads;
-		$text .= "- $n of type '$type':\n";
-		$text .= "  (in thread(s) " . join( ", ", sort { $a <=> $b } keys %$threads ) . ")\n";
+		$text .= sprintf(
+			Wx::gettext("- %s of type '%s':\n  (in thread(s) %s)\n"),
+			$n, $type, join( ", ", sort { $a <=> $b } keys %$threads )
+		);
 	}
 
 	$output->AppendText($text);
@@ -542,7 +549,8 @@ sub on_dump_running_tasks {
 	my $pending = $queue->pending;
 
 	if ($pending) {
-		$output->AppendText("\nAdditionally, there are $pending tasks pending execution.\n");
+		$output->AppendText(
+			sprintf( Wx::gettext("\nAdditionally, there are %s tasks pending execution.\n"), $pending ) );
 	}
 }
 

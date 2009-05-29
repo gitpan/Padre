@@ -39,6 +39,53 @@ will be automatically loaded by Padre as needed.
 
 Padre does B<not> currently support opening non-text files.
 
+=head2 File to MIME-type mapping
+
+Padre has a built-in hash mapping the file exetensions to mime-types.
+In certain cases (.t, .pl, .pm) Padre also looks in the content of the
+file to determine if the file is Perl 5 or Perl 6.
+
+mime-types are mapped to lexers that provide the syntax highlighting.
+
+mime-types are also mapped to modules that implement 
+special features needed by that kind of a file type.
+
+Plug-ins can add further mappings.
+
+=head3 Plan
+
+Padre has a built-in mapping of file extension to either 
+a single mime-type or function name. In order to determine
+the actual mime-type Padre checks this hash. If the key
+is a subroutine it is called and it should return the 
+mime-type of the file.
+
+The user has a way in the GUI to add more file extensions 
+and map them to existing mime-types or funtions. It is probably
+better to have a commonly used name along with the mime-type
+in that GUI instead of the mime-type only.
+
+A plugin is able to add new supported mime-types. Padre should
+either check for collisions if a plugin already wants to provide
+an already suported mime-type or should allow multiple support
+modules with a way to select the current one.
+
+
+Each mime-type is mapped to one or more lexers that provide 
+the syntax highlighting. Every mime-type has to be mapped to at least 
+one lexer but it can be mapped to several lexers as well. 
+The user is able to select the lexer for each mime-type.
+(For this each lexer should have a reasonable name too.)
+
+mime-types are also mapped to modules that implement 
+special features needed by that kind of a file type.
+
+The user can change the mime-type mapping of individual 
+files and Padre should remember this choice and allow the
+user to change it to another specific mime-type
+or to set it to "Default by extension".
+
+
 =head1 METHODS
 
 =cut
@@ -46,14 +93,13 @@ Padre does B<not> currently support opening non-text files.
 use 5.008;
 use strict;
 use warnings;
-use Carp           ();
-use File::Spec     ();
-use Class::Autouse ();
-use Padre::Util    ();
-use Padre::Wx      ();
-use Padre          ();
+use Carp        ();
+use File::Spec  ();
+use Padre::Util ();
+use Padre::Wx   ();
+use Padre       ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -249,11 +295,14 @@ sub rebless {
 	# to the the base class,
 	# This isn't exactly the most elegant way to do this, but will
 	# do for a first implementation.
-	my $subclass = $MIME_CLASS{ $self->get_mimetype } || __PACKAGE__;
-	Padre::Util::debug("Reblessing to mimetype: '$subclass'");
-	if ($subclass) {
-		Class::Autouse->autouse($subclass);
-		bless $self, $subclass;
+	my $class = $MIME_CLASS{ $self->get_mimetype } || __PACKAGE__;
+	Padre::Util::debug("Reblessing to mimetype: '$class'");
+	if ($class) {
+		unless ( $class->VERSION ) {
+			eval "require $class;";
+			die("Failed to load $class: $@") if $@;
+		}
+		bless $self, $class;
 	}
 
 	return;
@@ -261,6 +310,16 @@ sub rebless {
 
 sub last_sync {
 	return $_[0]->{_timestamp};
+}
+
+sub basename {
+	my $filename = $_[0]->filename;
+	defined($filename) ? File::Basename::basename($filename) : undef;
+}
+
+sub dirname {
+	my $filename = $_[0]->filename;
+	defined($filename) ? File::Basename::dirname($filename) : undef;
 }
 
 #####################################################################
@@ -292,7 +351,8 @@ sub guess_mimetype {
 			if ( $EXT_MIME{$ext} eq 'application/x-perl' ) {
 
 				# Sometimes Perl 6 will look like Perl 5
-				if ( is_perl6($text) ) {
+				# But only do this test if the Perl 6 plugin is enabled.
+				if ( $MIME_CLASS{'application/x-perl6'} and is_perl6($text) ) {
 					return 'application/x-perl6';
 				}
 			}
@@ -346,6 +406,7 @@ sub is_perl6 {
 
 	return 1 if $text =~ /^\s*use\s+v6;/msx;
 	return 1 if $text =~ /^\s*(?:class|grammar|module|role)\s+\w/msx;
+
 	return;
 }
 
@@ -391,7 +452,7 @@ sub is_unused {
 	my $self = shift;
 	return '' unless $self->is_new;
 	return 1  unless $self->is_modified;
-	return 1  unless $self->text_get =~ /[^ \t]/s;
+	return 1  unless $self->text_get =~ /\S/s;
 	return '';
 }
 
@@ -403,15 +464,16 @@ sub is_unused {
 # 3) every time we type something ????
 sub has_changed_on_disk {
 	my ($self) = @_;
-	return 0 if not defined $self->filename;
-	return 0 if not defined $self->last_sync;
+	return 0 unless defined $self->filename;
+	return 0 unless defined $self->last_sync;
 	return $self->last_sync < $self->time_on_file ? 1 : 0;
 }
 
 sub time_on_file {
-	return 0 if not defined $_[0]->filename;
-	return 0 if not -e $_[0]->filename;
-	return ( stat( $_[0]->filename ) )[9];
+	my $filename = $_[0]->filename;
+	return 0 unless defined $filename;
+	return 0 unless -e $filename;
+	return ( stat($filename) )[9];
 }
 
 =pod
@@ -662,15 +724,15 @@ sub lexer {
 		}
 	}
 
-	Padre::Util::debug( "Lexer will be based on mymetype " . $self->get_mimetype );
+	Padre::Util::debug( 'Lexer will be based on mime type "' . $self->get_mimetype . '"' );
 	return $MIME_LEXER{ $self->get_mimetype };
 }
 
 # What should be shown in the notebook tab
 sub get_title {
 	my $self = shift;
-	if ( $self->{filename} ) {
-		return File::Basename::basename( $self->{filename} );
+	if ( $self->filename ) {
+		return $self->basename;
 	} else {
 		my $str = sprintf( Wx::gettext("Unsaved %d"), $unsaved_number );
 

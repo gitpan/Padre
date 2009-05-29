@@ -7,8 +7,8 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.35';
-use base 'Padre::Plugin';
+our $VERSION = '0.36';
+our @ISA     = 'Padre::Plugin';
 
 #####################################################################
 # Padre::Plugin Methods
@@ -62,19 +62,19 @@ sub menu_plugins_simple {
 		# TODO
 		# Should be checkbox but I am too lazy to turn the whole
 		# menu_plugins_simple into a menu_plugins
-		Wx::gettext('Enable logging')            => sub { set_logging(1); },
-		Wx::gettext('Disable logging')           => sub { set_logging(0); },
-		Wx::gettext('Enable trace when logging') => sub { set_trace(1); },
-		Wx::gettext('Disable trace')             => sub { set_trace(0); },
-		'---'                                    => undef,
-		Wx::gettext('Simulate Crash')            => 'simulate_crash',
-		Wx::gettext('Simulate Crashing Bg Task') => 'simulate_task_crash',
-		'---'                                    => undef,
-		Wx::gettext('wxWidgets 2.8.8 Reference') => sub {
-			Padre::Wx::LaunchDefaultBrowser('http://docs.wxwidgets.org/2.8.8/');
+		Wx::gettext('Enable logging')             => sub { set_logging(1); },
+		Wx::gettext('Disable logging')            => sub { set_logging(0); },
+		Wx::gettext('Enable trace when logging')  => sub { set_trace(1); },
+		Wx::gettext('Disable trace')              => sub { set_trace(0); },
+		'---'                                     => undef,
+		Wx::gettext('Simulate Crash')             => 'simulate_crash',
+		Wx::gettext('Simulate Crashing Bg Task')  => 'simulate_task_crash',
+		'---'                                     => undef,
+		Wx::gettext('wxWidgets 2.8.10 Reference') => sub {
+			Padre::Wx::launch_browser('http://docs.wxwidgets.org/2.8.10/');
 		},
 		Wx::gettext('STC Reference') => sub {
-			Padre::Wx::LaunchDefaultBrowser('http://www.yellowbrain.com/stc/index.html');
+			Padre::Wx::launch_browser('http://www.yellowbrain.com/stc/index.html');
 		},
 		'---'                => undef,
 		Wx::gettext('About') => 'show_about',

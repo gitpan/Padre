@@ -26,8 +26,8 @@ use warnings;
 use Padre::Wx ();
 use Wx::Html  ();
 
-our $VERSION = '0.35';
-use base 'Wx::HtmlWindow';
+our $VERSION = '0.36';
+our @ISA     = 'Wx::HtmlWindow';
 
 #####################################################################
 # Loader Methods

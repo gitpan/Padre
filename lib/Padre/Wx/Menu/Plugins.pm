@@ -5,14 +5,14 @@ package Padre::Wx::Menu::Plugins;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Config ();
-use Padre::Config::Constants qw{ $PADRE_CONFIG_DIR };
 use Params::Util    ();
+use Padre::Constant ();
+use Padre::Current qw{_CURRENT};
+use Padre::Config   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
-use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -41,15 +41,14 @@ sub new {
 		},
 	);
 
-	# TODO: should be replaced by  a link to http://cpan.uwinnipeg.ca/chapter/World_Wide_Web_HTML_HTTP_CGI/Padre
+	# TODO: should be replaced by a link to http://cpan.uwinnipeg.ca/chapter/World_Wide_Web_HTML_HTTP_CGI/Padre
 	# better yet, by a window that also allows the installation of all the plugins that can take into account
 	# the type of installation we have (ppm, stand alone, rpm, deb, CPAN, etc.)
 	Wx::Event::EVT_MENU(
 		$main,
-		$self->Append( -1, Wx::gettext("All available plugins on CPAN") ),
+		$self->Append( -1, Wx::gettext("Plugin List (CPAN)") ),
 		sub {
-			Padre::Wx::LaunchDefaultBrowser(
-				'http://cpan.uwinnipeg.ca/search?query=Padre%3A%3APlugin%3A%3A&mode=dist' );
+			Padre::Wx::launch_browser( 'http://cpan.uwinnipeg.ca/search?query=Padre%3A%3APlugin%3A%3A&mode=dist' );
 		},
 	);
 
@@ -60,7 +59,7 @@ sub new {
 		$tools->Append( -1, Wx::gettext("Edit My Plugin") ),
 		sub {
 			my $file = File::Spec->catfile(
-				$PADRE_CONFIG_DIR,
+				Padre::Constant::CONFIG_DIR,
 				qw{ plugins Padre Plugin My.pm }
 			);
 			return $self->error( Wx::gettext("Could not find the Padre::Plugin::My plugin") ) unless -e $file;
@@ -70,6 +69,7 @@ sub new {
 			$_[0]->setup_editors($file);
 		},
 	);
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$tools->Append( -1, Wx::gettext("Reload My Plugin") ),
@@ -77,6 +77,7 @@ sub new {
 			Padre->ide->plugin_manager->reload_plugin('My');
 		},
 	);
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$tools->Append( -1, Wx::gettext("Reset My Plugin") ),
@@ -95,7 +96,9 @@ sub new {
 			}
 		},
 	);
+
 	$tools->AppendSeparator;
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$tools->Append( -1, Wx::gettext("Reload All Plugins") ),
@@ -103,6 +106,7 @@ sub new {
 			Padre->ide->plugin_manager->reload_plugins;
 		},
 	);
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$tools->Append( -1, Wx::gettext("(Re)load Current Plugin") ),
@@ -110,6 +114,7 @@ sub new {
 			Padre->ide->plugin_manager->reload_current_plugin;
 		},
 	);
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$tools->Append( -1, Wx::gettext("Test A Plugin From Local Dir") ),

@@ -1,17 +1,17 @@
-package Padre::Wx::History::TextDialog;
+package Padre::Wx::History::TextEntryDialog;
 
 use 5.008;
 use strict;
 use warnings;
-use Params::Util qw{_INSTANCE};
-use Padre::DB ();
-use Padre::Wx ();
+use Params::Util ();
+use Padre::DB    ();
+use Padre::Wx    ();
 
 use Class::Adapter::Builder
 	ISA      => 'Wx::TextEntryDialog',
 	AUTOLOAD => 1;
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 sub new {
 	my $class  = shift;
@@ -21,7 +21,7 @@ sub new {
 	# as a type value in the database history table.
 	my $type = $params[3];
 	$params[3] = Padre::DB::History->previous($type);
-	if ( _INSTANCE( $params[3], 'Padre::DB::History' ) ) {
+	if ( Params::Util::_INSTANCE( $params[3], 'Padre::DB::History' ) ) {
 		$params[3] = $params[3]->name;
 	}
 	unless ( defined $params[3] ) {
@@ -58,8 +58,8 @@ sub ShowModal {
 		return $rv;
 	}
 
-	# If they entered something differen add it to the history.
-	unless ( defined $self->{suggested} and $value eq $self->{suggested} ) {
+	# If they entered something different add it to the history.
+	unless ( defined $self->{suggested} and $self->{suggested} eq $value ) {
 		Padre::DB::History->create(
 			type => $self->{type},
 			name => $value,

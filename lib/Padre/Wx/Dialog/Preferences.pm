@@ -3,12 +3,29 @@ package Padre::Wx::Dialog::Preferences;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx      ();
-use Padre::Current ();
+use Padre::Current    ();
+use Padre::Wx         ();
+use Padre::Wx::Dialog ();
+use Padre::Wx::Editor ();
 
-use base qw(Padre::Wx::Dialog);
+our $VERSION = '0.36';
+our @ISA     = 'Padre::Wx::Dialog';
 
-our $VERSION = '0.35';
+=pod
+
+=head1 NAME
+
+Padre::Wx::Dialog::Preferences - window to set the preferences
+
+=head1 details
+
+In order to add a new panel implement the _name_of_the_panel method.
+Add to the dialog() sub a call to build the new panel.
+
+In the run() sub add code to take the values from the new panel
+and save them to the configuration file.
+
+=cut
 
 sub _new_panel {
 	my ( $self, $parent ) = splice( @_, 0, 2 );
@@ -23,6 +40,22 @@ sub _new_panel {
 	);
 	my $fgs = Wx::FlexGridSizer->new( 0, $cols, 0, 0 );
 	$panel->SetSizer($fgs);
+
+	return $panel;
+}
+
+sub _external_tools_panel {
+	my ( $self, $treebook ) = @_;
+
+	my $config = Padre->ide->config;
+	my $table  = [
+		[   [ 'Wx::StaticText', undef,                Wx::gettext('Diff tool:') ],
+			[ 'Wx::TextCtrl',   'external_diff_tool', $config->external_diff_tool ]
+		],
+	];
+
+	my $panel = $self->_new_panel($treebook);
+	$self->fill_panel_by_table( $panel, $table );
 
 	return $panel;
 }
@@ -205,7 +238,7 @@ sub _appearance_panel {
 sub _init_preview_editor {
 	my $self = shift;
 	my ( $bgcolor, $font ) = @_;
-
+	require Padre::Document::Perl;
 	my $doc    = Padre::Document::Perl->new();
 	my $editor = $self->get_widget('preview_editor');
 	$editor->{Document} = $doc;
@@ -461,6 +494,9 @@ sub dialog {
 	my $indentation = $self->_indentation_panel( $tb, $editor_autoindent );
 	$tb->AddPage( $indentation, Wx::gettext('Indentation') );
 
+	my $external_tools = $self->_external_tools_panel($tb);
+	$tb->AddPage( $external_tools, Wx::gettext('External Tools') );
+
 	#my $plugin_manager = $self->_pluginmanager_panel($tb);
 	#$tb->AddPage( $plugin_manager, Wx::gettext('Plugin Manager') );
 	#$self->_add_plugins($tb);
@@ -651,6 +687,11 @@ sub run {
 		$data->{run_script_args_default}
 	);
 
+	$config->set(
+		'external_diff_tool',
+		$data->{external_diff_tool}
+	);
+
 	# Quite like in _run_params_panel, trap exception if there
 	# is no document currently open
 	eval {
@@ -659,8 +700,10 @@ sub run {
 
 			# These are a bit different as run_* variable name depends
 			# on current document's filename
-			foreach ( grep { /^run_/ && !/_default$/ } ( keys %$data ) ) {
-				next if Padre::DB::History->previous($_) eq $data->{$_};
+			foreach ( grep { /^run_/ and not /_default$/ } keys %$data ) {
+				if ( Padre::DB::History->previous($_) eq $data->{$_} ) {
+					next;
+				}
 				Padre::DB::History->create(
 					type => $_,
 					name => $data->{$_},

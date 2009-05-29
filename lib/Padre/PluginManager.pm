@@ -1,8 +1,5 @@
 package Padre::PluginManager;
 
-# API NOTES:
-# This class uses english-style verb_noun method naming
-
 =pod
 
 =head1 NAME
@@ -18,25 +15,27 @@ plugins, as well as providing part of the interface to plugin writers.
 
 =cut
 
+# API NOTES:
+# This class uses english-style verb_noun method naming
+
 use strict;
 use warnings;
-
-use Carp qw{croak};
-use File::Basename qw{ dirname };
-use File::Copy qw{ copy };
-use File::Path ();
-use File::Spec ();
-use File::Spec::Functions qw{ catfile };
-use Scalar::Util ();
-use Params::Util qw{_IDENTIFIER _CLASS _INSTANCE};
-use Padre::Config::Constants qw{ :dirs };
+use Carp           ();
+use File::Copy     ();
+use File::Glob     ();
+use File::Path     ();
+use File::Spec     ();
+use File::Basename ();
+use Scalar::Util   ();
+use Params::Util qw{ _IDENTIFIER _CLASS _INSTANCE };
+use Padre::Constant          ();
 use Padre::Current           ();
 use Padre::Util              ();
 use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 #####################################################################
 # Constructor and Accessors
@@ -57,17 +56,17 @@ First argument should be a Padre object.
 sub new {
 	my $class = shift;
 	my $parent = shift || Padre->ide;
-
 	unless ( _INSTANCE( $parent, 'Padre' ) ) {
-		croak("Creation of a Padre::PluginManager without a Padre not possible");
+		Carp::croak("Creation of a Padre::PluginManager without a Padre not possible");
 	}
 
 	my $self = bless {
-		parent       => $parent,
-		plugins      => {},
-		plugin_names => [],
-		plugin_dir   => $PADRE_PLUGIN_DIR,
-		par_loaded   => 0,
+		parent                    => $parent,
+		plugins                   => {},
+		plugin_names              => [],
+		plugin_dir                => Padre::Constant::PLUGIN_DIR,
+		par_loaded                => 0,
+		plugins_with_context_menu => {},
 		@_,
 	}, $class;
 
@@ -96,12 +95,20 @@ L<Padre::PluginHandle>.
 
 This hash is only populated after C<load_plugins()> was called.
 
+=head2 plugins_with_context_menu
+
+Returns a hash (reference) with the names of all plugins as
+keys which define a hook for the context menu.
+
+See L<Padre::Plugin>.
+
 =cut
 
 use Class::XSAccessor getters => {
-	parent     => 'parent',
-	plugin_dir => 'plugin_dir',
-	plugins    => 'plugins',
+	parent                    => 'parent',
+	plugin_dir                => 'plugin_dir',
+	plugins                   => 'plugins',
+	plugins_with_context_menu => 'plugins_with_context_menu',
 };
 
 # Get the prefered plugin order.
@@ -135,7 +142,7 @@ sub plugin_objects {
 # update padre's locale object to handle new plugin l10n.
 #
 sub relocale {
-	my ($self) = @_;
+	my $self   = shift;
 	my $locale = Padre::Current->main->{locale};
 
 	foreach my $plugin ( $self->plugin_objects ) {
@@ -144,17 +151,21 @@ sub relocale {
 		next unless $plugin->status eq 'enabled';
 
 		# add the plugin locale dir to search path
-		my $object    = $plugin->{object};
-		my $localedir = $object->plugin_locale_directory
-			if $object->can('plugin_locale_directory');
-		$locale->AddCatalogLookupPathPrefix($localedir)
-			if defined $localedir && -d $localedir;
+		my $object = $plugin->{object};
+		if ( $object->can('plugin_locale_directory') ) {
+			my $dir = $object->plugin_locale_directory;
+			if ( defined $dir and -d $dir ) {
+				$locale->AddCatalogLookupPathPrefix($dir);
+			}
+		}
 
 		# add the plugin catalog to the locale
 		my $name = $plugin->name;
 		my $code = Padre::Locale::rfc4646();
 		$locale->AddCatalog("$name-$code");
 	}
+
+	return 1;
 }
 
 #
@@ -165,17 +176,29 @@ sub relocale {
 sub reset_my_plugin {
 	my ( $self, $overwrite ) = @_;
 
-	# do not overwrite it unless stated so.
-	my $dst = catfile( $PADRE_PLUGIN_LIBDIR, 'My.pm' );
-	return if -e $dst && !$overwrite;
+	# Do not overwrite it unless stated so.
+	my $dst = File::Spec->catfile(
+		Padre::Constant::PLUGIN_LIB,
+		'My.pm'
+	);
+	if ( -e $dst and not $overwrite ) {
+		return;
+	}
 
-	# find the My Plugin
-	my $src = catfile( dirname( $INC{'Padre/Config.pm'} ), 'Plugin', 'My.pm' );
-	die "Could not find the original My plugin" unless -e $src;
+	# Find the My Plugin
+	my $src = File::Spec->catfile(
+		File::Basename::dirname( $INC{'Padre/Config.pm'} ),
+		'Plugin', 'My.pm',
+	);
+	unless ( -e $src ) {
+		Carp::croak("Could not find the original My plugin");
+	}
 
 	# copy the My Plugin
 	unlink $dst;
-	copy( $src, $dst ) or die "Could not copy the My plugin ($src) to $dst: $!";
+	unless ( File::Copy::copy( $src, $dst ) ) {
+		Carp::croak("Could not copy the My plugin ($src) to $dst: $!");
+	}
 	chmod( 0644, $dst );
 }
 
@@ -277,7 +300,7 @@ sub _load_plugins_from_inc {
 	my @dirs = grep { -d $_ } map { File::Spec->catdir( $_, 'Padre', 'Plugin' ) } @INC;
 
 	require File::Find::Rule;
-	my @files = File::Find::Rule->file->name('*.pm')->maxdepth(1)->in(@dirs);
+	my @files = File::Find::Rule->name('*.pm')->file->maxdepth(1)->in(@dirs);
 	foreach my $file (@files) {
 
 		# Full path filenames
@@ -392,7 +415,7 @@ sub _setup_par {
 	my $plugin_dir = $self->plugin_dir;
 	my $cache_dir = File::Spec->catdir( $plugin_dir, 'cache' );
 	$ENV{PAR_GLOBAL_TEMP} = $cache_dir;
-	File::Path::mkpath($cache_dir) if not -e $cache_dir;
+	File::Path::make_path($cache_dir) unless -e $cache_dir;
 	$ENV{PAR_TEMP} = $cache_dir;
 
 	$self->{par_loaded} = 1;
@@ -464,34 +487,6 @@ sub _load_plugin {
 			sprintf(
 				Wx::gettext(
 					"Plugin:%s - Not compatible with Padre::Plugin API. " . "Need to be subclass of Padre::Plugin"
-				),
-				$name,
-			)
-		);
-		$plugin->status('error');
-		return;
-	}
-
-	# Does the plugin have new method?
-	# TODO: do we need to check this? After all Padre::Plugin has a new method..
-	unless ( $module->can('new') ) {
-		$plugin->errstr(
-			sprintf(
-				Wx::gettext( "Plugin:%s - Not compatible with Padre::Plugin API. " . "Plugin cannot be instantiated" ),
-				$name,
-			)
-		);
-		$plugin->status('error');
-		return;
-	}
-
-	# This will not check anything as padre_interfaces is defined in Padre::Plugin
-	# TODO: do we need to check this? After all Padre::Plugin has a padre_interfaces method..
-	unless ( $module->can('padre_interfaces') ) {
-		$plugin->errstr(
-			sprintf(
-				Wx::gettext(
-					"Plugin:%s - Not compatible with Padre::Plugin API. " . "Need to have sub padre_interfaces"
 				),
 				$name,
 			)
@@ -676,7 +671,7 @@ sub plugin_db {
 	unless ( defined $param ) {
 		my ($package) = caller();
 		unless ( $package =~ /^Padre::Plugin::/ ) {
-			croak("Cannot infer the name of the plugin for which the configuration has been requested");
+			Carp::croak("Cannot infer the name of the plugin for which the configuration has been requested");
 		}
 		$param = $package;
 	}
@@ -792,9 +787,11 @@ sub reload_current_plugin {
 	# TODO: locate project
 	my $dir = Padre::Util::get_project_dir($filename);
 	return $main->error( Wx::gettext('Could not locate project dir') ) if not $dir;
-	$dir = File::Spec->catdir( $dir, 'lib' );    # TODO shall we relax the assumption of a lib subdir?
 
+	# TODO shall we relax the assumption of a lib subdir?
+	$dir = File::Spec->catdir( $dir, 'lib' );
 	@INC = ( $dir, grep { $_ ne $dir } @INC );
+
 	my ($plugin_filename) = glob File::Spec->catdir( $dir, 'Padre', 'Plugin', '*.pm' );
 
 	# Load plugin
@@ -817,6 +814,31 @@ sub reload_current_plugin {
 	}
 
 	return;
+}
+
+=pod
+
+=head2 on_context_menu
+
+Called by C<Padre::Wx::Editor> when a context menu is about to
+be displayed. The method calls the context menu hooks in all plugins
+that have one for plugin-specific manipulation of the context menu.
+
+=cut
+
+sub on_context_menu {
+	my $self    = shift;
+	my $plugins = $self->plugins_with_context_menu;
+	return if not keys %$plugins;
+
+	my ( $doc, $editor, $menu, $event ) = @_;
+
+	my $plugin_handles = $self->plugins;
+	foreach my $plugin_name ( keys %$plugins ) {
+		my $plugin = $plugin_handles->{$plugin_name}->object;
+		$plugin->event_on_context_menu( $doc, $editor, $menu, $event );
+	}
+	return ();
 }
 
 # TODO: document this.
@@ -901,10 +923,10 @@ sub _plugin {
 	if ( _INSTANCE( $it, 'Padre::PluginHandle' ) ) {
 		my $current = $self->{plugins}->{ $it->name };
 		unless ( defined $current ) {
-			croak("Unknown plugin '$it' provided to PluginManager");
+			Carp::croak("Unknown plugin '$it' provided to PluginManager");
 		}
 		unless ( Scalar::Util::refaddr($it) == Scalar::Util::refaddr($current) ) {
-			croak("Duplicate plugin '$it' provided to PluginManager");
+			Carp::croak("Duplicate plugin '$it' provided to PluginManager");
 		}
 		return $it;
 	}
@@ -915,11 +937,11 @@ sub _plugin {
 	}
 	if ( _IDENTIFIER($it) ) {
 		unless ( defined $self->{plugins}->{$it} ) {
-			croak("Plugin '$it' does not exist in PluginManager");
+			Carp::croak("Plugin '$it' does not exist in PluginManager");
 		}
 		return $self->{plugins}->{$it};
 	}
-	croak("Missing or invalid plugin provided to Padre::PluginManager");
+	Carp::croak("Missing or invalid plugin provided to Padre::PluginManager");
 }
 
 1;

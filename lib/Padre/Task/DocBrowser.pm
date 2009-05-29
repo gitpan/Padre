@@ -2,17 +2,17 @@ package Padre::Task::DocBrowser;
 
 use strict;
 use warnings;
-use Padre::DocBrowser;
 use threads;
+use Padre::Task ();
 
-use base 'Padre::Task';
-
-our $VERSION = '0.35';
+our $VERSION = '0.36';
+our @ISA     = 'Padre::Task';
 
 sub run {
 	my ($self) = @_;
 
-	$self->{browser} ||= Padre::DocBrowser->new();
+	require Padre::DocBrowser;
+	$self->{browser} ||= Padre::DocBrowser->new;
 	my $type = $self->{type} || 'error';
 	if ( $type eq 'error' ) {
 		return "BREAK";
@@ -21,7 +21,10 @@ sub run {
 		return "BREAK";
 	}
 
-	my $result = $self->{browser}->$type( $self->{document} );
+	my $result = $self->{browser}->$type(
+		$self->{document},
+		$self->{args}
+	);
 	$self->{result} = $result;
 
 	return 1;

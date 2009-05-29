@@ -34,7 +34,7 @@ use Carp ();
 use Params::Util qw{ _INSTANCE };
 use Padre::Wx ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Wx::App';
 
 #####################################################################
@@ -54,6 +54,7 @@ sub new {
 	$self->{ide} = $ide;
 
 	# Immediately populate the main window
+	require Padre::Wx::Main;
 	$self->{main} = Padre::Wx::Main->new($ide);
 
 	return $self;

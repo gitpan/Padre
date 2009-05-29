@@ -5,12 +5,11 @@ package Padre::Project;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec             ();
-use YAML::Tiny             ();
-use Padre::Config          ();
-use Padre::Config::Project ();
+use File::Spec    ();
+use YAML::Tiny    ();
+use Padre::Config ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 use Class::XSAccessor getters => {
 	root      => 'root',
@@ -75,6 +74,7 @@ sub config {
 
 		# If we have a padre.yml file create a custom config object
 		if ( $self->{padre_yml} ) {
+			require Padre::Config::Project;
 			$self->{config} = Padre::Config->new(
 				$config->host,
 				$config->human,

@@ -1,14 +1,5 @@
 package Padre::Task::Outline::Perl;
 
-use strict;
-use warnings;
-
-our $VERSION = '0.35';
-
-use base 'Padre::Task::Outline';
-
-use version;
-
 =pod
 
 =head1 NAME
@@ -39,6 +30,14 @@ It inherits from L<Padre::Task::Outline>.
 Please read its documentation!
 
 =cut
+
+use strict;
+use warnings;
+use version;
+use Padre::Task::Outline ();
+
+our $VERSION = '0.36';
+our @ISA     = 'Padre::Task::Outline';
 
 sub run {
 	my $self = shift;
@@ -81,7 +80,7 @@ sub _get_outline {
 				if ( not $cur_pkg->{name} ) {
 					$cur_pkg->{name} = 'main';
 				}
-				push @{$outline}, $cur_pkg;
+				push @$outline, $cur_pkg;
 				$cur_pkg = {};
 			}
 			$not_first_one   = 1;
@@ -196,6 +195,7 @@ sub _on_tree_item_right_click {
 			sub {
 
 				# TODO Fix this wasting of objects (cf. Padre::Wx::Menu::Help)
+				require Padre::Wx::DocBrowser;
 				my $help = Padre::Wx::DocBrowser->new;
 				$help->help( $itemData->{name} );
 				$help->SetFocus;
@@ -301,6 +301,8 @@ sub _add_subtree {
 1;
 
 __END__
+
+=pod
 
 =head1 SEE ALSO
 

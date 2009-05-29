@@ -13,9 +13,9 @@ functions that aren't really Padre-specific that we want to throw
 somewhere it won't clog up task-specific packages.
 
 All functions are exportable and documented for maintenance purposes,
-but except for in the Padre core distribution you are discouraged in
-the strongest possible terms for relying on these functions, as they
-may be moved, removed or changed at any time without notice.
+but except for in the Padre core distribution you are discouraged in the
+strongest possible terms for relying on these functions, as they may be
+moved, removed or changed at any time without notice.
 
 =head1 FUNCTIONS
 
@@ -32,8 +32,8 @@ use File::Basename ();
 use Carp           ();
 use POSIX          ();
 
-our $VERSION = '0.35';
-use base 'Exporter';
+our $VERSION   = '0.36';
+our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches _T);
 
 #####################################################################
@@ -65,11 +65,12 @@ use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAC' : 'UNIX';
 
 =head2 newline_type
 
-  my $type = newline_type( $string );
+    my $type = newline_type( $string );
 
 Returns None if there was not CR or LF in the file.
 
-Returns UNIX, Mac or Windows if only the appropriate newlines were found.
+Returns UNIX, Mac or Windows if only the appropriate newlines
+were found.
 
 Returns Mixed if line endings are mixed.
 
@@ -97,17 +98,17 @@ sub newline_type {
 
 =head2 get_matches
 
-Paramters:
+Parameters:
 
 * The text in which we need to search
 
 * The regular expression
 
-* The offset within the text where we the last match started
-  so the next forward match must start after this.
+* The offset within the text where we the last match started so the next
+  forward match must start after this.
 
-* The offset within the text where we the last match ended
-  so the next backward match must end before this.
+* The offset within the text where we the last match ended so the next
+  backward match must end before this.
 
 * backward bit (1 = search backward, 0 = search forward)
 
@@ -121,7 +122,6 @@ sub get_matches {
 	$text = Encode::encode( 'utf-8', $text );
 
 	my @matches;
-
 	while ( $text =~ /$regex/g ) {
 		my $e = pos($text);
 		my $s = $e - length($&);
@@ -153,14 +153,13 @@ sub get_matches {
 
 This is the shorthand of Wx::gettext('some text to translate')
 
-Specifically to be used for strings that you want to
-delay translation until later, so that the translation
-tools can find it.
+Specifically to be used for strings that you want to delay translation
+until later, so that the translation tools can find it.
 
 =cut
 
 sub _T {
-	shift;
+	Wx::gettext(shift);
 }
 
 #####################################################################
@@ -180,8 +179,7 @@ sub svn_directory_revision {
 	my $buffer = <$fh>;
 	close($fh);
 
-	# Find the first number after the first occuranc
-	# of "dir".
+	# Find the first number after the first occurance of "dir".
 	unless ( $buffer =~ /\bdir\b\s+(\d+)/m ) {
 		return undef;
 	}
@@ -240,10 +238,9 @@ sub find_perldiag_translations {
 
 =head2 get_project_dir
 
-Given a file it will try to locate the root directory 
-of the given project. This is a temporary work around till
-we get full project support but it is used by some (SVK)
-plugins.
+Given a file it will try to locate the root directory of the given
+project. This is a temporary work around till we get full project
+support but it is used by some (SVK) plugins.
 
 
 =cut
@@ -272,7 +269,7 @@ sub get_project_dir {
 	return;
 }
 
-{
+SCOPE: {
 	my $logging;
 	my $trace;
 
@@ -293,43 +290,26 @@ sub get_project_dir {
 			print STDERR Carp::longmess();
 		} else {
 			my ( $package, $filename, $line ) = caller;
-
-			#$filename =~ s{.*/Padre/}{Padre/};
 			print STDERR "           in line $line of $filename\n";
 		}
 	}
 }
 
-package Px;
-
-use constant {
-	PADRE_BLACK    => 0,
-	PADRE_BLUE     => 1,
-	PADRE_RED      => 2,
-	PADRE_GREEN    => 3,
-	PADRE_MAGENTA  => 4,
-	PADRE_ORANGE   => 5,
-	PADRE_DIM_GRAY => 6,
-	PADRE_CRIMSON  => 7,
-	PADRE_BROWN    => 8,
-};
-
 1;
+
+__END__
 
 =pod
 
-=head1 SUPPORT
-
-See the support section of the main L<Padre> module.
-
-=head1 COPYRIGHT
+=head1 COPYRIGHT & LICENSE
 
 Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 
-=head1 LICENSE
+This program is free software; you can redistribute
+it and/or modify it under the same terms as Perl itself.
 
-This program is free software; you can redistribute it and/or
-modify it under the same terms as Perl 5 itself.
+The full text of the license can be found in the
+LICENSE file included with this module.
 
 =cut
 

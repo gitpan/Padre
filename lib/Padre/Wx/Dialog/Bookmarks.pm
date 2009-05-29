@@ -2,11 +2,11 @@ package Padre::Wx::Dialog::Bookmarks;
 
 use strict;
 use warnings;
-use Padre::DB ();
-use Padre::Wx ();
-use Padre::Wx::Dialog;
+use Padre::DB         ();
+use Padre::Wx         ();
+use Padre::Wx::Dialog ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 # TODO - Don't store run-time data in package lexicals
@@ -160,7 +160,6 @@ sub goto_bookmark {
 	$dialog->show_modal or return;
 
 	# Find the bookmark they selected
-	$DB::single = 1;
 	my $treebook  = $dialog->{_widgets_}->{tb};
 	my $selection = $treebook->GetSelection;
 	my $name      = $treebook->GetPageText($selection);
@@ -197,7 +196,6 @@ sub goto_bookmark {
 }
 
 sub on_delete_bookmark {
-	$DB::single = 1;
 	my $dialog = shift;
 
 	# Locate the selected bookmark
@@ -218,7 +216,6 @@ sub on_delete_bookmark {
 }
 
 sub on_delete_all_bookmark {
-	$DB::single = 1;
 	my $dialog = shift;
 
 	# Delete everything from the database

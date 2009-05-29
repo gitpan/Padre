@@ -14,12 +14,13 @@ use File::Spec ();
 use Wx ':everything';
 use Wx 'wxTheClipboard';
 use Wx::Event ':everything';
+use Wx::DND     ();
 use Wx::STC     ();
 use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 
 #####################################################################
 # Defines for sidebar marker; others may be needed for breakpoint
@@ -55,12 +56,37 @@ sub color {
 	return Wx::Colour->new(@c);
 }
 
+#####################################################################
+# External Website Integration
+
 # Fire and forget background version of Wx::LaunchDefaultBrowser
 sub LaunchDefaultBrowser {
+	warn("Padre::Wx::LaunchDefaultBrowser is deprecated. Use launch_browser");
+	launch_browser(@_);
+}
+
+sub launch_browser {
 	require Padre::Task::LaunchDefaultBrowser;
 	Padre::Task::LaunchDefaultBrowser->new(
 		url => $_[0],
 	)->schedule;
+}
+
+# Launch a Mibbit.com "Live Support" window
+sub launch_irc {
+	my $server  = shift;
+	my $channel = shift;
+
+	# Generate the (long) chat URL
+	my $url = 'http://widget.mibbit.com/?settings=1c154d53c72ad8cfdfab3caa051b30a2';
+	$url .= '&server=' . $server;
+	$url .= '&channel=%23' . $channel;
+	$url .= '&noServerTab=false&noServerNotices=true&noServerMotd=true&autoConnect=true';
+
+	# Spawn a browser to show it
+	LaunchDefaultBrowser($url);
+
+	return;
 }
 
 1;

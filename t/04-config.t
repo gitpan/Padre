@@ -8,7 +8,7 @@ BEGIN {
 }
 my $config_options;
 BEGIN {
-	$config_options = 60;
+	$config_options = 61;
 }
 
 # Move of Debug to Run Menu
@@ -16,15 +16,14 @@ use Test::More tests => 6 + $config_options * 2 + 10 + 1;
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
 use File::Temp ();
-
 BEGIN {
 	$ENV{PADRE_HOME} = File::Temp::tempdir( CLEANUP => 1 );
 }
-use Padre::Config ();
-use Padre::Config::Constants qw{ $CONFIG_FILE_USER };
+use Padre::Constant ();
+use Padre::Config   ();
 
 # Create the empty config file
-my $empty = $CONFIG_FILE_USER;
+my $empty = Padre::Constant::CONFIG_HUMAN;
 open( FILE, '>', $empty ) or die "Failed to open $empty";
 print FILE "--- {}\n";
 close( FILE );

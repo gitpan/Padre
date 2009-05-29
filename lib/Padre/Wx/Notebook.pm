@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Wx::AuiNotebook';
 
 ######################################################################
@@ -63,7 +63,7 @@ sub show_file {
 		my $editor   = $self->GetPage($i)  or next;
 		my $document = $editor->{Document} or next;
 		my $filename = $document->filename;
-		if ( defined $file and $file eq $filename ) {
+		if ( defined $filename and $file eq $filename ) {
 			$self->SetSelection($i);
 			return 1;
 		}
@@ -80,15 +80,17 @@ sub on_auinotebook_page_changed {
 	my $editor = $main->current->editor;
 	if ($editor) {
 		my $history = $main->{page_history};
-		@$history = grep { Scalar::Util::refaddr($_) ne Scalar::Util::refaddr($editor) } @$history;
-		push @$history, $editor;
+		my $current = Scalar::Util::refaddr($editor);
+		@$history = grep { $_ != $current } @$history;
+		push @$history, $current;
 
 		# Update indentation in case auto-update is on
-		# TODO: encapsulation?
+		# TODO: Violates encapsulation
 		$editor->{Document}->set_indentation_style;
 
 		# make sure the outline is refreshed for the new doc
-		if ( defined $main->outline ) {
+		# TODO: Violates encapsulation
+		if ( $main->has_outline ) {
 			$main->outline->clear;
 			$main->outline->force_next(1);
 		}

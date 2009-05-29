@@ -12,7 +12,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.87'
+generated_by: 'Module::Install version 0.86'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -30,10 +30,9 @@ requires:
   App::Ack: 1.86
   Carp: 0
   Class::Adapter: 1.05
-  Class::Autouse: 1.26
   Class::Unload: 0.03
-  Class::XSAccessor: 0.14
-  Class::XSAccessor::Array: 0.14
+  Class::XSAccessor: 1.02
+  Class::XSAccessor::Array: 1.02
   Cwd: 3.2701
   DBD::SQLite: 1.10
   DBI: 1.58
@@ -44,7 +43,9 @@ requires:
   File::Basename: 0
   File::Copy::Recursive: 0.37
   File::Find::Rule: 0.30
+  File::Glob: 0
   File::HomeDir: 0.84
+  File::Path: 2.07
   File::ShareDir: 1.00
   File::ShareDir::PAR: 0.04
   File::Spec: 3.2701
@@ -59,6 +60,7 @@ requires:
   IO::String: 1.08
   IPC::Cmd: 0.42
   IPC::Open3: 0
+  List::MoreUtils: 0.22
   List::Util: 1.18
   Module::Inspector: 0.04
   Module::Refresh: 0.13
@@ -70,6 +72,7 @@ requires:
   PPI: 1.203
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
+  Pod::Abstract: 0.16
   Pod::POM: 0.17
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
@@ -81,7 +84,7 @@ requires:
   Text::FindIndent: 0.03
   Thread::Queue: 2.11
   URI: 0
-  Wx: 0.89
+  Wx: 0.91
   Wx::Perl::ProcessStream: 0.11
   YAML::Tiny: 1.32
   perl: 5.008005
@@ -92,4 +95,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.35
+version: 0.36

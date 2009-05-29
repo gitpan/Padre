@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.35';
+our $VERSION = '0.36';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -66,7 +66,8 @@ sub new {
 			Wx::gettext("Select all\tCtrl-A")
 		),
 		sub {
-			\&Padre::Wx::Editor::text_select_all(@_);
+			require Padre::Wx::Editor;
+			Padre::Wx::Editor::text_select_all(@_);
 		},
 	);
 
@@ -101,22 +102,13 @@ sub new {
 			-1,
 			Wx::gettext("Clear selection marks")
 		),
-		\&Padre::Wx::Editor::text_selection_clear_marks,
+		sub {
+			require Padre::Wx::Editor;
+			Padre::Wx::Editor::text_selection_clear_marks(@_);
+		},
 	);
 
 	# Cut and Paste
-	$self->{copy} = $self->Append(
-		Wx::wxID_COPY,
-		Wx::gettext("&Copy\tCtrl-C")
-	);
-	Wx::Event::EVT_MENU(
-		$main,
-		$self->{copy},
-		sub {
-			Padre::Current->editor->Copy;
-		}
-	);
-
 	$self->{cut} = $self->Append(
 		Wx::wxID_CUT,
 		Wx::gettext("Cu&t\tCtrl-X")
@@ -125,7 +117,21 @@ sub new {
 		$main,
 		$self->{cut},
 		sub {
-			Padre::Current->editor->Cut;
+			my $editor = Padre::Current->editor or return;
+			$editor->Cut;
+		}
+	);
+
+	$self->{copy} = $self->Append(
+		Wx::wxID_COPY,
+		Wx::gettext("&Copy\tCtrl-C")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{copy},
+		sub {
+			my $editor = Padre::Current->editor or return;
+			$editor->Copy;
 		}
 	);
 
@@ -152,7 +158,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{goto},
-		\&Padre::Wx::Main::on_goto,
+		sub {
+			Padre::Wx::Main::on_goto(@_);
+		},
 	);
 
 	$self->{autocomp} = $self->Append(
@@ -162,7 +170,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{autocomp},
-		\&Padre::Wx::Main::on_autocompletition,
+		sub {
+			Padre::Wx::Main::on_autocompletition(@_);
+		},
 	);
 
 	$self->{brace_match} = $self->Append(
@@ -172,7 +182,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{brace_match},
-		\&Padre::Wx::Main::on_brace_matching,
+		sub {
+			Padre::Wx::Main::on_brace_matching(@_);
+		},
 	);
 
 	$self->{join_lines} = $self->Append(
@@ -182,7 +194,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{join_lines},
-		\&Padre::Wx::Main::on_join_lines,
+		sub {
+			Padre::Wx::Main::on_join_lines(@_);
+		},
 	);
 
 	$self->{snippets} = $self->Append(
@@ -193,6 +207,7 @@ sub new {
 		$main,
 		$self->{snippets},
 		sub {
+			require Padre::Wx::Dialog::Snippets;
 			Padre::Wx::Dialog::Snippets->snippets(@_);
 		},
 	);
@@ -207,7 +222,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{comment_toggle},
-		\&Padre::Wx::Main::on_comment_toggle_block,
+		sub {
+			Padre::Wx::Main::on_comment_toggle_block(@_);
+		},
 	);
 
 	$self->{comment_out} = $self->Append(
@@ -217,7 +234,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{comment_out},
-		\&Padre::Wx::Main::on_comment_out_block,
+		sub {
+			Padre::Wx::Main::on_comment_out_block(@_);
+		},
 	);
 
 	$self->{uncomment} = $self->Append(
@@ -227,9 +246,55 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{uncomment},
-		\&Padre::Wx::Main::on_uncomment_block,
+		sub {
+			Padre::Wx::Main::on_uncomment_block(@_);
+		},
 	);
 	$self->AppendSeparator;
+
+	# Conversions and Transforms
+	$self->{convert_nl} = Wx::Menu->new;
+	$self->Append(
+		-1,
+		Wx::gettext("Convert Encoding"),
+		$self->{convert_nl}
+	);
+
+	$self->{convert_nl_windows} = $self->{convert_nl}->Append(
+		-1,
+		Wx::gettext("EOL to Windows")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{convert_nl_windows},
+		sub {
+			$_[0]->convert_to("WIN");
+		},
+	);
+
+	$self->{convert_nl_unix} = $self->{convert_nl}->Append(
+		-1,
+		Wx::gettext("EOL to Unix")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{convert_nl_unix},
+		sub {
+			$_[0]->convert_to("UNIX");
+		},
+	);
+
+	$self->{convert_nl_mac} = $self->{convert_nl}->Append(
+		-1,
+		Wx::gettext("EOL to Mac Classic")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{convert_nl_mac},
+		sub {
+			$_[0]->convert_to("MAC");
+		},
+	);
 
 	# Tabs And Spaces
 	$self->{tabs} = Wx::Menu->new;
@@ -273,7 +338,6 @@ sub new {
 		$main,
 		$self->{delete_trailing},
 		sub {
-			$DB::single = $DB::single = 1;    # stupdily duplicated to avoid warning
 			$_[0]->on_delete_ending_space;
 		},
 	);
@@ -332,7 +396,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{diff},
-		\&Padre::Wx::Main::on_diff,
+		sub {
+			Padre::Wx::Main::on_diff(@_);
+		},
 	);
 
 	$self->{insert_from_file} = $self->Append(
@@ -342,7 +408,9 @@ sub new {
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->{insert_from_file},
-		\&Padre::Wx::Main::on_insert_from_file,
+		sub {
+			Padre::Wx::Main::on_insert_from_file(@_);
+		},
 	);
 
 	$self->AppendSeparator;
@@ -354,7 +422,9 @@ sub new {
 			-1,
 			Wx::gettext("Preferences")
 		),
-		\&Padre::Wx::Main::on_preferences,
+		sub {
+			Padre::Wx::Main::on_preferences(@_);
+		},
 	);
 
 	return $self;
@@ -363,35 +433,44 @@ sub new {
 sub refresh {
 	my $self     = shift;
 	my $current  = _CURRENT(@_);
-	my $document = $current->document;
 	my $editor   = $current->editor || 0;
 	my $text     = $current->text;
+	my $document = $current->document;
+	my $hasdoc   = $document ? 1 : 0;
+	my $newline  = $hasdoc ? $document->get_newline_type : '';
 
 	# Handle the simple cases
-	my $doc = $document ? 1 : 0;
-	$self->{goto}->Enable($doc);
-	$self->{autocomp}->Enable($doc);
-	$self->{brace_match}->Enable($doc);
-	$self->{join_lines}->Enable($doc);
-	$self->{snippets}->Enable($doc);
-	$self->{comment_out}->Enable($doc);
-	$self->{uncomment}->Enable($doc);
-	$self->{diff}->Enable($doc);
-	$self->{insert_from_file}->Enable($doc);
-	$self->{case_upper}->Enable($doc);
-	$self->{case_lower}->Enable($doc);
-	$self->{tabs_to_spaces}->Enable($doc);
-	$self->{spaces_to_tabs}->Enable($doc);
-	$self->{delete_leading}->Enable($doc);
-	$self->{delete_trailing}->Enable($doc);
+	$self->{goto}->Enable($hasdoc);
+	$self->{autocomp}->Enable($hasdoc);
+	$self->{brace_match}->Enable($hasdoc);
+	$self->{join_lines}->Enable($hasdoc);
+	$self->{snippets}->Enable($hasdoc);
+	$self->{comment_out}->Enable($hasdoc);
+	$self->{uncomment}->Enable($hasdoc);
+	$self->{diff}->Enable($hasdoc);
+	$self->{insert_from_file}->Enable($hasdoc);
+	$self->{case_upper}->Enable($hasdoc);
+	$self->{case_lower}->Enable($hasdoc);
+
+	unless ( $newline eq 'WIN' ) {
+		$self->{convert_nl_windows}->Enable($hasdoc);
+	}
+	unless ( $newline eq 'UNIX' ) {
+		$self->{convert_nl_unix}->Enable($hasdoc);
+	}
+	unless ( $newline eq 'MAC' ) {
+		$self->{convert_nl_mac}->Enable($hasdoc);
+	}
+	$self->{tabs_to_spaces}->Enable($hasdoc);
+	$self->{spaces_to_tabs}->Enable($hasdoc);
+	$self->{delete_leading}->Enable($hasdoc);
+	$self->{delete_trailing}->Enable($hasdoc);
 
 	# Handle the complex cases
 	my $selection = !!( defined $text and $text ne '' );
 	$self->{undo}->Enable( $editor and $editor->CanUndo );
 	$self->{redo}->Enable( $editor and $editor->CanRedo );
-	$self->{cut}->Enable($selection);
-	$self->{copy}->Enable($selection);
-	$self->{paste}->Enable( $editor and $editor->CanPaste );
+	$self->{paste}->Enable($editor);
 
 	return 1;
 }

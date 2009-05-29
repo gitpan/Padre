@@ -44,11 +44,11 @@ Display a text entry dialog
 use 5.008;
 use strict;
 use warnings;
+use Exporter   ();
+use File::Spec ();
 
-use base 'Exporter';
-use File::Spec;
-
-our $VERSION = '0.35';
+our $VERSION = '0.36';
+our @ISA     = 'Exporter';
 
 $| = 1;
 
