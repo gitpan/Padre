@@ -2,7 +2,7 @@ package Padre::Task::PPI::LexicalReplaceVariable;
 use strict;
 use warnings;
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use base 'Padre::Task::PPI';
 use Padre::Wx ();
@@ -188,7 +188,7 @@ sub finish {
 		}
 		Wx::MessageBox(
 			$text,
-			Wx::gettext("Check Canceled"),
+			Wx::gettext("Replace Operation Canceled"),
 			Wx::wxOK,
 			Padre->ide->wx->main
 		);

@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use base 'Padre::Task::PPI';
 
@@ -16,7 +16,7 @@ Padre::Task::PPI::FindVariableDeclaration - Finds where a variable was declared 
 
 =head1 SYNOPSIS
 
-  # finds declaration of varibable at cursor
+  # finds declaration of variable at cursor
   my $declfinder = Padre::Task::PPI::FindVariableDeclaration->new(
           document => $document_obj,
           location => [$line, $column], # ppi-style location is okay, too
@@ -43,7 +43,7 @@ sub prepare {
 	delete $self->{document};
 	if ( not defined $mto->{document} ) {
 		require Carp;
-		Carp::croak("Missing Padre::Document::Perl object as {document} attribute of the brace-finder task");
+		Carp::croak("Missing Padre::Document::Perl object as {document} attribute of the FindVariableDeclaration task");
 	}
 
 	if ( not defined $self->{location} ) {
@@ -94,7 +94,7 @@ sub finish {
 		}
 		Wx::MessageBox(
 			$text,
-			Wx::gettext("Check Canceled"),
+			Wx::gettext("Search Canceled"),
 			Wx::wxOK,
 			Padre->ide->wx->main
 		);

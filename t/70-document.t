@@ -12,7 +12,7 @@ BEGIN {
 }
 
 use Test::NoWarnings;
-use File::Spec  ();
+use File::Spec ();
 use t::lib::Padre;
 use t::lib::Padre::Editor;
 
@@ -66,11 +66,11 @@ SCOPE: {
 my %mimes;
 BEGIN {
 	%mimes = ( 
-		'eg/hello_world.pl'                => 'application/x-perl',
-		'eg/perl5.pod'                     => 'application/x-perl',
-		'eg/perl5_with_perl6_example.pod'  => 'application/x-perl',
-		'eg/perl6.pod'                     => 'application/x-perl6',
-		'eg/Perl6Class.pm'                 => 'application/x-perl6',
+		'eg/perl5/hello_world.pl'                => 'application/x-perl',
+		'eg/perl5/perl5.pod'                     => 'application/x-perl',
+		'eg/perl5/perl5_with_perl6_example.pod'  => 'application/x-perl',
+		'eg/perl6/perl6.pod'                     => 'application/x-perl',
+		'eg/perl6/Perl6Class.pm'                 => 'application/x-perl',
 	);
 }
 

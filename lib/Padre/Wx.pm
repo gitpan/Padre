@@ -20,7 +20,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 #####################################################################
 # Defines for sidebar marker; others may be needed for breakpoint
@@ -84,7 +84,7 @@ sub launch_irc {
 	$url .= '&noServerTab=false&noServerNotices=true&noServerMotd=true&autoConnect=true';
 
 	# Spawn a browser to show it
-	LaunchDefaultBrowser($url);
+	launch_browser($url);
 
 	return;
 }

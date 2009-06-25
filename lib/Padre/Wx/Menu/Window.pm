@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -67,7 +67,7 @@ sub new {
 		$main,
 		$self->Append(
 			-1,
-			Wx::gettext("Last Visited File\tCtrl-6")
+			Wx::gettext("Last Visited File\tCtrl-Shift-P")
 		),
 		sub {
 			Padre::Wx::Main::on_last_visited_pane(@_);

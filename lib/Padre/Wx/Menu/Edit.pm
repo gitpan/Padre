@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -253,10 +253,53 @@ sub new {
 	$self->AppendSeparator;
 
 	# Conversions and Transforms
-	$self->{convert_nl} = Wx::Menu->new;
+	$self->{convert_encoding} = Wx::Menu->new;
 	$self->Append(
 		-1,
 		Wx::gettext("Convert Encoding"),
+		$self->{convert_encoding}
+	);
+
+	$self->{convert_encoding_system} = $self->{convert_encoding}->Append(
+		-1,
+		Wx::gettext('Encode document to System Default')
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{convert_encoding_system},
+		sub {
+			Padre::Wx::Main::encode_document_to_system_default(@_);
+		},
+	);
+
+	$self->{convert_encoding_utf8} = $self->{convert_encoding}->Append(
+		-1,
+		Wx::gettext('Encode document to utf-8')
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{convert_encoding_utf8},
+		sub {
+			Padre::Wx::Main::encode_document_to_utf8(@_);
+		},
+	);
+
+	$self->{convert_encoding_to} = $self->{convert_encoding}->Append(
+		-1,
+		Wx::gettext('Encode document to...')
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{convert_encoding_to},
+		sub {
+			Padre::Wx::Main::encode_document_to(@_);
+		},
+	);
+
+	$self->{convert_nl} = Wx::Menu->new;
+	$self->Append(
+		-1,
+		Wx::gettext("Convert EOL"),
 		$self->{convert_nl}
 	);
 
@@ -388,18 +431,50 @@ sub new {
 
 	$self->AppendSeparator;
 
-	# Diff
-	$self->{diff} = $self->Append(
+	# Diff tools
+	$self->{diff} = Wx::Menu->new;
+	$self->Append(
 		-1,
-		Wx::gettext("Diff")
+		Wx::gettext("Diff Tools"),
+		$self->{diff},
+	);
+
+	$self->{diff2saved} = $self->{diff}->Append(
+		-1,
+		Wx::gettext("Diff to Saved Version")
 	);
 	Wx::Event::EVT_MENU(
 		$main,
-		$self->{diff},
+		$self->{diff2saved},
 		sub {
 			Padre::Wx::Main::on_diff(@_);
 		},
 	);
+	$self->{diff}->AppendSeparator;
+	$self->{applydiff2file} = $self->{diff}->Append(
+		-1,
+		Wx::gettext("Apply Diff to File")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{applydiff2file},
+		sub {
+			Padre::Wx::Main::on_diff(@_);
+		},
+	);
+	$self->{applydiff2project} = $self->{diff}->Append(
+		-1,
+		Wx::gettext("Apply Diff to Project")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{applydiff2project},
+		sub {
+			Padre::Wx::Main::on_diff(@_);
+		},
+	);
+	
+	
 
 	$self->{insert_from_file} = $self->Append(
 		-1,
@@ -445,9 +520,12 @@ sub refresh {
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{join_lines}->Enable($hasdoc);
 	$self->{snippets}->Enable($hasdoc);
+	$self->{comment_toggle}->Enable($hasdoc);
 	$self->{comment_out}->Enable($hasdoc);
 	$self->{uncomment}->Enable($hasdoc);
-	$self->{diff}->Enable($hasdoc);
+	$self->{diff2saved}->Enable($hasdoc);
+	$self->{applydiff2file}->Enable(0);
+	$self->{applydiff2project}->Enable(0);
 	$self->{insert_from_file}->Enable($hasdoc);
 	$self->{case_upper}->Enable($hasdoc);
 	$self->{case_lower}->Enable($hasdoc);
@@ -474,6 +552,8 @@ sub refresh {
 
 	return 1;
 }
+
+
 
 1;
 

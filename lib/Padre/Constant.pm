@@ -10,7 +10,28 @@ use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
+
+# Convenience constants for the operating system
+use constant WIN32 => !! ( $^O eq 'MSWin32' );
+use constant MAC   => !! ( $^O eq 'darwin'  );
+use constant UNIX  => !  ( WIN32 or MAC     );
+
+# Padre targets the three largest Wx backends
+# 1. Win32 Native
+# 2. Mac OS X Native
+# 3. Unix GTK
+# The following defined reusable constants for these platforms,
+# suitable for use in Wx platform-specific adaptation code.
+# Currently (and a bit naively) we align these to the platforms.
+use constant {
+	WXWIN32 => WIN32,
+	WXMAC   => MAC,
+	WXGTK   => UNIX,
+};
+
+# The local newline type
+use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAC' : 'UNIX';
 
 # Setting Types (based on Firefox types)
 use constant {
@@ -28,17 +49,19 @@ use constant {
 	PROJECT => 2,
 };
 
-# Syntax Highlighter Colours
+# Syntax Highlighter Colours.
+# Note: It's not clear why these need "PADRE_" in the name,
+# but they do.
 use constant {
-	BLACK    => 0,
-	BLUE     => 1,
-	RED      => 2,
-	GREEN    => 3,
-	MAGENTA  => 4,
-	ORANGE   => 5,
-	DIM_GRAY => 6,
-	CRIMSON  => 7,
-	BROWN    => 8,
+	PADRE_BLACK    => 0,
+	PADRE_BLUE     => 1,
+	PADRE_RED      => 2,
+	PADRE_GREEN    => 3,
+	PADRE_MAGENTA  => 4,
+	PADRE_ORANGE   => 5,
+	PADRE_DIM_GRAY => 6,
+	PADRE_CRIMSON  => 7,
+	PADRE_BROWN    => 8,
 };
 
 # Files and Directories
@@ -58,10 +81,10 @@ use constant PLUGIN_DIR => File::Spec->catdir( CONFIG_DIR, 'plugins' );
 use constant PLUGIN_LIB => File::Spec->catdir( PLUGIN_DIR, 'Padre', 'Plugin' );
 
 # Check and create the directories that need to exist
-unless ( -e CONFIG_DIR or File::Path::make_path(CONFIG_DIR) ) {
+unless ( -e CONFIG_DIR or File::Path::mkpath(CONFIG_DIR) ) {
 	Carp::croak( "Cannot create config dir '" . CONFIG_DIR . "': $!" );
 }
-unless ( -e PLUGIN_LIB or File::Path::make_path(PLUGIN_LIB) ) {
+unless ( -e PLUGIN_LIB or File::Path::mkpath(PLUGIN_LIB) ) {
 	Carp::croak( "Cannot create plugins dir '" . PLUGIN_LIB . "': $!" );
 }
 

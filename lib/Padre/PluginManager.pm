@@ -35,7 +35,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 #####################################################################
 # Constructor and Accessors
@@ -415,7 +415,7 @@ sub _setup_par {
 	my $plugin_dir = $self->plugin_dir;
 	my $cache_dir = File::Spec->catdir( $plugin_dir, 'cache' );
 	$ENV{PAR_GLOBAL_TEMP} = $cache_dir;
-	File::Path::make_path($cache_dir) unless -e $cache_dir;
+	File::Path::mkpath($cache_dir) unless -e $cache_dir;
 	$ENV{PAR_TEMP} = $cache_dir;
 
 	$self->{par_loaded} = 1;
@@ -857,7 +857,7 @@ sub test_a_plugin {
 	my $dialog = Wx::FileDialog->new(
 		$main, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
 	);
-	unless (Padre::Util::WIN32) {
+	unless (Padre::Constant::WIN32) {
 		$dialog->SetWildcard("*");
 	}
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {

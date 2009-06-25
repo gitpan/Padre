@@ -65,11 +65,17 @@ and map them to existing mime-types or funtions. It is probably
 better to have a commonly used name along with the mime-type
 in that GUI instead of the mime-type only.
 
+I wonder if we should allow the users (and or plugin authors) to
+change the functions or to add new functions that will map
+file content to mime-type or if we should just tell them to 
+patch Padre. What if they need it for some internal project?
+
 A plugin is able to add new supported mime-types. Padre should
 either check for collisions if a plugin already wants to provide
 an already suported mime-type or should allow multiple support
-modules with a way to select the current one.
-
+modules with a way to select the current one. (Again I think we
+probably don't need this. People can just come and add the 
+mime-types to Padre core.)
 
 Each mime-type is mapped to one or more lexers that provide 
 the syntax highlighting. Every mime-type has to be mapped to at least 
@@ -77,14 +83,13 @@ one lexer but it can be mapped to several lexers as well.
 The user is able to select the lexer for each mime-type.
 (For this each lexer should have a reasonable name too.)
 
-mime-types are also mapped to modules that implement 
-special features needed by that kind of a file type.
+The mime-types are also mapped to modules that implement 
+special features needed by that kind of file.
 
 The user can change the mime-type mapping of individual 
 files and Padre should remember this choice and allow the
 user to change it to another specific mime-type
 or to set it to "Default by extension".
-
 
 =head1 METHODS
 
@@ -93,13 +98,14 @@ or to set it to "Default by extension".
 use 5.008;
 use strict;
 use warnings;
-use Carp        ();
-use File::Spec  ();
-use Padre::Util ();
-use Padre::Wx   ();
-use Padre       ();
+use Carp            ();
+use File::Spec      ();
+use Padre::Constant ();
+use Padre::Util     ();
+use Padre::Wx       ();
+use Padre           ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -117,7 +123,7 @@ our %EXT_BINARY = map { $_ => 1 } qw{
 };
 
 # This is the primary file extension to mime-type mapping
-our %EXT_MIME = (
+my %EXT_MIME = (
 	abc   => 'text/x-abc',
 	ada   => 'text/x-adasrc',
 	asm   => 'text/x-asm',
@@ -145,11 +151,11 @@ our %EXT_MIME = (
 	tcl   => 'application/x-tcl',
 	vbs   => 'text/vbscript',
 	patch => 'text/x-patch',
-	pl    => 'application/x-perl',
-	plx   => 'application/x-perl',
-	pm    => 'application/x-perl',
-	pod   => 'application/x-perl',
-	t     => 'application/x-perl',
+	pl    => \&perl_mime_type,
+	plx   => \&perl_mime_type,
+	pm    => \&perl_mime_type,
+	pod   => \&perl_mime_type,
+	t     => \&perl_mime_type,
 	conf  => 'text/plain',
 	sh    => 'application/x-shellscript',
 	ksh   => 'application/x-shellscript',
@@ -340,23 +346,15 @@ sub guess_mimetype {
 		return 'application/x-perl';
 	}
 
-	# Perl 6:   use v6; class ..., module ...
-	# maybe also grammar ...
-	# but make sure that is real code and not just a comment or doc in some perl 5 code...
-
-	# Try derive the mime type from the name
+	# Try derive the mime type from the file extension
 	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 		my $ext = lc $1;
 		if ( $EXT_MIME{$ext} ) {
-			if ( $EXT_MIME{$ext} eq 'application/x-perl' ) {
-
-				# Sometimes Perl 6 will look like Perl 5
-				# But only do this test if the Perl 6 plugin is enabled.
-				if ( $MIME_CLASS{'application/x-perl6'} and is_perl6($text) ) {
-					return 'application/x-perl6';
-				}
+			if (ref $EXT_MIME{$ext}) {
+				return $EXT_MIME{$ext}->();
+			} else {
+				return $EXT_MIME{$ext}
 			}
-			return $EXT_MIME{$ext};
 		}
 	}
 
@@ -369,12 +367,10 @@ sub guess_mimetype {
 	# Fall back on deriving the type from the content.
 	# Hardcode this for now for the cases that we care about and
 	# are obvious.
-	# TODO: Add support for plugins being able to do something here.
 	if ( $text and $text =~ /\A#!/m ) {
-
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
-			return is_perl6($text) ? 'application/x-perl6' : 'application/x-perl';
+			return $self->perl_mime_type;
 		}
 		if ( $text =~ /\A---/ ) {
 			return 'text/x-yaml';
@@ -385,6 +381,19 @@ sub guess_mimetype {
 	return '';
 }
 
+sub perl_mime_type {
+	my $self = shift;
+
+	my $text = $self->{original_content};
+	# Sometimes Perl 6 will look like Perl 5
+	# But only do this test if the Perl 6 plugin is enabled.
+	if ( $MIME_CLASS{'application/x-perl6'} and is_perl6($text) ) {
+		return 'application/x-perl6';
+	} else {
+		return 'application/x-perl';
+	}
+}
+
 sub mime_type_by_extension {
 	$EXT_MIME{ $_[1] };
 }
@@ -392,10 +401,13 @@ sub mime_type_by_extension {
 # For ts without a newline type
 # TODO: get it from config
 sub _get_default_newline_type {
-	Padre::Util::NEWLINE;
+	Padre::Constant::NEWLINE;
 }
 
 # naive sub to decide if a piece of code is Perl 6 or Perl 5.
+# Perl 6:   use v6; class ..., module ...
+# maybe also grammar ...
+# but make sure that is real code and not just a comment or doc in some perl 5 code...
 sub is_perl6 {
 	my ($text) = @_;
 	return if not $text;
@@ -415,7 +427,7 @@ sub is_perl6 {
 # mixed files
 # TODO get from config
 sub _mixed_newlines {
-	Padre::Util::NEWLINE;
+	Padre::Constant::NEWLINE;
 }
 
 # What to do with files that have inconsistent line endings:

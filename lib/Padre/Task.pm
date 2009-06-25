@@ -112,7 +112,7 @@ use IO::String   ();
 use Scalar::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 # TODO: Why are there require?
 require Padre;
@@ -512,6 +512,7 @@ sub post_event {
 		$Padre::TaskManager::_main,
 		Wx::PlThreadEvent->new( -1, $stuff[1], $stuff[2] ),
 	);
+	return();
 }
 
 1;

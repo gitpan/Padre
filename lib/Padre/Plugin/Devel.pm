@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Plugin';
 
 #####################################################################
@@ -62,11 +62,20 @@ sub menu_plugins_simple {
 		# TODO
 		# Should be checkbox but I am too lazy to turn the whole
 		# menu_plugins_simple into a menu_plugins
-		Wx::gettext('Enable logging')             => sub { set_logging(1); },
-		Wx::gettext('Disable logging')            => sub { set_logging(0); },
-		Wx::gettext('Enable trace when logging')  => sub { set_trace(1); },
-		Wx::gettext('Disable trace')              => sub { set_trace(0); },
+		Wx::gettext('Enable logging') => sub {
+			$self->set_logging(1);
+		},
+		Wx::gettext('Disable logging') => sub {
+			$self->set_logging(0);
+		},
+		Wx::gettext('Enable trace when logging') => sub {
+			$self->set_trace(1);
+		},
+		Wx::gettext('Disable trace') => sub {
+			$self->set_trace(0);
+		},
 		'---'                                     => undef,
+		Wx::gettext('Load All Padre Modules')     => 'load_everything',
 		Wx::gettext('Simulate Crash')             => 'simulate_crash',
 		Wx::gettext('Simulate Crashing Bg Task')  => 'simulate_task_crash',
 		'---'                                     => undef,
@@ -75,6 +84,9 @@ sub menu_plugins_simple {
 		},
 		Wx::gettext('STC Reference') => sub {
 			Padre::Wx::launch_browser('http://www.yellowbrain.com/stc/index.html');
+		},
+		Wx::gettext('wxPerl Live Support') => sub {
+			Padre::Wx::launch_irc('irc.perl.org' => 'wxperl');
 		},
 		'---'                => undef,
 		Wx::gettext('About') => 'show_about',
@@ -85,38 +97,43 @@ sub menu_plugins_simple {
 # Plugin Methods
 
 sub set_logging {
-	my ($on) = @_;
+	my $self    = shift;
+	my $on      = shift;
+	my $current = $self->current;
 
-	Padre->ide->wx->config->set( logging => $on );
+	$current->config->set( logging => $on );
 	Padre::Util::set_logging($on);
 	Padre::Util::debug("After setting debugging to '$on'");
-	Padre->ide->wx->main->refresh;
+	$current->main->refresh;
 
 	return;
 }
 
 sub set_trace {
-	my ($on) = @_;
+	my $self    = shift;
+	my $on      = shift;
+	my $current = $self->current;
 
-	Padre->ide->wx->config->set( logging_trace => $on );
+	$current->config->set( logging_trace => $on );
 	Padre::Util::set_trace($on);
 	Padre::Util::debug("After setting trace to '$on'");
-	Padre->ide->wx->main->refresh;
+	$current->main->refresh;
 
 	return;
 }
 
 sub eval_document {
-	my $self = shift;
-	my $document = Padre::Current->document or return;
+	my $self     = shift;
+	my $document = $self->current->document or return;
 	return $self->_dump_eval( $document->text_get );
 }
 
 sub dump_document {
 	my $self     = shift;
-	my $document = Padre::Current->document;
-	unless ($document) {
-		Padre::Current->main->message( Wx::gettext('No file is open'), 'Info' );
+	my $current  = $self->current;
+	my $document = $current->document;
+	unless ( $document ) {
+		$current->main->message( Wx::gettext('No file is open'), 'Info' );
 		return;
 	}
 	return $self->_dump($document);
@@ -124,12 +141,11 @@ sub dump_document {
 
 sub dump_padre {
 	my $self = shift;
-	return $self->_dump( Padre->ide );
+	return $self->_dump( $self->current->ide );
 }
 
 sub dump_inc {
-	my $self = shift;
-	return $self->_dump( \%INC, \@INC );
+	$_[0]->_dump( \%INC, \@INC );
 }
 
 sub simulate_crash {
@@ -139,16 +155,56 @@ sub simulate_crash {
 
 sub simulate_task_crash {
 	require Padre::Task::Debug::Crashing;
-	Padre::Task::Debug::Crashing->new()->schedule();
+	Padre::Task::Debug::Crashing->new->schedule;
 }
 
 sub show_about {
 	my $self  = shift;
 	my $about = Wx::AboutDialogInfo->new;
 	$about->SetName('Padre::Plugin::Devel');
-	$about->SetDescription( Wx::gettext("A set of unrelated tools used by the Padre developers\n") );
+	$about->SetDescription(
+		Wx::gettext("A set of unrelated tools used by the Padre developers\n")
+	);
 	Wx::AboutBox($about);
 	return;
+}
+
+sub load_everything {
+	my $self = shift;
+	my $main = $self->current->main;
+
+	# Find the location of Padre.pm
+	my $padre  = $INC{'Padre.pm'};
+	my $parent = substr( $padre, 0, length($padre) - 3 );
+
+	# Find everything under Padre:: with a matching version
+	require File::Find::Rule;
+	require ExtUtils::MakeMaker;
+	my @children = grep {
+		not $INC{$_}
+	} map {
+		"Padre/$_->[0]"
+	} grep {
+		defined($_->[1]) and $_->[1] eq $VERSION
+	} map { [
+		$_,
+		ExtUtils::MM_Unix->parse_version(
+			File::Spec->catfile($parent, $_)
+		)
+	] } File::Find::Rule->name('*.pm')->file->relative->in($parent);
+	$main->message("Found " . scalar(@children) . " unloaded modules");
+	return unless @children;
+
+	# Load all of them (ignoring errors)
+	my $loaded = 0;
+	foreach my $child ( @children ) {
+		eval { require $child; };
+		next if $@;
+		$loaded++;
+	}
+
+	# Say how many classes we loaded
+	$main->message( "Loaded $loaded modules" );
 }
 
 # Takes a string, which it evals and then dumps to Output
@@ -159,7 +215,7 @@ sub _dump_eval {
 	# Evecute the code and handle errors
 	my @rv = eval $code;    ## no critic
 	if ($@) {
-		Padre::Current->main->error( sprintf( Wx::gettext("Error: %s"), $@ ) );
+		$self->current->main->error( sprintf( Wx::gettext("Error: %s"), $@ ) );
 		return;
 	}
 
@@ -168,13 +224,11 @@ sub _dump_eval {
 
 sub _dump {
 	my $self = shift;
-	my $main = Padre::Current->main;
+	my $main = $self->current->main;
 
 	# Generate the dump string and set into the output window
 	$main->output->SetValue(
-		Devel::Dumpvar->new(
-			to => 'return',
-			)->dump(@_)
+		Devel::Dumpvar->new( to => 'return' )->dump(@_)
 	);
 	$main->output->SetSelection( 0, 0 );
 	$main->show_output(1);
@@ -192,17 +246,35 @@ Padre::Plugin::Devel - tools used by the Padre developers
 
 =head1 DESCRIPTION
 
-=head2 Run in Padre
+=head2 Run Document inside Padre
 
 Executes and evaluates the contents of the current (saved or unsaved)
 document within the current Padre process, and then dumps the result
 of the evaluation to Output.
 
-=head2 Show %INC
+=head2 Dump Current Document
+
+=head2 Dump Top IDE Object
+
+=head2 Dump %INC and @INC
 
 Dumps the %INC hash to Output
 
-=head2 Info
+=head2 Enable/Disable logging
+
+=head2 Enable/Disable trace when logging
+
+=head2 Simulate crash
+
+=head2 wxWidgets 2.8.10 Reference
+
+=head2 STC reference
+
+Documentation for wxStyledTextCtrl, a control that wraps the Scintilla editor component.
+
+=head2 wxPerl Live Support
+
+Connects to #wxperl on irc.perl.org, where people can answer queries on wxPerl problems/usage.
 
 =head2 About
 

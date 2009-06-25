@@ -2,7 +2,6 @@
 
 use strict;
 use Test::More;
-BEGIN { plan skip_all => 'skipped for release until we got status/padre-fallback-icon sorted out'; } 
 BEGIN {
 	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
 		plan skip_all => 'Needs DISPLAY';
@@ -10,7 +9,7 @@ BEGIN {
 	}
 }
 
-plan( 'no_plan' );
+plan tests => 14;
 
 use Test::NoWarnings;
 use File::Spec::Functions qw( catfile );
@@ -40,9 +39,10 @@ isa_ok( $docs , 'Padre::DocBrowser::document' );
 my $tm = $db->resolve( URI->new( 'perldoc:Test::More' ) );
 isa_ok( $tm , 'Padre::DocBrowser::document' );
 ok( $tm->mimetype eq 'application/x-pod' , 'Resolve from uri' );
-
+cmp_ok( $tm->title , 'eq' , 'Test::More' , 'Doc title discovered' );
 
 my $view = $db->browse( $tm ) ;
 isa_ok( $view , 'Padre::DocBrowser::document' );
 ok( $view->mimetype eq 'text/xhtml' , 'Got html view' );
+cmp_ok( $view->title, 'eq', 'Test::More', 'Title' );
 

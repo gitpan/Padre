@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor accessors => {
@@ -33,13 +33,14 @@ sub new {
 			$self->on_tree_item_set_focus( $_[1] );
 		},
 	);
-
-	Wx::Event::EVT_TREE_SEL_CHANGED(
-		$self, $self,
-		sub {
-			$self->on_tree_item_selection_changed( $_[1] );
-		},
-	);
+	
+	# Double-click a function name
+        Wx::Event::EVT_TREE_ITEM_ACTIVATED(
+                $self, $self,
+                sub {
+                        $self->on_tree_item_activated( $_[1] );
+                }
+        );
 
 	$self->Hide;
 
@@ -127,12 +128,8 @@ sub on_tree_item_set_focus {
 	return;
 }
 
-sub on_tree_item_selection_changed {
-	my ( $self, $event ) = @_;
-	my $item = $self->GetPlData( $event->GetItem );
-	if ( defined $item ) {
-		$self->select_line_in_editor( $item->{line} );
-	}
+sub on_tree_item_activated {
+	on_tree_item_set_focus(@_);
 	return;
 }
 

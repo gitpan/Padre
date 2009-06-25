@@ -104,7 +104,7 @@ sub check_wx_version {
 			return;
 		}
 		unless ( Wx::wxUNICODE() ) {
-			nono("Padre needs wxWidgest to be compile with Unicode support (--enable-unicode)");
+			nono("Padre needs wxWidgest to be compiled with Unicode support (--enable-unicode)");
 		}
 	}
 
@@ -135,6 +135,8 @@ sub make_exe {
 	if ( $^O =~ /win32/i ) {
 		push @cmd, '-M', 'Tie::Hash::NamedCapture';
 	}
+
+	push @cmd, '-M', 'ORLite::Migrate::Patch';
 
 	print join( ' ', @cmd ) . "\n";
 	system(@cmd);

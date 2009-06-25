@@ -48,11 +48,11 @@ use Carp         ();
 use File::Spec   ();
 use Scalar::Util ();
 use Params::Util qw{_HASH0 _INSTANCE};
-use YAML::Tiny ();
-use Padre::DB  ();
-use Padre::Wx  ();
+use YAML::Tiny   ();
+use Padre::DB    ();
+use Padre::Wx    ();
 
-our $VERSION    = '0.36';
+our $VERSION    = '0.37';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
@@ -112,8 +112,22 @@ C<Padre::Plugin::Vi>.
 =cut
 
 sub plugin_locale_directory {
+	return File::Spec->catdir( shift->plugin_share_directory(@_), 'locale');
+}
+
+sub plugin_share_directory {
 	my $pkg = ref $_[0] || $_[0];
 	$pkg =~ s/::/-/g;
+
+	if ($ENV{PADRE_DEV}) {
+		my $root = File::Spec->catdir( $FindBin::Bin, File::Spec->updir, File::Spec->updir, $pkg );
+		my $path = File::Spec->catdir( $root, 'share' );
+		return $path if -d $path;
+		
+		$path = File::Spec->catdir( $root, 'lib', split(/-/, $pkg), 'share' );
+		return $path if -d $path;
+		return;
+	}
 
 	# Find the distribution directory
 	require File::ShareDir::PAR;
@@ -121,7 +135,7 @@ sub plugin_locale_directory {
 	return undef if $@;
 
 	return File::Spec->catdir(
-		$distdir, 'share', 'locale',
+		$distdir, 'share',
 	);
 }
 
@@ -656,10 +670,22 @@ sub main {
 	$IDE{ Scalar::Util::refaddr( $_[0] ) }->wx->main;
 }
 
+=pod
+
+=head2 current
+
+The C<current> convenience method provides a L<Padre::Current> context
+object for the current plugin.
+
+=cut
+
+sub current {
+	Padre::Current->new( ide => $_[0]->ide );
+}
+
 1;
 
 =pod
-
 
 =head1 SEE ALSO
 

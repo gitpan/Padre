@@ -4,23 +4,18 @@ package Padre::Wx::Right;
 
 use strict;
 use warnings;
-use Padre::Wx ();
+use Padre::Constant ();
+use Padre::Wx       ();
 
-our $VERSION = '0.36';
-our @ISA     = 'Wx::AuiNotebook';
+our $VERSION = '0.37';
+our @ISA     = qw{
+	Padre::Wx::Role::MainChild
+	Wx::AuiNotebook
+};
 
 sub new {
 	my $class = shift;
 	my $main  = shift;
-
-	# Create the platform-sensitive style
-	my $style = Wx::wxAUI_NB_SCROLL_BUTTONS | Wx::wxAUI_NB_TOP | Wx::wxBORDER_NONE;
-	unless (Padre::Util::WXGTK) {
-
-		# Crashes on Linux/GTK
-		# Doesn't seem to work right on Win32...
-		# $style = $style | Wx::wxAUI_NB_TAB_EXTERNAL_MOVE;
-	}
 
 	# Create the basic object
 	my $self = $class->SUPER::new(
@@ -28,7 +23,9 @@ sub new {
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::Size->new( 200, 500 ),    # used when pane is floated
-		$style,
+		Wx::wxAUI_NB_SCROLL_BUTTONS
+		| Wx::wxAUI_NB_TOP
+		| Wx::wxBORDER_NONE,
 	);
 
 	# Add ourself to the window manager
@@ -42,10 +39,6 @@ sub new {
 	$self->aui->caption( 'right' => Wx::gettext('Workspace View') );
 
 	return $self;
-}
-
-sub main {
-	$_[0]->GetParent;
 }
 
 sub aui {

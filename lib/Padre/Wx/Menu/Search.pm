@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -34,7 +34,7 @@ sub new {
 		$main,
 		$self->{find},
 		sub {
-			$_[0]->find->find(@_);
+			$_[0]->find->find;
 		},
 	);
 
@@ -46,7 +46,7 @@ sub new {
 		$main,
 		$self->{find_next},
 		sub {
-			$_[0]->find->find_next(@_);
+			$_[0]->find->find_next;
 		},
 	);
 
@@ -58,7 +58,7 @@ sub new {
 		$main,
 		$self->{find_previous},
 		sub {
-			$_[0]->find->find_previous(@_);
+			$_[0]->find->find_previous;
 		},
 	);
 
@@ -71,7 +71,7 @@ sub new {
 		$main,
 		$self->{replace},
 		sub {
-			$_[0]->replace->find(@_);
+			$_[0]->replace->find;
 		},
 	);
 
@@ -123,12 +123,11 @@ sub new {
 
 	$self->AppendSeparator;
 
-	# Was this going to be moved to a plugin?
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append(
 			-1,
-			Wx::gettext("Find in fi&les...")
+			Wx::gettext("Find in Fi&les...")
 		),
 		sub {
 			require Padre::Wx::Ack;

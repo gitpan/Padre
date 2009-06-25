@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Document';
 
 #####################################################################
@@ -65,14 +65,41 @@ sub ppi_transform {
 sub ppi_select {
 	my $self     = shift;
 	my $location = shift;
+	my $editor = $self->editor or return;
+	my $start = $self->ppi_location_to_character_position($location);
+	$editor->SetSelection( $start, $start + 1 );
+}
+
+
+# Convert a ppi-style location [$line, $col, $apparent_col]
+# to an absolute document offset
+sub ppi_location_to_character_position {
+	my $self     = shift;
+	my $location = shift;
 	if ( _INSTANCE( $location, 'PPI::Element' ) ) {
 		$location = $location->location;
 	}
 	my $editor = $self->editor or return;
 	my $line   = $editor->PositionFromLine( $location->[0] - 1 );
 	my $start  = $line + $location->[1] - 1;
-	$editor->SetSelection( $start, $start + 1 );
+	return $start;
 }
+
+
+# Convert an absolute document offset to
+# a ppi-style location [$line, $col, $apparent_col]
+# FIXME: Doesn't handle $apparent_col right
+sub character_position_to_ppi_location {
+	my $self     = shift;
+	my $position = shift;
+
+	my $ed   = $self->editor;
+	my $line = 1 + $ed->LineFromPosition($position);
+	my $col  = 1 + $position - $ed->PositionFromLine($line-1);
+
+	return [$line, $col, $col];
+}
+
 
 sub lexer {
 	my $self   = shift;
@@ -197,7 +224,6 @@ sub colorize {
 sub _css_class {
 	my ( $self, $Token ) = @_;
 	if ( $Token->isa('PPI::Token::Word') ) {
-
 		# There are some words we can be very confident are
 		# being used as keywords
 		unless ( $Token->snext_sibling and $Token->snext_sibling->content eq '=>' ) {
@@ -257,7 +283,13 @@ sub keywords {
 sub get_functions {
 	my $self = shift;
 	my $text = $self->text_get;
-	return $text =~ m/[\012\015]\s*sub\s+(\w+(?:::\w+)*)/g;
+
+	# Filter out POD
+	$text =~ s/(?:\015{1,2}\012|\015|\012)/\n/sg;
+	$text =~ s/(\n)\n*__(?:DATA|END)__\b.*\z/$1/s;
+	$text =~ s/\n\n=\w+.+?\n\n=cut\b.+?\n+/\n\n/sg;
+
+	return $text =~ m/\n\s*sub\s+(\w+(?:::\w+)*)/g;
 }
 
 sub get_function_regex {
@@ -274,8 +306,7 @@ sub get_command {
 	my $config = Padre->ide->config;
 
 	# Use a temporary file if run_save is set to 'unsaved'
-	my $filename
-		= $config->run_save eq 'unsaved' && !$self->is_saved
+	my $filename = $config->run_save eq 'unsaved' && !$self->is_saved
 		? $self->store_in_tempfile
 		: $self->filename;
 
@@ -551,6 +582,24 @@ sub lexical_variable_replacement {
 	return ();
 }
 
+sub introduce_temporary_variable {
+	my ( $self, $varname ) = @_;
+
+	my $editor = $self->editor;
+	my $start_position = $editor->GetSelectionStart;
+	my $end_position   = $editor->GetSelectionEnd-1;
+	# create a new object of the task class and schedule it
+	require Padre::Task::PPI::IntroduceTemporaryVariable;
+	Padre::Task::PPI::IntroduceTemporaryVariable->new(
+		document       => $self,
+		start_location => $start_position,
+		end_location   => $end_position,
+		varname        => $varname,
+	)->schedule;
+
+	return ();
+}
+
 sub autocomplete {
 	my $self = shift;
 
@@ -561,6 +610,88 @@ sub autocomplete {
 
 	# line from beginning to current position
 	my $prefix = $editor->GetTextRange( $first, $pos );
+
+	# WARNING: This is totally not done, but Gabor made me commit it.
+	# TODO:
+	# a) complete this list
+	# b) make the path configurable
+	# c) make the whole thing optional and/or pluggable
+	# d) make it not suck
+	# e) make the types of auto-completion configurable
+	# f) remove the old auto-comp code or at least let the user choose to use the new
+	#    *or* the old code via configuration
+	# g) hack STC so that we can get more information in the autocomp. window,
+	# h) hack STC so we can start populating the autocompletion choices and continue to do so in the background
+	# i) hack Perl::Tags to be better (including inheritance)
+	# j) add inheritance support
+	# k) figure out how to do method auto-comp. on objects
+	require Parse::ExuberantCTags;
+
+	# check for variables
+	if ($prefix =~ /([\$\@\%\*])(\w+(?:::\w+)*)$/) {
+		my $prefix = $2;
+		my $type = $1;
+		my $parser = Parse::ExuberantCTags->new(File::Spec->catfile($ENV{PADRE_HOME}, 'perltags'));
+		if (defined $parser) {
+			my $tag = $parser->findTag($prefix, partial => 1);
+			my @words;
+			my %seen;
+			while (defined($tag)) {
+				# TODO check file scope?
+				if ($tag->{kind} eq 'v') {
+					# TODO potentially don't skip depending on circumstances.
+					if (not $seen{$tag->{name}}++) {
+						push @words, $tag->{name};
+					}
+				}
+				$tag = $parser->findNextTag();
+			}
+			return(length($prefix), @words );
+		}
+	}
+	# check for methods
+	elsif ($prefix =~ /(?![\$\@\%\*])(\w+(?:::\w+)*)\s*->\s*(\w*)$/) {
+		my $class = $1;
+		my $prefix = $2;
+		$prefix = '' if not defined $prefix;
+		my $parser = Parse::ExuberantCTags->new(File::Spec->catfile($ENV{PADRE_HOME}, 'perltags'));
+		if (defined $parser) {
+			my $tag = ($prefix eq '') ? $parser->firstTag() : $parser->findTag($prefix, partial => 1);
+			my @words;
+			# TODO: INHERITANCE!
+			while (defined($tag)) {
+				if ($tag->{kind} eq 's'
+				    and defined $tag->{extension}{class}
+				    and $tag->{extension}{class} eq $class) {
+					push @words, $tag->{name};
+				}
+				$tag = ($prefix eq '') ? $parser->nextTag() : $parser->findNextTag();
+			}
+			return(length($prefix), @words );
+		}
+	}
+	# check for packages
+	elsif ($prefix =~ /(?![\$\@\%\*])(\w+(?:::\w+)*)/) {
+		my $prefix = $1;
+		my $parser = Parse::ExuberantCTags->new(File::Spec->catfile($ENV{PADRE_HOME}, 'perltags'));
+		if (defined $parser) {
+			my $tag = $parser->findTag($prefix, partial => 1);
+			my @words;
+			my %seen;
+			while (defined($tag)) {
+				# TODO check file scope?
+				if ($tag->{kind} eq 'p') {
+					# TODO potentially don't skip depending on circumstances.
+					if (not $seen{$tag->{name}}++) {
+						push @words, $tag->{name};
+					}
+				}
+				$tag = $parser->findNextTag();
+			}
+			return(length($prefix), @words );
+		}
+	}
+
 	$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
 	my $last      = $editor->GetLength();
 	my $text      = $editor->GetTextRange( 0, $last );
@@ -655,12 +786,14 @@ sub event_on_right_down {
 		$editor->GetCurrentPos();
 	}
 
+	my $introduced_separator = 0;
+
 	my ( $location, $token ) = _get_current_symbol( $self->editor, $pos );
 
 	# Append variable specific menu items if it's a variable
 	if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
 
-		$menu->AppendSeparator;
+		$menu->AppendSeparator if not $introduced_separator++;
 
 		my $findDecl = $menu->Append( -1, Wx::gettext("Find Variable Declaration") );
 		Wx::Event::EVT_MENU(
@@ -698,6 +831,36 @@ sub event_on_right_down {
 			},
 		);
 	}    # end if it's a variable
+
+	my $select_start = $editor->GetSelectionStart;
+	my $select_end   = $editor->GetSelectionEnd;
+	if ( $select_start != $select_end ) { # if something's selected
+		$menu->AppendSeparator if not $introduced_separator++;
+
+		my $intro_temp = $menu->Append( -1, Wx::gettext("Introduce Temporary Variable") );
+		Wx::Event::EVT_MENU(
+			$editor,
+			$intro_temp,
+			sub {
+				# FIXME near duplication of the code in Padre::Wx::Menu::Perl
+				my $editor = shift;
+				my $doc = $self;
+				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+				require Padre::Wx::History::TextEntryDialog;
+				my $dialog = Padre::Wx::History::TextEntryDialog->new(
+					$editor->main,
+					Wx::gettext("Variable Name"),
+					Wx::gettext("Variable Name"),
+					'$tmp',
+				);
+				return if $dialog->ShowModal == Wx::wxID_CANCEL;
+				my $replacement = $dialog->GetValue;
+				$dialog->Destroy;
+				return unless defined $replacement;
+				$doc->introduce_temporary_variable($replacement);
+			},
+		);
+	} # end if something's selected
 }
 
 sub event_on_left_up {

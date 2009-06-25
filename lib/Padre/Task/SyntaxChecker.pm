@@ -7,7 +7,7 @@ use Padre::Task    ();
 use Padre::Current ();
 use Padre::Wx      ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Task';
 
 =pod
@@ -89,7 +89,7 @@ sub new {
 	return () if not defined $editor;
 	$self->{main_thread_only}->{on_finish} = $on_finish if $on_finish;
 	$self->{main_thread_only}->{editor} = $editor;
-	return $self;
+	return bless $self => $class;
 }
 
 sub run {

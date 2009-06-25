@@ -7,8 +7,8 @@ use strict;
 use warnings;
 use utf8;
 
-# Non-Padre modules we need in order to show the initial
-# window should be loaded early to simplify the load order.
+# Non-Padre modules we need in order to the single-instance
+# check should be loaded early to simplify the load order.
 use Carp          ();
 use Cwd           ();
 use File::Spec    ();
@@ -24,13 +24,13 @@ use DBD::SQLite   ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
-use Padre::Util   ();
-use Padre::Config ();
-use Padre::DB     ();
+use Padre::Constant ();
+use Padre::Config   ();
+use Padre::DB       ();
 
 # Generate faster accessors
 use Class::XSAccessor getters => {
@@ -44,25 +44,26 @@ use Class::XSAccessor getters => {
 
 # Globally shared detection of the "current" Perl
 SCOPE: {
-	my $perl_interpreter;
+	my $perl;
 
 	sub perl_interpreter {
-		if ( defined $perl_interpreter ) {
-			return $perl_interpreter;
-		}
+		return $perl if defined $perl;
+		require Probe::Perl;
+		require File::Which;
+
 
 		# Use the most correct method first
 		require Probe::Perl;
-		my $perl = Probe::Perl->find_perl_interpreter;
-		if ( defined $perl ) {
-			$perl_interpreter = $perl;
+		my $_perl = Probe::Perl->find_perl_interpreter;
+		if ( defined $_perl ) {
+			$perl = $_perl;
 			return $perl;
 		}
 
 		# Fallback to a simpler way
 		require File::Which;
-		$perl             = scalar File::Which::which('perl');
-		$perl_interpreter = $perl;
+		$_perl = scalar File::Which::which('perl');
+		$perl = $_perl;
 		return $perl;
 	}
 }
@@ -82,7 +83,6 @@ sub new {
 
 	# Create the empty object
 	my $self = $SINGLETON = bless {
-
 		# parsed command-line options
 		opts => \%opts,
 
@@ -105,7 +105,6 @@ sub new {
 
 	# Connect to the server if we are running in single instance mode
 	if ( $self->config->main_singleinstance ) {
-
 		# This blocks for about 1 second
 		require IO::Socket;
 		my $socket = IO::Socket::INET->new(
@@ -114,8 +113,22 @@ sub new {
 			Proto    => 'tcp',
 			Type     => IO::Socket::SOCK_STREAM(),
 		);
-		if ($socket) {
-			foreach my $file (@ARGV) {
+		if ( $socket ) {
+			my $pid  = '';
+			my $read = $socket->sysread( $pid, 10 );
+			if ( defined $read and $read == 10 ) {
+				# Got the single instance PID
+				$pid =~ s/\s+\s//;
+				if ( Padre::Constant::WIN32 ) {
+					require Win32::API;
+					Win32::API->new(
+						'User32.dll',
+						'AllowSetForegroundWindow',
+						'N', 'L',
+					)->Call($pid);
+				}
+			}
+			foreach my $file ( @ARGV ) {
 				my $path = File::Spec->rel2abs($file);
 				$socket->print("open $path\n");
 			}
@@ -477,7 +490,7 @@ We plan to allow the user to switch between styles.
 
 =head3 Adding new syntax highlighting
 
-Need to define constanst in L<Padre::Util> to be in the Px:: namespace.
+Need to define constants in L<Padre::Util> to be in the Padre::Constant namespace.
 
 Need to add the color mapping to share/styles/default.yml
 

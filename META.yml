@@ -12,7 +12,7 @@ build_requires:
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.86'
+generated_by: 'Module::Install version 0.91'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -45,7 +45,7 @@ requires:
   File::Find::Rule: 0.30
   File::Glob: 0
   File::HomeDir: 0.84
-  File::Path: 2.07
+  File::Path: 0
   File::ShareDir: 1.00
   File::ShareDir::PAR: 0.04
   File::Spec: 3.2701
@@ -72,6 +72,7 @@ requires:
   PPI: 1.203
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
+  Parse::ExuberantCTags: 1.00
   Pod::Abstract: 0.16
   Pod::POM: 0.17
   Pod::Simple: 3.07
@@ -95,4 +96,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.36
+version: 0.37

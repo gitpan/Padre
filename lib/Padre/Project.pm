@@ -9,7 +9,7 @@ use File::Spec    ();
 use YAML::Tiny    ();
 use Padre::Config ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 
 use Class::XSAccessor getters => {
 	root      => 'root',
@@ -29,6 +29,9 @@ sub class {
 		return 'Padre::Project::Perl';
 	}
 	if ( -f File::Spec->catfile( $root, 'Build.PL' ) ) {
+		return 'Padre::Project::Perl';
+	}
+	if ( -f File::Spec->catfile( $root, 'dist.ini' ) ) {
 		return 'Padre::Project::Perl';
 	}
 	if ( -f File::Spec->catfile( $root, 'padre.yml' ) ) {

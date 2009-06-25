@@ -5,7 +5,7 @@ use warnings;
 use Padre::Task    ();
 use Padre::Current ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Task';
 
 =pod
@@ -77,7 +77,7 @@ sub new {
 		return () if not defined $doc;
 		$self->{text} = $doc->text_get;
 	}
-	return $self;
+	return bless $self => $class;
 }
 
 sub run {

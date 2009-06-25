@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Locale   ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -21,7 +21,7 @@ our @ISA     = 'Padre::Wx::Menu';
 sub new {
 	my $class  = shift;
 	my $main   = shift;
-	my $config = $main->config;
+	my $config = Padre->ide->config;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
@@ -124,7 +124,7 @@ sub new {
 	);
 
 	# On Windows disabling the status bar doesn't work, so don't allow it
-	unless (Padre::Util::WXWIN32) {
+	unless (Padre::Constant::WXWIN32) {
 		$self->{statusbar} = $self->AppendCheckItem(
 			-1,
 			Wx::gettext("Show StatusBar")
@@ -137,6 +137,18 @@ sub new {
 			},
 		);
 	}
+	
+	$self->{toolbar} = $self->AppendCheckItem(
+		-1,
+		Wx::gettext("Show Toolbar")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{toolbar},
+		sub {
+			$_[0]->on_toggle_toolbar($_[1]);
+		}
+	);
 
 	$self->AppendSeparator;
 
@@ -488,7 +500,7 @@ sub refresh {
 	my $doc      = $document ? 1 : 0;
 
 	# Simple check state cases from configuration
-	unless (Padre::Util::WXWIN32) {
+	unless ( Padre::Constant::WXWIN32 ) {
 		$self->{statusbar}->Check( $config->main_statusbar );
 	}
 
@@ -506,6 +518,7 @@ sub refresh {
 	$self->{show_calltips}->Check( $config->editor_calltips );
 	$self->{show_syntaxcheck}->Check( $config->main_syntaxcheck );
 	$self->{show_errorlist}->Check( $config->main_errorlist );
+	$self->{toolbar}->Check( $config->main_toolbar );
 
 	# Check state for word wrap is document-specific
 	if ($document) {

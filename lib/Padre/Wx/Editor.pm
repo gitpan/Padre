@@ -10,7 +10,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 our %mode = (
@@ -39,10 +39,11 @@ sub new {
 	my $notebook = shift;
 
 	# Create the underlying Wx object
-	my $self = $class->SUPER::new($notebook);
+	my $self   = $class->SUPER::new($notebook);
+	my $config = $self->main->ide->config;
 
 	# TODO: Make this suck less
-	$data = data( Padre->ide->config->editor_style );
+	$data = data( $config->editor_style );
 
 	# Set the code margins a little larger than the default.
 	# This seems to noticably reduce eye strain.
@@ -59,15 +60,17 @@ sub new {
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
 
-	if ( Padre->ide->config->editor_wordwrap ) {
+	if ( $config->editor_wordwrap ) {
 		$self->SetWrapMode(Wx::wxSTC_WRAP_WORD);
 	}
+
 	$self->SetDropTarget( Padre::Wx::FileDropTarget->new( $self->main ) );
+
 	return $self;
 }
 
 sub main {
-	$_[0]->GetGrandParent;
+	return $_[0]->GetGrandParent;
 }
 
 sub data {
@@ -140,11 +143,10 @@ sub padre_setup {
 }
 
 sub padre_setup_plain {
-	my $self = shift;
+	my $self   = shift;
+	my $config = $self->main->ide->config;
 	$self->set_font;
 	$self->StyleClearAll;
-
-	my $config = Padre->ide->config;
 
 	if ( defined $data->{plain}->{current_line_foreground} ) {
 		$self->SetCaretForeground( _color( $data->{plain}->{current_line_foreground} ) );
@@ -177,17 +179,21 @@ sub padre_setup_plain {
 }
 
 sub padre_setup_style {
-	my ( $self, $name ) = @_;
+	my $self = shift;
+	my $name = shift;
+	my $config = $self->main->ide->config;
 
 	$self->padre_setup_plain;
-
-	$self->StyleSetBackground( $_, _color( $data->{$name}->{background} ) ) for ( 0 .. Wx::wxSTC_STYLE_DEFAULT );
+	for ( 0 .. Wx::wxSTC_STYLE_DEFAULT ) {
+		$self->StyleSetBackground( $_, _color( $data->{$name}->{background} ) );
+	}
 	$self->setup_style_from_config($name);
 
 	# if mimetype is known, then it might
 	# be Perl with in-line POD
-	my $config = Padre->ide->config;
-	$self->fold_pod if ( $config->editor_folding && $config->editor_fold_pod );
+	if ( $config->editor_folding and $config->editor_fold_pod ) {
+		$self->fold_pod;
+	}
 
 	return;
 }
@@ -197,29 +203,35 @@ sub setup_style_from_config {
 
 	foreach my $k ( keys %{ $data->{$name}->{colors} } ) {
 		my $f = 'Wx::' . $k;
+		if ($k =~ /^PADRE_/) {
+			$f = 'Padre::Constant::' . $k;
+		}
 		no strict "refs";    ## no critic
 		my $v = eval { $f->() };
-		if ($@) {
-			$f = 'Px::' . $k;
-			$v = eval { $f->() };
-			if ($@) {
-				warn "invalid key '$k'\n";
-				next;
-			}
+		if ( $@ ) {
+			warn "invalid key '$k'\n";
+			next;
 		}
 
-		$self->StyleSetForeground( $f->(), _color( $data->{$name}->{colors}->{$k}->{foreground} ) )
-			if exists $data->{$name}->{colors}->{$k}->{foreground};
-		$self->StyleSetBackground( $f->(), _color( $data->{$name}->{colors}->{$k}->{background} ) )
-			if exists $data->{$name}->{colors}->{$k}->{background};
-		$self->StyleSetBold( $f->(), $data->{$name}->{colors}->{$k}->{bold} )
-			if exists $data->{$name}->{colors}->{$k}->{bold};
-		$self->StyleSetItalic( $f->(), $data->{$name}->{colors}->{$k}->{italic} )
-			if exists $data->{$name}->{colors}->{$k}->{italic};
-		$self->StyleSetEOLFilled( $f->(), $data->{$name}->{colors}->{$k}->{eolfilled} )
-			if exists $data->{$name}->{colors}->{$k}->{eolfilled};
-		$self->StyleSetUnderline( $f->(), $data->{$name}->{colors}->{$k}->{underline} )
-			if exists $data->{$name}->{colors}->{$k}->{underline};
+		my $colors = $data->{$name}->{colors}->{$k};
+		if ( exists $colors->{foreground} ) {
+			$self->StyleSetForeground( $f->(), _color( $colors->{foreground} ) );
+		}
+		if ( exists $colors->{background} ) {
+			$self->StyleSetBackground( $f->(), _color( $colors->{background} ) );
+		}
+		if ( exists $colors->{bold} ) {
+			$self->StyleSetBold( $f->(), $colors->{bold} );
+		}
+		if ( exists $colors->{italics} ) {
+			$self->StyleSetItalic( $f->(), $colors->{italic} );
+		}
+		if ( exists $colors->{eolfilled} ) {
+			$self->StyleSetEOLFilled( $f->(), $colors->{eolfilled} );
+		}
+		if ( exists $colors->{underlined} ) {
+			$self->StyleSetUnderline( $f->(), $colors->{underline} );
+		}
 	}
 }
 
@@ -359,7 +371,7 @@ sub show_folding {
 
 sub set_font {
 	my $self   = shift;
-	my $config = Padre->ide->config;
+	my $config = $self->main->ide->config;
 	my $font   = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
 	if ( defined $config->editor_font && length $config->editor_font > 0 ) {    # empty default...
 		$font->SetNativeFontInfoUserDesc( $config->editor_font );
@@ -371,7 +383,7 @@ sub set_font {
 
 sub set_preferences {
 	my $self   = shift;
-	my $config = Padre->ide->config;
+	my $config = $self->main->ide->config;
 
 	$self->show_line_numbers( $config->editor_linenumbers );
 	$self->show_folding( $config->editor_folding );
@@ -389,7 +401,7 @@ sub set_preferences {
 
 sub show_calltip {
 	my $self   = shift;
-	my $config = Padre->ide->config;
+	my $config = $self->main->ide->config;
 	return unless $config->editor_calltips;
 
 	my $pos    = $self->GetCurrentPos;
@@ -426,7 +438,7 @@ sub show_calltip {
 sub autoindent {
 	my ( $self, $mode ) = @_;
 
-	my $config = Padre->ide->config;
+	my $config = $self->main->ide->config;
 	return unless $config->editor_autoindent;
 	return if $config->editor_autoindent eq 'no';
 
@@ -599,8 +611,18 @@ sub on_focus {
 
 	Padre::Util::debug( "Focus received file: " . ( $doc->filename || '' ) );
 
+	my $main = $self->main;
+
 	# to show/hide the document specific Perl menu
-	$self->main->refresh_menu;
+	$main->refresh_menu;
+
+	# update the directory listing
+	if ( $main->has_directory ) {
+		if ( $main->menu->view->{directory}->IsChecked ) {
+			$main->directory->update_gui;
+		}
+	}
+
 
 	if ( $self->needs_manual_colorize ) {
 
@@ -635,7 +657,7 @@ sub on_left_up {
 	my ( $self, $event ) = @_;
 
 	my $text = $self->GetSelectedText;
-	if ( Padre::Util::WXGTK and defined $text and $text ne '' ) {
+	if ( Padre::Constant::WXGTK and defined $text and $text ne '' ) {
 
 		# Only on X11 based platforms
 		Wx::wxTheClipboard->UsePrimarySelection(1);
@@ -785,7 +807,7 @@ sub on_right_down {
 	$menu->AppendSeparator;
 
 	if ( $event->isa('Wx::MouseEvent')
-		and Padre->ide->config->editor_folding )
+		and $self->main->ide->config->editor_folding )
 	{
 		my $mousePos         = $event->GetPosition;
 		my $line             = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
@@ -826,7 +848,7 @@ sub on_right_down {
 	}
 
 	# Let the plugins have a go
-	Padre->ide->plugin_manager->on_context_menu( $doc, $self, $menu, $event );
+	$self->main->ide->plugin_manager->on_context_menu( $doc, $self, $menu, $event );
 
 	if ( $event->isa('Wx::MouseEvent') ) {
 		$self->PopupMenu( $menu, $event->GetX, $event->GetY );
@@ -836,17 +858,19 @@ sub on_right_down {
 }
 
 sub on_mouse_motion {
-	my ( $self, $event ) = @_;
+	my $self  = shift;
+	my $event = shift;
+	my $config = $self->main->ide->config;
 
 	$event->Skip;
-	return unless Padre->ide->config->main_syntaxcheck;
+	return unless $config->main_syntaxcheck;
 
 	my $mousePos         = $event->GetPosition;
 	my $line             = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
 	my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
 
 	my ( $offset1, $offset2 ) = ( 0, 18 );
-	if ( Padre->ide->config->editor_folding ) {
+	if ( $config->editor_folding ) {
 		$offset1 += 18;
 		$offset2 += 18;
 	}

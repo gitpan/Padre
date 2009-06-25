@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.36';
+our $VERSION = '0.37';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -31,7 +31,7 @@ sub new {
 	$self->{main} = $main;
 
 	# Cache the configuration
-	$self->{config} = $main->config;
+	$self->{config} = Padre->ide->config;
 
 	# Perl-Specific Searches
 	$self->{find_brace} = $self->Append(
@@ -87,6 +87,31 @@ sub new {
 			$dialog->Destroy;
 			return unless defined $replacement;
 			$doc->lexical_variable_replacement($replacement);
+		},
+	);
+
+	$self->{introduce_temporary} = $self->Append(
+		-1,
+		Wx::gettext("Introduce Temporary Variable")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{introduce_temporary},
+		sub {
+			my $doc = $_[0]->current->document;
+			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+			require Padre::Wx::History::TextEntryDialog;
+			my $dialog = Padre::Wx::History::TextEntryDialog->new(
+				$_[0],
+				Wx::gettext("Variable Name"),
+				Wx::gettext("Variable Name"),
+				'$tmp',
+			);
+			return if $dialog->ShowModal == Wx::wxID_CANCEL;
+			my $replacement = $dialog->GetValue;
+			$dialog->Destroy;
+			return unless defined $replacement;
+			$doc->introduce_temporary_variable($replacement);
 		},
 	);
 
