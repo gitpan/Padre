@@ -11,7 +11,7 @@ use Pod::Abstract ();
 use Padre::DocBrowser::document ();
 use File::Temp                  ();
 
-our $VERSION = '0.37';
+our $VERSION = '0.38';
 
 use Class::XSAccessor constructor => 'new', getters => {
 	get_provider => 'provider',
@@ -130,7 +130,7 @@ sub render {
 # URI::perldoc ??
 sub split_link {
         my $query = shift;
-        my($doc,$section) = $query =~ m|([^/]+)/?+(.*+)|;
+        my ($doc, $section) = split /\//, $query, 2; # was m|([^/]+)/?+(.*+)|;
 }
 
 1;
