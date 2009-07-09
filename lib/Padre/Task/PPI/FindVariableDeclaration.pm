@@ -4,9 +4,10 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use base 'Padre::Task::PPI';
+use PPIx::EditorTools::FindVariableDeclaration;
 
 =pod
 
@@ -59,21 +60,19 @@ sub process_ppi {
 	my $ppi      = shift or return;
 	my $location = $self->{location};
 
-	# TODO: PPI bug? This shouldn't be necessary!
-	require Padre::PPI;
-	$ppi->flush_locations;
-	my $token = Padre::PPI::find_token_at_location( $ppi, $location );
-	if ( not $token ) {
-		$self->{error} = "no token";
+	my $declaration = eval {
+		PPIx::EditorTools::FindVariableDeclaration->new->find(
+			ppi    => $ppi,
+			line   => $location->[0],
+			column => $location->[1]
+		);
+	};
+	if ($@) {
+		$self->{error} = $@;
 		return;
 	}
 
-	my $declaration = Padre::PPI::find_variable_declaration($token);
-	if ( not defined $declaration ) {
-		$self->{error} = "no declaration";
-		return;
-	}
-	$self->{declaration_location} = $declaration->location;
+	$self->{declaration_location} = $declaration->element->location;
 	return ();
 }
 
@@ -85,18 +84,16 @@ sub finish {
 		$self->{main_thread_only}->{document}->ppi_select( $self->{declaration_location} );
 	} else {
 		my $text;
-		if ( $self->{error} eq 'no token' ) {
+		if ( $self->{error} =~ /no token/ ) {
 			$text = Wx::gettext("Current cursor does not seem to point at a variable");
-		} elsif ( $self->{error} eq 'no declaration' ) {
+		} elsif ( $self->{error} =~ /no declaration/ ) {
 			$text = Wx::gettext("No declaration could be found for the specified (lexical?) variable");
 		} else {
 			$text = Wx::gettext("Unknown error");
 		}
 		Wx::MessageBox(
-			$text,
-			Wx::gettext("Search Canceled"),
-			Wx::wxOK,
-			Padre->ide->wx->main
+			$text,    Wx::gettext("Search Canceled"),
+			Wx::wxOK, Padre->ide->wx->main
 		);
 	}
 	return ();

@@ -6,7 +6,7 @@ use PPI::Document;
 use PPI::Dumper;
 use Text::Balanced;
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 sub class_to_color {
 	my $class  = shift;
@@ -382,8 +382,8 @@ sub do_styling {
 	my $editor = $doc->editor;
 
 	foreach my $t (@_) {
-		$editor->StartStyling( $t->{start}, $t->{color}||0 );
-		$editor->SetStyling( $t->{length}, $t->{color}||0 );
+		$editor->StartStyling( $t->{start}, $t->{color} || 0 );
+		$editor->SetStyling( $t->{length}, $t->{color} || 0 );
 	}
 }
 

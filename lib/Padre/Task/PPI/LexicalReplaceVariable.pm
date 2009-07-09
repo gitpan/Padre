@@ -2,10 +2,11 @@ package Padre::Task::PPI::LexicalReplaceVariable;
 use strict;
 use warnings;
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use base 'Padre::Task::PPI';
 use Padre::Wx ();
+use PPIx::EditorTools::RenameVariable;
 
 =pod
 
@@ -64,108 +65,25 @@ sub process_ppi {
 	my $ppi      = shift or return;
 	my $location = $self->{location};
 
-	# TODO: PPI bug? This shouldn't be necessary!
-	require Padre::PPI;
-	$ppi->flush_locations;
-	my $token = Padre::PPI::find_token_at_location( $ppi, $location );
-	if ( not $token ) {
-		$self->{error} = "no token";
-		return;
-	}
-
-	my $declaration = Padre::PPI::find_variable_declaration($token);
-	if ( not defined $declaration ) {
-		$self->{error} = "no declaration";
-		return;
-	}
-
-	my $scope = $declaration;
-	while ( not $scope->isa('PPI::Document') and not $scope->isa('PPI::Structure::Block') ) {
-		$scope = $scope->parent;
-	}
-
-	my $token_str = $token->content;
-	my $varname   = $token->symbol;
-
-	#warn "VARNAME: $varname";
-
-	# TODO: This could be part of PPI somehow?
-	# The following string of hacks is simply for finding symbols in quotelikes and regexes
-	my $type = substr( $varname, 0, 1 );
-	my $brace = $type eq '@' ? '[' : ( $type eq '%' ? '{' : '' );
-
-	my @patterns;
-	if ( $type eq '@' or $type eq '%' ) {
-		my $accessv = $varname;
-		$accessv =~ s/^\Q$type\E/\$/;
-		@patterns = (
-			quotemeta( _curlify($varname) ), quotemeta($varname),
-			quotemeta($accessv) . '(?=' . quotemeta($brace) . ')',
+	my $munged = eval {
+		PPIx::EditorTools::RenameVariable->new->rename(
+			ppi         => $ppi,
+			line        => $location->[0],
+			column      => $location->[1],
+			replacement => $self->{replacement},
 		);
-		if ( $type eq '%' ) {
-			my $slicev = $varname;
-			$slicev =~ s/^\%/\@/;
-			push @patterns, quotemeta($slicev) . '(?=' . quotemeta($brace) . ')';
-		} elsif ( $type eq '@' ) {
-			my $indexv = $varname;
-			$indexv =~ s/^\@/\$\#/;
-			push @patterns, quotemeta($indexv);
-		}
-	} else {
-		@patterns = ( quotemeta( _curlify($varname) ), quotemeta($varname) . "(?![\[\{])" );
+	};
+	if ($@) {
+		$self->{error} = $@;
+		return;
 	}
-	my %unique;
-	my $finder_regexp = '(?:' . join( '|', grep { !$unique{$_}++ } @patterns ) . ')';
 
-	$finder_regexp = qr/$finder_regexp/;    # used to find symbols in quotelikes and regexes
-	                                        #warn $finder_regexp;
+	# for moving the cursor after updating the text
+	$self->{token_location} = $munged->element->location;
 
-	my $replacement = $self->{replacement};
-	$replacement =~ s/^\W+//;
+	# TODO: passing this back and forth is probably hyper-inefficient, but such is life.
+	$self->{updated_document_string} = $munged->code;
 
-	$scope->find(
-		sub {
-			my $node = $_[1];
-			if ( $node->isa("PPI::Token::Symbol") ) {
-				return 0 unless $node->symbol eq $varname;
-
-				# TODO do this without breaking encapsulation!
-				$node->{content} = substr( $node->content(), 0, 1 ) . $replacement;
-			}
-			if ( $type eq '@' and $node->isa("PPI::Token::ArrayIndex") ) {    # $#foo
-				return 0 unless substr( $node->content, 2 ) eq substr( $varname, 1 );
-
-				# TODO do this without breaking encapsulation!
-				$node->{content} = '$#' . $replacement;
-			} elsif ( $node->isa("PPI::Token") ) {    # the case of potential quotelikes and regexes
-				my $str = $node->content;
-				if ($str =~ s{($finder_regexp)([\[\{]?)}<
-				        if ($1 =~ tr/{//) { substr($1, 0, ($1=~tr/#//)+1) . "{$replacement}$2" }
-				        else              { substr($1, 0, ($1=~tr/#//)+1) . "$replacement$2" }
-				    >ge
-					)
-				{
-
-					# TODO do this without breaking encapsulation!
-					$node->{content} = $str;
-				}
-			}
-			return 0;
-		},
-	);
-
-	$self->{token_location} = $token->location;    # for moving the cursor after updating the text
-	     # TODO: passing this back and forth is probably hyper-inefficient, but such is life.
-	$self->{updated_document_string} = $ppi->serialize;
-
-	return ();
-}
-
-sub _curlify {
-	my $var = shift;
-	if ( $var =~ s/^([\$\@\%])(.+)$/${1}{$2}/ ) {
-		return ($var);
-	}
 	return ();
 }
 
@@ -179,18 +97,16 @@ sub finish {
 		$self->{main_thread_only}->{document}->ppi_select( $self->{token_location} );
 	} else {
 		my $text;
-		if ( $self->{error} eq 'no token' ) {
+		if ( $self->{error} =~ /no token/ ) {
 			$text = Wx::gettext("Current cursor does not seem to point at a variable");
-		} elsif ( $self->{error} eq 'no declaration' ) {
+		} elsif ( $self->{error} =~ /no declaration/ ) {
 			$text = Wx::gettext("No declaration could be found for the specified (lexical?) variable");
 		} else {
 			$text = Wx::gettext("Unknown error");
 		}
 		Wx::MessageBox(
-			$text,
-			Wx::gettext("Replace Operation Canceled"),
-			Wx::wxOK,
-			Padre->ide->wx->main
+			$text,    Wx::gettext("Replace Operation Canceled"),
+			Wx::wxOK, Padre->ide->wx->main
 		);
 	}
 	return ();

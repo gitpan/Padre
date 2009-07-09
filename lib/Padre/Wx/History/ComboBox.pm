@@ -9,7 +9,7 @@ use Padre::Wx          ();
 use Padre::DB          ();
 use Padre::DB::History ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Wx::ComboBox';
 
 sub new {
@@ -17,7 +17,7 @@ sub new {
 	my @params = @_;
 	my $type   = $params[5];
 	$params[5] = [ Padre::DB::History->recent($type) ];
-	my $self   = $class->SUPER::new(@params);
+	my $self = $class->SUPER::new(@params);
 	$self->{type} = $type;
 	$self;
 }
@@ -26,11 +26,11 @@ sub refresh {
 	my $self = shift;
 
 	# Refresh the recent values
-	my @recent = Padre::DB::History->recent($self->{type});
+	my @recent = Padre::DB::History->recent( $self->{type} );
 
 	# Update the Wx object from the list
 	$self->Clear;
-	foreach my $option ( @recent ) {
+	foreach my $option (@recent) {
 		$self->Append($option);
 	}
 

@@ -20,8 +20,9 @@ use warnings;
 use File::Spec  ();
 use Padre::Util ();
 use Padre::Wx   ();
+use Params::Util qw( _HASH );
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -36,6 +37,14 @@ my %HINT = (
 	'gnome218' => {},
 );
 
+# Lay down some defaults from our common
+# constants
+my %PREFS = (
+	size  => SIZE,
+	ext   => EXT,
+	icons => ICONS,
+);
+
 our $DEFAULT_ICON_NAME = 'status/padre-fallback-icon';
 our $DEFAULT_ICON;
 
@@ -46,7 +55,15 @@ our $DEFAULT_ICON;
 # bother to check params.
 # TODO: Clearly this assumption can't last...
 sub find {
-	my $name = shift;
+	my $name  = shift;
+	my $prefs = shift;
+
+	# If you _really_ are competant ;), prefer size,icons,ext
+	# over the defaults
+	my %pref
+		= _HASH($prefs)
+		? ( %PREFS, %$prefs )
+		: %PREFS;
 
 	# Search through the theme list
 	foreach my $theme (THEMES) {
@@ -55,11 +72,11 @@ sub find {
 			? $HINT{$theme}->{$name}
 			: $name;
 		my $file = File::Spec->catfile(
-			ICONS,
+			$pref{icons},
 			$theme,
-			SIZE,
+			$pref{size},
 			( split /\//, $hinted )
-		) . '.png';
+		) . $pref{ext};
 		next unless -f $file;
 		return Wx::Bitmap->new( $file, Wx::wxBITMAP_TYPE_PNG );
 	}
@@ -83,6 +100,13 @@ sub find {
 	# wrong things to AddTool, you get a segfault and nobody likes
 	# segfaults, right?
 	Carp::confess("Could not find icon '$name'!");
+}
+
+# Some things like Wx::AboutDialogInfo want a _real_ Wx::Icon
+sub cast_to_icon {
+	my $icon = Wx::Icon->new;
+	$icon->CopyFromBitmap(shift);
+	return $icon;
 }
 
 1;

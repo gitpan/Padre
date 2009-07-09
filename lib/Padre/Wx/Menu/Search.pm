@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -62,18 +62,7 @@ sub new {
 		},
 	);
 
-	# Search and Replace
-	$self->{replace} = $self->Append(
-		-1,
-		Wx::gettext("Replace\tCtrl-R")
-	);
-	Wx::Event::EVT_MENU(
-		$main,
-		$self->{replace},
-		sub {
-			$_[0]->replace->find;
-		},
-	);
+	$self->AppendSeparator;
 
 	# Quick Find: Press F3 to start search with selected text
 	$self->{quick_find} = $self->AppendCheckItem(
@@ -93,10 +82,8 @@ sub new {
 	);
 	$self->{quick_find}->Check( Padre->ide->config->find_quick );
 
-	$self->AppendSeparator;
-
-	#We should be able to remove F4 and shift-F4 and hook this functionality to F3 and shift-F3
-	# Incremental find (#60)
+	# We should be able to remove F4 and shift-F4 and hook this functionality
+	# to F3 and shift-F3 Incremental find (#60)
 	$self->{quick_find_next} = $self->Append(
 		-1,
 		Wx::gettext("Find Next\tF4")
@@ -123,6 +110,22 @@ sub new {
 
 	$self->AppendSeparator;
 
+	# Search and Replace
+	$self->{replace} = $self->Append(
+		-1,
+		Wx::gettext("Replace\tCtrl-R")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{replace},
+		sub {
+			$_[0]->replace->find;
+		},
+	);
+
+	$self->AppendSeparator;
+
+	# Recursive Search
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append(

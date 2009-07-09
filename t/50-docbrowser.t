@@ -3,8 +3,12 @@
 use strict;
 use Test::More;
 BEGIN {
-	if (not $ENV{DISPLAY} and not $^O eq 'MSWin32') {
+	unless ( $ENV{DISPLAY} or $^O eq 'MSWin32') {
 		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+	unless ( $< ) {
+		plan skip_all => 'Cannot run as root';
 		exit 0;
 	}
 }
@@ -45,4 +49,5 @@ my $view = $db->browse( $tm ) ;
 isa_ok( $view , 'Padre::DocBrowser::document' );
 ok( $view->mimetype eq 'text/xhtml' , 'Got html view' );
 cmp_ok( $view->title, 'eq', 'Test::More', 'Title' );
+
 

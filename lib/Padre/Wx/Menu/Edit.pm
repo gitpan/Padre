@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -268,7 +268,8 @@ sub new {
 		$main,
 		$self->{convert_encoding_system},
 		sub {
-			Padre::Wx::Main::encode_document_to_system_default(@_);
+			require Padre::Wx::Dialog::Encode;
+			Padre::Wx::Dialog::Encode::encode_document_to_system_default(@_);
 		},
 	);
 
@@ -280,7 +281,8 @@ sub new {
 		$main,
 		$self->{convert_encoding_utf8},
 		sub {
-			Padre::Wx::Main::encode_document_to_utf8(@_);
+			require Padre::Wx::Dialog::Encode;
+			Padre::Wx::Dialog::Encode::encode_document_to_utf8(@_);
 		},
 	);
 
@@ -292,7 +294,8 @@ sub new {
 		$main,
 		$self->{convert_encoding_to},
 		sub {
-			Padre::Wx::Main::encode_document_to(@_);
+			require Padre::Wx::Dialog::Encode;
+			Padre::Wx::Dialog::Encode::encode_document_to(@_);
 		},
 	);
 
@@ -473,8 +476,6 @@ sub new {
 			Padre::Wx::Main::on_diff(@_);
 		},
 	);
-	
-	
 
 	$self->{insert_from_file} = $self->Append(
 		-1,
@@ -485,6 +486,39 @@ sub new {
 		$self->{insert_from_file},
 		sub {
 			Padre::Wx::Main::on_insert_from_file(@_);
+		},
+	);
+
+	$self->AppendSeparator;
+
+	$self->{show_as_number} = Wx::Menu->new;
+	$self->Append(
+		-1,
+		Wx::gettext("Show as ..."),
+		$self->{show_as_number}
+	);
+
+	$self->{show_as_hex} = $self->{show_as_number}->Append(
+		-1,
+		Wx::gettext("Show as hexa")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{show_as_hex},
+		sub {
+			Padre::Wx::Main::show_as_numbers( @_, 'hex' );
+		},
+	);
+
+	$self->{show_as_decimal} = $self->{show_as_number}->Append(
+		-1,
+		Wx::gettext("Show as decimal")
+	);
+	Wx::Event::EVT_MENU(
+		$main,
+		$self->{show_as_decimal},
+		sub {
+			Padre::Wx::Main::show_as_numbers( @_, 'decimal' );
 		},
 	);
 
@@ -552,8 +586,6 @@ sub refresh {
 
 	return 1;
 }
-
-
 
 1;
 

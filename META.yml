@@ -4,8 +4,9 @@ author:
   - 'Gabor Szabo'
 build_requires:
   ExtUtils::MakeMaker: 6.42
+  Locale::Msgfmt: 0.14
   Test::Exception: 0.27
-  Test::More: 0.47
+  Test::More: 0.88
   Test::Most: 0.21
   Test::NoWarnings: 0.084
   Test::Script: 1.03
@@ -13,6 +14,35 @@ configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
 generated_by: 'Module::Install version 0.91'
+keywords:
+  - auto-completion
+  - code
+  - coding
+  - completion
+  - context
+  - cross-platform
+  - development
+  - editor
+  - environment
+  - find
+  - 'function list'
+  - gui
+  - help
+  - highlight
+  - hightlighting
+  - ide
+  - linux
+  - 'mac os'
+  - 'mac os x'
+  - padre
+  - perl
+  - portable
+  - refactoring
+  - replace
+  - syntax
+  - windows
+  - wx
+  - wxwidgets
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -70,6 +100,7 @@ requires:
   PAR: 0.989
   POSIX: 0
   PPI: 1.203
+  PPIx::EditorTools: 0.04
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
   Parse::ExuberantCTags: 1.00
@@ -89,6 +120,7 @@ requires:
   Wx::Perl::ProcessStream: 0.11
   YAML::Tiny: 1.32
   perl: 5.008005
+  prefork: 1.03
   threads: 1.71
   threads::shared: 1.26
 resources:
@@ -96,4 +128,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.38
+version: 0.39

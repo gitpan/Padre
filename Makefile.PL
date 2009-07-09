@@ -5,12 +5,14 @@
 use 5.008005;
 use strict;
 use lib 'privinc';
-use inc::Module::Install 0.86;
+use inc::Module::Install 0.91;
 use POSIX qw(locale_h);
 
-
-
-
+BEGIN {
+	if ( author_context and not eval("use Locale::Msgfmt 0.14; 1;") ) {
+		die("Install Locale::Msgfmt version 0.14 or higher to build from SVN");
+	}
+}
 
 #####################################################################
 # Normal Boring Commands
@@ -76,6 +78,7 @@ requires       'Pod::Abstract'            => '0.16';
 requires       'Portable'                 => '0.12' if win32;
 requires       'POSIX'                    => 0;
 requires       'PPI'                      => '1.203';
+requires       'PPIx::EditorTools'        => '0.04';
 requires       'Probe::Perl'              => '0.01';
 requires       'Storable'                 => '2.15';
 requires       'Term::ReadLine'           => 0;
@@ -90,12 +93,16 @@ requires       'Win32::API'               => '0.58' if win32;
 requires       'Wx'                       => '0.91';
 requires       'Wx::Perl::ProcessStream'  => '0.11';
 requires       'YAML::Tiny'               => '1.32';
-test_requires  'Test::More'               => '0.47';
+test_requires  'Test::More'               => '0.88';
 test_requires  'Test::Most'               => '0.21';
 test_requires  'Test::Script'             => '1.03';
 test_requires  'Test::Exception'          => '0.27';
 test_requires  'Test::NoWarnings'         => '0.084';
-# test_requires  'Test::NeedsDisplay'       => '1.07';
+
+# Extra deps to squelch DIE complaints from dev.pl
+if ( author_context ) {
+	requires 'prefork' => '1.03';
+}
 
 my $locale = setlocale(LC_CTYPE);
 print "Found locale    $locale\n";
@@ -107,8 +114,40 @@ no_index       'directory'                => qw{ t xt eg share inc privinc };
 homepage       'http://padre.perlide.org/';
 bugtracker     'http://padre.perlide.org/';
 repository     'http://svn.perlide.org/padre/trunk/Padre/';
+
+keywords(
+    "auto-completion",
+    "code",
+    "coding",
+    "completion",
+    "context",
+    "cross-platform",
+    "development",
+    "editor",
+    "environment",
+    "find",
+    "function list",
+    "gui",
+    "help",
+    "highlight",
+    "hightlighting",
+    "ide",
+    "linux",
+    "mac os",
+    "mac os x",
+    "padre",
+    "perl",
+    "portable",
+    "refactoring",
+    "replace",
+    "syntax",
+    "windows",
+    "wx",
+    "wxwidgets",
+);
+
 install_script 'script/padre';
-install_share;
+install_share_with_mofiles;
 
 
 

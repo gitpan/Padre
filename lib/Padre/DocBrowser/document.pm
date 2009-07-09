@@ -3,15 +3,14 @@ package Padre::DocBrowser::document;
 use strict;
 use warnings;
 use File::Basename qw(fileparse basename);
-use Class::XSAccessor
-	constructor => 'new', accessors => {
+use Class::XSAccessor constructor => 'new', accessors => {
 	'mimetype' => 'mime_type',
 	'body'     => 'body',
 	'title'    => 'title',
 	'filename' => 'filename',
-	};
+};
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 =pod
 
@@ -106,9 +105,11 @@ sub guess_mimetype {
 		keys %EXT_MIME
 	);
 
-	exists $EXT_MIME{$suffix}
+	my $type
+		= exists $EXT_MIME{$suffix}
 		? $EXT_MIME{$suffix}
 		: '';
+	return $type;
 }
 
 1;

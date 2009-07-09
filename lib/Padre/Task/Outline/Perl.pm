@@ -36,7 +36,7 @@ use warnings;
 use version;
 use Padre::Task::Outline ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Padre::Task::Outline';
 
 sub run {
@@ -67,7 +67,8 @@ sub _get_outline {
 			return 1
 				if ref $_[0] eq 'PPI::Statement::Package'
 					or ref $_[0] eq 'PPI::Statement::Include'
-					or ref $_[0] eq 'PPI::Statement::Sub';
+					or ref $_[0] eq 'PPI::Statement::Sub'
+					or ref $_[0] eq 'PPI::Statement';
 		}
 	);
 
@@ -95,6 +96,24 @@ sub _get_outline {
 			}
 		} elsif ( ref $thing eq 'PPI::Statement::Sub' ) {
 			push @{ $cur_pkg->{methods} }, { name => $thing->name, line => $thing->location->[0] };
+		} elsif ( ref $thing eq 'PPI::Statement' ) {
+
+			# last resort, let's analyse further down...
+			my $node1 = $thing->first_element;
+			my $node2 = $thing->child(2);
+			next unless defined $node2;
+
+			# Moose attribute declaration
+			if ( $node1->isa('PPI::Token::Word') && $node1->content eq 'has' ) {
+				push @{ $cur_pkg->{attributes} }, { name => $node2->content, line => $thing->location->[0] };
+				next;
+			}
+
+			# MooseX::POE event declaration
+			if ( $node1->isa('PPI::Token::Word') && $node1->content eq 'event' ) {
+				push @{ $cur_pkg->{events} }, { name => $node2->content, line => $thing->location->[0] };
+				next;
+			}
 		}
 	}
 
@@ -229,7 +248,7 @@ sub _update_treectrl {
 				}
 			)
 		);
-		foreach my $type (qw(pragmata modules methods)) {
+		foreach my $type (qw(pragmata modules attributes methods events)) {
 			_add_subtree( $outlinebar, $pkg, $type, $branch );
 		}
 		$outlinebar->Expand($branch);

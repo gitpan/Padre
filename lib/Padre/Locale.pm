@@ -49,7 +49,7 @@ use Padre::Wx       ();
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => File::Spec->rel2abs( Padre::Util::sharedir('locale') );
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -68,6 +68,7 @@ BEGIN {
 		# The following entry for it is heavily commented for
 		# documentation purposes.
 		'en-gb' => {
+
 			# REQUIRED: The gettext msgid for the language.
 			gettext => _T('English (United Kingdom)'),
 
@@ -252,6 +253,7 @@ BEGIN {
 		},
 
 		'fr-fr' => {
+
 			# Simplify until there's another French
 			# gettext   => 'French (France)',
 			# utf8text  => 'Français (France)',
@@ -285,6 +287,7 @@ BEGIN {
 		},
 
 		'it-it' => {
+
 			# Simplify until there's another Italian
 			# gettext   => 'Italian (Italy)',
 			# utf8text  => 'Italiano (Italy)',
@@ -318,6 +321,7 @@ BEGIN {
 		},
 
 		'nl-nl' => {
+
 			# Simplify until there's another Italian
 			# gettext   => 'Dutch (Netherlands)',
 			# utf8text  => 'Nederlands (Nederlands)',
@@ -441,7 +445,8 @@ BEGIN {
 		my $lang = $RFC4646{$id};
 		$lang->{actual} = List::Util::first {
 			$RFC4646{$_}->{supported};
-		} ( $id, @{ $lang->{fallback} }, DEFAULT );
+		}
+		( $id, @{ $lang->{fallback} }, DEFAULT );
 	}
 }
 
@@ -449,9 +454,8 @@ use constant WX => Wx::Locale::GetSystemLanguage();
 
 use constant system_rfc4646 => List::Util::first {
 	$RFC4646{$_}->{wxid} == WX;
-} grep {
-	defined $RFC4646{$_}->{wxid}
-} sort keys %RFC4646;
+}
+grep { defined $RFC4646{$_}->{wxid} } sort keys %RFC4646;
 
 #####################################################################
 # Locale 2.0 Implementation
@@ -485,8 +489,9 @@ sub iso639 {
 
 sub system_iso639 {
 	my $system = system_rfc4646();
-	my $iso639 = $RFC4646{ $system }{iso639};
+	my $iso639 = $RFC4646{$system}{iso639};
 }
+
 # Given a rfc4646 identifier, sets the language globally
 # and returns the relevant Wx::Locale object.
 sub object {
@@ -502,11 +507,7 @@ sub object {
 }
 
 sub menu_view_languages {
-	return map {
-		$_ => Wx::gettext( $RFC4646{$_}->{gettext} )
-	} grep {
-		$RFC4646{$_}->{supported}
-	} sort keys %RFC4646;
+	return map { $_ => Wx::gettext( $RFC4646{$_}->{gettext} ) } grep { $RFC4646{$_}->{supported} } sort keys %RFC4646;
 }
 
 #####################################################################
@@ -563,6 +564,8 @@ sub encoding_system_default {
 		return;
 	}
 
+	Padre::Util::debug("Encoding system default: ($encoding)");
+
 	return $encoding;
 }
 
@@ -578,25 +581,27 @@ sub encoding_from_string {
 	# Or, we'll use system default encode setting
 	# If we cannot get system default, then forced it to set 'utf-8'
 	my $default  = '';
-	my @guess    = ();
+	my @guesses  = ();
 	my $encoding = '';
 	my $language = rfc4646();
-	if ( $language eq 'ko' ) {       # Korean
-		@guess = qw/utf-8 euc-kr/;
-	} elsif ( $language eq 'ja' ) {  # Japan (not yet tested)
-		@guess = qw/utf-8 iso8859-1 euc-jp shiftjis 7bit-jis/;
-	} elsif ( $language =~ /^zh/ ) { # Chinese (not yet tested)
-		@guess = qw/utf-8 iso8859-1 euc-cn/;
+	if ( $language eq 'ko' ) {    # Korean
+		@guesses = qw/utf-8 euc-kr/;
+	} elsif ( $language eq 'ja' ) {    # Japan (not yet tested)
+		@guesses = qw/utf-8 iso8859-1 euc-jp shiftjis 7bit-jis/;
+	} elsif ( $language =~ /^zh/ ) {    # Chinese (not yet tested)
+		@guesses = qw/utf-8 iso8859-1 euc-cn/;
 	} else {
 		$default ||= encoding_system_default();
-		@guess = ($default) if $default;
+		@guesses = ($default) if $default;
 	}
 
 	require Encode::Guess;
-	my $guess = Encode::Guess::guess_encoding( $content, @guess );
+	my $guess = Encode::Guess::guess_encoding( $content, @guesses );
 	unless ( defined $guess ) {
-		$guess = ''; # to avoid warnings
+		$guess = '';                    # to avoid warnings
 	}
+
+	Padre::Util::debug("Encoding guess: ($guess)");
 
 	# Wow, nice!
 	if ( ref($guess) and ref($guess) =~ m/^Encode::/ ) {
@@ -624,6 +629,8 @@ sub encoding_from_string {
 			. "Please check it manually and report to the Padre development team.";
 		$encoding = 'utf-8';
 	}
+
+	Padre::Util::debug("Encoding selected: ($encoding)");
 
 	return $encoding;
 }

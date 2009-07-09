@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Params::Util    ();
 use Padre::Constant ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 # Config schema revision
 my $REVISION = 1;
@@ -32,7 +32,7 @@ sub read {
 	my $class = shift;
 
 	# Load the user configuration
-	my $hash = eval { YAML::Tiny::LoadFile( Padre::Constant::CONFIG_HUMAN ) };
+	my $hash = eval { YAML::Tiny::LoadFile(Padre::Constant::CONFIG_HUMAN) };
 	unless ( Params::Util::_HASH0($hash) ) {
 		return;
 	}

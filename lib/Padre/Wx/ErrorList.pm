@@ -7,7 +7,7 @@ use Padre::Constant ();
 use Padre::Wx       ();
 use Padre::Locale   ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor getters => {
@@ -151,7 +151,13 @@ sub on_tree_item_activated {
 	my $item  = $event->GetItem or return;
 	my $error = $self->GetPlData($item);
 	my $main  = $self->main;
-	if ( $error->file eq 'eval' ) {
+
+	#TODO: The <$error eq 'Data'> clause prevents
+	#Padre from crashing when pressing [enter] before
+	#the main window is fully loaded. Further implications
+	# (and better understanding of why GetPlData returns 'Data'
+	# instead of an object) is a worthy investigation.
+	if ( $error eq 'Data' || $error->file eq 'eval' ) {
 		return;
 	}
 	$main->setup_editor( $error->file_abspath );

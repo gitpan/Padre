@@ -8,8 +8,12 @@ use Padre::Wx         ();
 use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Wx::ToolBar';
+
+# NOTE: Something is wrong with dockable toolbars on Windows
+#       so disable them for now.
+use constant DOCKABLE => !Padre::Constant::WXWIN32;
 
 sub new {
 	my $class = shift;
@@ -17,7 +21,7 @@ sub new {
 
 	# Prepare the style
 	my $style = Wx::wxTB_HORIZONTAL | Wx::wxTB_FLAT | Wx::wxTB_NODIVIDER | Wx::wxBORDER_NONE;
-	unless ( $main->config->main_lockinterface ) {
+	if ( DOCKABLE and not $main->config->main_lockinterface ) {
 		$style = $style | Wx::wxTB_DOCKABLE;
 	}
 
@@ -58,6 +62,21 @@ sub new {
 	);
 
 	$self->add_tool(
+		id    => Wx::wxID_SAVEAS,
+		icon  => 'actions/document-save-as',
+		short => Wx::gettext('Save as...'),
+	);
+
+	$self->add_tool(
+		id    => 1000,                        # I don't like these hard set ID's for Wx.
+		icon  => 'actions/stock_data-save',
+		short => Wx::gettext('Save All'),
+		event => sub {
+			Padre::Wx::Main::on_save_all(@_);
+		},
+	);
+
+	$self->add_tool(
 		id    => Wx::wxID_CLOSE,
 		icon  => 'actions/x-document-close',
 		short => Wx::gettext('Close File'),
@@ -89,7 +108,7 @@ sub new {
 		icon  => 'actions/edit-cut',
 		short => Wx::gettext('Cut'),
 		event => sub {
-			Padre::Current->editor->Cut;
+			Wx::Window::FindFocus->Cut;
 		},
 	);
 
@@ -98,7 +117,7 @@ sub new {
 		icon  => 'actions/edit-copy',
 		short => Wx::gettext('Copy'),
 		event => sub {
-			Padre::Current->editor->Copy;
+			Wx::Window::FindFocus->Copy;
 		},
 	);
 
@@ -107,7 +126,7 @@ sub new {
 		icon  => 'actions/edit-paste',
 		short => Wx::gettext('Paste'),
 		event => sub {
-			my $editor = Padre::Current->editor or return;
+			my $editor = Wx::Window::FindFocus() or return;
 			$editor->Paste;
 		},
 	);
@@ -117,19 +136,45 @@ sub new {
 		icon  => 'actions/edit-select-all',
 		short => Wx::gettext('Select All'),
 		event => sub {
-			Padre::Wx::Editor::text_select_all(@_);
+			Wx::Window::FindFocus->SelectAll();
 		},
+	);
+
+	# find and replace
+	$self->AddSeparator;
+
+	$self->add_tool(
+		id    => Wx::wxID_FIND,
+		icon  => 'actions/edit-find',
+		short => Wx::gettext('Find'),
+	);
+
+	$self->add_tool(
+		id    => Wx::wxID_REPLACE,
+		icon  => 'actions/edit-find-replace',
+		short => Wx::gettext('Find and Replace'),
 	);
 
 	# Document Transforms
 	$self->AddSeparator;
 
 	$self->add_tool(
-		id    => 999, 
+		id    => 999,
 		icon  => 'actions/toggle-comments',
 		short => Wx::gettext('Toggle Comments'),
 		event => sub {
 			Padre::Wx::Main::on_comment_toggle_block(@_);
+		},
+	);
+
+	$self->AddSeparator;
+
+	$self->add_tool(
+		id    => 1001,
+		icon  => 'actions/document-properties',
+		short => Wx::gettext('Document Stats'),
+		event => sub {
+			Padre::Wx::Main::on_doc_stats(@_);
 		},
 	);
 
@@ -145,6 +190,11 @@ sub refresh {
 	my $selection = ( defined $text and $text ne '' ) ? 1 : 0;
 
 	$self->EnableTool( Wx::wxID_SAVE, ( $document and $document->is_modified ? 1 : 0 ) );
+	$self->EnableTool( Wx::wxID_SAVEAS, ($document) );
+
+	# trying out the Comment Code method here
+	$self->EnableTool( 1000, ($document) );    # Save All
+
 	$self->EnableTool( Wx::wxID_CLOSE, ( $editor ? 1 : 0 ) );
 	$self->EnableTool( Wx::wxID_UNDO,  ( $editor and $editor->CanUndo ) );
 	$self->EnableTool( Wx::wxID_REDO,  ( $editor and $editor->CanRedo ) );
@@ -152,7 +202,7 @@ sub refresh {
 	$self->EnableTool( Wx::wxID_COPY,  ($selection) );
 	$self->EnableTool( Wx::wxID_PASTE, ( $editor and $editor->CanPaste ) );
 	$self->EnableTool( Wx::wxID_SELECTALL, ( $editor ? 1 : 0 ) );
-	$self->EnableTool( 999, ($document ? 1 : 0) );
+	$self->EnableTool( 999, ( $document ? 1 : 0 ) );
 
 	return;
 }
@@ -163,11 +213,11 @@ sub refresh {
 sub add_tool {
 	my $self  = shift;
 	my %param = @_;
-	
+
 	# TODO: the ID code must be unique. If set to -1 such as in
 	# the default call below, it will override any previous item
 	# with that id.
-	my $id    = $param{id} || -1;
+	my $id = $param{id} || -1;
 
 	# Create the tool
 	$self->AddTool(

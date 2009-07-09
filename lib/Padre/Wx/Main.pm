@@ -53,7 +53,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -119,12 +119,10 @@ sub new {
 	# Create the underlying Wx frame
 	my $self = $class->SUPER::new(
 		undef, -1, $title,
-		[
-			$config->main_left,
+		[   $config->main_left,
 			$config->main_top,
 		],
-		[
-			$config->main_width,
+		[   $config->main_width,
 			$config->main_height,
 		],
 		$style,
@@ -149,7 +147,7 @@ sub new {
 
 	# A large complex application looks, frankly, utterly stupid
 	# if it gets very small, or even mildly small.
-	$self->SetMinSize( Wx::Size->new(500, 400) );
+	$self->SetMinSize( Wx::Size->new( 500, 400 ) );
 
 	# Set the locale
 	$self->{locale} = Padre::Locale::object();
@@ -326,14 +324,15 @@ Accessors that may not belong to this class:
 =cut
 
 use Class::XSAccessor
-# Needed for lazily-constructed gui elements
-predicates => {
+
+	# Needed for lazily-constructed gui elements
+	predicates => {
 	has_find      => 'find',
 	has_replace   => 'replace',
 	has_outline   => 'outline',
 	has_directory => 'directory',
 	},
-getters => {
+	getters => {
 
 	# GUI Elements
 	title     => 'title',
@@ -355,7 +354,7 @@ getters => {
 
 	# Things that are probably in the wrong place
 	ack => 'ack',
-};
+	};
 
 sub outline {
 	$_[0]->{outline}
@@ -533,10 +532,6 @@ sub freezer {
 	Wx::WindowUpdateLocker->new( $_[0] );
 }
 
-
-
-
-
 #####################################################################
 
 =pod
@@ -571,8 +566,12 @@ sub single_instance_start {
 	require Wx::Socket;
 	$self->{single_instance} = Wx::SocketServer->new(
 		'127.0.0.1' => $single_instance_port,
-		Wx::wxSOCKET_NOWAIT & Wx::wxSOCKET_REUSEADDR,
+		Wx::wxSOCKET_NOWAIT Wx::wxSOCKET_REUSEADDR,
 	);
+	unless ( $self->{single_instance}->Ok ) {
+		delete $self->{single_instance_server};
+		warn( Wx::gettext("Failed to create server") );
+	}
 	Wx::Event::EVT_SOCKET_CONNECTION(
 		$self,
 		$self->{single_instance},
@@ -581,11 +580,7 @@ sub single_instance_start {
 		}
 	);
 
-	return 1 if $self->{single_instance}->Ok;
-
-	# there was an error during server creation, let's die... :-(
-	die( Wx::gettext("Failed to create server") );
-
+	return 1;
 }
 
 =pod
@@ -639,12 +634,13 @@ sub single_instance_connect {
 
 	# Before we start accepting input,
 	# send the client our process ID.
-	$client->Write( sprintf('% 10s', $$), 10 );
+	$client->Write( sprintf( '% 10s', $$ ), 10 );
 
 	# Set up the socket hooks
 	Wx::Event::EVT_SOCKET_INPUT(
 		$self, $client,
 		sub {
+
 			# Accept the data and stream commands
 			my $command = '';
 			my $buffer  = '';
@@ -1145,10 +1141,10 @@ recreate it from scratch.
 
 sub rebuild_toolbar {
 	my $self = shift;
-	
+
 	my $toolbar = $self->GetToolBar;
 	$toolbar->Destroy if $toolbar;
-	
+
 	$self->SetToolBar( Padre::Wx::ToolBar->new($self) );
 	$self->GetToolBar->refresh;
 	$self->GetToolBar->Realize;
@@ -1466,19 +1462,19 @@ Callback method, to run the project tests and harness them.
 sub on_run_tests {
 	my $self     = shift;
 	my $document = $self->current->document;
-	unless ( $document ) {
+	unless ($document) {
 		return $self->error( Wx::gettext("No document open") );
 	}
 
 	# TODO probably should fetch the current project name
 	my $filename = $document->filename;
-	unless ( $filename ) {
+	unless ($filename) {
 		return $self->error( Wx::gettext("Current document has no filename") );
 	}
 
 	# Find the project
 	my $project_dir = Padre::Util::get_project_dir($filename);
-	unless ( $project_dir ) {
+	unless ($project_dir) {
 		return $self->error( Wx::gettext("Could not find project root") );
 	}
 
@@ -1499,6 +1495,20 @@ Run C<$command> and display the result in the output panel.
 sub run_command {
 	my $self = shift;
 	my $cmd  = shift;
+
+	# experimental
+	# TODO: add windows version
+	# when this mode is used the Run menu options are not turned off
+	# and the Run/Stop is not turned on as we currently cannot control
+	# the external execution.
+	my $config = $self->config;
+	if ( $config->run_use_external_window ) {
+		if (Padre::Util::WIN32) {
+		} else {
+			system qq(xterm -e "$cmd; sleep 1000" &);
+			return;
+		}
+	}
 
 	# Disable access to the run menus
 	$self->menu->run->disable;
@@ -2050,18 +2060,20 @@ Prompt user for a line, and jump to this line in current document.
 =cut
 
 sub on_goto {
-	my $self        = shift;
+	my $self = shift;
+
+	my $editor      = $self->current->editor;
+	my $max         = $editor->GetLineCount;
 	my $line_number = $self->prompt(
-		Wx::gettext("Line number:"),
+		sprintf( Wx::gettext("Line number between (1-%s):"), $max ),
 		Wx::gettext("Go to line number"),
 		"GOTO_LINE_NUMBER"
 	);
 	return if not defined $line_number or $line_number !~ /^\d+$/;
 
-	# TODO: What if it is bigger than buffer?
-	my $page = $self->current->editor;
+	$line_number = $max if $line_number > $max;
 	$line_number--;
-	$page->goto_line_centerize($line_number);
+	$editor->goto_line_centerize($line_number);
 
 	return;
 }
@@ -2126,11 +2138,6 @@ sub on_close_window {
 	# at which Padre appears to close.
 	$self->Show(0);
 
-	# Stop all Task Manager's worker threads
-	$self->ide->task_manager->cleanup;
-
-	Padre::Util::debug("Finished TaskManager's cleanup");
-
 	# Save the window geometry
 	#$config->set( main_auilayout => $self->aui->SavePerspective );
 	$config->set( main_maximized => $self->IsMaximized ? 1 : 0 );
@@ -2165,6 +2172,11 @@ sub on_close_window {
 	# Write the configuration to disk
 	$ide->save_config;
 	$event->Skip;
+
+	Padre::Util::debug("Tell TaskManager to cleanup");
+
+	# Stop all Task Manager's worker threads
+	$self->ide->task_manager->cleanup;
 
 	Padre::Util::debug("Closing Padre");
 
@@ -2215,6 +2227,7 @@ sub setup_editors {
 	my @files = @_;
 	Padre::Util::debug("setup_editors @files");
 	SCOPE: {
+
 		# Lock both Perl and Wx-level updates
 		local $self->{_no_refresh} = 1;
 		my $guard = $self->freezer;
@@ -2229,8 +2242,8 @@ sub setup_editors {
 			}
 		}
 
-		if ( @files ) {
-			foreach my $f ( @files ) {
+		if (@files) {
+			foreach my $f (@files) {
 				$self->setup_editor($f);
 			}
 		} else {
@@ -2393,7 +2406,8 @@ No return value.
 sub on_open_selection {
 	my $self    = shift;
 	my $current = $self->current;
-	my $text    = $current->text;
+	return if not $current->editor;
+	my $text = $current->text;
 
 	# get selection, ask for it if needed
 	unless ( length $text ) {
@@ -2414,9 +2428,9 @@ sub on_open_selection {
 	#atm, we assume you are opening _one_ file, so newlines in the middle are significant
 	$text =~ s/^[\s\n]*(.*?)[\s\n]*$/$1/;
 
-	my $file;
+	my @files;
 	if ( File::Spec->file_name_is_absolute($text) and -e $text ) {
-		$file = $text;
+		push @files, $text;
 	} else {
 
 		# Try relative to the dir we started in?
@@ -2426,7 +2440,7 @@ sub on_open_selection {
 				$text,
 			);
 			if ( -e $filename ) {
-				$file = $filename;
+				push @files, $filename;
 			}
 		}
 
@@ -2437,11 +2451,11 @@ sub on_open_selection {
 				$text,
 			);
 			if ( -e $filename ) {
-				$file = $filename;
+				push @files, $filename;
 			}
 		}
 	}
-	unless ( $file ) { # and we are in a Perl environment
+	unless (@files) {    # TODO: and if we are in a Perl environment
 		my $module = $text;
 		$module =~ s{::}{/}g;
 		$module .= ".pm";
@@ -2450,19 +2464,23 @@ sub on_open_selection {
 			$module,
 		);
 		if ( -e $filename ) {
-			$file = $filename;
+			push @files, $filename;
 		} else {
+
+			# TODO: mayb it should not be our @INC but the @INC of the perl used for
+			# script execution
 			foreach my $path (@INC) {
 				my $filename = File::Spec->catfile( $path, $module );
 				if ( -e $filename ) {
-					$file = $filename;
-					last;
+					push @files, $filename;
+
+					#last;
 				}
 			}
 		}
 	}
 
-	unless ( $file ) {
+	unless (@files) {
 		Wx::MessageBox(
 			sprintf( Wx::gettext("Could not find file '%s'"), $text ),
 			Wx::gettext("Open Selection"),
@@ -2472,7 +2490,16 @@ sub on_open_selection {
 		return;
 	}
 
-	$self->setup_editors($file);
+	# eliminate duplicates
+	my %seen;
+	@files = grep { !$seen{$_}++ } @files;
+
+	require Wx::Perl::Dialog::Simple;
+	my $file = Wx::Perl::Dialog::Simple::single_choice( choices => \@files );
+
+	if ($file) {
+		$self->setup_editors($file);
+	}
 
 	return;
 }
@@ -2505,7 +2532,7 @@ return value.
 sub on_open {
 	my $self     = shift;
 	my $filename = $self->current->filename;
-	if ( $filename ) {
+	if ($filename) {
 		$self->{cwd} = File::Basename::dirname($filename);
 	}
 
@@ -2525,7 +2552,8 @@ sub on_open {
 		Wx::gettext("Text Files"),       "*.txt;*.TXT;*.yml;*.conf;*.ini;*.INI",
 		Wx::gettext("Web Files"),        "*.html;*.HTML;*.htm;*.HTM;*.css;*.CSS",
 	);
-	$wildcards = Padre::Constant::WIN32
+	$wildcards
+		= Padre::Constant::WIN32
 		? Wx::gettext("All Files") . "|*.*|" . $wildcards
 		: Wx::gettext("All Files") . "|*|" . $wildcards;
 	my $dialog = Wx::FileDialog->new(
@@ -2605,9 +2633,22 @@ sub on_save_as {
 		if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 			return;
 		}
-		my $filename = $dialog->GetFilename;
+
+		# GetPath will return the typed in string
+		# for a file path to be saved to.
+		# now we need to work out if we use GetPath
+		# or concatinate the two values used.
+
+		#my $filename = $dialog->GetFilename;
+		#print "FileName: $filename\n";
+		#my $dir = $dialog->GetDirectory;
+		#print "Directory: $dir\n";
+		#print "Path: " . $dialog->GetPath  . "\n";
 		$self->{cwd} = $dialog->GetDirectory;
-		my $path = File::Spec->catfile( $self->cwd, $filename );
+		my $saveto = $dialog->GetPath;
+
+		#my $path = File::Spec->catfile( $self->cwd, $filename );
+		my $path = File::Spec->catfile($saveto);
 		if ( -e $path ) {
 			my $response = Wx::MessageBox(
 				Wx::gettext("File already exists. Overwrite it?"),
@@ -3323,9 +3364,10 @@ sub on_toggle_toolbar {
 	if ( $config->main_toolbar ) {
 		$self->rebuild_toolbar;
 	} else {
+
 		# Update the tool bar
 		my $toolbar = $self->GetToolBar;
-		if ( $toolbar ) {
+		if ($toolbar) {
 			$toolbar->Destroy;
 			$self->SetToolBar(undef);
 		} else {
@@ -3386,18 +3428,11 @@ sub on_toggle_lockinterface {
 	my $config = $self->config;
 
 	# Update and save configuration
-	$config->set(
+	$config->apply(
 		'main_lockinterface',
 		$self->menu->view->{lockinterface}->IsChecked ? 1 : 0,
 	);
 	$config->write;
-
-	# Update the lock status
-	$self->aui->lock_panels( $config->main_lockinterface );
-
-	# The toolbar can't dynamically switch between
-	# tearable and non-tearable so rebuild it.
-	$self->rebuild_toolbar;
 
 	return;
 }
@@ -3412,7 +3447,7 @@ document. No return value.
 =cut
 
 sub on_insert_from_file {
-	my $self   = shift;
+	my $self = shift;
 	my $editor = $self->current->editor or return;
 
 	# popup the window
@@ -3582,6 +3617,7 @@ sub on_stc_style_needed {
 	my $current  = $self->current;
 	my $document = $current->document or return;
 	if ( $document->can('colorize') ) {
+
 		# Workaround something that seems like a Scintilla bug
 		# when the cursor is close to the end of the document
 		# and there is code at the end of the document (and not comment)
@@ -3628,7 +3664,6 @@ sub on_stc_update_ui {
 
 	# $self->refresh_functions;
 	# $self->refresh_syntaxcheck;
-
 
 	return;
 }
@@ -3764,7 +3799,8 @@ sub on_tab_and_space {
 	my $type     = shift;
 	my $current  = $self->current;
 	my $document = $current->document or return;
-	my $title = $type eq 'Space_to_Tab'
+	my $title
+		= $type eq 'Space_to_Tab'
 		? Wx::gettext('Space to Tab')
 		: Wx::gettext('Tab to Space');
 
@@ -3840,7 +3876,7 @@ sub on_delete_leading_space {
 	my $self    = shift;
 	my $current = $self->current;
 	my $src     = $current->text;
-	unless ( $src ) {
+	unless ($src) {
 		$self->message('No selection');
 		return;
 	}
@@ -3954,7 +3990,7 @@ sub on_new_from_template {
 	$self->on_new;
 
 	my $editor = $self->current->editor or return;
-	my $file   = File::Spec->catfile(
+	my $file = File::Spec->catfile(
 		Padre::Util::sharedir('templates'),
 		"template.$extension"
 	);
@@ -4141,13 +4177,13 @@ sub key_up {
 	# () needed after the constants as they are functions in Perl and
 	# without constants perl will call only the first one.
 	$mod = $mod & ( Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() );
-	if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
-		# Ctrl-TAB  #TODO it is already in the menu
+	if ( $mod == Wx::wxMOD_CMD ) {    # Ctrl
+		                              # Ctrl-TAB  #TODO it is already in the menu
 		if ( $code == Wx::WXK_TAB ) {
 			$self->on_next_pane;
 		}
-	} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) { # Ctrl-Shift
-		# Ctrl-Shift-TAB #TODO it is already in the menu
+	} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) {    # Ctrl-Shift
+		                                                         # Ctrl-Shift-TAB #TODO it is already in the menu
 		$self->on_prev_pane if $code == Wx::WXK_TAB;
 	} elsif ( $mod == Wx::wxMOD_ALT() ) {
 
@@ -4173,102 +4209,30 @@ sub key_up {
 	return;
 }
 
-# Encode document to System Default
-# Encode document to utf-8
-# Encode document to ...
-sub encode_document_to_system_default {
-    my ( $self, $event ) = @_;
+# TODO enable/disable menu options
+sub show_as_numbers {
+	my ( $self, $event, $form ) = @_;
 
-    my $doc = $self->current->document;
-    $doc->{encoding} = Padre::Locale::encoding_system_default || 'utf-8';
-    $doc->save_file if $doc->filename;
-    $self->refresh;
+	my $current = $self->current;
+	return if not $current->editor;
+	my $text = $current->text;
+	if ($text) {
+		$self->show_output(1);
+		my $output = $self->output;
+		$output->Remove( 0, $output->GetLastPosition );
 
-    my $string = 'Encode document to System Default('.$doc->{encoding}.')';
-    my $output_panel = $self->output;
-    $output_panel->clear;
-    $output_panel->AppendText( $string . $/ );
-    return;
-}
+		# TODO deal with wide characters ?
+		# TODO split lines, show location ?
+		foreach my $i ( 0 .. length($text) ) {
+			my $decimal = ord( substr( $text, $i, 1 ) );
+			$output->AppendText( ( $form eq 'decimal' ? $decimal : uc( sprintf( '%0.2x', $decimal ) ) ) . ' ' );
+		}
+	} else {
+		$self->message( Wx::gettext('Need to select text in order to translate to hex') );
+	}
 
-sub encode_document_to_utf8 {
-    my ( $self, $event ) = @_;
-
-    my $doc = $self->current->document;
-    $doc->{encoding} = 'utf-8';
-    $doc->save_file if $doc->filename;
-    $self->refresh;
-
-    my $string = 'Encode document to '.$doc->{encoding};
-    my $output_panel = $self->output;
-    $output_panel->clear;
-    $output_panel->AppendText( $string . $/ );
-    return;
-}
-
-sub encode_document_to {
-    my ( $self, $event ) = @_;
-
-	my @ENCODINGS = qw(
-	    cp932
-	    cp949
-	    euc-jp
-	    euc-kr
-	    shift-jis
-	    utf-8
-	);
-
-
-    my @layout = (
-        [
-            [ 'Wx::StaticText', undef, Wx::gettext('Encode to:') ],
-            [ 'Wx::ComboBox', '_encoding_', 'utf-8', \@ENCODINGS, Wx::wxCB_READONLY ],
-        ],
-        [
-            [ 'Wx::Button', '_ok_',     Wx::wxID_OK ],
-            [ 'Wx::Button', '_cancel_', Wx::wxID_CANCEL ],
-        ],
-    );
-
-    my $dialog = Padre::Wx::Dialog->new(
-        parent => $self,
-        title  => Wx::gettext("Encode document to..."),
-        layout => \@layout,
-        width  => [ 100, 200 ],
-        bottom => 20,
-    );
-    $dialog->{_widgets_}{_ok_}->SetDefault;
-    Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_ok_}, \&encode_ok_clicked );
-    Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}{_cancel_}, \&encode_cancel_clicked );
-
-    $dialog->{_widgets_}{_encoding_}->SetFocus;
-    $dialog->Show(1);
-
-    return 1;
-}
-
-sub encode_cancel_clicked {
-    my ( $dialog, $event ) = @_;
-
-    $dialog->Destroy;
-}
-
-sub encode_ok_clicked {
-    my ( $dialog, $event ) = @_;
-
-    my $window = $dialog->GetParent;
-    my $data = $dialog->get_data;
-    $dialog->Destroy;
-
-    my $doc = $window->current->document;
-    $doc->{encoding} = $data->{_encoding_};
-    $doc->save_file if $doc->filename;
-    $window->refresh;
-
-    my $string = 'Encode document to '.$doc->{encoding};
-    my $output_panel = $window->output;
-    $output_panel->clear;
-    $output_panel->AppendText( $string . $/ );
+	$event->Skip;
+	return;
 }
 
 1;

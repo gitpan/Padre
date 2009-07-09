@@ -21,7 +21,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use File::Basename    ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 my $iter;
 my %opts;
@@ -65,9 +65,9 @@ sub on_ack {
 
 	# delay App::Ack loading till first use, to reduce memory
 	# usage and init time.
-	unless ( $loaded ) {
+	unless ($loaded) {
 		my $error = load();
-		if ( $error ) {
+		if ($error) {
 			$main->error($error);
 			return;
 		}
@@ -132,7 +132,7 @@ sub get_layout {
 sub dialog {
 	my ( $main, $term, $directory ) = @_;
 
-	my $layout = get_layout($term, $directory);
+	my $layout = get_layout( $term, $directory );
 	my $dialog = Padre::Wx::Dialog->new(
 		parent => $main,
 		title  => Wx::gettext("Find in Files"),
@@ -141,6 +141,8 @@ sub dialog {
 		size   => Wx::wxDefaultSize,
 		pos    => Wx::wxDefaultPosition,
 	);
+
+	$dialog->{_widgets_}->{_find_}->SetDefault;
 
 	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}->{_find_},     \&find_clicked );
 	Wx::Event::EVT_BUTTON( $dialog, $dialog->{_widgets_}->{_pick_dir_}, \&on_pick_dir );

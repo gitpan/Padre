@@ -9,13 +9,16 @@ use Carp            ();
 use Params::Util    ();
 use Padre::Constant ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use Class::XSAccessor getters => {
 	name    => 'name',
 	type    => 'type',
 	store   => 'store',
 	default => 'default',
+	project => 'project',
+	options => 'options',
+	apply   => 'apply',
 };
 
 sub new {
@@ -26,15 +29,18 @@ sub new {
 	unless ( $self->name ) {
 		Carp::croak("Missing or invalid name");
 	}
-	unless ( _ISTYPE( $self->type ) ) {
+	unless ( _TYPE( $self->type ) ) {
 		Carp::croak("Missing or invalid type for setting $self->{name}");
 	}
-	unless ( _ISSTORE( $self->store ) ) {
+	unless ( _STORE( $self->store ) ) {
 		Carp::croak("Missing or invalid store for setting $self->{name}");
 	}
 	unless ( exists $self->{default} ) {
 		Carp::croak("Missing or invalid default for setting $self->{name}");
 	}
+
+	# Normalise
+	$self->{project} = !!$self->project;
 
 	return $self;
 }
@@ -42,27 +48,12 @@ sub new {
 #####################################################################
 # Support Functions
 
-sub _ISTYPE {
-	return !!(
-		defined $_[0] and not ref $_[0]
-		and {
-			0 => 1,
-			1 => 1,
-			2 => 1,
-			3 => 1,
-		}->{ $_[0] }
-	);
+sub _TYPE {
+	return !!( defined $_[0] and not ref $_[0] and $_[0] =~ /^[0-4]\z/ );
 }
 
-sub _ISSTORE {
-	return !!(
-		defined $_[0] and not ref $_[0]
-		and {
-			0 => 1,
-			1 => 1,
-			2 => 1,
-		}->{ $_[0] }
-	);
+sub _STORE {
+	return !!( defined $_[0] and not ref $_[0] and $_[0] =~ /^[0-2]\z/ );
 }
 
 1;

@@ -7,12 +7,12 @@ use strict;
 use warnings;
 use utf8;
 use Padre::Constant ();
-use Padre::Current  '_CURRENT';
+use Padre::Current '_CURRENT';
 use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -47,7 +47,7 @@ sub new {
 				# populate the main window hash.
 				my $selection = $_[0]->current->text;
 				$_[0]->menu->help->help( $_[0] );
-				if ( $selection ) {
+				if ($selection) {
 					$_[0]->{help}->help($selection);
 				}
 				return;
@@ -76,9 +76,9 @@ sub new {
 
 	Wx::Event::EVT_MENU(
 		$main,
-		$self->{live}->Append( -1, Wx::gettext('Padre Support') ),
+		$self->{live}->Append( -1, Wx::gettext('Padre Support (English)') ),
 		sub {
-			Padre::Wx::launch_browser('http://padre.perlide.org/irc.html?channel=padre');
+			Padre::Wx::launch_irc('padre');
 		},
 	);
 
@@ -88,13 +88,20 @@ sub new {
 		$main,
 		$self->{live}->Append( -1, Wx::gettext('Perl Help') ),
 		sub {
-			my $url = 'http://padre.perlide.org/irc.html?channel=general';
-			if (my $locale = Padre->ide->config->locale) {
-				$url .= "&locale=$locale";
-			}
-			Padre::Wx::launch_browser($url);
+			Padre::Wx::launch_irc('general');
 		},
 	);
+
+	if (Padre::Util::WIN32) {
+
+		Wx::Event::EVT_MENU(
+			$main,
+			$self->{live}->Append( -1, Wx::gettext('Win32 Questions (English)') ),
+			sub {
+				Padre::Wx::launch_irc('win32');
+			},
+		);
+	}
 
 	# Add interesting and helpful websites
 	$self->AppendSeparator;
@@ -113,22 +120,22 @@ sub new {
 		$main,
 		$self->Append( -1, Wx::gettext("Report a New &Bug") ),
 		sub {
-			Padre::Wx::launch_browser('http://padre.perlide.org/wiki/Tickets');
+			Padre::Wx::launch_browser('http://padre.perlide.org/trac/wiki/Tickets');
 		},
 	);
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append( -1, Wx::gettext("View All &Open Bugs") ),
 		sub {
-			Padre::Wx::launch_browser('http://padre.perlide.org/report/1');
+			Padre::Wx::launch_browser('http://padre.perlide.org/trac/report/1');
 		},
 	);
-	
+
 	Wx::Event::EVT_MENU(
 		$main,
 		$self->Append( -1, Wx::gettext("&Translate Padre...") ),
 		sub {
-			Padre::Wx::launch_browser('http://padre.perlide.org/wiki/TranslationIntro');
+			Padre::Wx::launch_browser('http://padre.perlide.org/trac/wiki/TranslationIntro');
 		},
 	);
 
@@ -206,7 +213,7 @@ sub about {
 	$about->SetCopyright( Wx::gettext("Copyright 2008-2009 The Padre development team as listed in Padre.pm") );
 
 	# Only Unix/GTK native about box supports websites
-	if ( Padre::Constant::WXGTK ) {
+	if (Padre::Constant::WXGTK) {
 		$about->SetWebSite("http://padre.perlide.org/");
 	}
 

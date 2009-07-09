@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Padre::Project ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Padre::Project';
 
 sub inspector {
@@ -32,7 +32,7 @@ sub from_file {
 	my @d = File::Spec->splitdir($d);
 	pop @d if $d[-1] eq '';
 	my $dirs = List::Util::first {
-		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
+		       -f File::Spec->catpath( $v, $_, 'Makefile.PL' )
 			or -f File::Spec->catpath( $v, $_, 'Build.PL' )
 			or -f File::Spec->catpath( $v, $_, 'dist.ini' )
 			or -f File::Spec->catpath( $v, $_, 'padre.yml' );

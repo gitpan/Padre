@@ -66,7 +66,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use Params::Util qw{_INSTANCE};
 
@@ -79,6 +79,7 @@ use Thread::Queue 2.11;
 
 require Padre;
 use Padre::Task;
+use Padre::Service;
 use Padre::Wx ();
 
 use Class::XSAccessor getters => {
@@ -95,6 +96,10 @@ our $TASK_DONE_EVENT : shared = Wx::NewEventType;
 # This event is triggered by the worker thread main loop before
 # running a task.
 our $TASK_START_EVENT : shared = Wx::NewEventType;
+
+# This event is triggered by a worker thread DURING ->run to incrementally
+# communicate to the main thread over the life of a service.
+our $SERVICE_POLL_EVENT : shared = Wx::NewEventType;
 
 # remember whether the event handlers were initialized...
 our $EVENTS_INITIALIZED = 0;
@@ -114,8 +119,8 @@ sub new {
 	return $SINGLETON if defined $SINGLETON;
 
 	my $self = $SINGLETON = bless {
-		min_no_workers => 1,
-		max_no_workers => 3,
+		min_no_workers => 2,       # there were config settings for
+		max_no_workers => 6,       #  these long ago?
 		use_threads    => 1,       # can be explicitly disabled
 		reap_interval  => 15000,
 		@_,
@@ -147,6 +152,10 @@ sub new {
 		$REAP_TIMER->Start( $self->reap_interval, Wx::wxTIMER_CONTINUOUS );
 	}
 
+	#	if ( not defined $SERVICE_TIMER and $self->use_threads ) {
+	#		my $timer ;
+	#	}
+
 	return $self;
 }
 
@@ -168,6 +177,11 @@ sub _init_events {
 			$main, -1,
 			$TASK_START_EVENT,
 			\&on_task_start_event,
+		);
+		Wx::Event::EVT_COMMAND(
+			$main, -1,
+			$SERVICE_POLL_EVENT,
+			\&on_service_poll_event,
 		);
 		$EVENTS_INITIALIZED = 1;
 	}
@@ -191,6 +205,10 @@ sub schedule {
 	my $task = _INSTANCE( shift, 'Padre::Task' )
 		or die "Invalid task scheduled!";    # TODO: grace
 
+	if ( _INSTANCE( $task, 'Padre::Service' ) ) {
+		$self->{running_services}{$task} = $task;
+	}
+
 	# Cleanup old threads and refill the pool
 	$self->reap();
 
@@ -202,6 +220,7 @@ sub schedule {
 
 	my $string;
 	$task->serialize( \$string );
+
 	if ( $self->use_threads ) {
 		require Time::HiRes;
 
@@ -272,7 +291,10 @@ sub _make_worker_thread {
 	return unless $self->use_threads;
 
 	@_ = ();    # avoid "Scalars leaked"
-	my $worker = threads->create( { 'exit' => 'thread_only' }, \&worker_loop, $main, $self->task_queue );
+	my $worker = threads->create(
+		{ 'exit' => 'thread_only' }, \&worker_loop,
+		$main, $self->task_queue
+	);
 	push @{ $self->{workers} }, $worker;
 }
 
@@ -334,12 +356,6 @@ sub reap {
 		$queue->insert( 0, ("STOP") x $n_threads_to_kill )
 			unless $queue->pending()
 				and not ref( $queue->peek(0) );
-
-		# We don't actually need to wait for the soon-to-be-joinable threads
-		# since reap should be called regularly.
-		#while (threads->list(threads::running) >= $target_n_threads) {
-		#  $_->join for threads->list(threads::joinable);
-		#}
 	}
 
 	$self->setup_workers();
@@ -372,7 +388,8 @@ sub _stop_task {
 
 =head2 cleanup
 
-Stops all worker threads. Called on editor shutdown.
+Shutdown all services with a HANGUP, then stop all worker threads.
+Called on editor shutdown.
 
 =cut
 
@@ -380,16 +397,27 @@ sub cleanup {
 	my $self = shift;
 	return if not $self->use_threads;
 
+	# Send all services a HANGUP , they will (hopefully)
+	# catch this and break the run loop, returning below as
+	# regular tasks. :|
+	Padre::Util::debug('Tell services to hangup');
+	$self->shutdown_services;
+
 	# the nice way:
+	Padre::Util::debug('Tell all tasks to stop');
 	my @workers = $self->workers;
 	$self->task_queue->insert( 0, ("STOP") x scalar(@workers) );
 	while ( threads->list(threads::running) >= 1 ) {
 		$_->join for threads->list(threads::joinable);
 	}
-	$_->join for threads->list(threads::joinable);
+	foreach my $thread ( threads->list(threads::joinable) ) {
+		Padre::Util::debug( 'Joining thread ' . $thread->tid );
+		$thread->join;
+	}
 
 	# didn't work the nice way?
 	while ( threads->list(threads::running) >= 1 ) {
+		Padre::Util::debug( 'Killing thread ' . $_->tid );
 		$_->detach(), $_->kill() for threads->list(threads::running);
 	}
 
@@ -435,6 +463,26 @@ sub running_tasks {
 
 =pod
 
+=head2 shutdown_services
+
+Gracefully shutdown the services by instructing them to hangup themselves
+and return via the usual Task mechanism.
+
+=cut
+
+## ERM FIXME where are is the {running_services} populated then eh?
+sub shutdown_services {
+	my $self = shift;
+	Padre::Util::debug('Shutdown services');
+
+	while ( my ( $sid, $service ) = each %{ $self->{running_services} } ) {
+		Padre::Util::debug("Hangup service $sid!");
+		$service->shutdown;
+	}
+}
+
+=pod
+
 =head2 workers
 
 Returns B<a list> of the worker threads.
@@ -463,7 +511,10 @@ because C<finish> most likely updates the GUI.)
 sub on_task_done_event {
 	my ( $main, $event ) = @_; @_ = ();    # hack to avoid "Scalars leaked"
 	my $frozen = $event->GetData;
-	my $task   = Padre::Task->deserialize( \$frozen );
+
+	# FIXME - can we know the _real_ class so the an extender
+	#  may hook de/serialize
+	my $task = Padre::Task->deserialize( \$frozen );
 
 	$task->finish($main);
 	my $tid = $task->{__thread_id};
@@ -500,6 +551,20 @@ sub on_task_start_event {
 	$manager->{running_tasks}{$task_type}{$tid} = 1;
 	$main->GetStatusBar->refresh;
 
+	return ();
+}
+
+=pod
+
+=head2 on_service_poll_event
+
+=cut
+
+sub on_service_poll_event {
+	my ( $main, $event ) = @_; @_ = ();
+	my $tid_and_type = $event->GetData();
+	my ( $tid, $type ) = split /;/, $tid_and_type, 2;
+	warn "Polled by service [$tid] as [$type]";
 	return ();
 }
 
@@ -580,7 +645,7 @@ sub worker_loop {
 		Wx::PostEvent( $main, $thread_start_event );
 
 		# RUN
-		$task->run();
+		$task->run;
 
 		# FREEZE THE PROCESS AND PASS IT BACK
 		undef $frozen_task;
@@ -606,6 +671,9 @@ What if the computer can't keep up with the queued jobs? This needs
 some consideration and probably, the schedule() call needs to block once
 the queue is "full". However, it's not clear how this can work if the
 Wx MainLoop isn't reached for processing finish events.
+
+Polling services 'aliveness' in a useful way , something a Wx::Taskmanager
+might like to display. Ability to selectivly kill tasks/services
 
 =head1 SEE ALSO
 

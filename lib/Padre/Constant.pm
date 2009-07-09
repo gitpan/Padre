@@ -10,12 +10,12 @@ use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 # Convenience constants for the operating system
-use constant WIN32 => !! ( $^O eq 'MSWin32' );
-use constant MAC   => !! ( $^O eq 'darwin'  );
-use constant UNIX  => !  ( WIN32 or MAC     );
+use constant WIN32 => !!( $^O eq 'MSWin32' );
+use constant MAC   => !!( $^O eq 'darwin' );
+use constant UNIX => !( WIN32 or MAC );
 
 # Padre targets the three largest Wx backends
 # 1. Win32 Native
@@ -31,7 +31,13 @@ use constant {
 };
 
 # The local newline type
-use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAC' : 'UNIX';
+use constant {
+	NEWLINE => {
+		MSWin32 => 'WIN',
+		darwin  => 'MAC',
+		}->{$^O}
+		|| 'UNIX'
+};
 
 # Setting Types (based on Firefox types)
 use constant {
@@ -120,7 +126,8 @@ Settings data types.
 
 Settings storage backends.
 
-=head2 BLACK, BLUE, RED, GREEN, MAGENTA, ORANGE, DIM_GRAY, CRIMSON, BROWN
+=head2 PADRE_BLACK, PADRE_BLUE, PADRE_RED, PADRE_GREEN, PADRE_MAGENTA, PADRE_ORANGE,
+PADRE_DIM_GRAY, PADRE_CRIMSON, PADRE_BROWN
 
 Core supported colours.
 
@@ -142,7 +149,7 @@ Private directory where Padre can look for plugins.
 
 =head2 PLUGIN_LIB
 
-Subdir of PLUGIN_DIR with the path C<Padre/Plugin> added
+Subdir of C<PLUGIN_DIR> with the path C<Padre/Plugin> added
 (or whatever depending on your platform) so that perl can
 load a C<Padre::Plugin::> plugin.
 

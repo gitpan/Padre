@@ -20,7 +20,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 #####################################################################
 # Defines for sidebar marker; others may be needed for breakpoint
@@ -72,16 +72,15 @@ sub launch_browser {
 	)->schedule;
 }
 
-# Launch a Mibbit.com "Live Support" window
+# Launch a "Live Support" window on Mibbit.com or other service
 sub launch_irc {
-	my $server  = shift;
 	my $channel = shift;
 
 	# Generate the (long) chat URL
-	my $url = 'http://widget.mibbit.com/?settings=1c154d53c72ad8cfdfab3caa051b30a2';
-	$url .= '&server=' . $server;
-	$url .= '&channel=%23' . $channel;
-	$url .= '&noServerTab=false&noServerNotices=true&noServerMotd=true&autoConnect=true';
+	my $url = "http://padre.perlide.org/irc.html?channel=$channel";
+	if ( my $locale = Padre->ide->config->locale ) {
+		$url .= "&locale=$locale";
+	}
 
 	# Spawn a browser to show it
 	launch_browser($url);
@@ -90,6 +89,26 @@ sub launch_irc {
 }
 
 1;
+
+=pod
+
+=head1 NAME
+
+Padre::Wx
+
+=head1 DESCRIPTION
+
+Support function library for Wx-related things, and bootstrap logic for Wx integration. 
+
+Isolates any Wx.pm twiddling away from the actual Padre implementation code.
+
+Load every exportable constant, so that they come into
+existance in the Wx:: packages, allowing everywhere else in the code to
+use them without braces.
+
+
+
+=cut
 
 # Copyright 2008-2009 The Padre development team as listed in Padre.pm.
 # LICENSE

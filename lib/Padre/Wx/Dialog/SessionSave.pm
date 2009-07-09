@@ -1,7 +1,3 @@
-#
-# This file is part of Padre, the Perl ide.
-#
-
 package Padre::Wx::Dialog::SessionSave;
 
 use strict;
@@ -18,7 +14,7 @@ use Padre::Wx ();
 
 use base 'Wx::Dialog';
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 # -- constructor
 
@@ -211,6 +207,8 @@ sub _create_buttons {
 	Wx::Event::EVT_BUTTON( $self, $bc, \&_on_butclose_clicked );
 	$sizer->Add( $bs, Wx::GBPosition->new( 2, 2 ) );
 	$sizer->Add( $bc, Wx::GBPosition->new( 2, 3 ) );
+
+	$bs->SetDefault;
 
 	# save button is disabled at first
 	$bs->Disable;

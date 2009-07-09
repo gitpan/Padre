@@ -6,12 +6,12 @@ use warnings;
 
 use Padre::Wx::Editor;
 
-our $VERSION = '0.38';
-our @ISA = 'Padre::Wx::Editor';
+our $VERSION = '0.39';
+our @ISA     = 'Padre::Wx::Editor';
 
 sub main {
 	my $window = shift;
-	while ($window and not $window->isa('Padre::Wx::Main')) {
+	while ( $window and not $window->isa('Padre::Wx::Main') ) {
 		$window = $window->GetParent;
 	}
 	return $window;

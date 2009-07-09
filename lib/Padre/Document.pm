@@ -105,7 +105,7 @@ use Padre::Util     ();
 use Padre::Wx       ();
 use Padre           ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
@@ -350,10 +350,10 @@ sub guess_mimetype {
 	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 		my $ext = lc $1;
 		if ( $EXT_MIME{$ext} ) {
-			if (ref $EXT_MIME{$ext}) {
+			if ( ref $EXT_MIME{$ext} ) {
 				return $EXT_MIME{$ext}->();
 			} else {
-				return $EXT_MIME{$ext}
+				return $EXT_MIME{$ext};
 			}
 		}
 	}
@@ -368,6 +368,7 @@ sub guess_mimetype {
 	# Hardcode this for now for the cases that we care about and
 	# are obvious.
 	if ( $text and $text =~ /\A#!/m ) {
+
 		# Found a hash bang line
 		if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
 			return $self->perl_mime_type;
@@ -385,6 +386,7 @@ sub perl_mime_type {
 	my $self = shift;
 
 	my $text = $self->{original_content};
+
 	# Sometimes Perl 6 will look like Perl 5
 	# But only do this test if the Perl 6 plugin is enabled.
 	if ( $MIME_CLASS{'application/x-perl6'} and is_perl6($text) ) {
@@ -595,8 +597,11 @@ sub save_file {
 	my $filename = $self->filename;
 
 	# not set when first time to save
+	# allow the upgrade from ascii to utf-8 if there were unicode characters added
 	require Padre::Locale;
-	$self->{encoding} ||= Padre::Locale::encoding_from_string($content);
+	if ( not $self->{encoding} or $self->{encoding} eq 'ascii' ) {
+		$self->{encoding} = Padre::Locale::encoding_from_string($content);
+	}
 
 	my $encode = '';
 	if ( defined $self->{encoding} ) {
@@ -1022,9 +1027,11 @@ sub stats {
 	my $filename = $self->filename;
 
 	# not set when first time to save
+	# allow the upgread of ascii to utf-8
 	require Padre::Locale;
-	$self->{encoding} ||= Padre::Locale::encoding_from_string($src);
-
+	if ( not $self->{encoding} or $self->{encoding} eq 'ascii' ) {
+		$self->{encoding} = Padre::Locale::encoding_from_string($src);
+	}
 	return (
 		$lines, $chars_with_space, $chars_without_space, $words, $is_readonly, $filename, $self->{newline_type},
 		$self->{encoding}

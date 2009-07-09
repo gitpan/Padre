@@ -7,7 +7,7 @@ use Params::Util qw{ _STRING };
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 our @ISA     = 'Wx::ListCtrl';
 
 #####################################################################
@@ -86,8 +86,9 @@ sub on_char {
 	# Remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
 	# TODO: This is cargo-cult
 	$mod = $mod & ( Wx::wxMOD_ALT + Wx::wxMOD_CMD + Wx::wxMOD_SHIFT );
-	unless ( $mod ) {
+	unless ($mod) {
 		if ( $code <= 255 and $code > 0 and chr($code) =~ /^[\w_:-]$/ ) {
+
 			# transform - => _ for convenience
 			$code = 95 if $code == 45;
 
@@ -126,6 +127,7 @@ sub on_list_item_activated {
 		$editor->GetSelection,    # Provides two params
 	);
 	unless ( defined $start ) {
+
 		# Couldn't find it
 		return;
 	}

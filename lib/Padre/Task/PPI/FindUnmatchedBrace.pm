@@ -1,12 +1,12 @@
-
 package Padre::Task::PPI::FindUnmatchedBrace;
 use strict;
 use warnings;
 
-our $VERSION = '0.38';
+our $VERSION = '0.39';
 
 use base 'Padre::Task::PPI';
 use Padre::Wx();
+use PPIx::EditorTools::FindUnmatchedBrace;
 
 =pod
 
@@ -53,16 +53,14 @@ sub process_ppi {
 	# find bad braces
 	my $self = shift;
 	my $ppi = shift or return;
-	require Padre::PPI;
-	my $where = $ppi->find( \&Padre::PPI::find_unmatched_brace );
-	if ($where) {
-		@$where = sort {
-			       Padre::PPI::element_depth($b) <=> Padre::PPI::element_depth($a)
-				or $a->location->[0] <=> $b->location->[0]
-				or $a->location->[1] <=> $b->location->[1]
-		} @$where;
-		$self->{bad_element} = $where->[0]->location;    # remember for gui update
+
+	my $brace = eval { PPIx::EditorTools::FindUnmatchedBrace->new->find( ppi => $ppi ); };
+	if ($@) {
+		$self->{error} = $@;
+		return;
 	}
+	$self->{bad_element} = $brace->element->location;    # remember for gui update
+
 	return ();
 }
 
@@ -76,8 +74,7 @@ sub finish {
 		Wx::MessageBox(
 			Wx::gettext("All braces appear to be matched"),
 			Wx::gettext("Check Complete"),
-			Wx::wxOK,
-			Padre->ide->wx->main
+			Wx::wxOK, Padre->ide->wx->main
 		);
 	}
 	return ();
