@@ -11,7 +11,7 @@ use Padre::Task   ();
 use Thread::Queue ();
 our @ISA = 'Padre::Task';
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 =pod
 
@@ -80,7 +80,7 @@ with no arguments B<IN A TIGHT LOOP>.
 	sub running {$running}
 
 	sub stop  { $running = 0 }
-	sub start { $running = 1 };    #??
+	sub start { $running = 1 }; #??
 
 	sub run {
 		croak "Already running!" if $running;

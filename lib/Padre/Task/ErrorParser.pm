@@ -3,7 +3,7 @@ package Padre::Task::ErrorParser;
 use strict;
 use warnings;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use base 'Padre::Task';
 
@@ -14,10 +14,13 @@ use Class::XSAccessor getters => {
 	data     => 'data',
 };
 
+require Parse::ErrorString::Perl;
+
 sub run {
 	my $self = shift;
 	unless ( $self->parser and ( ( !$self->cur_lang and !$self->old_lang ) or ( $self->cur_lang eq $self->old_lang ) ) )
 	{
+
 		if ( $self->cur_lang ) {
 			$self->{parser} = Parse::ErrorString::Perl->new( lang => $self->cur_lang );
 		} else {

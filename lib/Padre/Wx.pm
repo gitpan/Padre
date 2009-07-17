@@ -20,7 +20,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 #####################################################################
 # Defines for sidebar marker; others may be needed for breakpoint
@@ -43,7 +43,7 @@ sub ID_TIMER_OUTLINE   {30004}
 # Colour constructor
 sub color {
 	my $rgb = shift;
-	my @c = ( 0xFF, 0xFF, 0xFF );    # Some default
+	my @c = ( 0xFF, 0xFF, 0xFF ); # Some default
 	if ( not defined $rgb ) {
 
 		# Carp::cluck("undefined color");

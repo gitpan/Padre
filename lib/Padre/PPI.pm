@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use PPI;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 #####################################################################
 # Assorted Search Functions
@@ -91,7 +91,7 @@ sub get_all_variable_declarations {
 			}
 
 		}
-	}    # end foreach declaration
+	} # end foreach declaration
 
 	return ( { our => \%our, lexical => \%lexical, dynamic => \%dynamic, package => \%package } );
 }
@@ -238,7 +238,7 @@ sub find_variable_declaration {
 			}
 			last if $declaration or $cursor == $document;
 		}
-	}    # end while not top level
+	} # end while not top level
 
 	return $declaration;
 }

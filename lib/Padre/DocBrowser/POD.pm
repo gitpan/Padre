@@ -11,7 +11,7 @@ use Pod::Abstract               ();
 use Padre::DocBrowser::document ();
 use File::Temp                  ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 use Class::XSAccessor constructor => 'new', getters => {
 	get_provider => 'provider',
@@ -57,7 +57,12 @@ sub resolve {
 	);
 
 	my $pd = Padre::DocBrowser::pseudoPerldoc->new( args => \@args );
-	my $perldoc_return = eval { $pd->process() };
+	{
+		local *STDERR = IO::Scalar->new;
+		local *STDOUT = IO::Scalar->new;
+		eval { $pd->process() };
+	}
+
 	return unless -s $tempfile;
 
 	my $pa = Pod::Abstract->load_file($tempfile);
@@ -123,7 +128,7 @@ sub render {
 # URI::perldoc ??
 sub split_link {
 	my $query = shift;
-	my ( $doc, $section ) = split /\//, $query, 2;    # was m|([^/]+)/?+(.*+)|;
+	my ( $doc, $section ) = split /\//, $query, 2; # was m|([^/]+)/?+(.*+)|;
 }
 
 1;

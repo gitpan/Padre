@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Padre::Plugin';
 
 #####################################################################
@@ -204,7 +204,7 @@ sub _dump_eval {
 	my $code = shift;
 
 	# Evecute the code and handle errors
-	my @rv = eval $code;    ## no critic
+	my @rv = eval $code; ## no critic
 	if ($@) {
 		$self->current->main->error( sprintf( Wx::gettext("Error: %s"), $@ ) );
 		return;

@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -46,7 +46,7 @@ sub new {
 		$main,
 		$self->{run_document_debug},
 		sub {
-			$_[0]->run_document(1);    # Enable debug info
+			$_[0]->run_document(1); # Enable debug info
 		},
 	);
 

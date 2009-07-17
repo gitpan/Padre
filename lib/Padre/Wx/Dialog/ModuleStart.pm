@@ -10,7 +10,7 @@ use File::Spec        ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 sub get_layout {
 
@@ -143,8 +143,8 @@ sub ok_clicked {
 	);
 	if ( $ret == Wx::wxYES ) {
 		my $module_name = $data->{_module_name_};
-		($module_name) = split( ',', $module_name );    # for Foo::Bar,Foo::Bat
-		                                                # prepare Foo-Bar/lib/Foo/Bar.pm
+		($module_name) = split( ',', $module_name ); # for Foo::Bar,Foo::Bat
+		                                             # prepare Foo-Bar/lib/Foo/Bar.pm
 		my @parts = split( '::', $module_name );
 		my $dir_name = join( '-', @parts );
 		$parts[-1] .= '.pm';

@@ -7,7 +7,7 @@ use Padre::Constant ();
 use Padre::Wx       ();
 use Padre::Locale   ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor getters => {
@@ -128,8 +128,8 @@ sub on_menu_help_context_help {
 		$diagnostics = $error->diagnostics;
 		$diagnostics =~ s/[A-Z]<(.*?)>/$1/sg;
 	}
-	$diagnostics
-		= Padre::Constant::WIN32
+	$diagnostics =
+		Padre::Constant::WIN32
 		? $diagnostics
 		: Encode::encode( 'utf8', $diagnostics );
 	my $dialog_title = Wx::gettext("Diagnostics");

@@ -16,13 +16,13 @@ use Carp                   ();
 use Params::Util           ();
 use Padre::Constant        ();
 use Padre::Util            ('_T');
-use Padre::Current         ();
+use Padre::Current         ('_CURRENT');
 use Padre::Config::Setting ();
 use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -77,7 +77,7 @@ sub $object->{name} {
 END_PERL
 
 	# Compile the accessor
-	eval $code;    ## no critic
+	eval $code; ## no critic
 	if ($@) {
 		Carp::croak("Failed to compile setting $object->{name}");
 	}
@@ -99,6 +99,12 @@ setting(
 );
 setting(
 	name    => 'identity_email',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => '',
+);
+setting(
+	name    => 'identity_nickname',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => '',
@@ -203,7 +209,7 @@ setting(
 		# The toolbar can't dynamically switch between
 		# tearable and non-tearable so rebuild it.
 		# TODO: Review this assumption
-		if ( Padre::Wx::Toolbar::DOCKABLE() ) {
+		if ( $Padre::Wx::Toolbar::DOCKABLE ) {
 			$main->rebuild_toolbar;
 		}
 

@@ -12,7 +12,7 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -225,6 +225,7 @@ sub about {
 	$about->AddDeveloper("Chris Dolan");
 	$about->AddDeveloper("Claudio Ramirez");
 	$about->AddDeveloper("Fayland Lam");
+	$about->AddDeveloper("Gabriel Vieira");
 	$about->AddDeveloper("Gábor Szabó - גאבור סבו ");
 	$about->AddDeveloper("Heiko Jansen");
 	$about->AddDeveloper("Jérôme Quelin");
@@ -235,6 +236,7 @@ sub about {
 	$about->AddDeveloper("Patrick Donelan");
 	$about->AddDeveloper("Paweł Murias");
 	$about->AddDeveloper("Petar Shangov");
+	$about->AddDeveloper("Ryan Niebur");
 	$about->AddDeveloper("Steffen Müller");
 
 	$about->AddTranslator("Arabic - Ahmad Zawawi - أحمد محمد زواوي");

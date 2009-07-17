@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -1077,6 +1077,8 @@ Chris Dolan (CHRISDOLAN)
 Claudio Ramirez (CLAUDIO) E<lt>padre.claudio@apt-get.beE<gt>
 
 Fayland Lam (FAYLAND) E<lt>fayland@gmail.comE<gt>
+
+Gabriel Vieira (GABRIELMAD)
 
 Gábor Szabó - גאבור סבו (SZABGAB) E<lt>szabgab@gmail.comE<gt>
 

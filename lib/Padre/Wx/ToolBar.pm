@@ -8,7 +8,7 @@ use Padre::Wx         ();
 use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Wx::ToolBar';
 
 # NOTE: Something is wrong with dockable toolbars on Windows
@@ -68,7 +68,7 @@ sub new {
 	);
 
 	$self->add_tool(
-		id    => 1000,                        # I don't like these hard set ID's for Wx.
+		id    => 1000,                     # I don't like these hard set ID's for Wx.
 		icon  => 'actions/stock_data-save',
 		short => Wx::gettext('Save All'),
 		event => sub {
@@ -193,7 +193,7 @@ sub refresh {
 	$self->EnableTool( Wx::wxID_SAVEAS, ($document) );
 
 	# trying out the Comment Code method here
-	$self->EnableTool( 1000, ($document) );    # Save All
+	$self->EnableTool( 1000, ($document) ); # Save All
 
 	$self->EnableTool( Wx::wxID_CLOSE, ( $editor ? 1 : 0 ) );
 	$self->EnableTool( Wx::wxID_UNDO,  ( $editor and $editor->CanUndo ) );
@@ -202,7 +202,10 @@ sub refresh {
 	$self->EnableTool( Wx::wxID_COPY,  ($selection) );
 	$self->EnableTool( Wx::wxID_PASTE, ( $editor and $editor->CanPaste ) );
 	$self->EnableTool( Wx::wxID_SELECTALL, ( $editor ? 1 : 0 ) );
-	$self->EnableTool( 999, ( $document ? 1 : 0 ) );
+	$self->EnableTool( Wx::wxID_FIND,      ( $editor ? 1 : 0 ) );
+	$self->EnableTool( Wx::wxID_REPLACE,   ( $editor ? 1 : 0 ) );
+	$self->EnableTool( 999,  ( $document ? 1 : 0 ) );
+	$self->EnableTool( 1001, ( $editor   ? 1 : 0 ) );
 
 	return;
 }

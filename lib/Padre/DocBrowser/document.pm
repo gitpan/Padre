@@ -10,7 +10,7 @@ use Class::XSAccessor constructor => 'new', accessors => {
 	'filename' => 'filename',
 };
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 =pod
 
@@ -105,8 +105,8 @@ sub guess_mimetype {
 		keys %EXT_MIME
 	);
 
-	my $type
-		= exists $EXT_MIME{$suffix}
+	my $type =
+		exists $EXT_MIME{$suffix}
 		? $EXT_MIME{$suffix}
 		: '';
 	return $type;

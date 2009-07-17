@@ -58,6 +58,7 @@ no_index:
     - xt
 requires:
   App::Ack: 1.86
+  Capture::Tiny: 0.06
   Carp: 0
   Class::Adapter: 1.05
   Class::Unload: 0.03
@@ -88,11 +89,8 @@ requires:
   IO::Scalar: 2.110
   IO::Socket: 1.30
   IO::String: 1.08
-  IPC::Cmd: 0.42
-  IPC::Open3: 0
   List::MoreUtils: 0.22
   List::Util: 1.18
-  Module::Inspector: 0.04
   Module::Refresh: 0.13
   Module::Starter: 1.50
   ORLite: 1.20
@@ -128,4 +126,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.39
+version: 0.40

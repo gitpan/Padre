@@ -25,6 +25,7 @@ author         'Gabor Szabo';
 all_from       'lib/Padre.pm';
 requires       'perl'                     => '5.008005';
 requires       'App::Ack'                 => '1.86';
+requires       'Capture::Tiny'            => '0.06';
 requires       'Carp'                     => 0;
 requires       'Class::Adapter'           => '1.05';
 requires       'Class::Unload'            => '0.03';
@@ -57,12 +58,8 @@ requires       'HTML::Parser'             => '3.58';
 requires       'IO::Scalar'               => '2.110';
 requires       'IO::Socket'               => '1.30';
 requires       'IO::String'               => '1.08';
-requires       'IPC::Cmd'                 => '0.42';
-requires       'IPC::Open3'               => 0;
-requires       'IPC::Run'                 => '0.82' if win32;
 requires       'List::Util'               => '1.18';
 requires       'List::MoreUtils'          => '0.22';
-requires       'Module::Inspector'        => '0.04';
 requires       'Module::Refresh'          => '0.13';
 requires       'Module::Starter'          => '1.50';
 requires       'ORLite'                   => '1.20';
@@ -116,34 +113,34 @@ bugtracker     'http://padre.perlide.org/';
 repository     'http://svn.perlide.org/padre/trunk/Padre/';
 
 keywords(
-    "auto-completion",
-    "code",
-    "coding",
-    "completion",
-    "context",
-    "cross-platform",
-    "development",
-    "editor",
-    "environment",
-    "find",
-    "function list",
-    "gui",
-    "help",
-    "highlight",
-    "hightlighting",
-    "ide",
-    "linux",
-    "mac os",
-    "mac os x",
-    "padre",
-    "perl",
-    "portable",
-    "refactoring",
-    "replace",
-    "syntax",
-    "windows",
-    "wx",
-    "wxwidgets",
+	"auto-completion",
+	"code",
+	"coding",
+	"completion",
+	"context",
+	"cross-platform",
+	"development",
+	"editor",
+	"environment",
+	"find",
+	"function list",
+	"gui",
+	"help",
+	"highlight",
+	"hightlighting",
+	"ide",
+	"linux",
+	"mac os",
+	"mac os x",
+	"padre",
+	"perl",
+	"portable",
+	"refactoring",
+	"replace",
+	"syntax",
+	"windows",
+	"wx",
+	"wxwidgets",
 );
 
 install_script 'script/padre';

@@ -6,17 +6,8 @@ use strict;
 use warnings;
 use Padre::Project ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Padre::Project';
-
-sub inspector {
-	my $self = shift;
-	unless ( $self->{inspector} ) {
-		require Module::Inspector;
-		$self->{inspector} = Module::Inspector->new( dist_dir => $self->root );
-	}
-	return $self->{inspector};
-}
 
 sub from_file {
 	my $class = shift;

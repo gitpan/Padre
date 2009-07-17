@@ -8,7 +8,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 # -- constructors
 
@@ -47,7 +47,7 @@ sub read {
 #
 sub version {
 	my $self = shift;
-	$self->{version};    # stored as other preferences!
+	$self->{version}; # stored as other preferences!
 }
 
 #

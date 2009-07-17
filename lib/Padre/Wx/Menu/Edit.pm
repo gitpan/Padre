@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -31,7 +31,7 @@ sub new {
 		Wx::gettext("&Undo")
 	);
 	Wx::Event::EVT_MENU(
-		$main,    # Ctrl-Z
+		$main, # Ctrl-Z
 		$self->{undo},
 		sub {
 			Padre::Current->editor->Undo;
@@ -43,7 +43,7 @@ sub new {
 		Wx::gettext("&Redo")
 	);
 	Wx::Event::EVT_MENU(
-		$main,    # Ctrl-Y
+		$main, # Ctrl-Y
 		$self->{redo},
 		sub {
 			Padre::Current->editor->Redo;

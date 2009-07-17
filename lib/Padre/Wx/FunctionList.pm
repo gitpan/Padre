@@ -7,7 +7,7 @@ use Params::Util qw{ _STRING };
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = 'Wx::ListCtrl';
 
 #####################################################################
@@ -124,7 +124,7 @@ sub on_list_item_activated {
 	my ( $start, $end ) = Padre::Util::get_matches(
 		$editor->GetText,
 		$document->get_function_regex($subname),
-		$editor->GetSelection,    # Provides two params
+		$editor->GetSelection, # Provides two params
 	);
 	unless ( defined $start ) {
 

@@ -7,7 +7,7 @@ use warnings;
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook
@@ -22,7 +22,7 @@ sub new {
 		$main,
 		-1,
 		Wx::wxDefaultPosition,
-		Wx::Size->new( 200, 500 ),    # used when pane is floated
+		Wx::Size->new( 200, 500 ), # used when pane is floated
 		Wx::wxAUI_NB_SCROLL_BUTTONS | Wx::wxAUI_NB_TOP | Wx::wxBORDER_NONE,
 	);
 

@@ -24,7 +24,7 @@ use Padre::Wx                    ();
 use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -316,7 +316,7 @@ sub find {
 	my $self = shift;
 	my $text = $self->current->text;
 
-	return if not $self->current->editor;    # no search if no file is open (TODO ??)
+	return if not $self->current->editor; # no search if no file is open (TODO ??)
 
 	# TODO: if selection is more than one lines then consider it as the limit
 	# of the search and not as the string to be used
@@ -456,7 +456,7 @@ sub search {
 
 	# Find the range to search within
 	my $editor = $self->current->editor;
-	return if not $editor;    # avoid crash if no file is open
+	return if not $editor; # avoid crash if no file is open
 	my $text = $editor->GetTextRange( 0, $editor->GetLength );
 	my ( $from, $to ) = $editor->GetSelection;
 

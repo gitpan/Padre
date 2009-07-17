@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.39';
+our $VERSION = '0.40';
 
 ######################################################################
 # Constructor
@@ -36,7 +36,7 @@ sub search {
 	my $self      = shift;
 	my $direction = shift;
 
-	return if not Padre->ide->wx->main->current->editor;    # avoid crash if no file open
+	return if not Padre->ide->wx->main->current->editor; # avoid crash if no file open
 
 	$self->{backward} = $direction eq 'previous';
 	unless ( $self->{panel} ) {
@@ -88,8 +88,8 @@ sub _find {
 
 	my $regex = $self->{case}->GetValue ? qr/$what/im : qr/$what/m;
 
-	my ( $from, $to )
-		= $self->{restart}
+	my ( $from, $to ) =
+		$self->{restart}
 		? ( 0, $last )
 		: $page->GetSelection;
 	$self->{restart} = 0;
