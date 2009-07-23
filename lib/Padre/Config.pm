@@ -22,7 +22,7 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -209,7 +209,7 @@ setting(
 		# The toolbar can't dynamically switch between
 		# tearable and non-tearable so rebuild it.
 		# TODO: Review this assumption
-		if ( $Padre::Wx::Toolbar::DOCKABLE ) {
+		if ($Padre::Wx::Toolbar::DOCKABLE) {
 			$main->rebuild_toolbar;
 		}
 
@@ -408,18 +408,6 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 );
-setting(
-	name    => 'ppi_highlight',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-);
-setting(
-	name    => 'ppi_highlight_limit',
-	type    => Padre::Constant::POSINT,
-	store   => Padre::Constant::HUMAN,
-	default => 2000,
-);
 
 # Behaviour Tuning
 # When running a script from the application some of the files might have
@@ -470,12 +458,6 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => '',
-);
-setting(
-	name    => 'experimental',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
 );
 
 # Colour Data

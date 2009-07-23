@@ -75,16 +75,43 @@ either check for collisions if a plugin already wants to provide
 an already suported mime-type or should allow multiple support
 modules with a way to select the current one. (Again I think we
 probably don't need this. People can just come and add the 
-mime-types to Padre core.)
+mime-types to Padre core.) (not yet implemented)
+
+A plugin can register zero or more modules that implement 
+special features needed by certain mime-types. Every mime-type
+can have only one module that implements its features. Padre is
+checking if a mime-type already has a registered module and
+does not let to replace it.
+(Special features such as commenting out a few lines at once,
+autocompletion or refactoring tools).
+
+Padre should check if the given mime-type is one that is
+in the supported mime-type list. (TODO)
+
 
 Each mime-type is mapped to one or more lexers that provide 
 the syntax highlighting. Every mime-type has to be mapped to at least 
 one lexer but it can be mapped to several lexers as well. 
 The user is able to select the lexer for each mime-type.
-(For this each lexer should have a reasonable name too.)
+(For this each lexer should have a reasonable name too.) (TODO)
 
-The mime-types are also mapped to modules that implement 
-special features needed by that kind of file.
+Every plugin should be able to add a list of lexers to the existing 
+mime-types regardless if the plugin also provides the class that 
+implements the features of that mime-type. By default Padre
+suppors the built-in syntax highlighting of Scintialla but. 
+Perl 5 currently has two PPI based syntax highlighter,
+Perl 6 can use the STD.pm or Rakudo/PGE for syntax highlighting but 
+there are two plugins Parrot and Kate that can provide synax 
+highlighting to a wide range of mime-types.
+
+ provided_highlighters()  returns a lits of arrays like this:
+    ['Module with a colorize function' => 'Human readable Name' => 'Long description']
+
+ highlighting_mime_types() returns a hash where the keys are module
+ names listed in the provided_highlighters the values are array references to mime-types
+     'Module::A' => [ mime-type-1, mime-type-2]
+
+    
 
 The user can change the mime-type mapping of individual 
 files and Padre should remember this choice and allow the
@@ -98,131 +125,23 @@ or to set it to "Default by extension".
 use 5.008;
 use strict;
 use warnings;
-use Carp            ();
-use File::Spec      ();
-use Padre::Constant ();
-use Padre::Util     ();
-use Padre::Wx       ();
-use Padre           ();
+use Carp             ();
+use File::Spec       ();
+use Padre::Constant  ();
+use Padre::Util      ();
+use Padre::Wx        ();
+use Padre            ();
+use Padre::MimeTypes ();
 
-our $VERSION = '0.40';
-
-# NOTE: This is probably a bad place to store this
-my $unsaved_number = 0;
+our $VERSION = '0.41';
 
 #####################################################################
 # Document Registration
 
-# This is the list of binary files
-# (which we don't support loading in fallback text mode)
-our %EXT_BINARY = map { $_ => 1 } qw{
-	aiff  au    avi  bmp  cache  dat   doc  gif  gz   icns
-	jar   jpeg  jpg  m4a  mov    mp3   mpg  ogg  pdf  png
-	pnt   ppt   qt   ra   svg    svgz  svn  swf  tar  tgz
-	tif   tiff  wav  xls  xlw    zip
-};
+# NOTE: This is probably a bad place to store this
+my $unsaved_number = 0;
 
-# This is the primary file extension to mime-type mapping
-my %EXT_MIME = (
-	abc   => 'text/x-abc',
-	ada   => 'text/x-adasrc',
-	asm   => 'text/x-asm',
-	bat   => 'text/x-bat',
-	cpp   => 'text/x-c++src',
-	css   => 'text/css',
-	diff  => 'text/x-patch',
-	e     => 'text/x-eiffel',
-	f     => 'text/x-fortran',
-	htm   => 'text/html',
-	html  => 'text/html',
-	js    => 'application/javascript',
-	json  => 'application/json',
-	latex => 'application/x-latex',
-	lsp   => 'application/x-lisp',
-	lua   => 'text/x-lua',
-	mak   => 'text/x-makefile',
-	mat   => 'text/x-matlab',
-	pas   => 'text/x-pascal',
-	pod   => 'text/x-pod',
-	php   => 'application/x-php',
-	py    => 'text/x-python',
-	rb    => 'application/x-ruby',
-	sql   => 'text/x-sql',
-	tcl   => 'application/x-tcl',
-	vbs   => 'text/vbscript',
-	patch => 'text/x-patch',
-	pl    => \&perl_mime_type,
-	plx   => \&perl_mime_type,
-	pm    => \&perl_mime_type,
-	pod   => \&perl_mime_type,
-	t     => \&perl_mime_type,
-	conf  => 'text/plain',
-	sh    => 'application/x-shellscript',
-	ksh   => 'application/x-shellscript',
-	txt   => 'text/plain',
-	xml   => 'text/xml',
-	yml   => 'text/x-yaml',
-	yaml  => 'text/x-yaml',
-	'4th' => 'text/x-forth',
-	pasm  => 'application/x-pasm',
-	pir   => 'application/x-pir',
-	p6    => 'application/x-perl6',
-);
-
-# This is the mime-type to Scintilla lexer mapping.
-# Lines marked with CONFIRMED indicate that the mime-typehas been checked
-# to confirm that the MIME type is either the official type, or the primary
-# one in use by the relevant language community.
-our %MIME_LEXER = (
-	'text/x-abc' => Wx::wxSTC_LEX_CONTAINER,
-
-	'text/x-adasrc' => Wx::wxSTC_LEX_ADA, # CONFIRMED
-	'text/x-asm'    => Wx::wxSTC_LEX_ASM, # CONFIRMED
-
-	# application/x-msdos-program includes .exe and .com, so don't use it
-	'application/x-bat' => Wx::wxSTC_LEX_BATCH, # CONFIRMED
-
-	'text/x-c++src'             => Wx::wxSTC_LEX_CPP,       # CONFIRMED
-	'text/css'                  => Wx::wxSTC_LEX_CSS,       # CONFIRMED
-	'text/x-patch'              => Wx::wxSTC_LEX_DIFF,      # CONFIRMED
-	'text/x-eiffel'             => Wx::wxSTC_LEX_EIFFEL,    # CONFIRMED
-	'text/x-forth'              => Wx::wxSTC_LEX_FORTH,     # CONFIRMED
-	'text/x-fortran'            => Wx::wxSTC_LEX_FORTRAN,   # CONFIRMED
-	'text/html'                 => Wx::wxSTC_LEX_HTML,      # CONFIRMED
-	'application/javascript'    => Wx::wxSTC_LEX_ESCRIPT,   # CONFIRMED
-	'application/json'          => Wx::wxSTC_LEX_ESCRIPT,   # CONFIRMED
-	'application/x-latex'       => Wx::wxSTC_LEX_LATEX,     # CONFIRMED
-	'application/x-lisp'        => Wx::wxSTC_LEX_LISP,      # CONFIRMED
-	'application/x-shellscript' => Wx::wxSTC_LEX_BASH,
-	'text/x-lua'                => Wx::wxSTC_LEX_LUA,       # CONFIRMED
-	'text/x-makefile'           => Wx::wxSTC_LEX_MAKEFILE,  # CONFIRMED
-	'text/x-matlab'             => Wx::wxSTC_LEX_MATLAB,    # CONFIRMED
-	'text/x-pascal'             => Wx::wxSTC_LEX_PASCAL,    # CONFIRMED
-	'application/x-perl'        => Wx::wxSTC_LEX_PERL,      # CONFIRMED
-	'text/x-python'             => Wx::wxSTC_LEX_PYTHON,    # CONFIRMED
-	'application/x-php'         => Wx::wxSTC_LEX_PHPSCRIPT, # CONFIRMED
-	'application/x-ruby'        => Wx::wxSTC_LEX_RUBY,      # CONFIRMED
-	'text/x-sql'                => Wx::wxSTC_LEX_SQL,       # CONFIRMED
-	'application/x-tcl'         => Wx::wxSTC_LEX_TCL,       # CONFIRMED
-	'text/vbscript'             => Wx::wxSTC_LEX_VBSCRIPT,  # CONFIRMED
-
-	# text/xml specifically means "human-readable XML".
-	# This is prefered to the more generic application/xml
-	'text/xml' => Wx::wxSTC_LEX_XML,                        # CONFIRMED
-
-	'text/x-yaml'         => Wx::wxSTC_LEX_YAML,            # CONFIRMED
-	'application/x-pir'   => Wx::wxSTC_LEX_CONTAINER,       # CONFIRMED
-	'application/x-pasm'  => Wx::wxSTC_LEX_CONTAINER,       # CONFIRMED
-	'application/x-perl6' => Wx::wxSTC_LEX_CONTAINER,       # CONFIRMED
-	'text/plain'          => Wx::wxSTC_LEX_NULL,            # CONFIRMED
-);
-
-# This is the mime-type to document class mapping
-our %MIME_CLASS = (
-	'application/x-perl' => 'Padre::Document::Perl',
-	'text/x-pod'         => 'Padre::Document::POD',
-);
-
+# TODO generate this from the the MIME_TYPES in the Padre::MimeTypes class?
 sub menu_view_mimes {
 	'00Plain Text'     => 'text/plain',
 		'01Perl'       => 'application/x-perl',
@@ -236,7 +155,7 @@ sub menu_view_mimes {
 		'15YAML'       => 'text/x-yaml',
 		'17VBScript'   => 'text/vbscript',
 		'19SQL'        => 'text/x-sql',
-		'21Perl6'      => 'application/x-perl6',
+		'21Perl 6'     => 'application/x-perl6',
 		;
 }
 
@@ -250,6 +169,7 @@ use Class::XSAccessor getters => {
 	get_newline_type => 'newline_type',
 	errstr           => 'errstr',
 	tempfile         => 'tempfile',
+	get_highlighter  => 'highlighter',
 	},
 	setters => {
 	_set_filename    => 'filename',    # TODO temporary hack
@@ -258,6 +178,7 @@ use Class::XSAccessor getters => {
 	set_errstr       => 'errstr',
 	set_editor       => 'editor',
 	set_tempfile     => 'tempfile',
+	set_highlighter  => 'highlighter',
 	};
 
 =pod
@@ -301,7 +222,8 @@ sub rebless {
 	# to the the base class,
 	# This isn't exactly the most elegant way to do this, but will
 	# do for a first implementation.
-	my $class = $MIME_CLASS{ $self->get_mimetype } || __PACKAGE__;
+	my $mime_type = $self->get_mimetype;
+	my $class = Padre::MimeTypes->get_mime_class($mime_type) || __PACKAGE__;
 	Padre::Util::debug("Reblessing to mimetype: '$class'");
 	if ($class) {
 		unless ( $class->VERSION ) {
@@ -311,8 +233,54 @@ sub rebless {
 		bless $self, $class;
 	}
 
+	my $module = Padre::MimeTypes->get_current_highlighter_of_mime_type($mime_type);
+	my $filename = $self->filename || '';
+	warn("No module  mime_type='$mime_type' filename='$filename'\n") if not $module;
+
+	#warn("Module '$module' mime_type='$mime_type' filename='$filename'\n") if $module;
+	$self->set_highlighter($module);
+
 	return;
 }
+
+#####################################################################
+# Padre::Document GUI Integration
+
+sub colorize {
+	my $self = shift;
+
+	Padre::Util::debug("colorize called");
+
+	my $module = $self->get_highlighter;
+	if ( $module eq 'stc' ) {
+
+		#TODO sometime this happens when I open Padre with several file
+		# I think this can be somehow related to the quick (or slow ?) switching of
+		# what is the current document while the code is still running.
+		# for now I hide the warnings as this would just frighten people and the
+		# actual problem seems to be only the warning or maybe late highighting
+		# of a single document - szabgab
+		#Carp::cluck("highlighter is set to 'stc' while colorize() is called for " . ($self->filename || '') . "\n");
+		#warn "Length: " . $self->editor->GetTextLength;
+		return;
+	}
+
+	# allow virtual modules if they have a colorize method
+	if ( not $module->can('colorize') ) {
+		eval "use $module";
+		if ($@) {
+			Carp::cluck( "Could not load module '$module' for file '" . ( $self->filename || '' ) . "'\n" );
+			return;
+		}
+	}
+	if ( $module->can('colorize') ) {
+		$module->colorize(@_);
+	} else {
+		warn("Module $module does not have a colorize method\n");
+	}
+	return;
+}
+
 
 sub last_sync {
 	return $_[0]->{_timestamp};
@@ -328,100 +296,20 @@ sub dirname {
 	defined($filename) ? File::Basename::dirname($filename) : undef;
 }
 
-#####################################################################
-# Bad/Ugly/Broken Methods
-# These don't really completely belong in this class, but there's
-# currently nowhere better for them. Some break API boundaries...
-# NOTE: This is NOT an excuse to invent somewhere new that's just as
-# innappropriate just to get them out of here.
-
+#left here a it is used in many places. Maybe we need to remove this sub.
 sub guess_mimetype {
 	my $self     = shift;
 	my $text     = $self->{original_content};
 	my $filename = $self->filename || q{};
 
-	# Default mime-type of new files, should be configurable in the GUI
-	# TODO: Make it configurable in the GUI :)
-	unless ($filename) {
-		return 'application/x-perl';
-	}
-
-	# Try derive the mime type from the file extension
-	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
-		my $ext = lc $1;
-		if ( $EXT_MIME{$ext} ) {
-			if ( ref $EXT_MIME{$ext} ) {
-				return $EXT_MIME{$ext}->();
-			} else {
-				return $EXT_MIME{$ext};
-			}
-		}
-	}
-
-	# Try derive the mime type from the basename
-	my $basename = File::Basename::basename($filename);
-	if ($basename) {
-		return 'text/x-makefile' if $basename =~ /^Makefile\.?/i;
-	}
-
-	# Fall back on deriving the type from the content.
-	# Hardcode this for now for the cases that we care about and
-	# are obvious.
-	if ( $text and $text =~ /\A#!/m ) {
-
-		# Found a hash bang line
-		if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
-			return $self->perl_mime_type;
-		}
-		if ( $text =~ /\A---/ ) {
-			return 'text/x-yaml';
-		}
-	}
-
-	# Fall back to a null value
-	return '';
+	return Padre::MimeTypes->_guess_mimetype( $text, $filename );
 }
 
-sub perl_mime_type {
-	my $self = shift;
-
-	my $text = $self->{original_content};
-
-	# Sometimes Perl 6 will look like Perl 5
-	# But only do this test if the Perl 6 plugin is enabled.
-	if ( $MIME_CLASS{'application/x-perl6'} and is_perl6($text) ) {
-		return 'application/x-perl6';
-	} else {
-		return 'application/x-perl';
-	}
-}
-
-sub mime_type_by_extension {
-	$EXT_MIME{ $_[1] };
-}
 
 # For ts without a newline type
 # TODO: get it from config
 sub _get_default_newline_type {
 	Padre::Constant::NEWLINE;
-}
-
-# naive sub to decide if a piece of code is Perl 6 or Perl 5.
-# Perl 6:   use v6; class ..., module ...
-# maybe also grammar ...
-# but make sure that is real code and not just a comment or doc in some perl 5 code...
-sub is_perl6 {
-	my ($text) = @_;
-	return if not $text;
-	return 1 if $text =~ /^=begin\s+pod/msx;
-
-	# Needed for eg/perl5_with_perl6_example.pod
-	return if $text =~ /^=head[12]/msx;
-
-	return 1 if $text =~ /^\s*use\s+v6;/msx;
-	return 1 if $text =~ /^\s*(?:class|grammar|module|role)\s+\w/msx;
-
-	return;
 }
 
 # Where to convert (UNIX, WIN, MAC)
@@ -480,6 +368,7 @@ sub has_changed_on_disk {
 	my ($self) = @_;
 	return 0 unless defined $self->filename;
 	return 0 unless defined $self->last_sync;
+	return 1 unless $self->time_on_file;
 	return $self->last_sync < $self->time_on_file ? 1 : 0;
 }
 
@@ -684,6 +573,20 @@ sub text_like {
 	return !!( $self->text_get =~ /$_[0]/m );
 }
 
+sub text_with_one_nl {
+	my $self   = shift;
+	my $text   = $self->text_get;
+	my $nlchar = "\n";
+	if ( $self->get_newline_type eq 'WIN' ) {
+		$nlchar = "\r\n";
+	} elsif ( $self->get_newline_type eq 'MAC' ) {
+		$nlchar = "\r";
+	}
+	$text =~ s/$nlchar/\n/g;
+	return $text;
+}
+
+
 # --
 
 #
@@ -724,25 +627,20 @@ sub restore_cursor_position {
 # Determine the Scintilla lexer to use
 sub lexer {
 	my $self = shift;
+
+	# this should never happen as now we set mime-type on everything
 	return Wx::wxSTC_LEX_AUTOMATIC unless $self->get_mimetype;
-	return Wx::wxSTC_LEX_AUTOMATIC unless defined $MIME_LEXER{ $self->get_mimetype };
 
-	Padre::Util::debug("Trying to determine the lexer");
-
-	# If mime type is not sufficient to figure out file type
-	# than use suffix for lexer
-	my $filename = $self->filename || q{};
-	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
-		my $ext = lc $1;
-		if ( $EXT_MIME{$ext} ) {
-			if ( $EXT_MIME{$ext} eq 'text/plain' ) {
-				return Wx::wxSTC_LEX_CONF if $ext eq 'conf';
-			}
-		}
+	my $highlighter = $self->get_highlighter;
+	if ( not $highlighter ) {
+		warn "no highlighter\n";
+		$highlighter = 'stc';
 	}
+	return Wx::wxSTC_LEX_CONTAINER if $highlighter ne 'stc';
+	return Wx::wxSTC_LEX_AUTOMATIC unless defined Padre::MimeTypes->get_lexer( $self->get_mimetype );
 
-	Padre::Util::debug( 'Lexer will be based on mime type "' . $self->get_mimetype . '"' );
-	return $MIME_LEXER{ $self->get_mimetype };
+	Padre::Util::debug( 'STC Lexer will be based on mime type "' . $self->get_mimetype . '"' );
+	return Padre::MimeTypes->get_lexer( $self->get_mimetype );
 }
 
 # What should be shown in the notebook tab
@@ -1165,6 +1063,7 @@ sub autocomplete {
 
 	return ( length($prefix), @words );
 }
+
 
 1;
 

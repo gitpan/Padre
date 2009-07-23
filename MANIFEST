@@ -14,6 +14,8 @@ eg/perl6/outline_test.p6
 eg/perl6/perl6.pod
 eg/perl6/Perl6Class.pm
 eg/perl6/Perl6Grammar.p6
+eg/ruby/add.rb
+eg/ruby/hello_world.rb
 eg/syntax_demo.css
 eg/syntax_demo.js
 eg/syntax_demo.json
@@ -23,6 +25,8 @@ eg/wx/03_button.pl
 eg/wx/04_button_with_event.pl
 eg/wx/05_button_with_event_and_message_box.pl
 eg/wx/21_progress_bar.pl
+eg/wx/22_notebook.pl
+eg/wx/30_editor.pl
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
@@ -57,6 +61,7 @@ lib/Padre/DB/Plugin.pm
 lib/Padre/DB/Session.pm
 lib/Padre/DB/SessionFile.pm
 lib/Padre/DB/Snippets.pod
+lib/Padre/DB/SyntaxHighlight.pm
 lib/Padre/DocBrowser.pm
 lib/Padre/DocBrowser/document.pm
 lib/Padre/DocBrowser/POD.pm
@@ -64,11 +69,13 @@ lib/Padre/Document.pm
 lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl/Beginner.pm
 lib/Padre/Document/Perl/Lexer.pm
+lib/Padre/Document/Perl/PPILexer.pm
 lib/Padre/Document/POD.pm
 lib/Padre/Locale.pm
 lib/Padre/Log.pm
 lib/Padre/Manual.pod
 lib/Padre/Manual/Hacking.pod
+lib/Padre/MimeTypes.pm
 lib/Padre/Plugin.pm
 lib/Padre/Plugin/Devel.pm
 lib/Padre/Plugin/My.pm
@@ -142,7 +149,6 @@ lib/Padre/Wx/Icon.pm
 lib/Padre/Wx/Main.pm
 lib/Padre/Wx/Menu.pm
 lib/Padre/Wx/Menu/Edit.pm
-lib/Padre/Wx/Menu/Experimental.pm
 lib/Padre/Wx/Menu/File.pm
 lib/Padre/Wx/Menu/Help.pm
 lib/Padre/Wx/Menu/Perl.pm
@@ -244,6 +250,7 @@ share/timeline/migrate-5.pl
 share/timeline/migrate-6.pl
 share/timeline/migrate-7.pl
 share/timeline/migrate-8.pl
+share/timeline/migrate-9.pl
 t/00-compile.t
 t/01-load.t
 t/02-new.t

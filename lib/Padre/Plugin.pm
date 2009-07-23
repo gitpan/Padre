@@ -52,7 +52,7 @@ use YAML::Tiny ();
 use Padre::DB  ();
 use Padre::Wx  ();
 
-our $VERSION    = '0.40';
+our $VERSION    = '0.41';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
@@ -252,6 +252,28 @@ sub registered_documents {
 	return ();
 }
 
+=head2 provided_highlighters
+
+Default method returning an empty array.
+
+TBD. See Padre::Document
+
+=cut
+
+sub provided_highlighters {
+	return ();
+}
+
+=head2 highlighting_mime_types
+
+TBD. See Padre::Document
+
+=cut
+
+sub highlighting_mime_types {
+	return ();
+}
+
 =pod
 
 =head2 event_on_context_menu
@@ -403,7 +425,7 @@ sub config_write {
 
 	# Write the config string to the database
 	my $class = Scalar::Util::blessed($self);
-	Padre::DB->selectrow_array(
+	Padre::DB->do(
 		'update plugin set config = ? where name = ?', {},
 		$string, $class,
 	);

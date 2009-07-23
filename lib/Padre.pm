@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -481,16 +481,22 @@ With a rectangular text selection you can select only the keys, only the values,
 =head2 Syntax highlighting
 
 Padre is using L<Wx> (aka wxPerl), wxWidgtes for GUI and Scintilla for the editor.
-Scintiall provides very good syntax highlighting for many languages but Padre is still
+Scintilla provides very good syntax highlighting for many languages but Padre is still
 bound by the version of Scintilla included.
 
-The share/styles/default.yml file is the mapping between the Scintialla defined
+The share/styles/default.yml file is the mapping between the Scintilla defined
 constants for various syntactical elements of each language and the RGB values
 of the color to be used to highlight them.
 
-We plan to allow the user to switch between styles.
-
 =head3 Adding new syntax highlighting
+
+To set up a custom syntax highlighting scheme, you create a .yml file that defines
+the mappings decribed above. The easiest way to create your own scheme is probably to copy an existing
+.yml file (for instance, default.yml) from the C<share/styles/> folder, put it in
+C<~/.padre/styles>, and then modify it. Padre checks this folder on startup and adds
+any styles in the .yml files there to the View -> Style menu.
+
+TODO does this stuff below really belong here?
 
 Need to define constants in L<Padre::Util> to be in the Padre::Constant namespace.
 

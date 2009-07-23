@@ -17,7 +17,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 #####################################################################
 # Construction, Setup, and Accessors
@@ -28,16 +28,15 @@ use Class::XSAccessor getters => {
 
 	# Don't add accessors to here until they have been
 	# upgraded to be fully encapsulated classes.
-	file         => 'file',
-	edit         => 'edit',
-	search       => 'search',
-	view         => 'view',
-	perl         => 'perl',
-	run          => 'run',
-	plugins      => 'plugins',
-	window       => 'window',
-	help         => 'help',
-	experimental => 'experimental',
+	file    => 'file',
+	edit    => 'edit',
+	search  => 'search',
+	view    => 'view',
+	perl    => 'perl',
+	run     => 'run',
+	plugins => 'plugins',
+	window  => 'window',
+	help    => 'help',
 };
 
 sub new {
@@ -79,16 +78,6 @@ sub new {
 	$self->wx->Append( $self->help->wx,    Wx::gettext("&Help") );
 
 	my $config = $self->main->ide->config;
-	if ( $config->experimental ) {
-
-		# Create the Experimental menu
-		# All the crap that doesn't work, have a home,
-		# or should never be seen be real users goes here.
-		require Padre::Wx::Menu::Experimental;
-		$self->{experimental} = Padre::Wx::Menu::Experimental->new($main);
-		$self->wx->Append( $self->experimental->wx, Wx::gettext("E&xperimental") );
-		$self->{default}++;
-	}
 
 	Wx::Event::EVT_MENU_OPEN(
 		$main,
@@ -140,10 +129,6 @@ sub refresh {
 	}
 	$self->window->refresh($current);
 	$self->help->refresh($current);
-
-	if ( $self->experimental ) {
-		$self->experimental->refresh($current);
-	}
 
 	return 1;
 }

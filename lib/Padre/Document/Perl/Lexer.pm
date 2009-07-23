@@ -6,7 +6,7 @@ use PPI::Document;
 use PPI::Dumper;
 use Text::Balanced;
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 
 sub class_to_color {
 	my $class  = shift;
@@ -63,6 +63,8 @@ sub class_to_color {
 
 sub colorize {
 	my $class = shift;
+
+	Padre::Util::debug("Lexer colorize called");
 
 	my $doc    = Padre::Current->document;
 	my $editor = $doc->editor;

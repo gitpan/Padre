@@ -32,7 +32,7 @@ use File::Basename ();
 use Carp           ();
 use POSIX          ();
 
-our $VERSION   = '0.40';
+our $VERSION   = '0.41';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches _T);
 
@@ -110,7 +110,7 @@ Parameters:
 * The offset within the text where we the last match ended so the next
   backward match must end before this.
 
-* backward bit (1 = search backward, 0 = search forward)
+* backward bit (1 = search backward, 0 = search forward) - Optional. Defaults to 0.
 
 =cut
 

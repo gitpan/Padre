@@ -8,7 +8,7 @@ BEGIN {
 		plan skip_all => 'Needs DISPLAY';
 		exit 0;
 	}
-	plan( tests => 63 );
+	plan( tests => 60 );
 }
 use Test::NoWarnings;
 use t::lib::Padre;
@@ -27,7 +27,6 @@ SCOPE: {
 	my $config = $app->config;
 	isa_ok( $config, 'Padre::Config' );
 
-	is( $config->experimental             => 0              );
 	is( $config->main_startup             => 'new'          );
 	is( $config->main_lockinterface       => 1              );
 	is( $config->main_functions           => 0              );
@@ -61,8 +60,6 @@ SCOPE: {
 	is( $config->find_first               => 0              );
 	is( $config->find_nohidden            => 1              );
 	is( $config->find_quick               => 0              );
-	is( $config->ppi_highlight            => 0              );
-	is( $config->ppi_highlight_limit      => 2000           );
 	is( $config->run_save                 => 'same'         );
 	is( $config->threads                  => 1              );
 	is( $config->locale                   => ''             );

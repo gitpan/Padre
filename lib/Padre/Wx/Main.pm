@@ -53,7 +53,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -1497,17 +1497,21 @@ sub run_command {
 	my $cmd  = shift;
 
 	# experimental
-	# TODO: add windows version
 	# when this mode is used the Run menu options are not turned off
 	# and the Run/Stop is not turned on as we currently cannot control
 	# the external execution.
 	my $config = $self->config;
 	if ( $config->run_use_external_window ) {
 		if (Padre::Util::WIN32) {
+
+			# '^' is the escape character in win32 command line
+			# '"' is needed to escape spaces and other characters in paths
+			$cmd =~ s/"/^/g;
+			system "cmd.exe /C \"start $cmd\"";
 		} else {
 			system qq(xterm -e "$cmd; sleep 1000" &);
-			return;
 		}
+		return;
 	}
 
 	# Disable access to the run menus
@@ -2658,11 +2662,13 @@ sub on_save_as {
 			);
 			if ( $response == Wx::wxYES ) {
 				$document->_set_filename($path);
+				$document->save_file;
 				$document->set_newline_type(Padre::Constant::NEWLINE);
 				last;
 			}
 		} else {
 			$document->_set_filename($path);
+			$document->save_file;
 			$document->set_newline_type(Padre::Constant::NEWLINE);
 			last;
 		}
@@ -3109,12 +3115,28 @@ Open Padre's preferences dialog. No return value.
 sub on_preferences {
 	my $self = shift;
 
+	require Padre::MimeTypes;
+	my %old_highlighters = Padre::MimeTypes->get_current_highlighters;
+
 	require Padre::Wx::Dialog::Preferences;
 	my $prefDlg = Padre::Wx::Dialog::Preferences->new;
 	if ( $prefDlg->run($self) ) {
+		my %mime_types; # all the mime-types of currently open files
 		foreach my $editor ( $self->editors ) {
 			$editor->set_preferences;
+			$mime_types{ $editor->{Document}->get_mimetype } = 1;
 		}
+
+		my %new_highlighters = Padre::MimeTypes->get_current_highlighters;
+
+		foreach my $mime_type ( keys %mime_types ) {
+			my $old_highlighter = $old_highlighters{$mime_type};
+			my $new_highlighter = $new_highlighters{$mime_type};
+			if ( $old_highlighter ne $new_highlighter ) {
+				$self->change_highlighter( $mime_type, $new_highlighter );
+			}
+		}
+
 		$self->refresh_functions( $self->current );
 	}
 	$self->ide->save_config;
@@ -4097,64 +4119,44 @@ sub setup_bindings {
 	return;
 }
 
-=pod
 
-=item * $main->set_ppi_highlight( $on );
-
-Toggle C<$on> the fact that we're using PPI to highlight current Perl document.
-If not using PPI, we're using syntax highlighting provided by wxSTC.
-
-Note: this is Perl specific but for now we could not find a better place for
-this.
-
-=cut
-
-sub set_ppi_highlight {
-	my $self   = shift;
-	my $on     = shift;
-	my $config = $self->config;
-
-	# Update the saved config setting
-	$config->set( ppi_highlight => $on );
+sub change_highlighter {
+	my $self      = shift;
+	my $mime_type = shift;
+	my $module    = shift;
 
 	# Refresh the menu (and MIME_LEXER hook)
 	# probably no need for this
 	# $self->refresh;
 
-	# Update the colourise for each Perl editor
-	# TODO try to delay the actual color updating for the
+	# Update the colourise for each editor of the relevant mime-type
+	# Trying to delay the actual color updating for the
 	# pages that are not in focus till they get in focus
 	my $focused = $self->current->editor;
 	foreach my $editor ( $self->editors ) {
 		my $document = $editor->{Document};
-		next unless $document->isa('Padre::Document::Perl');
-		Padre::Util::debug( "Set ppi to $on for $document in file " . ( $document->filename || '' ) );
+		next if $document->get_mimetype ne $mime_type;
+		$document->set_highlighter($module);
+		Padre::Util::debug( "Set highlighter to to $module for $document in file " . ( $document->filename || '' ) );
 		my $lexer = $document->lexer;
 		$editor->SetLexer($lexer);
 
 		# TODO maybe the document should have a method that tells us if it was setup
 		# to be colored by ppi or not instead of fetching the lexer again.
-		Padre::Util::debug("lexer: $lexer");
-
+		Padre::Util::debug("Editor $editor focused $focused lexer: $lexer");
 		if ( $editor eq $focused ) {
 			$editor->needs_manual_colorize(0);
-			$editor->needs_stc_colorize(0);
-			if ( $config->ppi_highlight and $lexer == Wx::wxSTC_LEX_CONTAINER ) {
+			if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 				$document->colorize;
 			} else {
 				$document->remove_color;
 				$editor->Colourise( 0, $editor->GetLength );
 			}
 		} else {
-			if ( $config->ppi_highlight and $lexer == Wx::wxSTC_LEX_CONTAINER ) {
-				$editor->needs_manual_colorize(1);
-				$editor->needs_stc_colorize(0);
-			} else {
-				$editor->needs_manual_colorize(0);
-				$editor->needs_stc_colorize(1);
-			}
+			$editor->needs_manual_colorize(1);
 		}
 	}
+
 	return;
 }
 

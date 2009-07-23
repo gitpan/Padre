@@ -41,6 +41,7 @@ use Padre::Current             ();
 use Padre::Util                ();
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
+use Padre::MimeTypes           ();
 
 use Class::XSAccessor accessors => {
 	_task_sbmp   => '_task_sbmp',   # Static bitmap holding the task status
@@ -48,18 +49,19 @@ use Class::XSAccessor accessors => {
 	_task_width  => '_task_width',  # Current width of task field
 };
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::StatusBar
 };
 
 use constant {
-	FILENAME => 0,
-	TASKLOAD => 1,
-	MIMETYPE => 2,
-	NEWLINE  => 3,
-	POSTRING => 4,
+	FILENAME    => 0,
+	TASKLOAD    => 1,
+	HIGHLIGHTER => 2,
+	MIMETYPE    => 3,
+	NEWLINE     => 4,
+	POSTRING    => 5,
 };
 
 #####################################################################
@@ -101,8 +103,9 @@ sub new {
 	);
 
 	# Set up the fields
-	$self->SetFieldsCount(5);
-	$self->SetStatusWidths( -1, 0, 100, 50, 100 );
+	$self->SetFieldsCount(6);
+
+	#$self->SetStatusWidths( -1, 0, 100, 100, 50, 100 );
 
 	# react to resize events, to adapt size of icon field
 	Wx::Event::EVT_SIZE( $self, \&on_resize );
@@ -126,6 +129,7 @@ in all fields.
 sub clear {
 	my $self = shift;
 	$self->SetStatusText( "", FILENAME );
+	$self->SetStatusText( "", HIGHLIGHTER );
 	$self->SetStatusText( "", MIMETYPE );
 	$self->SetStatusText( "", NEWLINE );
 	$self->SetStatusText( "", POSTRING );
@@ -160,30 +164,39 @@ sub refresh {
 		$filename
 		? File::Basename::basename($filename)
 		: substr( $old, 1 );
-	my $modified = $editor->GetModify ? '*' : ' ';
-	my $title    = $modified . $text;
-	my $position = $editor->GetCurrentPos;
-	my $line     = $editor->GetCurrentLine;
-	my $start    = $editor->PositionFromLine($line);
-	my $char     = $position - $start;
-	my $width    = $self->GetCharWidth;
-	my $mimetype = $document->get_mimetype;
-	my $postring = Wx::gettext('L:') . ( $line + 1 ) . ' ' . Wx::gettext('Ch:') . $char;
+	my $modified    = $editor->GetModify ? '*' : ' ';
+	my $title       = $modified . $text;
+	my $position    = $editor->GetCurrentPos;
+	my $line        = $editor->GetCurrentLine;
+	my $start       = $editor->PositionFromLine($line);
+	my $lines       = $editor->GetLineCount;
+	my $char        = $position - $start;
+	my $width       = $self->GetCharWidth;
+	my $highlighter = Padre::MimeTypes->get_highlighter_name( $document->get_highlighter );
+	my $mimetype    = $document->get_mimetype;
+	my $percent     = int( 100 * $line / $lines );
+
+	#my $postring  = Wx::gettext('L:') . ( $line + 1  ) . ' ' . Wx::gettext('Ch:') . "$char $percent%";
+	my $format   = '%' . length( $lines + 1 ) . 's,%-3s %3s%%';
+	my $length   = length( $lines + 1 ) + 8;
+	my $postring = sprintf( $format, ( $line + 1 ), $char, $percent );
 
 	# update task load status
 	$self->update_task_status;
 
 	# Write the new values into the status bar and update sizes
 	$self->SetStatusText( "$modified $filename", FILENAME );
+	$self->SetStatusText( $highlighter,          HIGHLIGHTER );
 	$self->SetStatusText( $mimetype,             MIMETYPE );
 	$self->SetStatusText( $newline,              NEWLINE );
 	$self->SetStatusText( $postring,             POSTRING );
 	$self->SetStatusWidths(
 		-1,
 		$self->_task_width,
+		( length($highlighter) + 2 ) * $width,
 		( length($mimetype) ) * $width,
 		( length($newline) + 2 ) * $width,
-		( length($postring) + 4 ) * $width,
+		( $length + 2 ) * $width,
 	);
 
 	# move the static bitmap holding the task load status

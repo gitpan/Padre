@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.40';
+our $VERSION = '0.41';
 our @ISA     = 'Padre::Document';
 
 #####################################################################
@@ -98,173 +98,37 @@ sub character_position_to_ppi_location {
 	return [ $line, $col, $col ];
 }
 
-sub lexer {
+sub set_highlighter {
 	my $self   = shift;
-	my $config = Padre->ide->config;
+	my $module = shift;
 
-	Padre::Util::debug( "Setting highlighter for Perl 5 code. length: " . $self->editor->GetTextLength );
-	Padre::Util::debug( "Limit " . $config->ppi_highlight_limit );
-	if ( $config->ppi_highlight and $self->editor->GetTextLength < $config->ppi_highlight_limit ) {
-		Padre::Util::debug("Setting ppi highlighting");
-		return Wx::wxSTC_LEX_CONTAINER;
-	} else {
-		return $self->SUPER::lexer();
-	}
-}
-
-#####################################################################
-# Padre::Document GUI Integration
-
-sub colorize {
-	my $self = shift;
-
-	Padre::Util::debug("colorize called");
-
-	# use pshangov's experimental ppi lexer only when running in development mode
-	if ( $ENV{PADRE_DEV} ) {
-		require Padre::Document::Perl::Lexer;
-		Padre::Document::Perl::Lexer->colorize(@_);
-		return;
+	# These are hard coded limits because the PPI highlighter
+	# is slow. Probably there is not much use in moving this back to a
+	# configuration variable
+	my $limit;
+	if ( $module eq 'Padre::Document::Perl::PPILexer' ) {
+		$limit = 2000;
+	} elsif ( $module eq 'Padre::Document::Perl::Lexer' ) {
+		$limit = 2000;
+	} elsif ( $module eq 'Padre::Plugin::Kate' ) {
+		$limit = 2000;
 	}
 
-	$self->remove_color;
-
+	my $length = $self->{original_content} ? length $self->{original_content} : 0;
 	my $editor = $self->editor;
-	my $text   = $self->text_get;
-	return unless $text;
-
-	require PPI::Document;
-	my $ppi_doc = PPI::Document->new( \$text );
-	if ( not defined $ppi_doc ) {
-		Padre::Util::debug( 'PPI::Document Error %s', PPI::Document->errstr );
-		Padre::Util::debug( 'Original text: %s',      $text );
-		return;
+	if ($editor) {
+		$length = $editor->GetTextLength;
 	}
 
-	my %colors = (
-		keyword      => 4, # dark green
-		structure    => 6,
-		core         => 1, # red
-		pragma       => 7, # purple
-		'Whitespace' => 0,
-		'Structure'  => 0,
+	Padre::Util::debug( "Setting highlighter for Perl 5 code. length: $length" . ( $limit ? " limit is $limit" : '' ) );
 
-		'Number' => 1,
-		'Float'  => 1,
-
-		'HereDoc'       => 4,
-		'Data'          => 4,
-		'Operator'      => 6,
-		'Comment'       => 2, # it's good, it's green
-		'Pod'           => 2,
-		'End'           => 2,
-		'Label'         => 0,
-		'Word'          => 0, # stay the black
-		'Quote'         => 9,
-		'Single'        => 9,
-		'Double'        => 9,
-		'Backtick'      => 9,
-		'Interpolate'   => 9,
-		'QuoteLike'     => 7,
-		'Regexp'        => 7,
-		'Words'         => 7,
-		'Readline'      => 7,
-		'Match'         => 3,
-		'Substitute'    => 5,
-		'Transliterate' => 5,
-		'Separator'     => 0,
-		'Symbol'        => 0,
-		'Prototype'     => 0,
-		'ArrayIndex'    => 0,
-		'Cast'          => 0,
-		'Magic'         => 0,
-		'Octal'         => 0,
-		'Hex'           => 0,
-		'Literal'       => 0,
-		'Version'       => 0,
-	);
-
-	my @tokens = $ppi_doc->tokens;
-	$ppi_doc->index_locations;
-	my $first = $editor->GetFirstVisibleLine;
-	my $lines = $editor->LinesOnScreen;
-
-	#print "First $first lines $lines\n";
-	foreach my $t (@tokens) {
-
-		#print $t->content;
-		my ( $row, $rowchar, $col ) = @{ $t->location };
-
-		#		next if $row < $first;
-		#		next if $row > $first + $lines;
-		my $css = $self->_css_class($t);
-
-		#		if ($row > $first and $row < $first + 5) {
-		#			print "$row, $rowchar, ", $t->length, "  ", $t->class, "  ", $css, "  ", $t->content, "\n";
-		#		}
-		#		last if $row > 10;
-		my $color = $colors{$css};
-		if ( not defined $color ) {
-			Padre::Util::debug("Missing definition for '$css'\n");
-			next;
-		}
-		next if not $color;
-
-		my $start = $editor->PositionFromLine( $row - 1 ) + $rowchar - 1;
-		my $len   = $t->length;
-
-		$editor->StartStyling( $start, $color );
-		$editor->SetStyling( $len, $color );
+	if ( defined $limit and $length > $limit ) {
+		Padre::Util::debug("Forcing STC highlighting");
+		$module = 'stc';
 	}
+	return $self->SUPER::set_highlighter($module);
 }
 
-sub _css_class {
-	my ( $self, $Token ) = @_;
-	if ( $Token->isa('PPI::Token::Word') ) {
-
-		# There are some words we can be very confident are
-		# being used as keywords
-		unless ( $Token->snext_sibling and $Token->snext_sibling->content eq '=>' ) {
-			if ( $Token->content =~ /^(?:sub|return)$/ ) {
-				return 'keyword';
-			} elsif ( $Token->content =~ /^(?:undef|shift|defined|bless)$/ ) {
-				return 'core';
-			}
-		}
-		if ( $Token->previous_sibling and $Token->previous_sibling->content eq '->' ) {
-			if ( $Token->content =~ /^(?:new)$/ ) {
-				return 'core';
-			}
-		}
-		if ( $Token->parent->isa('PPI::Statement::Include') ) {
-			if ( $Token->content =~ /^(?:use|no)$/ ) {
-				return 'keyword';
-			}
-			if ( $Token->content eq $Token->parent->pragma ) {
-				return 'pragma';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Variable') ) {
-			if ( $Token->content =~ /^(?:my|local|our)$/ ) {
-				return 'keyword';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Compond') ) {
-			if ( $Token->content =~ /^(?:if|else|elsif|unless|for|foreach|while|my)$/ ) {
-				return 'keyword';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Package') ) {
-			if ( $Token->content eq 'package' ) {
-				return 'keyword';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Scheduled') ) {
-			return 'keyword';
-		}
-	}
-
-	# Normal coloring
-	my $css = ref $Token;
-	$css =~ s/^.+:://;
-	$css;
-}
 
 #####################################################################
 # Padre::Document Document Analysis
