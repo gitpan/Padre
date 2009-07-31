@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Wx::Perl::Dialog ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Wx::Perl::Dialog';
 
 sub create_widget {
@@ -22,12 +22,8 @@ sub create_widget {
 		$widget = $widgetClass->new( $parent, -1, $param->[1] );
 	} elsif ( $widgetClass eq 'Wx::DirPickerCtrl' ) {
 		my $title = $param->[1] || '';
-		$widget = $widgetClass->new( $parent, -1, $param->[1], $param->[2] );
-
-		# it seems we cannot set the default directory and
-		# we still have to set this directory in order to get anything back in
-		# GetPath
-		$widget->SetPath( Cwd::cwd() );
+		$widget = $widgetClass->new( $parent, -1, '', $param->[2] );
+		$widget->SetPath( $param->[1] || Cwd::cwd() );
 	} elsif ( $widgetClass eq 'Wx::FilePickerCtrl' ) {
 		$widget = $widgetClass->new( $parent, -1, $param->[1], $param->[2] );
 		$widget->SetPath( Cwd::cwd() );

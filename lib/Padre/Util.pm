@@ -32,7 +32,7 @@ use File::Basename ();
 use Carp           ();
 use POSIX          ();
 
-our $VERSION   = '0.41';
+our $VERSION   = '0.42';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw(newline_type get_matches _T);
 
@@ -256,6 +256,30 @@ sub find_perldiag_translations {
 		}
 	}
 	return sort keys %languages;
+}
+
+=pod get_project_rcs
+
+Given a project dir (see "get_project_dir"), returns the project's 
+Revision Control System (RCS) by name. This can be either 'CVS', 
+'SVN' or 'GIT'. Returns undef if none was found.
+
+=cut
+
+sub get_project_rcs {
+	my $project_dir = shift;
+
+	my %evidence_of = (
+		'CVS' => 'CVS',
+		'SVN' => '.svn',
+		'GIT' => '.git',
+	);
+
+	foreach my $rcs ( keys %evidence_of ) {
+		my $dir = File::Spec->catdir( $project_dir, $evidence_of{$rcs} );
+		return $rcs if -d $dir;
+	}
+	return;
 }
 
 =pod

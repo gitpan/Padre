@@ -20,8 +20,10 @@ use warnings;
 use Carp           ();
 use Data::Dumper   ();
 use File::Basename ();
+use Padre::Wx      ();
+use Padre::DB      ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 #####################################################################
 # Document Registration
@@ -259,7 +261,7 @@ sub _initialize {
 	# array ref of objects with value and mime_type fields that have the raw values
 	__PACKAGE__->read_current_highlighters_from_db();
 
-	__PACKAGE__->add_highlighter( 'stc', 'Scintilla', Wx::gettext('Scintilla, fast but might be out of date') );
+	__PACKAGE__->add_highlighter( 'stc', 'Scintilla', Wx::gettext('Fast but might be out of date') );
 
 	foreach my $mime ( keys %MIME_TYPES ) {
 		__PACKAGE__->add_highlighter_to_mime_type( $mime, 'stc' );
@@ -383,6 +385,7 @@ sub get_highlighter_name {
 	# TODO this can happen if the user configureda highlighter but on the next start
 	# the highlighter is not available any more
 	# we need to handle this situation
+	return '' if !defined($highlighter);
 	return '' if not $AVAILABLE_HIGHLIGHTERS{$highlighter}; # avoid autovivification
 	return $AVAILABLE_HIGHLIGHTERS{$highlighter}{name};
 }
@@ -395,7 +398,6 @@ sub change_highlighters {
 	my %mtn          = map { $MIME_TYPES{$_}{name}             => $_ } keys %MIME_TYPES;
 	my %highlighters = map { $AVAILABLE_HIGHLIGHTERS{$_}{name} => $_ } keys %AVAILABLE_HIGHLIGHTERS;
 
-	require Padre::DB::SyntaxHighlight;
 	foreach my $mime_type_name ( keys %$changed_highlighters ) {
 		my $mime_type   = $mtn{$mime_type_name};                                     # get mime_type from name
 		my $highlighter = $highlighters{ $changed_highlighters->{$mime_type_name} }; # get highlighter from name
@@ -535,7 +537,7 @@ sub _guess_mimetype {
 		my $ext = lc $1;
 		if ( $EXT_MIME{$ext} ) {
 			if ( ref $EXT_MIME{$ext} ) {
-				return $EXT_MIME{$ext}->($text);
+				return $EXT_MIME{$ext}->( $self, $text );
 			} else {
 				return $EXT_MIME{$ext};
 			}

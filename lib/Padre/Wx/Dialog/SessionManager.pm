@@ -5,9 +5,10 @@ package Padre::Wx::Dialog::SessionManager;
 use strict;
 use warnings;
 use POSIX qw{ strftime };
-use Padre::Wx ();
+use Padre::Wx       ();
+use Padre::Wx::Icon ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -35,7 +36,8 @@ sub new {
 		Wx::wxDefaultSize,
 		Wx::wxDEFAULT_FRAME_STYLE | Wx::wxTAB_TRAVERSAL,
 	);
-	$self->SetIcon( Wx::GetWxPerlIcon() );
+
+	$self->SetIcon(Padre::Wx::Icon::PADRE);
 
 	# create dialog
 	$self->_create;

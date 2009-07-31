@@ -7,7 +7,6 @@ build_requires:
   Locale::Msgfmt: 0.14
   Test::Exception: 0.27
   Test::More: 0.88
-  Test::Most: 0.21
   Test::NoWarnings: 0.084
   Test::Script: 1.03
 configure_requires:
@@ -119,7 +118,6 @@ requires:
   Wx::Perl::ProcessStream: 0.11
   YAML::Tiny: 1.32
   perl: 5.008005
-  prefork: 1.03
   threads: 1.71
   threads::shared: 1.26
 resources:
@@ -127,4 +125,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.41
+version: 0.42

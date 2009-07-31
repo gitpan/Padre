@@ -36,7 +36,7 @@ use warnings;
 use version;
 use Padre::Task::Outline ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Padre::Task::Outline';
 
 sub run {
@@ -182,8 +182,8 @@ sub update_gui {
 	# by the user)
 	#$outlinebar->ExpandAll;
 	$outlinebar->GetBestSize;
-
 	$outlinebar->Thaw;
+
 	return 1;
 }
 

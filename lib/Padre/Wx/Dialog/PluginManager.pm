@@ -8,7 +8,7 @@ use Carp 'croak';
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -42,7 +42,8 @@ sub new {
 		Wx::wxDefaultSize,
 		Wx::wxDEFAULT_FRAME_STYLE,
 	);
-	$self->SetIcon( Wx::GetWxPerlIcon() );
+
+	$self->SetIcon(Padre::Wx::Icon::PADRE);
 	$self->_sortcolumn(0);
 	$self->_sortreverse(0);
 
@@ -389,8 +390,7 @@ sub _refresh_list {
 	# plugin status
 	my $i = 0;
 	foreach my $name (qw{ enabled disabled error crashed incompatible }) {
-		my $icon = Padre::Wx::Icon::find("status/padre-plugin-$name");
-		$imglist->Add($icon);
+		$imglist->Add( Padre::Wx::Icon::find("status/padre-plugin-$name") );
 		$icon{$name} = ++$i;
 	}
 

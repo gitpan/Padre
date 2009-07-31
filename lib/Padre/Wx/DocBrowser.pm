@@ -13,6 +13,7 @@ use Scalar::Util          ();
 use Params::Util qw(
 	_INSTANCE _INVOCANT _CLASSISA _HASH _STRING
 );
+use Padre::Wx::Icon         ();
 use Padre::Wx::AuiManager   ();
 use Padre::Wx::Dialog       ();
 use Padre::Task::DocBrowser ();
@@ -20,7 +21,7 @@ use Padre::DocBrowser       ();
 use Padre::Util qw( _T );
 use Wx::Perl::Dialog::Simple ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Wx::Frame';
 
 use Class::XSAccessor accessors => {
@@ -85,7 +86,7 @@ sub new {
 	$self->{provider} = Padre::DocBrowser->new;
 
 	# Until we get a real icon use the same one as the others
-	$self->SetIcon( Wx::GetWxPerlIcon() );
+	$self->SetIcon(Padre::Wx::Icon::PADRE);
 
 	my $top_s = Wx::BoxSizer->new(Wx::wxVERTICAL);
 	my $but_s = Wx::BoxSizer->new(Wx::wxHORIZONTAL);

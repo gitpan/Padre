@@ -40,6 +40,7 @@ use Padre::Constant            ();
 use Padre::Current             ();
 use Padre::Util                ();
 use Padre::Wx                  ();
+use Padre::Wx::Icon            ();
 use Padre::Wx::Role::MainChild ();
 use Padre::MimeTypes           ();
 
@@ -49,7 +50,7 @@ use Class::XSAccessor accessors => {
 	_task_width  => '_task_width',  # Current width of task field
 };
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::StatusBar
@@ -164,17 +165,20 @@ sub refresh {
 		$filename
 		? File::Basename::basename($filename)
 		: substr( $old, 1 );
-	my $modified    = $editor->GetModify ? '*' : ' ';
-	my $title       = $modified . $text;
-	my $position    = $editor->GetCurrentPos;
-	my $line        = $editor->GetCurrentLine;
-	my $start       = $editor->PositionFromLine($line);
-	my $lines       = $editor->GetLineCount;
-	my $char        = $position - $start;
-	my $width       = $self->GetCharWidth;
-	my $highlighter = Padre::MimeTypes->get_highlighter_name( $document->get_highlighter );
-	my $mimetype    = $document->get_mimetype;
-	my $percent     = int( 100 * $line / $lines );
+	my $modified       = $editor->GetModify ? '*' : ' ';
+	my $title          = $modified . $text;
+	my $position       = $editor->GetCurrentPos;
+	my $line           = $editor->GetCurrentLine;
+	my $start          = $editor->PositionFromLine($line);
+	my $lines          = $editor->GetLineCount;
+	my $char           = $position - $start;
+	my $width          = $self->GetCharWidth;
+	my $highlighter    = Padre::MimeTypes->get_highlighter_name( $document->get_highlighter );
+	my $mime_type_name = Padre::MimeTypes->get_mime_type_name( $document->get_mimetype );
+	my $percent        = int( 100 * $line / $lines );
+
+	# Set some defaults to advoid "use of uninittialized value" - messages:
+	$mime_type_name = '???' if !defined($mime_type_name);
 
 	#my $postring  = Wx::gettext('L:') . ( $line + 1  ) . ' ' . Wx::gettext('Ch:') . "$char $percent%";
 	my $format   = '%' . length( $lines + 1 ) . 's,%-3s %3s%%';
@@ -187,14 +191,14 @@ sub refresh {
 	# Write the new values into the status bar and update sizes
 	$self->SetStatusText( "$modified $filename", FILENAME );
 	$self->SetStatusText( $highlighter,          HIGHLIGHTER );
-	$self->SetStatusText( $mimetype,             MIMETYPE );
+	$self->SetStatusText( $mime_type_name,       MIMETYPE );
 	$self->SetStatusText( $newline,              NEWLINE );
 	$self->SetStatusText( $postring,             POSTRING );
 	$self->SetStatusWidths(
 		-1,
 		$self->_task_width,
 		( length($highlighter) + 2 ) * $width,
-		( length($mimetype) ) * $width,
+		( length($mime_type_name) ) * $width,
 		( length($newline) + 2 ) * $width,
 		( $length + 2 ) * $width,
 	);
@@ -243,13 +247,12 @@ sub update_task_status {
 	}
 
 	# Not idling, show the correct icon in the statusbar
-	my $icon = Padre::Wx::Icon::find("status/padre-tasks-$status");
+	$sbmp->SetBitmap( Padre::Wx::Icon::find("status/padre-tasks-$status") );
 	$sbmp->SetToolTip(
 		$status eq 'running'
 		? Wx::gettext('Background Tasks are running')
 		: Wx::gettext('Background Tasks are running with high load')
 	);
-	$sbmp->SetBitmap($icon);
 	$sbmp->Show;
 	$self->_task_width(20);
 }

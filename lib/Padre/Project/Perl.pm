@@ -6,7 +6,7 @@ use strict;
 use warnings;
 use Padre::Project ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Padre::Project';
 
 sub from_file {
@@ -37,6 +37,31 @@ sub from_file {
 	return $class->new(
 		root => File::Spec->catpath( $v, $dirs ),
 	);
+}
+
+
+
+
+
+######################################################################
+# Directory Integration
+
+sub ignore_rule {
+	return sub {
+
+		# Default filter as per normal
+		if ( $_->{name} =~ /^\./ ) {
+			return 0;
+		}
+
+		# In a distribution, we can ignore more things
+		if ( $_->{name} =~ /^(?:blib|_build|inc|Makefile|pm_to_blib)\z/ ) {
+			return 0;
+		}
+
+		# Everything left, we show
+		return 1;
+	};
 }
 
 1;

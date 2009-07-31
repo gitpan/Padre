@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx      ();
 use Padre::Current ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor accessors => {
@@ -120,7 +120,8 @@ sub running {
 
 sub on_tree_item_set_focus {
 	my ( $self, $event ) = @_;
-	my $page = $self->main->current->editor;
+	my $main = Padre::Current->main($self);
+	my $page = $main->current->editor;
 	my $item = $self->GetPlData( $self->GetSelection() );
 	if ( defined $item ) {
 		$self->select_line_in_editor( $item->{line} );
@@ -135,7 +136,8 @@ sub on_tree_item_activated {
 
 sub select_line_in_editor {
 	my ( $self, $line_number ) = @_;
-	my $page = $self->main->current->editor;
+	my $main = Padre::Current->main($self);
+	my $page = $main->current->editor;
 	if (   defined $line_number
 		&& ( $line_number =~ /^\d+$/o )
 		&& ( defined $page )
@@ -152,7 +154,14 @@ sub select_line_in_editor {
 sub on_timer {
 	my ( $self, $event, $force ) = @_;
 
-	my $document = $self->main->current->document or return;
+	### NOTE:
+	# floating windows, when undocked (err... "floating"), will
+	# return Wx::AuiFloatingFrame as their parent. So floating
+	# windows should always get their "main" from Padre::Current->main
+	# and -not- from $self->main.
+	my $main = Padre::Current->main($self);
+
+	my $document = $main->current->document or return;
 
 	unless ( $document->can('get_outline') ) {
 		$self->clear;

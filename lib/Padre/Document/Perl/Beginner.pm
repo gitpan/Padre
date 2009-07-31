@@ -3,7 +3,7 @@ package Padre::Document::Perl::Beginner;
 use strict;
 use warnings;
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 
 =head1 NAME
 
@@ -74,6 +74,10 @@ sub check {
 	}
 	if ( $text =~ /use\s+warning\s*;/ ) {
 		$self->{error} = "You need to write use warnings (with an s at the end) and not use warning.";
+		return;
+	}
+	if ( $text =~ /map[\s\t\r\n]*\{.+?\}[\s\t\r\n]*\(.+?\)[\s\t\r\n]*\,/ ) {
+		$self->{error} = "map (),x uses x also as list value for map.";
 		return;
 	}
 

@@ -92,26 +92,20 @@ requires       'Wx'                       => '0.91';
 requires       'Wx::Perl::ProcessStream'  => '0.11';
 requires       'YAML::Tiny'               => '1.32';
 test_requires  'Test::More'               => '0.88';
-test_requires  'Test::Most'               => '0.21';
 test_requires  'Test::Script'             => '1.03';
 test_requires  'Test::Exception'          => '0.27';
 test_requires  'Test::NoWarnings'         => '0.084';
 
-# Extra deps to squelch DIE complaints from dev.pl
-if ( author_context ) {
-	requires 'prefork' => '1.03';
-}
-
 my $locale = setlocale(LC_CTYPE);
 print "Found locale    $locale\n";
 if ( win32 and $locale =~ /^English/ ) {
-	tests     't/*.t t/win32/*.t';
+	tests 't/*.t t/win32/*.t';
 }
 
-no_index       'directory'                => qw{ t xt eg share inc privinc };
-homepage       'http://padre.perlide.org/';
-bugtracker     'http://padre.perlide.org/';
-repository     'http://svn.perlide.org/padre/trunk/Padre/';
+no_index   'directory' => qw{ t xt eg share inc privinc };
+homepage   'http://padre.perlide.org/';
+bugtracker 'http://padre.perlide.org/';
+repository 'http://svn.perlide.org/padre/trunk/Padre/';
 
 keywords(
 	"auto-completion",

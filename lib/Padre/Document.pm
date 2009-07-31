@@ -133,7 +133,11 @@ use Padre::Wx        ();
 use Padre            ();
 use Padre::MimeTypes ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
+
+
+
+
 
 #####################################################################
 # Document Registration
@@ -143,7 +147,8 @@ my $unsaved_number = 0;
 
 # TODO generate this from the the MIME_TYPES in the Padre::MimeTypes class?
 sub menu_view_mimes {
-	'00Plain Text'     => 'text/plain',
+	return (
+		'00Plain Text' => 'text/plain',
 		'01Perl'       => 'application/x-perl',
 		'02Shell'      => 'application/x-shellscript',
 		'03HTML'       => 'text/html',
@@ -156,8 +161,12 @@ sub menu_view_mimes {
 		'17VBScript'   => 'text/vbscript',
 		'19SQL'        => 'text/x-sql',
 		'21Perl 6'     => 'application/x-perl6',
-		;
+	);
 }
+
+
+
+
 
 #####################################################################
 # Constructor and Accessors
@@ -243,6 +252,10 @@ sub rebless {
 	return;
 }
 
+
+
+
+
 #####################################################################
 # Padre::Document GUI Integration
 
@@ -305,7 +318,6 @@ sub guess_mimetype {
 	return Padre::MimeTypes->_guess_mimetype( $text, $filename );
 }
 
-
 # For ts without a newline type
 # TODO: get it from config
 sub _get_default_newline_type {
@@ -329,6 +341,10 @@ sub _auto_convert {
 	# TODO get from config
 	return 0;
 }
+
+
+
+
 
 #####################################################################
 # Disk Interaction Methods
@@ -368,15 +384,21 @@ sub has_changed_on_disk {
 	my ($self) = @_;
 	return 0 unless defined $self->filename;
 	return 0 unless defined $self->last_sync;
-	return 1 unless $self->time_on_file;
-	return $self->last_sync < $self->time_on_file ? 1 : 0;
+
+	# Caching the result for two lines saved one stat-I/O each time this sub is run (about every 2 sec.)
+	my $Time_on_file = $self->time_on_file;
+	return 1 unless $Time_on_file;
+	return $self->last_sync < $Time_on_file ? 1 : 0;
 }
 
 sub time_on_file {
 	my $filename = $_[0]->filename;
 	return 0 unless defined $filename;
-	return 0 unless -e $filename;
-	return ( stat($filename) )[9];
+
+	# using one stat instead of -e and does one I/O instead of two every few seconds
+	my @FileInfo = stat($filename);
+	return 0 if $#FileInfo == -1; # file does not exist
+	return $FileInfo[9];
 }
 
 =pod
@@ -859,9 +881,9 @@ sub project_find {
 	unless ( defined $dirs ) {
 
 		# This document is part of the null project
-		return File::Spec->catpath( $v, $d, '' );
+		return File::Spec->catpath( $v, File::Spec->catdir(@d), '' );
 	}
-
+	$self->{is_project} = 1;
 	return File::Spec->catpath( $v, $dirs, '' );
 }
 

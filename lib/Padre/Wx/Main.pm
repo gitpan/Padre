@@ -39,6 +39,7 @@ use Padre::Document           ();
 use Padre::DB                 ();
 use Padre::Wx                 ();
 use Padre::Wx::Icon           ();
+use Padre::Wx::Left           ();
 use Padre::Wx::Right          ();
 use Padre::Wx::Bottom         ();
 use Padre::Wx::Editor         ();
@@ -53,12 +54,10 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
-
-#####################################################################
 
 =pod
 
@@ -70,7 +69,7 @@ There's only one constructor for this class.
 
 =head3 new
 
-    my $main = Padre::Wx::Main->new( $ide );
+    my $main = Padre::Wx::Main->new($ide);
 
 Create and return a new Padre main window. One should pass a C<Padre>
 object as argument, to get a reference to the Padre application.
@@ -99,7 +98,7 @@ sub new {
 	Wx::InitAllImageHandlers();
 
 	# Determine the window title
-	my $title = 'Padre';
+	my $title = '     \o/ Padre - 1st Birthday Edition! \o/     ';
 	if ( $0 =~ /padre$/ ) {
 		my $dir = $0;
 		$dir =~ s/padre$//;
@@ -182,16 +181,17 @@ sub new {
 	my $statusbar = Padre::Wx::StatusBar->new($self);
 	$self->SetStatusBar($statusbar);
 
-	# Create the three notebooks (document and tools) that
+	# Create the notebooks (document and tools) that
 	# serve as the main AUI manager GUI elements.
 	$self->{notebook} = Padre::Wx::Notebook->new($self);
+	$self->{left}     = Padre::Wx::Left->new($self);
 	$self->{right}    = Padre::Wx::Right->new($self);
 	$self->{bottom}   = Padre::Wx::Bottom->new($self);
 
 	# Creat the various tools that will live in the panes
-	$self->{functions} = Padre::Wx::FunctionList->new($self);
 	$self->{output}    = Padre::Wx::Output->new($self);
 	$self->{syntax}    = Padre::Wx::Syntax->new($self);
+	$self->{functions} = Padre::Wx::FunctionList->new($self);
 	$self->{errorlist} = Padre::Wx::ErrorList->new($self);
 
 	# Set up the pane close event
@@ -227,7 +227,8 @@ sub new {
 
 	# As ugly as the WxPerl icon is, the new file toolbar image we
 	# used to use was far uglier
-	$self->SetIcon( Wx::GetWxPerlIcon() );
+	# Wx::GetWxPerlIcon()
+	$self->SetIcon(Padre::Wx::Icon::PADRE);
 
 	# Show the tools that the configuration dictates
 	$self->show_functions( $self->config->main_functions );
@@ -261,6 +262,10 @@ sub new {
 	return $self;
 }
 
+
+
+
+
 #####################################################################
 
 =pod
@@ -275,31 +280,33 @@ Accessors to GUI elements:
 
 =over 4
 
-=item * title()
+=item * title
 
-=item * config()
+=item * config
 
-=item * aui()
+=item * aui
 
-=item * menu()
+=item * menu
 
-=item * notebook()
+=item * notebook
 
-=item * right()
+=item * left
 
-=item * functions()
+=item * right
 
-=item * outline()
+=item * functions
 
-=item * directory()
+=item * outline
 
-=item * bottom()
+=item * directory
 
-=item * output()
+=item * bottom
 
-=item * syntax()
+=item * output
 
-=item * errorlist()
+=item * syntax
+
+=item * errorlist
 
 =back
 
@@ -307,9 +314,9 @@ Accessors to operating data:
 
 =over 4
 
-=item * cwd()
+=item * cwd
 
-=item * no_refresh()
+=item * no_refresh
 
 =back
 
@@ -317,16 +324,15 @@ Accessors that may not belong to this class:
 
 =over 4
 
-=item * ack()
+=item * ack
 
 =back
 
 =cut
 
-use Class::XSAccessor
+use Class::XSAccessor predicates => {
 
 	# Needed for lazily-constructed gui elements
-	predicates => {
 	has_find      => 'find',
 	has_replace   => 'replace',
 	has_outline   => 'outline',
@@ -341,6 +347,7 @@ use Class::XSAccessor
 	aui       => 'aui',
 	menu      => 'menu',
 	notebook  => 'notebook',
+	left      => 'left',
 	right     => 'right',
 	functions => 'functions',
 	bottom    => 'bottom',
@@ -372,7 +379,11 @@ sub directory {
 		};
 }
 
-#####################################################################
+sub directory_panel {
+	my $self = shift;
+	my $side = $self->config->main_directory_panel;
+	return $self->$side();
+}
 
 =pod
 
@@ -513,7 +524,7 @@ sub _timer_post_init {
 			$_[0]->timer_check_overwrite;
 		},
 	);
-	$timer->Start( 2 * SECONDS, 0 );
+	$timer->Start( $self->ide->config->update_file_from_disk_interval * SECONDS, 0 );
 
 	return;
 }
@@ -532,8 +543,6 @@ sub freezer {
 	Wx::WindowUpdateLocker->new( $_[0] );
 }
 
-#####################################################################
-
 =pod
 
 =head2 Single Instance Server
@@ -547,9 +556,9 @@ my $single_instance_port = 4444;
 
 =pod
 
-=over 4
+=head3 single_instance_start
 
-=item * $main->single_instance_start;
+    $main->single_instance_start;
 
 Start the embedded server. Create it if it doesn't exist. Return true on
 success, die otherwise.
@@ -585,7 +594,9 @@ sub single_instance_start {
 
 =pod
 
-=item * $main->single_instance_stop;
+=head3 single_instance_stop
+
+    $main->single_instance_stop;
 
 Stop & destroy the embedded server if it was running. Return true
 on success.
@@ -607,7 +618,9 @@ sub single_instance_stop {
 
 =pod
 
-=item * my $is_running = $main->single_instance_running;
+=head3 single_instance_running
+
+    my $is_running = $main->single_instance_running;
 
 Return true if the embedded server is currently running.
 
@@ -619,7 +632,9 @@ sub single_instance_running {
 
 =pod
 
-=item * $main->single_instance_connect;
+=head3 single_instance_connect
+
+    $main->single_instance_connect;
 
 Callback called when a client is connecting to embedded server. This is
 the case when user starts a new Padre, and preference "open all
@@ -665,7 +680,9 @@ sub single_instance_connect {
 
 =pod
 
-=item * $main->single_instance_command( $line );
+=heda3 single_instance_command
+
+    $main->single_instance_command( $line );
 
 Callback called when a client has issued a command C<$line> while
 connected on embedded server. Current supported commands are C<open
@@ -718,22 +735,15 @@ sub single_instance_command {
 
 =pod
 
-=back
-
-=cut
-
-#####################################################################
-
-=pod
-
 =head2 Window Methods
 
 Those methods allow to query properties about the main window.
 
-
 =over 4
 
-=item * my $width = $main->window_width;
+=head3 window_width
+
+    my $width = $main->window_width;
 
 Return the main window width.
 
@@ -745,7 +755,9 @@ sub window_width {
 
 =pod
 
-=item * my $width = $main->window_height;
+=heda3 window_height
+
+    my $width = $main->window_height;
 
 Return the main window height.
 
@@ -757,7 +769,9 @@ sub window_height {
 
 =pod
 
-=item * my $left = $main->window_left;
+=head3 window_left
+
+    my $left = $main->window_left;
 
 Return the main window position from the left of the screen.
 
@@ -769,7 +783,9 @@ sub window_left {
 
 =pod
 
-=item * my $top = $main->window_top;
+=head3 window_top
+
+    my $top = $main->window_top;
 
 Return the main window position from the top of the screen.
 
@@ -781,21 +797,15 @@ sub window_top {
 
 =pod
 
-=back
-
-=cut
-
-#####################################################################
-
-=pod
-
 =head2 Refresh Methods
 
 Those methods refresh parts of Padre main window. The term C<refresh>
 and the following methods are reserved for fast, blocking, real-time
 updates to the GUI, implying rapid changes.
 
-=head3 $main->refresh;
+=head3 refresh
+
+    $main->refresh;
 
 Force refresh of all elements of Padre main window. (see below for
 individual refresh methods)
@@ -835,7 +845,9 @@ sub refresh {
 
 =pod
 
-=head3 $main->refresh_syntaxcheck;
+=head3 refresh_syntaxcheck
+
+    $main->refresh_syntaxcheck;
 
 Do a refresh of document syntax checking. This is a "rapid" change,
 since actual syntax check is happening in the background.
@@ -852,7 +864,9 @@ sub refresh_syntaxcheck {
 
 =pod
 
-=head3 $main->refresh_menu;
+=head3 refresh_menu
+
+    $main->refresh_menu;
 
 Force a refresh of all menus. It can enable / disable menu entries
 depending on current document or Padre internal state.
@@ -867,7 +881,9 @@ sub refresh_menu {
 
 =pod
 
-=head3 $main->refresh_menubar;
+=head3 refresh_menubar
+
+    $main->refresh_menubar;
 
 Force a refresh of Padre's menubar.
 
@@ -881,7 +897,9 @@ sub refresh_menubar {
 
 =pod
 
-=head3 $main->refresh_toolbar;
+=head3 refresh_toolbar
+
+    $main->refresh_toolbar;
 
 Force a refresh of Padre's toolbar.
 
@@ -898,7 +916,9 @@ sub refresh_toolbar {
 
 =pod
 
-=head3 $main->refresh_status;
+=head3 refresh_status
+
+    $main->refresh_status;
 
 Force a refresh of Padre's status bar.
 
@@ -912,7 +932,9 @@ sub refresh_status {
 
 =pod
 
-=head3 $main->refresh_functions;
+=head3 refresh_functions
+
+    $main->refresh_functions;
 
 Force a refresh of the function list on the right.
 
@@ -971,8 +993,6 @@ sub refresh_functions {
 	return;
 }
 
-#####################################################################
-
 =pod
 
 =head2 Interface Rebuilding Methods
@@ -980,10 +1000,9 @@ sub refresh_functions {
 Those methods reconfigure Padre's main window in case of drastic changes
 (locale, etc.)
 
+=head3 change_style
 
-=over 4
-
-=item * $main->change_style( $style, $private );
+    $main->change_style( $style, $private );
 
 Apply C<$style> to Padre main window. C<$private> is a boolean true if
 the style is located in user's private Padre directory.
@@ -1007,7 +1026,9 @@ sub change_style {
 
 =pod
 
-=item * $main->change_locale( $locale );
+=head3 change_locale
+
+    $main->change_locale( $locale );
 
 Change Padre's locale to C<$locale>. This will update the GUI to reflect
 the new locale.
@@ -1042,7 +1063,9 @@ sub change_locale {
 
 =pod
 
-=item * $main->relocale;
+=head3 relocale
+
+    $main->relocale;
 
 The term and method C<relocale> is reserved for functionality intended
 to run when the application wishes to change locale (and wishes to do so
@@ -1089,7 +1112,9 @@ sub relocale {
 
 =pod
 
-=item * $main->reconfig( $config );
+=head3 reconfig
+
+    $main->reconfig( $config );
 
 The term and method "reconfig" is reserved for functionality intended to
 run when Padre's underlying configuration is updated by an external
@@ -1131,7 +1156,9 @@ sub reconfig {
 
 =pod
 
-=item * $main->rebuild_toolbar;
+=head3 rebuild_toolbar
+
+    $main->rebuild_toolbar;
 
 Destroy and rebuild the toolbar. This method is useful because the
 toolbar is not really flexible, and most of the time it's better to
@@ -1151,12 +1178,6 @@ sub rebuild_toolbar {
 	return 1;
 }
 
-=pod
-
-=back
-
-=cut
-
 #####################################################################
 
 =pod
@@ -1166,9 +1187,9 @@ sub rebuild_toolbar {
 Those methods deal with the various panels that Padre provides, and
 allow to show or hide them.
 
-=over 4
+=head3 show_functions
 
-=item * $main->show_functions( $visible );
+    $main->show_functions( $visible );
 
 Show the functions panel on the right if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -1199,7 +1220,9 @@ sub show_functions {
 
 =pod
 
-=item * $main->show_outline( $visible );
+=head3 show_outline
+
+    $main->show_outline( $visible );
 
 Show the outline panel on the right if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -1235,7 +1258,9 @@ sub show_outline {
 
 =pod
 
-=item * $main->show_directory( $visible );
+=head3 show_directory
+
+    $main->show_directory( $visible );
 
 Show the directory panel on the right if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -1255,10 +1280,10 @@ sub show_directory {
 
 	if ($on) {
 		my $directory = $self->directory;
-		$self->right->show($directory);
-		$directory->update_gui;
+		$self->directory_panel->show($directory);
+		$directory->refresh;
 	} elsif ( $self->has_directory ) {
-		$self->right->hide( $self->directory );
+		$self->directory_panel->hide( $self->directory );
 	}
 
 	$self->aui->Update;
@@ -1269,7 +1294,9 @@ sub show_directory {
 
 =pod
 
-=item * $main->show_output( $visible );
+=head3 show_output
+
+    $main->show_output( $visible );
 
 Show the output panel at the bottom if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -1300,7 +1327,9 @@ sub show_output {
 
 =pod
 
-=item * $main->show_syntax( $visible );
+=head3 show_syntax
+
+    $main->show_syntax( $visible );
 
 Show the syntax panel at the bottom if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -1333,21 +1362,13 @@ sub show_syntax {
 
 =pod
 
-=back
-
-=cut
-
-#####################################################################
-
-=pod
-
 =head2 Introspection
 
 The following methods allow to poke into Padre's internals.
 
-=over 4
+=head3 current
 
-=item * my $current = $main->current;
+    my $current = $main->current;
 
 Creates a L<Padre::Current> object for the main window, giving you quick
 and cacheing access to the current various whatevers.
@@ -1362,7 +1383,9 @@ sub current {
 
 =pod
 
-=item * my @ids = $main->pageids;
+=head3 pageids
+
+    my @ids = $main->pageids;
 
 Return a list of all current tab ids (integers) within the notebook.
 
@@ -1374,7 +1397,9 @@ sub pageids {
 
 =pod
 
-=item * my @pages = $main->pages;
+=head3 pages
+
+    my @pages = $main->pages;
 
 Return a list of all notebook tabs. Those are the real objects, not the
 ids (see C<pageids()> above).
@@ -1388,7 +1413,9 @@ sub pages {
 
 =pod
 
-=item * my @editors = $main->editors;
+=head3 editors
+
+    my @editors = $main->editors;
 
 Return a list of all current editors. Those are the real objects, not
 the ids (see C<pageids()> above).
@@ -1405,11 +1432,18 @@ sub editors {
 
 =pod
 
-=back
+=head3 documents
+
+    my @document = $main->documents;
+
+Return a list of all current docunments, in the specific order
+they are open in the notepad.
 
 =cut
 
-#####################################################################
+sub documents {
+	return map { $_->{Document} } $_[0]->editors;
+}
 
 =pod
 
@@ -1418,9 +1452,9 @@ sub editors {
 The following methods run an external command, for example to evaluate
 current document.
 
-=over 4
+=head3 on_run_command
 
-=item * $main->on_run_command;
+    $main->on_run_command;
 
 Prompt the user for a command to run, then run it with C<run_command()>
 (see below).
@@ -1453,7 +1487,9 @@ sub on_run_command {
 
 =pod
 
-=item * $main->on_run_tests;
+=head3 on_run_tests
+
+    $main->on_run_tests;
 
 Callback method, to run the project tests and harness them.
 
@@ -1486,7 +1522,9 @@ sub on_run_tests {
 
 =pod
 
-=item * $main->run_command( $command );
+=head3 run_command
+
+    $main->run_command( $command );
 
 Run C<$command> and display the result in the output panel.
 
@@ -1584,7 +1622,9 @@ sub run_command {
 
 =pod
 
-=item * $main->run_document( $debug )
+=head3 run_document
+
+    $main->run_document( $debug )
 
 Run current document. If C<$debug> is true, document will be run with
 diagnostics and various debug options.
@@ -1636,7 +1676,9 @@ sub run_document {
 
 =pod
 
-=item * $main->debug_perl;
+=head3 debug_perl
+
+    $main->debug_perl;
 
 Run current document under perl debugger. An error is reported if
 current is not a Perl document.
@@ -1683,24 +1725,15 @@ sub debug_perl {
 
 =pod
 
-=back
-
-=cut
-
-######################################################################
-
-=pod
-
 =head2 Session Support
 
 Those methods deal with Padre sessions. A session is a set of files /
 tabs opened, with the position within the files saved, as well as the
 document that has the focus.
 
+=head3 capture_session
 
-=over 4
-
-=item * my @session = $main->capture_session;
+    my @session = $main->capture_session;
 
 Capture list of opened files, with information. Return a list of
 C<Padre::DB::SessionFile> objects.
@@ -1708,8 +1741,7 @@ C<Padre::DB::SessionFile> objects.
 =cut
 
 sub capture_session {
-	my ($self) = @_;
-
+	my $self     = shift;
 	my @session  = ();
 	my $notebook = $self->notebook;
 	my $current  = $self->current->filename;
@@ -1734,7 +1766,9 @@ sub capture_session {
 
 =pod
 
-=item * $main->open_session( $session );
+=head3 open_session
+
+    $main->open_session( $session );
 
 Try to close all files, then open all files referenced in the given
 C<$session> (a C<Padre::DB::Session> object). No return value.
@@ -1747,8 +1781,8 @@ sub open_session {
 	# prevent redrawing until we're done
 	$self->Freeze;
 
-	# close all files
-	$self->on_close_all;
+	# Close all files
+	$self->close_all;
 
 	# get list of files in the session
 	my @files = $session->files;
@@ -1775,7 +1809,9 @@ sub open_session {
 
 =pod
 
-=item * $main->save_session( $session, @session );
+=head3 save_session
+
+    $main->save_session( $session, @session );
 
 Try to save C<@session> files (C<Padre::DB::SessionFile> objects, such
 as what is returned by C<capture_session()> - see above) to database,
@@ -1796,21 +1832,13 @@ sub save_session {
 
 =pod
 
-=back
-
-=cut
-
-#####################################################################
-
-=pod
-
 =head2 User Interaction
 
 Various methods to help send information to user.
 
-=over 4
+=head3 message
 
-=item * $main->message( $msg, $title );
+    $main->message( $msg, $title );
 
 Open a dialog box with C<$msg> as main text and C<$title> (title
 defaults to C<Message>). There's only one OK button. No return value.
@@ -1827,7 +1855,9 @@ sub message {
 
 =pod
 
-=item * $main->error( $msg );
+=head3 error
+
+    $main->error( $msg );
 
 Open an error dialog box with C<$msg> as main text. There's only one OK
 button. No return value.
@@ -1840,7 +1870,9 @@ sub error {
 
 =pod
 
-=item * my $find = $main->find;
+=head3 find
+
+    my $find = $main->find;
 
 Returns the find dialog, creating a new one if needed.
 
@@ -1859,7 +1891,9 @@ sub find {
 
 =pod
 
-=item * my $find = $main->fast_find;
+=head3 fast_find
+
+    my $find = $main->fast_find;
 
 Return current quick find dialog. Create a new one if needed.
 
@@ -1878,7 +1912,9 @@ sub fast_find {
 
 =pod
 
-=item * my $replace = $main->replace;
+=head3 replace
+
+    my $replace = $main->replace;
 
 Return current replace dialog. Create a new one if needed.
 
@@ -1897,7 +1933,9 @@ sub replace {
 
 =pod
 
-=item * my $value = $main->prompt( $title, $subtitle, $key );
+=head3 prompt
+
+    my $value = $main->prompt( $title, $subtitle, $key );
 
 Prompt user with a dialog box about the value that C<$key> should have.
 Return this value, or undef if user clicked C<cancel>.
@@ -1924,22 +1962,14 @@ sub prompt {
 
 =pod
 
-=back
-
-=cut
-
-#####################################################################
-
-=pod
-
 =head2 General Events
 
 Those methods are the various callbacks registered in the menus or
 whatever widgets Padre has.
 
-=over 4
+=head3 on_brace_matching
 
-=item * $main->on_brace_matching;
+    $main->on_brace_matching;
 
 Jump to brace matching current the one at current position.
 
@@ -1968,7 +1998,9 @@ sub on_brace_matching {
 
 =pod
 
-=item * $main->on_comment_toggle_block;
+=head3 on_comment_toggle_block
+
+    $main->on_comment_toggle_block;
 
 Un/comment selected lines, depending on their current state.
 
@@ -1989,7 +2021,9 @@ sub on_comment_toggle_block {
 
 =pod
 
-=item * $main->on_comment_out_block;
+=head3 on_comment_out_block
+
+    $main->on_comment_out_block;
 
 Comment out selected lines unilateraly.
 
@@ -2010,7 +2044,9 @@ sub on_comment_out_block {
 
 =pod
 
-=item * $main->on_uncomment_block;
+=head3 on_uncomment_block
+
+    $main->on_uncomment_block;
 
 Uncomment selected lines unilateraly.
 
@@ -2031,7 +2067,9 @@ sub on_uncomment_block {
 
 =pod
 
-=item * $main->on_autocompletition;
+=head3 on_autocompletion
+
+    $main->on_autocompletition;
 
 Try to autocomplete current word being typed, depending on
 document type.
@@ -2057,7 +2095,9 @@ sub on_autocompletition {
 
 =pod
 
-=item * $main->on_goto;
+=head3 on_goto
+
+    $main->on_goto;
 
 Prompt user for a line, and jump to this line in current document.
 
@@ -2084,7 +2124,9 @@ sub on_goto {
 
 =pod
 
-=item * $main->on_close_window( $event );
+=head3 on_close_window
+
+    $main->on_close_window( $event );
 
 Callback when window is about to be closed. This is our last chance to
 veto the C<$event> close, eg when some files are not yet saved.
@@ -2124,7 +2166,7 @@ sub on_close_window {
 				return;
 			}
 		} else {
-			my $closed = $self->on_close_all;
+			my $closed = $self->close_all;
 			unless ($closed) {
 
 				# They cancelled at some point
@@ -2189,7 +2231,9 @@ sub on_close_window {
 
 =pod
 
-=item * $main->on_split_window;
+=head3 on_split_window
+
+    $main->on_split_window;
 
 Open a new editor with the same current document. No return value.
 
@@ -2219,7 +2263,9 @@ sub on_split_window {
 
 =pod
 
-=item * $main->setup_editors( @files );
+=head3 setup_editors
+
+    $main->setup_editors( @files );
 
 Setup (new) tabs for C<@files>, and update the GUI. If C<@files> is undef, open
 an empty document.
@@ -2266,7 +2312,9 @@ sub setup_editors {
 
 =pod
 
-=item * $main->on_new;
+=head3 on_new
+
+    $main->on_new;
 
 Create a new empty tab. No return value.
 
@@ -2283,7 +2331,9 @@ sub on_new {
 
 =pod
 
-=item * $main->setup_editor( $file );
+=head3 setup_editor
+
+    $main->setup_editor( $file );
 
 Setup a new tab / buffer and open C<$file>, then update the GUI. Recycle
 current buffer if there's only one empty tab currently opened. If C<$file> is
@@ -2362,9 +2412,15 @@ sub setup_editor {
 			name => $doc->filename,
 		);
 		$self->menu->file->update_recentfiles;
+	} else {
+		$doc->{project_dir} =
+			  $self->current->document
+			? $self->current->document->project_dir
+			: $self->ide->config->default_projects_directory;
 	}
 
 	my $id = $self->create_tab( $editor, $title );
+	$self->notebook->GetPage($id)->SetFocus;
 
 	# no need to call this here as set_preferences already calls padre_setup.
 	#$editor->padre_setup;
@@ -2378,7 +2434,9 @@ sub setup_editor {
 
 =pod
 
-=item * my $tab = $main->create_tab;
+=head3 create_tab
+
+    my $tab = $main->create_tab;
 
 Create a new tab in the notebook, and return its id (an integer).
 
@@ -2395,7 +2453,9 @@ sub create_tab {
 
 =pod
 
-=item * $main->on_open_selection;
+=head3 on_open_selection
+
+    $main->on_open_selection;
 
 Try to open current selection in a new tab. Different combinations are
 tried in order: as full path, as path relative to cwd (where the editor
@@ -2410,7 +2470,7 @@ No return value.
 sub on_open_selection {
 	my $self    = shift;
 	my $current = $self->current;
-	return if not $current->editor;
+	return unless $current->editor;
 	my $text = $current->text;
 
 	# get selection, ask for it if needed
@@ -2471,7 +2531,17 @@ sub on_open_selection {
 			push @files, $filename;
 		} else {
 
-			# TODO: mayb it should not be our @INC but the @INC of the perl used for
+			# relative to the project dir
+			my $filename = File::Spec->catfile(
+				$self->current->document->project_dir,
+				'lib',
+				$module,
+			);
+			if ( -e $filename ) {
+				push @files, $filename;
+			}
+
+			# TODO: it should not be our @INC but the @INC of the perl used for
 			# script execution
 			foreach my $path (@INC) {
 				my $filename = File::Spec->catfile( $path, $module );
@@ -2510,7 +2580,9 @@ sub on_open_selection {
 
 =pod
 
-=item * $main->on_open_all_recent_files;
+=head3 on_open_all_recent_files
+
+    $main->on_open_all_recent_files;
 
 Try to open all recent files within Padre. No return value.
 
@@ -2526,7 +2598,9 @@ sub on_open_all_recent_files {
 
 =pod
 
-=item * $main->on_open;
+=head3 on_open
+
+    $main->on_open;
 
 Prompt user for file(s) to open, and open them as new tabs. No
 return value.
@@ -2539,6 +2613,13 @@ sub on_open {
 	if ($filename) {
 		$self->{cwd} = File::Basename::dirname($filename);
 	}
+	$self->_open_file_dialog;
+
+	return;
+}
+
+sub _open_file_dialog {
+	my $self = shift;
 
 	# http://docs.wxwidgets.org/stable/wx_wxfiledialog.html:
 	# "It must be noted that wildcard support in the native Motif file dialog is quite
@@ -2580,9 +2661,20 @@ sub on_open {
 	return;
 }
 
+sub on_open_example {
+	my $self = shift;
+	$self->{cwd} = Padre::Util::sharedir('examples');
+	$self->_open_file_dialog;
+
+	return;
+}
+
+
 =pod
 
-=item * $main->on_reload_file;
+=head3 on_reload_file
+
+    $main->on_reload_file;
 
 Try to reload current file from disk. Display an error if something went wrong.
 No return value.
@@ -2611,7 +2703,9 @@ sub on_reload_file {
 
 =pod
 
-=item * my $was_saved = $main->on_save_as;
+=head3 on_save_as
+
+    my $was_saved = $main->on_save_as;
 
 Prompt user for a new filename to save current document, and save it.
 Returns true if saved, false if cancelled.
@@ -2624,6 +2718,8 @@ sub on_save_as {
 	my $current  = $document->filename;
 	if ( defined $current ) {
 		$self->{cwd} = File::Basename::dirname($current);
+	} elsif ( defined $document->project_dir ) {
+		$self->{cwd} = $document->project_dir;
 	}
 	while (1) {
 		my $dialog = Wx::FileDialog->new(
@@ -2670,6 +2766,7 @@ sub on_save_as {
 			$document->_set_filename($path);
 			$document->save_file;
 			$document->set_newline_type(Padre::Constant::NEWLINE);
+			delete $document->{project_dir};
 			last;
 		}
 	}
@@ -2693,7 +2790,9 @@ sub on_save_as {
 
 =pod
 
-=item * my $success = $main->on_save;
+=head3 on_save
+
+    my $success = $main->on_save;
 
 Try to save current document. Prompt user for a filename if document was
 new (see C<on_save_as()> above). Return true if document has been saved,
@@ -2723,7 +2822,9 @@ sub on_save {
 
 =pod
 
-=item * my $success = $main->on_save_all;
+=head3 on_save_all
+
+    my $success = $main->on_save_all;
 
 Try to save all opened documents. Return true if all documents were
 saved, false otherwise.
@@ -2744,7 +2845,9 @@ sub on_save_all {
 
 =pod
 
-=item * my $success = $main->_save_buffer( $id );
+=head3 _save_buffer
+
+    my $success = $main->_save_buffer( $id );
 
 Try to save buffer in tab C<$id>. This is the method used underneath by
 all C<on_save_*()> methods. It will check if document has been updated
@@ -2787,7 +2890,9 @@ sub _save_buffer {
 
 =pod
 
-=item * $main->on_close( $event );
+=head3 on_close
+
+    $main->on_close( $event );
 
 Handler when there is a close C<$event>. Veto it if it's from the aui
 notebook, since wx will try to close the tab no matter what. Otherwise,
@@ -2812,7 +2917,9 @@ sub on_close {
 
 =pod
 
-=item * my $success = $main->close( $id );
+=head3 close
+
+    my $success = $main->close( $id );
 
 Request to close document in tab C<$id>, or current one if no C<$id>
 provided. Return true if closed, false otherwise.
@@ -2854,7 +2961,6 @@ sub close {
 		}
 	}
 
-	#
 	$doc->store_cursor_position;
 	$doc->remove_tempfile if $doc->tempfile;
 
@@ -2876,40 +2982,16 @@ sub close {
 
 =pod
 
-=item * my $success = $main->on_close_all;
+=head3 close_all
 
-Event called when menu item close all has been hit. Return true if all
-documents were closed, false otherwise.
-
-=cut
-
-sub on_close_all {
-	$_[0]->_close_all;
-}
-
-=pod
-
-=item * my $success = $main->on_close_all_but_current;
-
-Event called when menu item close all but current has been hit. Return
-true upon success, false otherwise.
-
-=cut
-
-sub on_close_all_but_current {
-	$_[0]->_close_all( $_[0]->notebook->GetSelection );
-}
-
-=pod
-
-=item * my $success = $main->_on_close_all( $skip );
+    my $success = $main->close_all( $skip );
 
 Try to close all documents. If C<$skip> is specified (an integer), don't
 close the tab with this id. Return true upon success, false otherwise.
 
 =cut
 
-sub _close_all {
+sub close_all {
 	my $self  = shift;
 	my $skip  = shift;
 	my $guard = $self->freezer;
@@ -2925,7 +3007,42 @@ sub _close_all {
 
 =pod
 
-=item * $main->on_nth_pane( $id );
+=head3 close_where
+
+    # Close all files in current project
+    my $project = Padre::Current->document->project_dir;
+    my $success = $main->close_where( sub {
+        $_[0]->project_dir eq $project
+    } );
+
+The C<close_where> method is a programatically enhanceable mass-close
+tool. It takes a subroutine as a parameter and calls that subroutine
+for each currently open document, passing the document as the first
+parameter.
+
+Any documents that return true will be closed.
+
+=cut
+
+sub close_where {
+	my $self     = shift;
+	my $where    = shift;
+	my $notebook = $self->notebook;
+	my $guard    = $self->freezer;
+	foreach my $id ( reverse $self->pageids ) {
+		if ( $where->( $notebook->GetPage($id)->{Document} ) ) {
+			$self->close($id) or return 0;
+		}
+	}
+	$self->refresh;
+	return 1;
+}
+
+=pod
+
+=head3 on_nth_path
+
+    $main->on_nth_pane( $id );
 
 Put focus on tab C<$id> in the notebook. Return true upon success, false
 otherwise.
@@ -2947,7 +3064,9 @@ sub on_nth_pane {
 
 =pod
 
-=item * $main->on_next_pane;
+=head3 on_next_pane
+
+    $main->on_next_pane;
 
 Put focus on tab next to current document. Currently, only left to right
 order is supported, but later on it can be extended to follow a last
@@ -2971,7 +3090,9 @@ sub on_next_pane {
 
 =pod
 
-=item * $main->on_prev_pane;
+=head3 on_prev_pane
+
+    $main->on_prev_pane;
 
 Put focus on tab previous to current document. Currently, only right to
 left order is supported, but later on it can be extended to follow a
@@ -2995,7 +3116,9 @@ sub on_prev_pane {
 
 =pod
 
-=item * $main->on_diff;
+=head3 on_diff
+
+    $main->on_diff;
 
 Run C<Text::Diff> between current document and its last saved content on
 disk. This allow to see what has changed before saving. Display the
@@ -3043,7 +3166,9 @@ sub on_diff {
 
 =pod
 
-=item * $main->on_join_lines;
+=head3 on_join_lines
+
+    $main->on_join_lines;
 
 Join current line with next one (a-la vi with Ctrl+J). No return value.
 
@@ -3074,22 +3199,13 @@ sub on_join_lines {
 
 =pod
 
-=back
-
-=cut
-
-######################################################################
-
-=pod
-
 =head2 Preferences and toggle methods
 
 Those methods allow to change Padre's preferences.
 
+=head3 zoom
 
-=over 4
-
-=item * $main->zoom( $factor );
+    $main->zoom( $factor );
 
 Apply zoom C<$factor> to Padre's documents. Factor can be either
 positive or negative.
@@ -3106,7 +3222,9 @@ sub zoom {
 
 =pod
 
-=item * $main->on_preferences;
+=head3 on_preferences
+
+    $main->on_preferences;
 
 Open Padre's preferences dialog. No return value.
 
@@ -3146,7 +3264,9 @@ sub on_preferences {
 
 =pod
 
-=item * $main->on_toggle_line_numbers;
+=head3 on_toggle_line_numbers
+
+    $main->on_toggle_line_numbers;
 
 Toggle visibility of line numbers on the left of the document. No
 return value.
@@ -3170,7 +3290,9 @@ sub on_toggle_line_numbers {
 
 =pod
 
-=item * $main->on_toggle_code_folding;
+=head3 on_toggle_code_folding
+
+    $main->on_toggle_code_folding;
 
 De/activate code folding. No return value.
 
@@ -3194,7 +3316,9 @@ sub on_toggle_code_folding {
 
 =pod
 
-=item * $main->on_toggle_currentline;
+=head3 on_toggle_currentline
+
+    $main->on_toggle_currentline;
 
 Toggle overlining of current line. No return value.
 
@@ -3215,9 +3339,38 @@ sub on_toggle_currentline {
 	return;
 }
 
+=head3 on_toggle_right_margin
+
+    $main->on_toggle_right_margin;
+
+Toggle display of right margin. No return value.
+
+=cut
+
+sub on_toggle_right_margin {
+	my ( $self, $event ) = @_;
+
+	my $config = $self->config;
+	$config->set( editor_right_margin_enable => $event->IsChecked ? 1 : 0 );
+
+	my $enabled = $config->editor_right_margin_enable;
+	my $col     = $config->editor_right_margin_column;
+
+	foreach my $editor ( $self->editors ) {
+		$editor->SetEdgeColumn($col);
+		$editor->SetEdgeMode( $enabled ? Wx::wxSTC_EDGE_LINE : Wx::wxSTC_EDGE_NONE );
+	}
+
+	$config->write;
+
+	return;
+}
+
 =pod
 
-=item * $main->on_toggle_syntax_check;
+=head3 on_toggle_syntax_check
+
+    $main->on_toggle_syntax_check;
 
 Toggle visibility of syntax panel. No return value.
 
@@ -3237,7 +3390,9 @@ sub on_toggle_syntax_check {
 
 =pod
 
-=item * $main->on_toggle_errorlist;
+=head3 on_toggle_errorlist
+
+    $main->on_toggle_errorlist;
 
 Toggle visibility of error-list panel. No return value.
 
@@ -3261,7 +3416,9 @@ sub on_toggle_errorlist {
 
 =pod
 
-=item * $main->on_toggle_indentation_guide;
+=head3 on_toggle_indentation_guide
+
+    $main->on_toggle_indentation_guide;
 
 Toggle visibility of indentation guide. No return value.
 
@@ -3287,7 +3444,9 @@ sub on_toggle_indentation_guide {
 
 =pod
 
-=item * $main->on_toggle_eol;
+=head3 on_toggle_eol
+
+    $main->on_toggle_eol;
 
 Toggle visibility of end of line cariage returns. No return value.
 
@@ -3313,7 +3472,9 @@ sub on_toggle_eol {
 
 =pod
 
-=item * $main->on_toggle_whitespaces;
+=head3 on_toggle_whitespaces
+
+    $main->on_toggle_whitespaces;
 
 Show/hide spaces and tabs (with dots and arrows respectively). No
 return value.
@@ -3343,7 +3504,9 @@ sub on_toggle_whitespaces {
 
 =pod
 
-=item * $main->on_word_wrap;
+=head3 on_word_wrap
+
+    $main->on_word_wrap;
 
 Toggle word wrapping for current document. No return value.
 
@@ -3367,7 +3530,9 @@ sub on_word_wrap {
 
 =pod
 
-=item * $main->on_toggle_toolbar;
+=head3 on_toggle_toolbar
+
+    $main->on_toggle_toolbar;
 
 Toggle toolbar visibility. No return value.
 
@@ -3405,7 +3570,9 @@ sub on_toggle_toolbar {
 
 =pod
 
-=item * $main->on_toggle_statusbar;
+=head3 on_toggle_statusbar
+
+    $main->on_toggle_statusbar;
 
 Toggle statusbar visibility. No return value.
 
@@ -3438,7 +3605,9 @@ sub on_toggle_statusbar {
 
 =pod
 
-=item * $main->on_toggle_lockinterface;
+=head3 on_toggle_lockinterface
+
+    $main->on_toggle_lockinterface;
 
 Toggle possibility for user to change Padre's external aspect. No
 return value.
@@ -3461,7 +3630,9 @@ sub on_toggle_lockinterface {
 
 =pod
 
-=item * $main->on_insert_from_file;
+=head3 on_insert_from_file
+
+    $main->on_insert_from_file;
 
 Prompt user for a file to be inserted at current position in current
 document. No return value.
@@ -3502,7 +3673,9 @@ sub on_insert_from_file {
 
 =pod
 
-=item * $main->convert_to( $eol_style );
+=head3 convert_to
+
+    $main->convert_to( $eol_style );
 
 Convert document to C<$eol_style> line endings (can be one of C<WIN>,
 C<UNIX>, or C<MAC>). No return value.
@@ -3529,7 +3702,9 @@ sub convert_to {
 
 =pod
 
-=item * my $editor = $main->find_editor_of_file( $file );
+=head3 find_editor_of_file
+
+    my $editor = $main->find_editor_of_file( $file );
 
 Return the editor (a C<Padre::Wx::Editor> object) containing the wanted
 C<$file>, or undef if file is not opened currently.
@@ -3551,7 +3726,9 @@ sub find_editor_of_file {
 
 =pod
 
-=item * my $id = $main->find_id_of_editor( $editor );
+=head3 find_id_of_editor
+
+    my $id = $main->find_id_of_editor( $editor );
 
 Given C<$editor>, return the tab id holding it, or undef if it was
 not found.
@@ -3574,7 +3751,9 @@ sub find_id_of_editor {
 
 =pod
 
-=item * $main->run_in_padre;
+=heda3 run_in_padre
+
+    $main->run_in_padre;
 
 Eval current document within Padre. It means it can access all of
 Padre's internals, and wreck havoc. Display an error message if the eval
@@ -3612,21 +3791,13 @@ sub run_in_padre {
 
 =pod
 
-=back
-
-=cut
-
-######################################################################
-
-=pod
-
 =head2 STC related methods
 
 Those methods are needed to have a smooth STC experience.
 
-=over 4
+=head3 on_stc_style_needed
 
-=item * $main->on_stc_style_needed( $event );
+    $main->on_stc_style_needed( $event );
 
 Handler of EVT_STC_STYLENEEDED C<$event>. Used to work around some edge
 cases in scintilla. No return value.
@@ -3658,7 +3829,9 @@ sub on_stc_style_needed {
 
 =pod
 
-=item * $main->on_stc_update_ui;
+=head3 on_stc_update_ui
+
+    $main->on_stc_update_ui;
 
 Handler called on every movement of the cursor. No return value.
 
@@ -3692,7 +3865,9 @@ sub on_stc_update_ui {
 
 =pod
 
-=item * $main->on_stc_change;
+=head3 on_stc_change
+
+    $main->on_stc_change;
 
 Handler of the EVT_STC_CHANGE event. Doesn't do anythin. No
 return value.
@@ -3705,7 +3880,9 @@ sub on_stc_change {
 
 =pod
 
-=item * $main->on_stc_char_added;
+=head3 on_stc_char_needed
+
+    $main->on_stc_char_added;
 
 This handler is called when a character is added. No return value. See
 L<http://www.yellowbrain.com/stc/events.html#EVT_STC_CHARADDED>
@@ -3728,7 +3905,9 @@ sub on_stc_char_added {
 
 =pod
 
-=item * $main->on_stc_dwell_start( $event );
+=head3 on_stc_dwell_start
+
+    $main->on_stc_dwell_start( $event );
 
 Handler of the DWELLSTART C<$event>. This event is sent when the mouse
 has not moved in a given amount of time. Doesn't do anything by now. No
@@ -3751,7 +3930,9 @@ sub on_stc_dwell_start {
 
 =pod
 
-=item * $main->on_aui_pane_close( $event );
+=head3 on_aui_pane_close
+
+    $main->on_aui_pane_close( $event );
 
 Handler called upon EVT_AUI_PANE_CLOSE C<$event>. Doesn't do anything by now.
 
@@ -3763,7 +3944,9 @@ sub on_aui_pane_close {
 
 =pod
 
-=item * $main->on_doc_stats;
+=head3 on_doc_stats
+
+    $main->on_doc_stats;
 
 Compute various stats about current document, and display them in a
 message. No return value.
@@ -3807,7 +3990,9 @@ sub on_doc_stats {
 
 =pod
 
-=item * $main->on_tab_and_space( $style );
+=head3 on_tab_and_space
+
+    $main->on_tab_and_space( $style );
 
 Convert current document from spaces to tabs (or vice-versa) depending
 on C<$style> (can be either of C<Space_to_Tab> or C<Tab_to_Space>).
@@ -3861,7 +4046,9 @@ sub on_tab_and_space {
 
 =pod
 
-=item * $main->on_delete_ending_space;
+=head3 on_delete_ending_space
+
+    $main->on_delete_ending_space;
 
 Trim all ending spaces in current selection, or document if no text is
 selected. No return value.
@@ -3888,7 +4075,9 @@ sub on_delete_ending_space {
 
 =pod
 
-=item * $main->on_delete_leading_space;
+=head3 on_delete_leading_space
+
+    $main->on_delete_leading_space;
 
 Trim all leading spaces in current selection. No return value.
 
@@ -3933,7 +4122,9 @@ sub on_delete_leading_space {
 
 =pod
 
-=item * $main->timer_check_overwrite;
+=head3 timer_check_overwrite
+
+    $main->timer_check_overwrite;
 
 Called every n seconds to check if file has been overwritten outside of
 Padre. If that's the case, prompts the user whether s/he wants to reload
@@ -3972,7 +4163,9 @@ sub timer_check_overwrite {
 
 =pod
 
-=item * $main->on_last_visited_pane;
+=head3 on_last_visited_pane
+
+    $main->on_last_visited_pane;
 
 Put focus on tab visited before the current one. No return value.
 
@@ -3999,7 +4192,9 @@ sub on_last_visited_pane {
 
 =pod
 
-=item * $main->on_new_from_template( $extension );
+=head3 on_new_from_template
+
+    $main->on_new_from_template( $extension );
 
 Create a new document according to template for C<$extension> type of
 file. No return value.
@@ -4019,7 +4214,7 @@ sub on_new_from_template {
 	$editor->insert_from_file($file);
 
 	my $document = $editor->{Document};
-	$document->set_mimetype( $document->mime_type_by_extension($extension) );
+	$document->set_mimetype( Padre::MimeTypes->mime_type_by_extension($extension) );
 	$document->editor->padre_setup;
 	$document->rebless;
 
@@ -4028,21 +4223,13 @@ sub on_new_from_template {
 
 =pod
 
-=back
-
-=cut
-
-#####################################################################
-
-=pod
-
 =head2 Auxiliary Methods
 
 Various methods that did not fit exactly in above categories...
 
-=over 4
+=head3 install_cpan
 
-=item * $main->install_cpan( $module );
+    $main->install_cpan( $module );
 
 Install C<$module> from CPAN.
 
@@ -4070,7 +4257,9 @@ sub install_cpan {
 
 =pod
 
-=item * $main->setup_bindings;
+=head3 setup_bindings
+
+    $main->setup_bindings;
 
 Setup the various bindings needed to handle output pane correctly.
 
@@ -4119,7 +4308,6 @@ sub setup_bindings {
 	return;
 }
 
-
 sub change_highlighter {
 	my $self      = shift;
 	my $mime_type = shift;
@@ -4162,7 +4350,9 @@ sub change_highlighter {
 
 =pod
 
-=item * $main->key_up( $event );
+=head3 key_up
+
+    $main->key_up( $event );
 
 Callback for when a key up C<$event> happens in Padre. This handles the various
 ctrl+key combinations used within Padre.
@@ -4240,8 +4430,6 @@ sub show_as_numbers {
 1;
 
 =pod
-
-=back
 
 =head1 COPYRIGHT & LICENSE
 

@@ -52,11 +52,15 @@ use YAML::Tiny ();
 use Padre::DB  ();
 use Padre::Wx  ();
 
-our $VERSION    = '0.41';
+our $VERSION    = '0.42';
 our $COMPATIBLE = '0.18';
 
 # Link plugins back to their IDE
 my %IDE = ();
+
+
+
+
 
 ######################################################################
 # Static Methods
@@ -92,7 +96,7 @@ The C<plugin_icon> method will be called by Padre when it needs an
 icon to display in the user interface. It should return a 16x16
 C<Wx::Bitmap> object.
 
-There is no default default implementation, meaning that a default
+There is no default implementation, meaning that a default
 plugin icon will be displayed for the plugin.
 
 =head2 plugin_locale_directory
@@ -120,11 +124,20 @@ sub plugin_share_directory {
 	$pkg =~ s/::/-/g;
 
 	if ( $ENV{PADRE_DEV} ) {
-		my $root = File::Spec->catdir( $FindBin::Bin, File::Spec->updir, File::Spec->updir, $pkg );
+		my $root = File::Spec->catdir(
+			$FindBin::Bin,
+			File::Spec->updir,
+			File::Spec->updir,
+			$pkg,
+		);
 		my $path = File::Spec->catdir( $root, 'share' );
 		return $path if -d $path;
-
-		$path = File::Spec->catdir( $root, 'lib', split( /-/, $pkg ), 'share' );
+		$path = File::Spec->catdir(
+			$root,
+			'lib',
+			split( /-/, $pkg ),
+			'share',
+		);
 		return $path if -d $path;
 		return;
 	}
@@ -176,6 +189,10 @@ sub padre_interfaces {
 	return ();
 }
 
+
+
+
+
 ######################################################################
 # Default Constructor
 
@@ -213,6 +230,10 @@ sub new {
 sub DESTROY {
 	delete $IDE{ Scalar::Util::refaddr( $_[0] ) };
 }
+
+
+
+
 
 #####################################################################
 # Instance Methods
@@ -592,6 +613,10 @@ sub _menu_plugins_submenu {
 	return $menu;
 }
 
+
+
+
+
 ######################################################################
 # Event Handlers
 
@@ -661,6 +686,10 @@ deep integration with the editor widget.
 sub editor_disable {
 	return 1;
 }
+
+
+
+
 
 #####################################################################
 # Padre Integration Methods

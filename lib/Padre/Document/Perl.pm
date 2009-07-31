@@ -10,7 +10,7 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.41';
+our $VERSION = '0.42';
 our @ISA     = 'Padre::Document';
 
 #####################################################################
@@ -503,7 +503,10 @@ sub autocomplete {
 			while ( defined($tag) ) {
 
 				# TODO check file scope?
-				if ( $tag->{kind} eq 'v' ) {
+				if ( !defined( $tag->{kind} ) ) {
+
+					# This happens with some tagfiles which have no kind
+				} elsif ( $tag->{kind} eq 'v' ) {
 
 					# TODO potentially don't skip depending on circumstances.
 					if ( not $seen{ $tag->{name} }++ ) {
@@ -528,7 +531,10 @@ sub autocomplete {
 
 			# TODO: INHERITANCE!
 			while ( defined($tag) ) {
-				if (    $tag->{kind} eq 's'
+				if ( !defined( $tag->{kind} ) ) {
+
+					# This happens with some tagfiles which have no kind
+				} elsif ( $tag->{kind} eq 's'
 					and defined $tag->{extension}{class}
 					and $tag->{extension}{class} eq $class )
 				{
@@ -551,7 +557,10 @@ sub autocomplete {
 			while ( defined($tag) ) {
 
 				# TODO check file scope?
-				if ( $tag->{kind} eq 'p' ) {
+				if ( !defined( $tag->{kind} ) ) {
+
+					# This happens with some tagfiles which have no kind
+				} elsif ( $tag->{kind} eq 'p' ) {
 
 					# TODO potentially don't skip depending on circumstances.
 					if ( not $seen{ $tag->{name} }++ ) {
@@ -610,26 +619,23 @@ sub event_on_char {
 			123 => 125, # { }
 		);
 		my $pos = $editor->GetCurrentPos;
-		foreach my $code ( keys %table ) {
-			if ( $key == $code ) {
-				if ($selection_exists) {
-					my $start = $editor->GetSelectionStart;
-					my $end   = $editor->GetSelectionEnd;
-					$editor->GotoPos($end);
-					$editor->AddText( chr( $table{$code} ) );
-					$editor->GotoPos($start);
-				} else {
-					my $nextChar;
-					if ( $editor->GetTextLength > $pos ) {
-						$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
-					}
-					unless ( defined($nextChar)
-						&& ord($nextChar) == $table{$code} )
-					{
-						$editor->AddText( chr( $table{$code} ) );
-						$editor->CharLeft;
-						last;
-					}
+		if ( $table{$key} ) {
+			if ($selection_exists) {
+				my $start = $editor->GetSelectionStart;
+				my $end   = $editor->GetSelectionEnd;
+				$editor->GotoPos($end);
+				$editor->AddText( chr( $table{$key} ) );
+				$editor->GotoPos($start);
+			} else {
+				my $nextChar;
+				if ( $editor->GetTextLength > $pos ) {
+					$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
+				}
+				unless ( defined($nextChar)
+					&& ord($nextChar) == $table{$key} )
+				{
+					$editor->AddText( chr( $table{$key} ) );
+					$editor->CharLeft;
 				}
 			}
 		}
