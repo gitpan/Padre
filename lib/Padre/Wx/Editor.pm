@@ -10,13 +10,15 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Wx::StyledTextCtrl';
 
+# WIN is usually called WIN32, so WIN remains here for backwards compatiblity:
 our %mode = (
-	WIN  => Wx::wxSTC_EOL_CRLF,
-	MAC  => Wx::wxSTC_EOL_CR,
-	UNIX => Wx::wxSTC_EOL_LF,
+	WIN   => Wx::wxSTC_EOL_CRLF,
+	WIN32 => Wx::wxSTC_EOL_CRLF,
+	MAC   => Wx::wxSTC_EOL_CR,
+	UNIX  => Wx::wxSTC_EOL_LF,
 );
 
 # mapping for mime-type to the style name in the share/styles/default.yml file
@@ -33,6 +35,7 @@ my $data;
 my $data_name;
 my $data_private;
 my $width;
+my $Clipboard_Old = '';
 
 sub new {
 	my $class    = shift;
@@ -62,6 +65,7 @@ sub new {
 	Wx::Event::EVT_LEFT_UP( $self, \&on_left_up );
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
+	Wx::Event::EVT_MIDDLE_UP( $self, \&on_middle_up );
 
 	# Smart highlighting...
 	my @styles = ();
@@ -107,6 +111,16 @@ sub data {
 		$data         = $tdata;
 	}
 	return $data;
+}
+
+sub error { # Error Message
+	my $self = shift;
+	my $text = shift;
+	Wx::MessageBox(
+		$text,    Wx::gettext("Error"),
+		Wx::wxOK, $self->main
+	);
+
 }
 
 # most of this should be read from some external files
@@ -727,14 +741,33 @@ sub on_left_up {
 	if ( Padre::Constant::WXGTK and defined $text and $text ne '' ) {
 
 		# Only on X11 based platforms
-		Wx::wxTheClipboard->UsePrimarySelection(1);
+		#		Wx::wxTheClipboard->UsePrimarySelection(1);
 		$self->put_text_to_clipboard($text);
-		Wx::wxTheClipboard->UsePrimarySelection(0);
+
+		#		Wx::wxTheClipboard->UsePrimarySelection(0);
 	}
 
 	my $doc = $self->{Document};
 	if ( $doc->can('event_on_left_up') ) {
 		$doc->event_on_left_up( $self, $event );
+	}
+
+	$event->Skip;
+	return;
+}
+
+sub on_middle_up {
+	my ( $self, $event ) = @_;
+
+	# TODO: Sometimes there are unexpected effects when using the middle button.
+	# It seems that another event is doing something but not within this module.
+	# Please look at ticket #390 for details!
+
+	Padre::Current->editor->Paste;
+
+	my $doc = $self->{Document};
+	if ( $doc->can('event_on_middle_up') ) {
+		$doc->event_on_middle_up( $self, $event );
 	}
 
 	$event->Skip;
@@ -1039,9 +1072,26 @@ sub current_paragraph {
 	return ( $begin, $end );
 }
 
+sub Paste {
+	my $self = shift;
+
+	# Workaround for Copy/Paste bug ticket #390
+	my $text = $self->get_text_from_clipboard;
+	$self->ReplaceSelection($text);
+
+	return 1;
+}
+
 sub put_text_to_clipboard {
 	my ( $self, $text ) = @_;
 	@_ = (); # Feeble attempt to kill Scalars Leaked
+
+	return if $text eq '';
+
+	# Backup last clipboard value:
+	$self->{Clipboard_Old} = $self->get_text_from_clipboard;
+
+	#         if $self->{Clipboard_Old} ne $self->get_text_from_clipboard;
 
 	Wx::wxTheClipboard->Open;
 	Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($text) );
@@ -1052,16 +1102,20 @@ sub put_text_to_clipboard {
 
 sub get_text_from_clipboard {
 
-	# This is to be used as a method even if we don't use $self!
-	# my $self = shift;
+	my $self = shift;
+
 	my $text = '';
 	Wx::wxTheClipboard->Open;
 	if ( Wx::wxTheClipboard->IsSupported(Wx::wxDF_TEXT) ) {
 		my $data = Wx::TextDataObject->new;
 		if ( Wx::wxTheClipboard->GetData($data) ) {
-			$text = $data->GetText;
+			$text = $data->GetText if defined($data);
 		}
 	}
+	if ( $text eq $self->GetSelectedText ) {
+		$text = $self->{Clipboard_Old};
+	}
+
 	Wx::wxTheClipboard->Close;
 	return $text;
 }
@@ -1239,7 +1293,7 @@ sub insert_from_file {
 
 	$self->insert_text($text);
 
-	return;
+	return $file;
 }
 
 sub vertically_align {
@@ -1249,7 +1303,7 @@ sub vertically_align {
 	my $begin = $editor->LineFromPosition( $editor->GetSelectionStart );
 	my $end   = $editor->LineFromPosition( $editor->GetSelectionEnd );
 	if ( $begin == $end ) {
-		$_[0]->error( Wx::gettext("You must select a range of lines") );
+		$editor->error( Wx::gettext("You must select a range of lines") );
 		return;
 	}
 	my @line = ( $begin .. $end );
@@ -1265,7 +1319,7 @@ sub vertically_align {
 	my $start = $editor->GetSelectionStart;
 	my $c = $editor->GetTextRange( $start, $start + 1 );
 	unless ( defined $c and $c =~ /^[^\s\w]$/ ) {
-		$_[0]->error( Wx::gettext("First character of selection must be a non-word character to align") );
+		$editor->error( Wx::gettext("First character of selection must be a non-word character to align") );
 	}
 
 	# Locate the position of the align character,

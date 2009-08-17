@@ -6,7 +6,7 @@ package Padre::DB::SyntaxHighlight;
 use strict;
 use warnings;
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 sub set_mime_type {
 	my $class     = shift;
@@ -43,7 +43,7 @@ Padre::DB::SyntaxHighlight - Database table to store mime-type to syntax highlig
 
 =head1 DESCRIPTION
 
-This class allows storing in L<Padre>'s database the the name of the 
+This class allows storing in L<Padre>'s database the name of the 
 syntax highlighter module.
 
 =head1 PUBLIC METHODS

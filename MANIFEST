@@ -54,6 +54,7 @@ lib/Padre/DB/History.pm
 lib/Padre/DB/HostConfig.pm
 lib/Padre/DB/LastPositionInFile.pm
 lib/Padre/DB/Plugin.pm
+lib/Padre/DB/RecentlyUsed.pm
 lib/Padre/DB/Session.pm
 lib/Padre/DB/SessionFile.pm
 lib/Padre/DB/Snippets.pod
@@ -72,6 +73,7 @@ lib/Padre/Log.pm
 lib/Padre/Manual.pod
 lib/Padre/Manual/Hacking.pod
 lib/Padre/MimeTypes.pm
+lib/Padre/Perl.pm
 lib/Padre/Plugin.pm
 lib/Padre/Plugin/Devel.pm
 lib/Padre/Plugin/My.pm
@@ -88,6 +90,7 @@ lib/Padre/Project/Null.pm
 lib/Padre/Project/Perl.pm
 lib/Padre/Search.pm
 lib/Padre/Service.pm
+lib/Padre/Splash.pm
 lib/Padre/Task.pm
 lib/Padre/Task/Debug/Crashing.pm
 lib/Padre/Task/DocBrowser.pm
@@ -111,6 +114,7 @@ lib/Padre/Transform/Perl.pm
 lib/Padre/Transform/Perl/UpdateCopyright.pm
 lib/Padre/Util.pm
 lib/Padre/Wx.pm
+lib/Padre/Wx/About.pm
 lib/Padre/Wx/Ack.pm
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/AuiManager.pm
@@ -121,11 +125,15 @@ lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
 lib/Padre/Wx/Dialog/Encode.pm
 lib/Padre/Wx/Dialog/Find.pm
+lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
+lib/Padre/Wx/Dialog/OpenResource.pm
+lib/Padre/Wx/Dialog/OpenResource/SearchTask.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
+lib/Padre/Wx/Dialog/QuickMenuAccess.pm
 lib/Padre/Wx/Dialog/Replace.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/SessionManager.pm
@@ -133,6 +141,7 @@ lib/Padre/Wx/Dialog/SessionSave.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/Text.pm
 lib/Padre/Wx/Directory.pm
+lib/Padre/Wx/Directory/OpenInFileBrowserAction.pm
 lib/Padre/Wx/Directory/SearchCtrl.pm
 lib/Padre/Wx/Directory/TreeCtrl.pm
 lib/Padre/Wx/DocBrowser.pm
@@ -208,6 +217,7 @@ share/icons/gnome218/16x16/actions/go-previous.png
 share/icons/gnome218/16x16/actions/stock_data-save.png
 share/icons/gnome218/16x16/places/folder-saved-search.png
 share/icons/gnome218/16x16/places/stock_folder.png
+share/icons/gnome218/16x16/status/info.png
 share/icons/gnome218/16x16/stock/generic/stock_example.png
 share/icons/gnome218/README.txt
 share/icons/padre/16x16/actions/toggle-comments.png
@@ -224,6 +234,7 @@ share/icons/padre/16x16/status/padre-syntax-error.png
 share/icons/padre/16x16/status/padre-syntax-warning.png
 share/icons/padre/16x16/status/padre-tasks-load.png
 share/icons/padre/16x16/status/padre-tasks-running.png
+share/icons/padre/64x64/logo.png
 share/icons/padre/README.txt
 share/languages/perl5/perl5.yml
 share/locale/ar.po
@@ -245,7 +256,9 @@ share/locale/pt-br.po
 share/locale/ru.po
 share/locale/zh-cn.po
 share/locale/zh-tw.po
+share/padre-splash.bmp
 share/ppm/README.txt
+share/README.txt
 share/styles/default.yml
 share/styles/night.yml
 share/styles/notepad.yml
@@ -255,6 +268,8 @@ share/templates/template.pl
 share/templates/template.pm
 share/templates/template.t
 share/timeline/migrate-1.pl
+share/timeline/migrate-10.pl
+share/timeline/migrate-11.pl
 share/timeline/migrate-2.pl
 share/timeline/migrate-3.pl
 share/timeline/migrate-4.pl

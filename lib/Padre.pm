@@ -24,7 +24,27 @@ use DBD::SQLite   ();
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
+
+# Load the splash screen here, before we get bogged
+# down running the database migration scripts.
+# TODO
+# This means we'll splash even if we run the single
+# instance server, but that's better than before.
+# We need it to be even less whacked.
+BEGIN {
+
+	# Display Padre's Splash Screen. It is saved as XPM
+	# as it seems (from wxWidgets documentation) that it
+	# is the most portable format (and we don't need to
+	# call Wx::InitAllImageHeaders() or whatever)
+	# NOTE:
+	# Don't show the splash screen during testing otherwise
+	# it will spoil the flashy surprise when they upgrade.
+	unless ( $ENV{HARNESS_ACTIVE} ) {
+		require Padre::Splash;
+	}
+}
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -44,31 +64,6 @@ use Class::XSAccessor getters => {
 	accessors => {
 	actions => 'actions',
 	};
-
-# Globally shared detection of the "current" Perl
-SCOPE: {
-	my $perl;
-
-	sub perl_interpreter {
-		return $perl if defined $perl;
-		require Probe::Perl;
-		require File::Which;
-
-		# Use the most correct method first
-		require Probe::Perl;
-		my $_perl = Probe::Perl->find_perl_interpreter;
-		if ( defined $_perl ) {
-			$perl = $_perl;
-			return $perl;
-		}
-
-		# Fallback to a simpler way
-		require File::Which;
-		$_perl = scalar File::Which::which('perl');
-		$perl  = $_perl;
-		return $perl;
-	}
-}
 
 my $SINGLETON = undef;
 
@@ -733,8 +728,7 @@ modules/functions/etc.
 
 There is a highly experimental but quite simple plugin system.
 
-A plugin is a module in the Padre::Plugin::* namespace optionally
-packaged as a L<PAR> archive.
+A plugin is a module in the Padre::Plugin::* namespace.
 
 At startup time Padre looks for all such modules in @INC and
 in its own private directory and loads them.
@@ -1155,6 +1149,7 @@ Jérôme Quelin (JQUELIN)
 =head3 German
 
 Heiko Jansen (HJANSEN)
+Sebastian Willing (SEWI)
 
 =head3 Hebrew
 

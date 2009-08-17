@@ -3,7 +3,7 @@ package Padre::DB::Plugin;
 use strict;
 use warnings;
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 # Finds and returns a single element by name
 sub fetch_name {
@@ -97,15 +97,10 @@ Returns a new L<Padre::DB::Plugin> object.
 =head2 create
 
   my $object = Padre::DB::Plugin->create(
-
-      name => 'value',
-
+      name    => 'value',
       version => 'value',
-
       enabled => 'value',
-
-      config => 'value',
-
+      config  => 'value',
   );
 
 The C<create> constructor is a one-step combination of C<new> and

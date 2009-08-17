@@ -10,7 +10,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Padre::Wx::Dialog';
 
 =pod
@@ -28,6 +28,12 @@ In the run() sub add code to take the values from the new panel
 and save them to the configuration file.
 
 =cut
+
+my @Func_List = (
+	[ 'bookmark', Wx::gettext('Enable bookmarks') ],
+	[ 'fontsize', Wx::gettext('Change font size') ],
+	[ 'session',  Wx::gettext('Enable session manager') ],
+);
 
 sub _new_panel {
 	my ( $self, $parent ) = splice( @_, 0, 2 );
@@ -78,7 +84,7 @@ sub _mime_type_panel {
 		[   [ 'Wx::StaticText', undef, Wx::gettext('Description:') ],
 			[ 'Wx::StaticText', 'description', [] ]
 		],
-		[   [ 'Wx::StaticText', undef, Wx::gettext('Mime type:') ],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Content type:') ],
 			[ 'Wx::StaticText', 'mime_type_name', [] ]
 		],
 	];
@@ -204,7 +210,7 @@ sub _indentation_panel {
 }
 
 sub _behaviour_panel {
-	my ( $self, $treebook, $main_startup, $main_functions_order, $perldiag_locales ) = @_;
+	my ( $self, $treebook, $main_startup, $main_functions_order, $perldiag_locales, $default_line_ending ) = @_;
 
 	my $config = Padre->ide->config;
 	my $table  = [
@@ -242,8 +248,21 @@ sub _behaviour_panel {
 		[   [ 'Wx::StaticText', undef,             Wx::gettext('Preferred language for error diagnostics:') ],
 			[ 'Wx::Choice',     'locale_perldiag', $perldiag_locales ]
 		],
+		[   [ 'Wx::StaticText', undef,                 Wx::gettext('Default line ending:') ],
+			[ 'Wx::Choice',     'default_line_ending', $default_line_ending ]
+		],
 		[   [ 'Wx::StaticText', undef, Wx::gettext('Check for file updates on disk every (seconds):') ],
 			[ 'Wx::SpinCtrl', 'update_file_from_disk_interval', $config->update_file_from_disk_interval, 0, 90 ]
+		],
+
+		# Will be moved to a own AutoComp-panel as soon as there are enough options for this (and I get the spare time to do it):
+		[   [   'Wx::CheckBox',
+				'autocomplete_multiclosebracket',
+				( $config->autocomplete_multiclosebracket ? 1 : 0 ),
+				Wx::gettext(
+					"Add another closing bracket if there is already one (and the auto-bracket-function is enabled)")
+			],
+			[]
 		],
 	];
 
@@ -357,6 +376,23 @@ sub _appearance_panel {
 	$notebook->AddPage( $editor_panel, Wx::gettext('Settings Demo') );
 
 	$preview_sizer->Add( $notebook, 1, Wx::wxGROW, 5 );
+
+	if ( $config->func_config ) {
+
+		my @table2 =
+			( [ [ 'Wx::StaticText', undef, Wx::gettext('Any changes to these options require a restart:') ] ] );
+
+		for (@Func_List) {
+
+			push @table2,
+				[ [ 'Wx::CheckBox', 'func_' . $_->[0], ( eval( '$config->func_' . $_->[0] ) ? 1 : 0 ), $_->[1] ] ];
+		}
+
+		my $settings_subpanel2 = $self->_new_panel($panel);
+		$self->fill_panel_by_table( $settings_subpanel2, \@table2 );
+
+		$main_sizer->Add($settings_subpanel2);
+	}
 
 	$panel->SetSizerAndFit($main_sizer);
 
@@ -600,7 +636,9 @@ END_TEXT
 }
 
 sub dialog {
-	my ( $self, $win, $main_startup, $editor_autoindent, $main_functions_order, $perldiag_locales ) = @_;
+	my ($self, $win, $main_startup, $editor_autoindent, $main_functions_order, $perldiag_locales,
+		$default_line_ending
+	) = @_;
 
 	my $dialog = Wx::Dialog->new(
 		$win,
@@ -629,6 +667,7 @@ sub dialog {
 		$main_startup,
 		$main_functions_order,
 		$perldiag_locales,
+		$default_line_ending,
 	);
 	$tb->AddPage( $behaviour, Wx::gettext('Behaviour') );
 
@@ -761,6 +800,12 @@ sub run {
 		$perldiag_locale,
 		grep { $_ ne $perldiag_locale } ( 'EN', Padre::Util::find_perldiag_translations() )
 	);
+	my $default_line_ending       = $config->default_line_ending;
+	my @default_line_ending_items = (
+		$default_line_ending,
+		grep { $_ ne $default_line_ending } qw{WIN32 MAC UNIX}
+	);
+	my @default_line_ending_localized = map { Wx::gettext($_) } @default_line_ending_items;
 
 	$self->{dialog} = $self->dialog(
 		$win,
@@ -768,8 +813,10 @@ sub run {
 		\@editor_autoindent_localized,
 		\@main_functions_order_localized,
 		\@perldiag_locales,
+		\@default_line_ending_localized,
 	);
 	my $ret = $self->{dialog}->ShowModal;
+
 	if ( $ret eq Wx::wxID_CANCEL ) {
 		return;
 	}
@@ -871,9 +918,24 @@ sub run {
 		$data->{external_diff_tool}
 	);
 	$config->set(
+		'default_line_ending',
+		$default_line_ending_items[ $data->{default_line_ending} ]
+	);
+	$config->set(
 		'update_file_from_disk_interval',
 		$data->{update_file_from_disk_interval}
 	);
+	$config->set(
+		'autocomplete_multiclosebracket',
+		$data->{autocomplete_multiclosebracket} ? 1 : 0
+	);
+
+	for (@Func_List) {
+		$config->set(
+			'func_' . $_->[0],
+			$data->{ 'func_' . $_->[0] } ? 1 : 0
+		);
+	}
 
 	# Quite like in _run_params_panel, trap exception if there
 	# is no document currently open

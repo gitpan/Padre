@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -154,13 +154,23 @@ sub new {
 		},
 	);
 
+	$self->{next_problem} = $self->add_menu_item(
+		$self,
+		name       => 'edit.next_problem',
+		label      => Wx::gettext('&Next Problem'),
+		shortcut   => 'Ctrl-.',
+		menu_event => sub {
+			$main->{syntax}->select_next_problem;
+		},
+	);
+
 	$self->{autocomp} = $self->add_menu_item(
 		$self,
 		name       => 'edit.autocomp',
-		label      => Wx::gettext('&AutoComp'),
+		label      => Wx::gettext('&AutoComplete'),
 		shortcut   => 'Ctrl-P',
 		menu_event => sub {
-			Padre::Wx::Main::on_autocompletition(@_);
+			Padre::Wx::Main::on_autocompletion(@_);
 		},
 	);
 
@@ -473,6 +483,7 @@ sub refresh {
 
 	# Handle the simple cases
 	$self->{goto}->Enable($hasdoc);
+	$self->{next_problem}->Enable($hasdoc);
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{join_lines}->Enable($hasdoc);
@@ -480,6 +491,9 @@ sub refresh {
 	$self->{comment_toggle}->Enable($hasdoc);
 	$self->{comment_out}->Enable($hasdoc);
 	$self->{uncomment}->Enable($hasdoc);
+	$self->{convert_encoding_system}->Enable($hasdoc);
+	$self->{convert_encoding_utf8}->Enable($hasdoc);
+	$self->{convert_encoding_to}->Enable($hasdoc);
 	$self->{diff2saved}->Enable($hasdoc);
 	$self->{applydiff2file}->Enable(0);
 	$self->{applydiff2project}->Enable(0);
@@ -500,6 +514,8 @@ sub refresh {
 	$self->{spaces_to_tabs}->Enable($hasdoc);
 	$self->{delete_leading}->Enable($hasdoc);
 	$self->{delete_trailing}->Enable($hasdoc);
+	$self->{show_as_hex}->Enable($hasdoc);
+	$self->{show_as_decimal}->Enable($hasdoc);
 
 	# Handle the complex cases
 	my $selection = !!( defined $text and $text ne '' );

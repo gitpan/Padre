@@ -8,7 +8,7 @@ use Padre::Wx         ();
 use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Wx::ToolBar';
 
 # NOTE: Something is wrong with dockable toolbars on Windows
@@ -141,6 +141,18 @@ sub new {
 	$self->{doc_stat} = $self->add_tool_item(
 		action => 'file.doc_stat',
 		icon   => 'actions/document-properties',
+	);
+
+	$self->AddSeparator;
+
+	$self->{open_resource} = $self->add_tool_item(
+		action => 'search.open_resource',
+		icon   => 'places/folder-saved-search',
+	);
+
+	$self->{quick_menu_access} = $self->add_tool_item(
+		action => 'search.quick_menu_access',
+		icon   => 'status/info',
 	);
 
 	return $self;

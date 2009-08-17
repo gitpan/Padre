@@ -14,6 +14,13 @@ BEGIN {
 	}
 }
 
+# Configure-time dependencies MUST be done first
+configure_requires 'ExtUtils::MakeMaker' => '6.52';
+
+
+
+
+
 #####################################################################
 # Normal Boring Commands
 
@@ -44,10 +51,11 @@ requires       'File::Glob::Windows'      => '0.1.3' if win32;
 requires       'File::Copy::Recursive'    => '0.37';
 requires       'File::Find::Rule'         => '0.30';
 requires       'File::HomeDir'            => '0.84';
+requires       'File::Next'               => '1.06'; # Force-bump ack dep
 requires       'File::Path'               => 0;
 requires       'File::Remove'             => '1.42';
 requires       'File::ShareDir'           => '1.00';
-requires       'File::ShareDir::PAR'      => '0.04';
+#requires      'File::ShareDir::PAR'      => '0.04';
 requires       'File::Spec'               => '3.2701';
 requires       'File::Spec::Functions'    => '3.2701';
 requires       'File::Which'              => '0.05';
@@ -65,7 +73,7 @@ requires       'Module::Refresh'          => '0.13';
 requires       'Module::Starter'          => '1.50';
 requires       'ORLite'                   => '1.20';
 requires       'ORLite::Migrate'          => '0.03';
-requires       'PAR'                      => '0.989';
+#requires      'PAR'                      => '0.989';
 requires       'Params::Util'             => '0.33';
 requires       'Parse::ErrorString::Perl' => '0.11';
 requires       'Parse::ExuberantCTags'    => '1.00';
@@ -73,10 +81,10 @@ requires       'Pod::POM'                 => '0.17';
 requires       'Pod::Simple'              => '3.07';
 requires       'Pod::Simple::XHTML'       => '3.04';
 requires       'Pod::Abstract'            => '0.16';
-requires       'Portable'                 => '0.12' if win32;
+#requires       'Portable'                 => '0.12' if win32;
 requires       'POSIX'                    => 0;
-requires       'PPI'                      => '1.203';
-requires       'PPIx::EditorTools'        => '0.04';
+requires       'PPI'                      => '1.205';
+requires       'PPIx::EditorTools'        => '0.08';
 requires       'Probe::Perl'              => '0.01';
 requires       'Storable'                 => '2.15';
 requires       'Term::ReadLine'           => 0;
@@ -91,6 +99,9 @@ requires       'Win32::API'               => '0.58' if win32;
 requires       'Wx'                       => '0.91';
 requires       'Wx::Perl::ProcessStream'  => '0.11';
 requires       'YAML::Tiny'               => '1.32';
+requires       'ExtUtils::Manifest'       => '1.56';
+requires       'Pod::Functions'           => 0;
+requires       'Module::CoreList'         => 0;
 test_requires  'Test::More'               => '0.88';
 test_requires  'Test::Script'             => '1.03';
 test_requires  'Test::Exception'          => '0.27';
@@ -163,12 +174,5 @@ check_wx_version;
 
 # Add the make exe target
 setup_padre;
-
-# EU:MM incorrectly attempts to load all the dependencies.
-# To prevent this happening we populate the %INC hash and create
-# a VERSION method for each module, so that we can prevent loading
-# any modules while convincing EU:MM that we have the right version.
-# This has to be called immediately before calling WriteAll.
-trick_eumm;
 
 WriteAll;

@@ -13,8 +13,8 @@ Padre::Search - The Padre Search API
       find_term => 'foo',
   );  
   
-  # Execute the search on an editor object
-  $search->find_next(Padre::Current->editor);
+  # Execute the search on the current editor
+  $search->search_next(Padre::Current->editor);
 
 =head2 DESCRIPTION
 
@@ -31,7 +31,7 @@ use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 use Class::XSAccessor getters => {
 	find_term    => 'find_term',
@@ -47,6 +47,11 @@ sub new {
 	my $self = bless {@_}, $class;
 	unless ( defined $self->find_term ) {
 		die("Did not provide 'find_term' search term");
+	}
+	unless ( length $self->find_term ) {
+
+		# Pointless zero-length search
+		return undef;
 	}
 	unless ( defined $self->find_case ) {
 		$self->{find_case} = $self->config->find_case;
@@ -72,11 +77,7 @@ sub new {
 
 	# Compile the regex
 	$self->{search_regex} = eval { $self->find_case ? qr/$term/m : qr/$term/mi };
-	if ($@) {
-
-		# The regex doesn't compile
-		return;
-	}
+	return undef if $@;
 
 	return $self;
 }
@@ -89,24 +90,28 @@ sub config {
 	return $self->{config};
 }
 
+
+
+
+
 #####################################################################
 # Command Abstraction
 
 sub search_next {
 	my $self = shift;
-	if ( $self->config->find_reverse ) {
-		return $self->search_down(@_);
-	} else {
+	if ( $self->find_reverse ) {
 		return $self->search_up(@_);
+	} else {
+		return $self->search_down(@_);
 	}
 }
 
 sub search_previous {
 	my $self = shift;
-	if ( $self->config->find_reverse ) {
-		return $self->search_up(@_);
-	} else {
+	if ( $self->find_reverse ) {
 		return $self->search_down(@_);
+	} else {
+		return $self->search_up(@_);
 	}
 }
 
@@ -117,7 +122,7 @@ sub replace_next {
 	$self->replace(@_);
 
 	# Select and move to the next match
-	if ( $self->config->find_reverse ) {
+	if ( $self->find_reverse ) {
 		return $self->search_down(@_);
 	} else {
 		return $self->search_up(@_);
@@ -131,12 +136,16 @@ sub replace_previous {
 	$self->replace(@_);
 
 	# Select and move to the next match
-	if ( $self->config->find_reverse ) {
+	if ( $self->find_reverse ) {
 		return $self->search_up(@_);
 	} else {
 		return $self->search_down(@_);
 	}
 }
+
+
+
+
 
 #####################################################################
 # Content Abstraction
@@ -172,6 +181,18 @@ sub replace_all {
 	}
 	die("Missing or invalid content object to search in");
 }
+
+sub count_all {
+	my $self = shift;
+	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
+		return $self->editor_count_all(@_);
+	}
+	die("Missing or invalid ccontent object to search in");
+}
+
+
+
+
 
 #####################################################################
 # Editor Interaction
@@ -269,6 +290,27 @@ sub editor_replace_all {
 	return scalar @matches;
 }
 
+sub editor_count_all {
+	my $self   = shift;
+	my $editor = shift;
+	unless ( _INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
+		die("Failed to provide editor object to replace in");
+	}
+
+	# Execute the search for all matches
+	my ( undef, undef, @matches ) = $self->matches(
+		$editor->GetTextRange( 0, $editor->GetLength ),
+		$self->search_regex,
+		$editor->GetSelection,
+	);
+
+	return scalar @matches;
+}
+
+
+
+
+
 #####################################################################
 # Core Search
 
@@ -309,18 +351,18 @@ sub matches {
 		return ( undef, undef );
 	}
 
-	my $pair = ();
+	my $pair = [];
 	my $from = shift || 0;
 	my $to   = shift || 0;
 	if ( $_[0] ) {
 
 		# Search backwards
-		my $pair = List::Util::first { $to > $_->[1] } reverse @matches;
+		$pair = List::Util::first { $to > $_->[1] } reverse @matches;
 		$pair = $matches[-1] unless $pair;
 	} else {
 
 		# Search forwards
-		my $pair = List::Util::first { $from < $_->[0] } @matches;
+		$pair = List::Util::first { $from < $_->[0] } @matches;
 		$pair = $matches[0] unless $pair;
 	}
 

@@ -9,9 +9,13 @@ use Carp         ();
 use Exporter     ();
 use Params::Util ();
 
-our $VERSION   = '0.42';
+our $VERSION   = '0.43';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_CURRENT';
+
+
+
+
 
 #####################################################################
 # Exportable Functions
@@ -38,6 +42,10 @@ sub _CURRENT {
 	return Padre::Current->new;
 }
 
+
+
+
+
 #####################################################################
 # Constructor
 
@@ -45,6 +53,10 @@ sub new {
 	my $class = shift;
 	bless {@_}, $class;
 }
+
+
+
+
 
 #####################################################################
 # Context Methods

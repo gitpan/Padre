@@ -6,7 +6,7 @@ use Padre::Wx                        ();
 use Padre::Wx::Directory::TreeCtrl   ();
 use Padre::Wx::Directory::SearchCtrl ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Wx::Panel';
 
 use Class::XSAccessor getters => {
@@ -92,6 +92,8 @@ sub refresh {
 		  $doc
 		? $doc->project_dir
 		: $self->main->config->default_projects_directory;
+
+	return unless $dir;
 
 	$self->{projects}->{$dir}->{dir} ||= $dir;
 	$self->{projects}->{$dir}->{mode} ||=

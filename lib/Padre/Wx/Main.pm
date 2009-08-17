@@ -33,6 +33,7 @@ use Scalar::Util   ();
 use Params::Util qw{_INSTANCE};
 use Padre::Constant ();
 use Padre::Util     ();
+use Padre::Perl     ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 use Padre::Document           ();
@@ -54,7 +55,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -98,7 +99,7 @@ sub new {
 	Wx::InitAllImageHandlers();
 
 	# Determine the window title
-	my $title = '     \o/ Padre - 1st Birthday Edition! \o/     ';
+	my $title = 'Padre';
 	if ( $0 =~ /padre$/ ) {
 		my $dir = $0;
 		$dir =~ s/padre$//;
@@ -333,6 +334,7 @@ Accessors that may not belong to this class:
 use Class::XSAccessor predicates => {
 
 	# Needed for lazily-constructed gui elements
+	has_about     => 'about',
 	has_find      => 'find',
 	has_replace   => 'replace',
 	has_outline   => 'outline',
@@ -357,32 +359,119 @@ use Class::XSAccessor predicates => {
 
 	# Operating Data
 	cwd        => 'cwd',
+	search     => 'search',
 	no_refresh => '_no_refresh',
 
 	# Things that are probably in the wrong place
 	ack => 'ack',
 	};
 
+sub about {
+	my $self = shift;
+	unless ( defined $self->{about} ) {
+		require Padre::Wx::About;
+		$self->{about} = Padre::Wx::About->new($self);
+	}
+	return $self->{about};
+}
+
 sub outline {
-	$_[0]->{outline}
-		or $_[0]->{outline} = do {
+	my $self = shift;
+	unless ( defined $self->{outline} ) {
 		require Padre::Wx::Outline;
-		Padre::Wx::Outline->new( $_[0] );
-		};
+		$self->{outline} = Padre::Wx::Outline->new($self);
+	}
+	return $self->{outline};
 }
 
 sub directory {
-	$_[0]->{directory}
-		or $_[0]->{directory} = do {
+	my $self = shift;
+	unless ( defined $self->{directory} ) {
 		require Padre::Wx::Directory;
-		Padre::Wx::Directory->new( $_[0] );
-		};
+		$self->{directory} = Padre::Wx::Directory->new($self);
+	}
+	return $self->{directory};
 }
 
 sub directory_panel {
 	my $self = shift;
 	my $side = $self->config->main_directory_panel;
 	return $self->$side();
+}
+
+sub open_resource {
+	my $self = shift;
+	unless ( defined $self->{open_resource} ) {
+		require Padre::Wx::Dialog::OpenResource;
+		$self->{open_resource} = Padre::Wx::Dialog::OpenResource->new($self);
+	}
+	return $self->{open_resource};
+}
+
+sub help_search {
+	my $self = shift;
+	unless ( defined $self->{help_search} ) {
+		require Padre::Wx::Dialog::HelpSearch;
+		$self->{help_search} = Padre::Wx::Dialog::HelpSearch->new($self);
+	}
+	return $self->{help_search};
+}
+
+=pod
+
+=head3 find
+
+    my $find = $main->find;
+
+Returns the find dialog, creating a new one if needed.
+
+=cut
+
+sub find {
+	my $self = shift;
+	unless ( defined $self->{find} ) {
+		require Padre::Wx::Dialog::Find;
+		$self->{find} = Padre::Wx::Dialog::Find->new($self);
+	}
+	return $self->{find};
+}
+
+=pod
+
+=head3 fast_find
+
+    my $find = $main->fast_find;
+
+Return current quick find dialog. Create a new one if needed.
+
+=cut
+
+sub fast_find {
+	my $self = shift;
+	unless ( defined $self->{fast_find} ) {
+		require Padre::Wx::Dialog::Search;
+		$self->{fast_find} = Padre::Wx::Dialog::Search->new;
+	}
+	return $self->{fast_find};
+}
+
+=pod
+
+=head3 replace
+
+    my $replace = $main->replace;
+
+Return current replace dialog. Create a new one if needed.
+
+=cut
+
+sub replace {
+	my $self = shift;
+	unless ( defined $self->{replace} ) {
+		require Padre::Wx::Dialog::Replace;
+		$self->{replace} = Padre::Wx::Dialog::Replace->new($self);
+	}
+	return $self->{replace};
 }
 
 =pod
@@ -680,7 +769,7 @@ sub single_instance_connect {
 
 =pod
 
-=heda3 single_instance_command
+=head3 single_instance_command
 
     $main->single_instance_command( $line );
 
@@ -739,8 +828,6 @@ sub single_instance_command {
 
 Those methods allow to query properties about the main window.
 
-=over 4
-
 =head3 window_width
 
     my $width = $main->window_width;
@@ -755,7 +842,7 @@ sub window_width {
 
 =pod
 
-=heda3 window_height
+=head3 window_height
 
     my $width = $main->window_height;
 
@@ -1142,6 +1229,7 @@ sub reconfig {
 	# TODO - Implement this
 
 	# Show or hide all the main gui elements
+	# TODO - Move this into the config ->apply logic
 	$self->show_functions( $config->main_functions );
 	$self->show_outline( $config->main_outline );
 	$self->show_directory( $config->main_directory );
@@ -1182,7 +1270,7 @@ sub rebuild_toolbar {
 
 =pod
 
-=head2 Panel Tools
+=head2 Tools and Dialogs
 
 Those methods deal with the various panels that Padre provides, and
 allow to show or hide them.
@@ -1541,11 +1629,7 @@ sub run_command {
 	my $config = $self->config;
 	if ( $config->run_use_external_window ) {
 		if (Padre::Util::WIN32) {
-
-			# '^' is the escape character in win32 command line
-			# '"' is needed to escape spaces and other characters in paths
-			$cmd =~ s/"/^/g;
-			system "cmd.exe /C \"start $cmd\"";
+			system "start cmd /C \"$cmd\"";
 		} else {
 			system qq(xterm -e "$cmd; sleep 1000" &);
 		}
@@ -1718,7 +1802,7 @@ sub debug_perl {
 	local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
 
 	# Run with the same Perl that launched Padre
-	my $perl = Padre->perl_interpreter;
+	my $perl = Padre::Perl::perl();
 	$self->run_command(qq["$perl" -d "$filename"]);
 
 }
@@ -1870,69 +1954,6 @@ sub error {
 
 =pod
 
-=head3 find
-
-    my $find = $main->find;
-
-Returns the find dialog, creating a new one if needed.
-
-=cut
-
-sub find {
-	my $self = shift;
-
-	unless ( defined $self->{find} ) {
-		require Padre::Wx::Dialog::Find;
-		$self->{find} = Padre::Wx::Dialog::Find->new($self);
-	}
-
-	return $self->{find};
-}
-
-=pod
-
-=head3 fast_find
-
-    my $find = $main->fast_find;
-
-Return current quick find dialog. Create a new one if needed.
-
-=cut
-
-sub fast_find {
-	my $self = shift;
-
-	unless ( defined $self->{fast_find_panel} ) {
-		require Padre::Wx::Dialog::Search;
-		$self->{fast_find_panel} = Padre::Wx::Dialog::Search->new;
-	}
-
-	return $self->{fast_find_panel};
-}
-
-=pod
-
-=head3 replace
-
-    my $replace = $main->replace;
-
-Return current replace dialog. Create a new one if needed.
-
-=cut
-
-sub replace {
-	my $self = shift;
-
-	unless ( defined $self->{replace} ) {
-		require Padre::Wx::Dialog::Replace;
-		$self->{replace} = Padre::Wx::Dialog::Replace->new($self);
-	}
-
-	return $self->{replace};
-}
-
-=pod
-
 =head3 prompt
 
     my $value = $main->prompt( $title, $subtitle, $key );
@@ -1958,6 +1979,76 @@ sub prompt {
 	my $value = $dialog->GetValue;
 	$dialog->Destroy;
 	return $value;
+}
+
+=pod
+
+=head2 Search and Replace
+
+These methods provide the highest level abstraction for entry into the various
+search and replace functions and dialogs.
+
+However, they still represent abstract logic and should NOT be tied directly to
+keystroke or menu events.
+
+=head2 search_next
+
+  # Next match for a new search
+  $main->search_next( $search );
+  
+  # Next match on current search (or show Find dialog if none)
+  $main->search_next;
+
+Find the next match for the current search, or spawn the Find dialog.
+
+If no files are open, silently do nothing (don't even remember the new search)
+
+=cut
+
+sub search_next {
+	my $self = shift;
+	my $editor = $self->current->editor or return;
+	if ( _INSTANCE( $_[0], 'Padre::Search' ) ) {
+		$self->{search} = shift;
+	} elsif (@_) {
+		die("Invalid argument to search_next");
+	}
+	if ( $self->search ) {
+		$self->search->search_next($editor);
+	} else {
+		$self->find->find;
+	}
+}
+
+=pod
+
+=head2 search_previous
+
+  # Previous match for a new search
+  $main->search_previous( $search );
+  
+  # Previous match on current search (or show Find dialog if none)
+  $main->search_previous;
+
+Find the previous match for the current search, or spawn the Find dialog.
+
+If no files are open, do nothing
+
+=cut
+
+sub search_previous {
+	my $self = shift;
+	my $editor = $self->current->editor or return;
+	if ( _INSTANCE( $_[0], 'Padre::Search' ) ) {
+		$self->{search} = shift;
+	} elsif (@_) {
+		die("Invalid argument to search_previous");
+	}
+	if ( $self->search ) {
+		$self->search->search_previous($editor);
+	} else {
+		$self->find->find;
+	}
 }
 
 =pod
@@ -2069,14 +2160,14 @@ sub on_uncomment_block {
 
 =head3 on_autocompletion
 
-    $main->on_autocompletition;
+    $main->on_autocompletion;
 
 Try to autocomplete current word being typed, depending on
 document type.
 
 =cut
 
-sub on_autocompletition {
+sub on_autocompletion {
 	my $self = shift;
 	my $document = $self->current->document or return;
 	my ( $length, @words ) = $document->autocomplete;
@@ -2199,6 +2290,9 @@ sub on_close_window {
 	}
 
 	# Clean up our secondary windows
+	if ( $self->has_about ) {
+		$self->about->Destroy;
+	}
 	if ( $self->{help} ) {
 		$self->{help}->Destroy;
 	}
@@ -2347,8 +2441,12 @@ sub setup_editor {
 	my $config = $self->config;
 
 	Padre::Util::debug( "setup_editor called for '" . ( $file || '' ) . "'" );
+
+	# These need to be TWO if's, because Cwd::realpath returns undef when opening an non-existent file!
 	if ($file) {
 		$file = Cwd::realpath($file); # get absolute path
+	}
+	if ($file) {
 		my $id = $self->find_editor_of_file($file);
 		if ( defined $id ) {
 			$self->on_nth_pane($id);
@@ -2776,6 +2874,7 @@ sub on_save_as {
 	$document->set_mimetype( $document->guess_mimetype );
 	$document->editor->padre_setup;
 	$document->rebless;
+	$document->colourize;
 
 	Padre::DB::History->create(
 		type => 'files',
@@ -3142,7 +3241,7 @@ sub on_diff {
 		if ( open my $fh, '>', $filename ) {
 			print $fh $text;
 			CORE::close($fh);
-			system( $external_diff, $filename, $file );
+			system( $external_diff, $file, $filename );
 		} else {
 			$self->error($!);
 		}
@@ -3751,7 +3850,7 @@ sub find_id_of_editor {
 
 =pod
 
-=heda3 run_in_padre
+=head3 run_in_padre
 
     $main->run_in_padre;
 
@@ -4211,13 +4310,17 @@ sub on_new_from_template {
 		Padre::Util::sharedir('templates'),
 		"template.$extension"
 	);
-	$editor->insert_from_file($file);
 
-	my $document = $editor->{Document};
-	$document->set_mimetype( Padre::MimeTypes->mime_type_by_extension($extension) );
-	$document->editor->padre_setup;
-	$document->rebless;
-
+	if ( $editor->insert_from_file($file) ) {
+		my $document = $editor->{Document};
+		$document->{original_content} = $document->text_get;
+		$document->set_mimetype( $document->guess_mimetype );
+		$document->editor->padre_setup;
+		$document->rebless;
+		$document->colourize;
+	} else {
+		$self->message( sprintf( Wx::gettext("Error loading template file '%s'"), $file ) );
+	}
 	return;
 }
 
@@ -4241,16 +4344,9 @@ sub install_cpan {
 	my $main   = shift;
 	my $module = shift;
 
-	# Validation?
-	#$main->setup_bindings;
 	# Run with the same Perl that launched Padre
-	#my $perl = Padre->perl_interpreter;
-	#my $cmd = qq{"$perl" "-MCPAN" "-e" "install $module"};
 	local $ENV{AUTOMATED_TESTING} = 1;
-	my $cpan = Padre::CPAN->new;
-	$cpan->install($module);
-
-	#Wx::Perl::ProcessStream->OpenProcess( $cmd, 'CPAN_mod', $main );
+	Padre::CPAN->new->install($module);
 
 	return;
 }
@@ -4269,36 +4365,7 @@ Note: I'm not sure those are really needed...
 
 sub setup_bindings {
 	my $main = shift;
-
-	# If this is the first time a command has been run,
-	# set up the ProcessStream bindings.
-	unless ($Wx::Perl::ProcessStream::VERSION) {
-		require Wx::Perl::ProcessStream;
-		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDOUT(
-			$main,
-			sub {
-				$_[1]->Skip(1);
-				$_[0]->output->AppendText( $_[1]->GetLine . "\n" );
-				return;
-			},
-		);
-		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDERR(
-			$main,
-			sub {
-				$_[1]->Skip(1);
-				$_[0]->output->AppendText( $_[1]->GetLine . "\n" );
-				return;
-			},
-		);
-		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_EXIT(
-			$main,
-			sub {
-				$_[1]->Skip(1);
-				$_[1]->GetProcess->Destroy;
-				$main->menu->run->enable;
-			},
-		);
-	}
+	$main->output->setup_bindings;
 
 	# Prepare the output window
 	$main->show_output(1);
@@ -4329,17 +4396,10 @@ sub change_highlighter {
 		my $lexer = $document->lexer;
 		$editor->SetLexer($lexer);
 
-		# TODO maybe the document should have a method that tells us if it was setup
-		# to be colored by ppi or not instead of fetching the lexer again.
 		Padre::Util::debug("Editor $editor focused $focused lexer: $lexer");
 		if ( $editor eq $focused ) {
 			$editor->needs_manual_colorize(0);
-			if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
-				$document->colorize;
-			} else {
-				$document->remove_color;
-				$editor->Colourise( 0, $editor->GetLength );
-			}
+			$document->colourize();
 		} else {
 			$editor->needs_manual_colorize(1);
 		}
@@ -4423,8 +4483,55 @@ sub show_as_numbers {
 		$self->message( Wx::gettext('Need to select text in order to translate to hex') );
 	}
 
-	$event->Skip;
 	return;
+}
+
+# showing the DocBrowser window
+sub help {
+	my $self  = shift;
+	my $param = shift;
+	unless ( $self->{help} ) {
+		require Padre::Wx::DocBrowser;
+		$self->{help} = Padre::Wx::DocBrowser->new;
+		Wx::Event::EVT_CLOSE(
+			$self->{help},
+			sub { $self->on_help_close( $_[1] ) },
+		);
+		$self->{help}->help('Padre');
+	}
+	$self->{help}->SetFocus;
+	$self->{help}->Show(1);
+	if ($param) {
+		$self->{help}->help($param);
+	}
+	return;
+}
+
+# TODO - why do we need the Hide/Destroy pair?
+sub on_help_close {
+	my ( $self, $event ) = @_;
+	my $help = $self->{help};
+
+	if ( $event->CanVeto ) {
+		$help->Hide;
+	} else {
+		delete $self->{help};
+		$help->Destroy;
+	}
+}
+
+sub set_mimetype {
+	my $self      = shift;
+	my $mime_type = shift;
+
+	my $doc = $self->current->document;
+	if ($doc) {
+		$doc->set_mimetype($mime_type);
+		$doc->editor->padre_setup;
+		$doc->rebless;
+		$doc->colourize;
+	}
+	$self->refresh;
 }
 
 1;

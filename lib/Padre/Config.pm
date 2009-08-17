@@ -5,7 +5,7 @@ package Padre::Config;
 #
 
 # To help force the break from the first-generate HASH based configuration
-# over to the second-generation method based configuration, initially we
+# over to thdee second-generation method based configuration, initially we
 # will use an ARRAY-based object, so that all existing code is forcefully
 # broken.
 
@@ -22,7 +22,7 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -317,8 +317,8 @@ setting(
 # Directory Tree Settings
 setting(
 	name    => 'default_projects_directory',
-	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
+	type    => Padre::Constant::PATH,
+	store   => Padre::Constant::HOST,
 	default => File::HomeDir->my_documents,
 );
 
@@ -461,10 +461,22 @@ setting(
 	default => 0,
 );
 setting(
+	name    => 'default_line_ending',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => Padre::Constant::NEWLINE
+);
+setting(
 	name    => 'update_file_from_disk_interval',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 2,
+);
+setting(
+	name    => 'autocomplete_multiclosebracket',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
 );
 
 # Behaviour Tuning
@@ -599,7 +611,31 @@ setting(
 	default => '',
 );
 
-
+# Enable/Disable functions
+setting(
+	name    => 'func_config',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
+	name    => 'func_bookmark',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+setting(
+	name    => 'func_fontsize',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+setting(
+	name    => 'func_session',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
 
 
 

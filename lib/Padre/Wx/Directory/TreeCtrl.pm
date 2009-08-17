@@ -2,6 +2,7 @@ package Padre::Wx::Directory::TreeCtrl;
 
 use strict;
 use warnings;
+use File::Copy;
 use File::Spec     ();
 use File::Basename ();
 use Params::Util qw{_INSTANCE};
@@ -9,7 +10,7 @@ use Padre::Current ();
 use Padre::Util    ();
 use Padre::Wx      ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Wx::TreeCtrl';
 
 use constant IS_MAC => !!( $^O eq 'darwin' );
@@ -430,6 +431,40 @@ sub _rename_or_move {
 	}
 }
 
+# Tries to copy a file and if success returns 1 or if fails shows a
+# MessageBox with the reason and returns 0
+sub _copy {
+	my $self     = shift;
+	my $old_file = $self->_removes_double_dot(shift);
+	my $new_file = $self->_removes_double_dot(shift);
+
+	# Renames/moves the old file name to the new file name
+
+	if ( copy( $old_file, $new_file ) ) {
+
+		# Sets the new file to be selected
+		my $project = $self->parent->project_dir;
+		$self->{current_item}->{$project} = $new_file;
+		$self->{select_item} = 1;
+
+		# Expands the node's parent (one level expand)
+		my $cached     = $self->{CACHED};
+		my $parent_dir = File::Basename::dirname($new_file);
+		if ( $parent_dir =~ /^$project/ ) {
+			$cached->{$project}->{Expanded}->{$parent_dir} = 1;
+		}
+
+		# Returns success
+		return 1;
+	} else {
+
+		# Popups the error message and returns fail
+		my $error_msg = $!;
+		Wx::MessageBox( $error_msg, Wx::gettext('Error'), Wx::wxOK | Wx::wxCENTRE | Wx::wxICON_ERROR );
+		return 0;
+	}
+}
+
 # Action that must be executaded when a item is activated
 # Called when the item is actived
 sub _on_tree_item_activated {
@@ -529,6 +564,7 @@ sub _on_tree_item_expanding {
 	my $node_data = $self->GetPlData($node);
 
 	# Returns if a search is being done (expands only the browser listing)
+	return if !defined( $self->search );
 	return if $self->search->{in_use}->{ $self->parent->project_dir };
 
 	# The item complete path
@@ -618,9 +654,43 @@ sub _on_tree_end_drag {
 		return;
 	}
 
-	# If the move (renaming) sucess, updates the Browser gui
-	$self->refresh if $self->_rename_or_move( $old_file, $new_file );
-	return;
+	# Pops up a menu to confirm the
+	# action do be done
+	my $menu = Wx::Menu->new;
+
+	# Move file or directory
+	my $menu_mv = $menu->Append(
+		-1,
+		Wx::gettext('Move here')
+	);
+	Wx::Event::EVT_MENU(
+		$self, $menu_mv,
+		sub { $self->_rename_or_move( $old_file, $new_file ) }
+	);
+
+	# Copy file
+	unless ( -d $old_file ) {
+		my $menu_cp = $menu->Append(
+			-1,
+			Wx::gettext('Copy here')
+		);
+		Wx::Event::EVT_MENU(
+			$self, $menu_cp,
+			sub { $self->_copy( $old_file, $new_file ) }
+		);
+	}
+
+	# Cancel action
+	$menu->AppendSeparator();
+	my $menu_cl = $menu->Append(
+		-1,
+		Wx::gettext('Cancel')
+	);
+
+	# Pops up the context menu
+	my $x = $event->GetPoint->x;
+	my $y = $event->GetPoint->y;
+	$self->PopupMenu( $menu, $x, $y );
 }
 
 # Shows up a context menu above an item with its controls
@@ -647,6 +717,19 @@ sub _on_tree_item_menu {
 		$self, $default,
 		sub { $self->_on_tree_item_activated($event) }
 	);
+
+
+	Wx::Event::EVT_MENU(
+		$self,
+		$menu->Append( -1, Wx::gettext('Open In File Browser') ),
+		sub {
+
+			#Open the current node in file browser
+			require Padre::Wx::Directory::OpenInFileBrowserAction;
+			Padre::Wx::Directory::OpenInFileBrowserAction->new->open_in_file_browser($selected_path);
+		}
+	);
+
 	$menu->AppendSeparator();
 
 	# Rename and/or move the item

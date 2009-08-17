@@ -23,7 +23,7 @@ use File::Basename ();
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 
 #####################################################################
 # Document Registration
@@ -276,7 +276,7 @@ sub _initialize {
 	__PACKAGE__->add_highlighter(
 		'Padre::Document::Perl::PPILexer',
 		Wx::gettext('PPI Standard'),
-		Wx::gettext('Hopefully faster than the PPI Traditional')
+		Wx::gettext('Hopefully faster than the PPI Traditional. Big file will fall back to Scintilla highlighter.')
 	);
 
 	__PACKAGE__->add_highlighter_to_mime_type( 'application/x-perl', 'Padre::Document::Perl::Lexer' );
@@ -526,12 +526,6 @@ sub _guess_mimetype {
 	my $text     = shift;
 	my $filename = shift;
 
-	# Default mime-type of new files, should be configurable in the GUI
-	# TODO: Make it configurable in the GUI :)
-	unless ($filename) {
-		return 'application/x-perl';
-	}
-
 	# Try derive the mime type from the file extension
 	if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 		my $ext = lc $1;
@@ -545,9 +539,11 @@ sub _guess_mimetype {
 	}
 
 	# Try derive the mime type from the basename
-	my $basename = File::Basename::basename($filename);
-	if ($basename) {
-		return 'text/x-makefile' if $basename =~ /^Makefile\.?/i;
+	if ($filename) {
+		my $basename = File::Basename::basename($filename);
+		if ($basename) {
+			return 'text/x-makefile' if $basename =~ /^Makefile\.?/i;
+		}
 	}
 
 	# Fall back on deriving the type from the content.
@@ -562,6 +558,28 @@ sub _guess_mimetype {
 		if ( $text =~ /\A---/ ) {
 			return 'text/x-yaml';
 		}
+	}
+
+	# Try to identify Perl Scripts based on soft criterias as a last resort
+	# TODO: Improve the tests
+	if ( defined($text) ) {
+		my $Score = 0;
+		if ( $text =~ /(use \w+\:\:\w+.+?\;[\r\n][\r\n.]*){3,}/ )           { $Score += 2; }
+		if ( $text =~ /use \w+\:\:\w+.+?\;[\r\n]/ )                         { $Score += 1; }
+		if ( $text =~ /require ([\"\'])[a-zA-Z0-9\.\-\_]+\1\;[\r\n]/ )      { $Score += 1; }
+		if ( $text =~ /[\r\n]sub \w+ ?(\(\$*\))? ?\{([\s\t]+\#.+)?[\r\n]/ ) { $Score += 1; }
+		if ( $text =~ /\=\~ ?[sm]?\// )                                     { $Score += 1; }
+		if ( $text =~ /\bmy [\$\%\@]/ )                                     { $Score += .5; }
+		if ( $text =~ /1\;[\r\n]+$/ )                                       { $Score += .5; }
+		if ( $text =~ /\$\w+\{/ )                                           { $Score += .5; }
+		if ( $text =~ /\bsplit[ \(]\// )                                    { $Score += .5; }
+		return $self->perl_mime_type($text) if $Score >= 3;
+	}
+
+	# Fallback mime-type of new files, should be configurable in the GUI
+	# TODO: Make it configurable in the GUI :)
+	unless ($filename) {
+		return $self->perl_mime_type($text);
 	}
 
 	# Fall back to plain text file

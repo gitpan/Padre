@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -110,6 +110,18 @@ sub new {
 		menu_event => sub {
 			my $editor = $_[0]->current->editor or return;
 			$editor->vertically_align;
+		},
+	);
+
+	$self->add_menu_item(
+		$self,
+		name       => 'perl.newline_keep_column',
+		label      => Wx::gettext('Newline same column'),
+		shortcut   => 'Ctrl-Enter',
+		menu_event => sub {
+			my $document = $_[0]->current->document or return;
+			return unless _INSTANCE( $document, 'Padre::Document::Perl' );
+			$document->newline_keep_column;
 		},
 	);
 

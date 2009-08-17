@@ -8,7 +8,7 @@ use POSIX qw{ strftime };
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.42';
+our $VERSION = '0.43';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -95,6 +95,11 @@ sub _on_butdelete_clicked {
 #
 sub _on_butopen_clicked {
 	my $self = shift;
+
+	# prevents crash if user double-clicks on list
+	# item and tries to click buttons
+	$self->_butdelete->Disable;
+	$self->_butopen->Disable;
 
 	# close all open documents
 	my $main = $self->GetParent;
