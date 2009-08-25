@@ -1,12 +1,13 @@
 package Padre::Wx::Directory;
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Wx                        ();
 use Padre::Wx::Directory::TreeCtrl   ();
 use Padre::Wx::Directory::SearchCtrl ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Wx::Panel';
 
 use Class::XSAccessor getters => {

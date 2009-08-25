@@ -11,7 +11,7 @@ use Pod::Abstract               ();
 use Padre::DocBrowser::document ();
 use File::Temp                  ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Class::XSAccessor constructor => 'new', getters => {
 	get_provider => 'provider',
@@ -113,9 +113,10 @@ sub render {
 	my $self = shift;
 	my $doc  = shift;
 	my $data = '';
-	my $pod  = IO::Scalar->new( \$doc->body );
-	my $out  = IO::Scalar->new( \$data );
-	my $v    = Pod::Simple::XHTML->new;
+	return if not $doc;
+	my $pod = IO::Scalar->new( \$doc->body );
+	my $out = IO::Scalar->new( \$data );
+	my $v   = Pod::Simple::XHTML->new;
 	$v->perldoc_url_prefix('perldoc:');
 	$v->output_fh($out);
 	$v->parse_file($pod);

@@ -1,5 +1,6 @@
 package Padre::Wx::Dialog::Text;
 
+use 5.008;
 use strict;
 use warnings;
 
@@ -7,7 +8,7 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 sub get_layout {
 	my ($text) = @_;

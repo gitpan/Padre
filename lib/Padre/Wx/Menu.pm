@@ -2,6 +2,7 @@ package Padre::Wx::Menu;
 
 # Implements additional functionality to support richer menus
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Action ();
@@ -12,7 +13,7 @@ use Class::Adapter::Builder
 	NEW      => 'Wx::Menu',
 	AUTOLOAD => 'PUBLIC';
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Class::XSAccessor getters => {
 	wx => 'OBJECT',

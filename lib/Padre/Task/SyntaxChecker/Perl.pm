@@ -1,11 +1,12 @@
 package Padre::Task::SyntaxChecker::Perl;
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Perl                ();
 use Padre::Task::SyntaxChecker ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Task::SyntaxChecker';
 
 use version;

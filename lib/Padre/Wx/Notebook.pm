@@ -1,11 +1,12 @@
 package Padre::Wx::Notebook;
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook

@@ -1,10 +1,11 @@
 package Padre::Wx::Dialog::HelpSearch;
 
-use warnings;
+use 5.008;
 use strict;
+use warnings;
 
 # package exports and version
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -14,13 +15,14 @@ use Padre::Wx::Icon ();
 # accessors
 use Class::XSAccessor accessors => {
 	_hbox          => '_hbox',          # horizontal box sizer
-	_vbox          => '_vbox',          # vertical box sizer
 	_search_text   => '_search_text',   # search text control
 	_list          => '_list',          # matches list
-	_targets_index => '_targets_index', # targets index
+	_index         => '_index',         # help topic list
 	_help_viewer   => '_help_viewer',   # HTML Help Viewer
 	_main          => '_main',          # Padre's main window
 	_topic         => '_topic',         # default help topic
+	_help_provider => '_help_provider', # Help Provider
+	_status        => '_status'         # status label
 };
 
 # -- constructor
@@ -38,7 +40,7 @@ sub new {
 	);
 
 	$self->_main($main);
-	$self->_topic( $opt{topic} // '' );
+	$self->_topic( $opt{topic} || '' );
 
 	# Dialog's icon as is the same as Padre
 	$self->SetIcon(Padre::Wx::Icon::PADRE);
@@ -54,39 +56,36 @@ sub new {
 }
 
 
-# -- event handler
-
 #
 # Fetches the current selection's help HTML
 #
-sub display_help_in_viewer {
+sub _display_help_in_viewer {
 	my $self = shift;
 
-	my $help_html;
+	my ( $html, $location );
 	my $selection = $self->_list->GetSelection();
 	if ( $selection != -1 ) {
-		my $help_target = $self->_list->GetClientData($selection);
+		my $topic = $self->_list->GetClientData($selection);
 
-		if ($help_target) {
-			my $doc = Padre::Current->document;
-			if ( $doc && $doc->can('on_help_render') ) {
-				eval {
-					my $help_location;
-					( $help_html, $help_location ) = $doc->on_help_render($help_target);
-					$self->SetTitle( Wx::gettext('Help Search') . " - " . $help_location );
-				};
-				if ($@) {
-					warn "Error while calling on_help_render: $@\n";
-				}
+		if ( $topic && $self->_help_provider ) {
+			eval { ( $html, $location ) = $self->_help_provider->help_render($topic); };
+			if ($@) {
+				warn "Error while calling help_render: $@\n";
 			}
 		}
 	}
 
-	if ( not $help_html ) {
-		$help_html = '<b>No Help found</b>';
+	if ($html) {
+
+		# Highlights <pre> code sections with a grey background
+		$html =~ s/<pre>/<table border="0" width="100%" bgcolor="#EEEEEE"><tr><td><pre>/ig;
+		$html =~ s/<\/pre>/<\/pre\><\/td><\/tr><\/table>/ig;
+	} else {
+		$html = '<b>' . Wx::gettext('No Help found') . '</b>';
 	}
 
-	$self->_help_viewer->SetPage($help_html);
+	$self->SetTitle( Wx::gettext('Help Search') . ( defined $location ? ' - ' . $location : '' ) );
+	$self->_help_viewer->SetPage($html);
 
 	return;
 }
@@ -101,31 +100,15 @@ sub _create {
 
 	# create sizer that will host all controls
 	$self->_hbox( Wx::BoxSizer->new(Wx::wxHORIZONTAL) );
-	$self->_vbox( Wx::BoxSizer->new(Wx::wxVERTICAL) );
 
 	# create the controls
 	$self->_create_controls;
-	$self->_create_buttons;
 
 	# wrap everything in a box to add some padding
 	$self->SetMinSize( [ 640, 480 ] );
 	$self->SetSizer( $self->_hbox );
 
-	# focus on the search text box
-	$self->_search_text->SetFocus();
-
-	$self->_search_text->SetValue( $self->_topic );
-	$self->_update_list_box;
-}
-
-#
-# create the buttons pane.
-#
-sub _create_buttons {
-	my $self = shift;
-
-	my $close_button = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('&Close') );
-	$self->_vbox->Add( $close_button, 0, Wx::wxALL | Wx::wxALIGN_LEFT, 5 );
+	return;
 }
 
 #
@@ -151,7 +134,7 @@ sub _create_controls {
 			$self,
 			-1,
 			Wx::wxDefaultPosition,
-			Wx::wxDefaultSize,
+			[ 180, -1 ],
 			[],
 			Wx::wxLB_SINGLE
 		)
@@ -170,12 +153,18 @@ sub _create_controls {
 	);
 	$self->_help_viewer->SetPage('');
 
+	my $close_button = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('&Close') );
+	$self->_status( Wx::StaticText->new( $self, -1, '' ) );
 
-	$self->_vbox->Add( $search_label,       0, Wx::wxALL | Wx::wxEXPAND, 2 );
-	$self->_vbox->Add( $self->_search_text, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
-	$self->_vbox->Add( $matches_label,      0, Wx::wxALL | Wx::wxEXPAND, 2 );
-	$self->_vbox->Add( $self->_list,        1, Wx::wxALL | Wx::wxEXPAND, 2 );
-	$self->_hbox->Add( $self->_vbox,        0, Wx::wxALL | Wx::wxEXPAND, 2 );
+	my $vbox = Wx::BoxSizer->new(Wx::wxVERTICAL);
+
+	$vbox->Add( $search_label,       0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_search_text, 0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $matches_label,      0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_list,        1, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_status,      0, Wx::wxALL | Wx::wxEXPAND,     0 );
+	$vbox->Add( $close_button,       0, Wx::wxALL | Wx::wxALIGN_LEFT, 0 );
+	$self->_hbox->Add( $vbox, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
 	$self->_hbox->Add(
 		$self->_help_viewer,                                                        1,
 		Wx::wxALL | Wx::wxALIGN_TOP | Wx::wxALIGN_CENTER_HORIZONTAL | Wx::wxEXPAND, 1
@@ -222,26 +211,36 @@ sub _setup_events {
 		$self,
 		$self->_list,
 		sub {
-			$self->display_help_in_viewer;
+			$self->_display_help_in_viewer;
 		}
 	);
 
+	return;
 }
 
 #
 # Focus on it if it shown or restart its state and show it if it is hidden.
 #
 sub showIt {
-	my $self = shift;
+	my ( $self, $topic ) = @_;
 
-	if ( $self->IsShown ) {
-		$self->SetFocus;
-	} else {
-		$self->_search_text->ChangeValue('');
+	if ( not $self->IsShown ) {
+		if ( not $topic ) {
+			$topic = $self->find_help_topic || '';
+		}
+		$self->_topic($topic);
+		$self->_search_text->ChangeValue( $self->_topic );
+		my $doc = Padre::Current->document;
+		if ($doc) {
+			$self->_help_provider(undef);
+		}
 		$self->_search;
 		$self->_update_list_box;
 		$self->Show(1);
 	}
+	$self->_search_text->SetFocus();
+
+	return;
 }
 
 #
@@ -252,21 +251,53 @@ sub _search() {
 
 	# a default..
 	my @empty = ();
-	$self->_targets_index( \@empty );
+	$self->_index( \@empty );
 
 	# Generate a sorted file-list based on filename
-	my $doc = Padre::Current->document;
-	if ( $doc && $doc->can('on_help_list') ) {
-		eval {
-			my @targets_index = $doc->on_help_list;
-			$self->_targets_index( \@targets_index );
-		};
-		if ($@) {
-			warn "Error while calling on_help_list: $@\n";
+	if ( not $self->_help_provider ) {
+		my $doc = Padre::Current->document;
+		if ($doc) {
+			eval { $self->_help_provider( $doc->get_help_provider ); };
+			if ($@) {
+				warn "Error while calling get_help_provider: $@\n";
+			}
 		}
+	}
+	return if not $self->_help_provider;
+	eval {
+		my @targets_index = @{ $self->_help_provider->help_list };
+		$self->_index( \@targets_index );
+	};
+	if ($@) {
+		warn "Error while calling help_list: $@\n";
 	}
 
 	return;
+}
+
+#
+# Returns the selected or under the cursor help topic
+#
+sub find_help_topic {
+	my $self = shift;
+
+	my $topic = '';
+	my $doc   = Padre::Current->document;
+	if ($doc) {
+
+		# The selected/under the cursor word is a help topic
+		my $editor = $doc->editor;
+		$topic = $editor->GetSelectedText;
+		if ( not $topic ) {
+			my $pos = $editor->GetCurrentPos;
+			$topic = $editor->GetTextRange(
+				$editor->WordStartPosition( $pos, 1 ),
+				$editor->WordEndPosition( $pos, 1 )
+			);
+		}
+	}
+
+	return $topic;
 }
 
 #
@@ -275,7 +306,7 @@ sub _search() {
 sub _update_list_box() {
 	my $self = shift;
 
-	if ( not $self->_targets_index ) {
+	if ( not $self->_index ) {
 		$self->_search;
 	}
 
@@ -285,7 +316,7 @@ sub _update_list_box() {
 	#Populate the list box now
 	$self->_list->Clear();
 	my $pos = 0;
-	foreach my $target ( @{ $self->_targets_index } ) {
+	foreach my $target ( @{ $self->_index } ) {
 		if ( $target =~ /^$search_expr$/i ) {
 			$self->_list->Insert( $target, 0, $target );
 			$pos++;
@@ -297,7 +328,8 @@ sub _update_list_box() {
 	if ( $pos > 0 ) {
 		$self->_list->Select(0);
 	}
-	$self->display_help_in_viewer;
+	$self->_status->SetLabel("Found $pos help topic(s)\n");
+	$self->_display_help_in_viewer;
 
 	return;
 }

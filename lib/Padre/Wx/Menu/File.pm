@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -145,7 +145,9 @@ sub new {
 		name       => 'file.close_current_project',
 		label      => Wx::gettext('Close This Project'),
 		menu_event => sub {
-			my $dir = $_[0]->current->document->project_dir;
+			my $doc = $_[0]->current->document;
+			return if not $doc;
+			my $dir = $doc->project_dir;
 			unless ( defined $dir ) {
 				$_[0]->error( Wx::gettext("File is not in a project") );
 			}
@@ -163,7 +165,9 @@ sub new {
 		name       => 'file.close_other_projects',
 		label      => Wx::gettext('Close Other Projects'),
 		menu_event => sub {
-			my $dir = $_[0]->current->document->project_dir;
+			my $doc = $_[0]->current->document;
+			return if not $doc;
+			my $dir = $doc->project_dir;
 			unless ( defined $dir ) {
 				$_[0]->error( Wx::gettext("File is not in a project") );
 			}

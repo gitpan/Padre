@@ -34,6 +34,7 @@ the available methods that can be applied to it besides the added ones
 
 =cut
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Constant            ();
@@ -50,7 +51,7 @@ use Class::XSAccessor accessors => {
 	_task_width  => '_task_width',  # Current width of task field
 };
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::StatusBar

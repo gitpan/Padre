@@ -31,12 +31,13 @@ Please read its documentation!
 
 =cut
 
+use 5.008;
 use strict;
 use warnings;
 use version;
 use Padre::Task::Outline ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Task::Outline';
 
 sub run {

@@ -133,7 +133,7 @@ use Padre::Wx        ();
 use Padre            ();
 use Padre::MimeTypes ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 
 
@@ -405,9 +405,13 @@ sub has_changed_on_disk {
 	return 0 unless defined $self->filename;
 	return 0 unless defined $self->last_sync;
 
-	# Caching the result for two lines saved one stat-I/O each time this sub is run (about every 2 sec.)
+	# Caching the result for two lines saved one stat-I/O each time this sub is run
 	my $Time_on_file = $self->time_on_file;
-	return 1 unless $Time_on_file;
+
+	# Return -1 if file has been deleted from disk
+	return -1 unless $Time_on_file;
+
+	# Return 1 if the file has changed on disk, otherwise 0
 	return $self->last_sync < $Time_on_file ? 1 : 0;
 }
 
@@ -419,6 +423,19 @@ sub time_on_file {
 	my @FileInfo = stat($filename);
 	return 0 if $#FileInfo == -1; # file does not exist
 	return $FileInfo[9];
+}
+
+# Generate MD5-checksum for current file stored on disk
+sub checksum_on_file {
+	return 1;
+	my $filename = $_[0]->filename;
+	return undef unless defined $filename;
+
+	require Digest::MD5;
+
+	open my $FH, $filename or return undef;
+	binmode($FH);
+	return Digest::MD5->new->addfile(*$FH)->hexdigest;
 }
 
 =pod
@@ -558,11 +575,15 @@ sub save_file {
 
 	if ( open my $fh, ">$encode", $filename ) {
 		print {$fh} $content;
+		close $fh;
 	} else {
 		$self->set_errstr($!);
 		return;
 	}
+
+	# File must be closed at this time, slow fs/userspace-fs may not return the correct result otherwise!
 	$self->{_timestamp} = $self->time_on_file;
+
 	return 1;
 }
 

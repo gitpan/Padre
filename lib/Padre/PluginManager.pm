@@ -22,6 +22,7 @@ plugins, as well as providing part of the interface to plugin writers.
 # - Don't delete the commented-out PAR-related code, we're turning it
 #   back on at some point.
 
+use 5.008;
 use strict;
 use warnings;
 use Carp                     ();
@@ -39,7 +40,7 @@ use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 use Params::Util qw{ _IDENTIFIER _CLASS _INSTANCE };
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 
 

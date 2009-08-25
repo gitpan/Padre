@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -164,6 +164,63 @@ sub new {
 		},
 	);
 
+	$self->{quick_fix} = $self->add_menu_item(
+		$self,
+		name       => 'edit.quick_fix',
+		label      => Wx::gettext('&Quick Fix'),
+		shortcut   => 'Ctrl-2',
+		menu_event => sub {
+
+			my $doc = Padre::Current->document;
+			return if not $doc;
+			my $editor = $doc->editor;
+			$editor->AutoCompSetSeparator( ord '|' );
+			my @list  = ();
+			my @items = ();
+			eval {
+
+				# Find available quick fixes from provider
+				my $provider = $doc->get_quick_fix_provider;
+				@items = $provider->quick_fix_list( $doc, $editor );
+
+				# Add quick list items from document's quick fix provider
+				foreach my $item (@items) {
+					push @list, $item->{text};
+				}
+			};
+			if ($@) {
+				warn "Error while calling get_quick_fix_provider: $@\n";
+			}
+			my $empty_list = ( scalar @list == 0 );
+			if ($empty_list) {
+				@list = ( Wx::gettext('No suggestions') );
+			}
+			my $words = join( '|', @list );
+			Wx::Event::EVT_STC_USERLISTSELECTION(
+				$main, $editor,
+				sub {
+					my ( $self, $event ) = @_;
+					return if $empty_list;
+					my $text = $event->GetText;
+					my $selection;
+					for my $item (@items) {
+						if ( $item->{text} eq $text ) {
+							$selection = $item;
+							last;
+						}
+					}
+					if ($selection) {
+						eval { &{ $selection->{listener} }(); };
+						if ($@) {
+							warn "Failed while calling Quick fix " . $selection->{text} . "\n";
+						}
+					}
+				},
+			);
+			$editor->UserListShow( 1, $words );
+		},
+	);
+
 	$self->{autocomp} = $self->add_menu_item(
 		$self,
 		name       => 'edit.autocomp',
@@ -194,9 +251,24 @@ sub new {
 		},
 	);
 
+	my $submenu = Wx::Menu->new;
+	$self->{insert_submenu} = $self->AppendSubMenu( $submenu, Wx::gettext('Insert') );
+
+	$self->{insert_special} = $self->add_menu_item(
+		$submenu,
+		name       => 'edit.insert.insert_special',
+		label      => Wx::gettext('Insert Special Value'),
+		shortcut   => 'Ctrl-Shift-I',
+		menu_event => sub {
+			require Padre::Wx::Dialog::SpecialValues;
+			Padre::Wx::Dialog::SpecialValues->insert_special(@_);
+		},
+
+	);
+
 	$self->{snippets} = $self->add_menu_item(
-		$self,
-		name       => 'edit.snippets',
+		$submenu,
+		name       => 'edit.insert.snippets',
 		label      => Wx::gettext('Snippets'),
 		shortcut   => 'Ctrl-Shift-A',
 		menu_event => sub {
@@ -484,6 +556,7 @@ sub refresh {
 	# Handle the simple cases
 	$self->{goto}->Enable($hasdoc);
 	$self->{next_problem}->Enable($hasdoc);
+	$self->{quick_fix}->Enable($hasdoc);
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{join_lines}->Enable($hasdoc);

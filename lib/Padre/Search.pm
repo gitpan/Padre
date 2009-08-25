@@ -25,13 +25,14 @@ object that can independantly search and/or replace in an editor object.
 
 =cut
 
+use 5.008;
 use strict;
 use warnings;
 use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 use Class::XSAccessor getters => {
 	find_term    => 'find_term',

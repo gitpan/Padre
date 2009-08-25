@@ -2,13 +2,14 @@ package Padre::Plugin::PopularityContest::Ping;
 
 # First-generation live call to the Popularity Contest server
 
+use 5.008;
 use strict;
 use warnings;
 use URI              ();
 use HTTP::Request    ();
 use Padre::Task::LWP ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Task::LWP';
 
 sub new {

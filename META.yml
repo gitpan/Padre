@@ -123,8 +123,8 @@ requires:
   threads: 1.71
   threads::shared: 1.26
 resources:
-  bugtracker: http://padre.perlide.org/
+  bugtracker: http://padre.perlide.org/trac/
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.43
+version: 0.44

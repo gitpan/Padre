@@ -55,7 +55,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -409,12 +409,13 @@ sub open_resource {
 }
 
 sub help_search {
-	my $self = shift;
+	my ( $self, $topic ) = @_;
+
 	unless ( defined $self->{help_search} ) {
 		require Padre::Wx::Dialog::HelpSearch;
 		$self->{help_search} = Padre::Wx::Dialog::HelpSearch->new($self);
 	}
-	return $self->{help_search};
+	$self->{help_search}->showIt($topic);
 }
 
 =pod
@@ -2179,7 +2180,9 @@ sub on_autocompletion {
 		);
 	}
 	if (@words) {
-		$document->editor->AutoCompShow( $length, join " ", @words );
+		my $editor = $document->editor;
+		$editor->AutoCompSetSeparator( ord ' ' );
+		$editor->AutoCompShow( $length, join " ", @words );
 	}
 	return;
 }
@@ -2711,13 +2714,19 @@ sub on_open {
 	if ($filename) {
 		$self->{cwd} = File::Basename::dirname($filename);
 	}
-	$self->_open_file_dialog;
+	$self->open_file_dialog;
 
 	return;
 }
 
-sub _open_file_dialog {
+# TODO: let's allow this to be used by plugins
+sub open_file_dialog {
 	my $self = shift;
+	my $dir  = shift;
+
+	if ($dir) {
+		$self->{cwd} = $dir;
+	}
 
 	# http://docs.wxwidgets.org/stable/wx_wxfiledialog.html:
 	# "It must be noted that wildcard support in the native Motif file dialog is quite
@@ -2761,10 +2770,7 @@ sub _open_file_dialog {
 
 sub on_open_example {
 	my $self = shift;
-	$self->{cwd} = Padre::Util::sharedir('examples');
-	$self->_open_file_dialog;
-
-	return;
+	return $self->open_file_dialog( Padre::Util::sharedir('examples') );
 }
 
 
@@ -4232,15 +4238,24 @@ the document. No return value.
 =cut
 
 sub timer_check_overwrite {
-	my $self = shift;
-	my $doc = $self->current->document or return;
+	my $self       = shift;
+	my $doc        = $self->current->document or return;
+	my $file_state = $doc->has_changed_on_disk;         # 1 = updated, 0 = unchanged, -1 = deleted
 
-	return unless $doc->has_changed_on_disk;
+	return unless $file_state;
 	return if $doc->{_already_popup_file_changed};
 
 	$doc->{_already_popup_file_changed} = 1;
+
+	my $Text;
+	if ( $file_state == -1 ) {
+		$Text = Wx::gettext('File has been deleted on disk, do you want to CLEAR the editor window?');
+	} else {
+		$Text = Wx::gettext("File changed on disk since last saved. Do you want to reload it?");
+	}
+
 	my $ret = Wx::MessageBox(
-		Wx::gettext("File changed on disk since last saved. Do you want to reload it?"),
+		$Text,
 		$doc->filename || Wx::gettext("File not in sync"),
 		Wx::wxYES_NO | Wx::wxCENTRE,
 		$self,
@@ -4534,6 +4549,39 @@ sub set_mimetype {
 	$self->refresh;
 }
 
+=pod
+
+=head3 new_document_from_string
+
+    $main->new_document_from_string( $string );
+
+Create a new document in Padre with the string value.
+
+Note: this method may not belong here...
+
+=cut
+
+sub new_document_from_string {
+	my ( $self, $str, $mimetype ) = @_;
+
+	$self->on_new();
+
+	my $editor = $self->current->editor or return;
+	my $doc = $editor->{Document};
+	$doc->text_set($str);
+
+	if ($mimetype) {
+		$doc->set_mimetype($mimetype);
+	}
+
+	$doc->{original_content} = $doc->text_get;
+	$doc->editor->padre_setup;
+	$doc->rebless;
+	$doc->colourize;
+
+	return 1;
+
+}
 1;
 
 =pod

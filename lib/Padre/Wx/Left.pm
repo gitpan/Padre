@@ -2,12 +2,13 @@ package Padre::Wx::Left;
 
 # The left-hand notebook
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook

@@ -2,13 +2,14 @@ package Padre::Wx::Dialog::PluginManager;
 
 # The Plugin Manager GUI for Padre
 
+use 5.008;
 use strict;
 use warnings;
 use Carp 'croak';
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {

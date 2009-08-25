@@ -1,5 +1,6 @@
 package Padre::Wx::Directory::TreeCtrl;
 
+use 5.008;
 use strict;
 use warnings;
 use File::Copy;
@@ -10,7 +11,7 @@ use Padre::Current ();
 use Padre::Util    ();
 use Padre::Wx      ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Wx::TreeCtrl';
 
 use constant IS_MAC => !!( $^O eq 'darwin' );
@@ -345,6 +346,8 @@ sub _update_subdirs {
 	for my $item ( 1 .. $self->GetChildrenCount($root) ) {
 
 		( my $node, $cookie ) = $item == 1 ? $self->GetFirstChild($root) : $self->GetNextChild( $root, $cookie );
+		next if not $node->IsOk;
+
 		my $node_data = $self->GetPlData($node);
 		my $path = File::Spec->catfile( $node_data->{dir}, $node_data->{name} );
 
@@ -549,6 +552,7 @@ sub _on_tree_end_label_edit {
 # Called when a item is selected
 sub _on_tree_sel_changed {
 	my ( $self, $event ) = @_;
+	return if not $self->parent->can('project_dir');
 	my $node_data = $self->GetPlData( $event->GetItem );
 
 	# Caches the item path

@@ -10,7 +10,7 @@ use File::Spec        ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 sub get_layout {
 
@@ -131,20 +131,35 @@ sub ok_clicked {
 
 	my $pwd = Cwd::cwd();
 	chdir $data->{_directory_};
-	require Module::Starter::App;
-	@ARGV = (
-		'--module',  $data->{_module_name_},
-		'--author',  $data->{_author_name_},
-		'--email',   $data->{_email_},
-		'--builder', $data->{_builder_choice_},
-		'--license', $data->{_license_choice_},
-	);
-	Module::Starter::App->run;
-	@ARGV = ();
+	eval {
+		require Module::Starter::App;
+		@ARGV = (
+			'--module',  $data->{_module_name_},
+			'--author',  $data->{_author_name_},
+			'--email',   $data->{_email_},
+			'--builder', $data->{_builder_choice_},
+			'--license', $data->{_license_choice_},
+		);
+		Module::Starter::App->run;
+		@ARGV = ();
+	};
 	chdir $pwd;
 
+	if ($@) {
+		Wx::MessageBox(
+			sprintf(
+				Wx::gettext("An error has occured while generating '%s':\n%s"),
+				$data->{_module_name_}, $@
+			),
+			Wx::gettext("Error"),
+			Wx::wxOK | Wx::wxCENTRE,
+			$main
+		);
+		return;
+	}
+
 	my $ret = Wx::MessageBox(
-		sprintf( Wx::gettext("%s apparantly created. Do you want to open it now?"), $data->{_module_name_} ),
+		sprintf( Wx::gettext("%s apparently created. Do you want to open it now?"), $data->{_module_name_} ),
 		Wx::gettext("Done"),
 		Wx::wxYES_NO | Wx::wxCENTRE,
 		$main,

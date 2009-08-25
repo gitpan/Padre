@@ -12,7 +12,7 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -66,9 +66,8 @@ sub new {
 		shortcut   => 'F2',
 		menu_event => sub {
 
-			#Create and show the Help search dialog
-			my $dlg = $_[0]->help_search;
-			$dlg->showIt;
+			#Show Help Search with no topic...
+			$_[0]->help_search;
 		},
 	);
 

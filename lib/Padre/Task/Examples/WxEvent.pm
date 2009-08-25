@@ -1,11 +1,12 @@
 package Padre::Task::Examples::WxEvent;
 
+use 5.008;
 use strict;
 use warnings;
 use Padre::Task ();
 use Padre::Wx   ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Task';
 
 # set up a new event type

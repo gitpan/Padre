@@ -26,12 +26,13 @@ configuration directory (which defaults to C<~/.padre> on Unixy systems).
 
 =cut
 
+use 5.008;
 use strict;
 use warnings;
 use Module::Build   ();
 use Padre::Constant ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Module::Build';
 
 sub ACTION_plugin {

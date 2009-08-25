@@ -1,5 +1,6 @@
 package Padre::Wx::Dialog::OpenResource;
 
+use 5.008;
 use strict;
 use warnings;
 use Cwd             ();
@@ -7,7 +8,7 @@ use Padre::DB       ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -437,8 +438,8 @@ sub _search() {
 
 	$self->_status_text->SetLabel( Wx::gettext("Reading items. Please wait...") );
 
-	require Padre::Wx::Dialog::OpenResource::SearchTask;
-	my $search_task = Padre::Wx::Dialog::OpenResource::SearchTask->new(
+	require Padre::Task::OpenResource::SearchTask;
+	my $search_task = Padre::Task::OpenResource::SearchTask->new(
 		dialog                   => $self,
 		directory                => $self->_directory,
 		skip_vcs_files           => $self->_skip_vcs_files->IsChecked,

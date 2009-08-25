@@ -1,5 +1,6 @@
 package Padre::Task::SyntaxChecker;
 
+use 5.008;
 use strict;
 use warnings;
 use Params::Util qw{_CODE _INSTANCE};
@@ -7,7 +8,7 @@ use Padre::Task    ();
 use Padre::Current ();
 use Padre::Wx      ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 our @ISA     = 'Padre::Task';
 
 =pod

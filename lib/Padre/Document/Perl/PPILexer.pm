@@ -6,7 +6,7 @@ use warnings;
 use Padre::Document ();
 use Padre::Util     ();
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 
 sub colorize {
@@ -136,7 +136,7 @@ sub _css_class {
 			if ( $Token->content =~ /^(?:my|local|our)$/ ) {
 				return 'keyword';
 			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Compond') ) {
+		} elsif ( $Token->parent->isa('PPI::Statement::Compound') ) {
 			if ( $Token->content =~ /^(?:if|else|elsif|unless|for|foreach|while|my)$/ ) {
 				return 'keyword';
 			}

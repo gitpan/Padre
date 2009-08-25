@@ -68,6 +68,8 @@ lib/Padre/Document/Perl/Beginner.pm
 lib/Padre/Document/Perl/Lexer.pm
 lib/Padre/Document/Perl/PPILexer.pm
 lib/Padre/Document/POD.pm
+lib/Padre/HelpProvider.pm
+lib/Padre/HelpProvider/Perl.pm
 lib/Padre/Locale.pm
 lib/Padre/Log.pm
 lib/Padre/Manual.pod
@@ -88,6 +90,8 @@ lib/Padre/PPI.pm
 lib/Padre/Project.pm
 lib/Padre/Project/Null.pm
 lib/Padre/Project/Perl.pm
+lib/Padre/QuickFixProvider.pm
+lib/Padre/QuickFixProvider/Perl.pm
 lib/Padre/Search.pm
 lib/Padre/Service.pm
 lib/Padre/Splash.pm
@@ -99,6 +103,7 @@ lib/Padre/Task/Examples/WxEvent.pm
 lib/Padre/Task/HTTPClient.pm
 lib/Padre/Task/LaunchDefaultBrowser.pm
 lib/Padre/Task/LWP.pm
+lib/Padre/Task/OpenResource/SearchTask.pm
 lib/Padre/Task/Outline.pm
 lib/Padre/Task/Outline/Perl.pm
 lib/Padre/Task/PPI.pm
@@ -129,7 +134,6 @@ lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/OpenResource.pm
-lib/Padre/Wx/Dialog/OpenResource/SearchTask.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
@@ -139,6 +143,7 @@ lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/SessionManager.pm
 lib/Padre/Wx/Dialog/SessionSave.pm
 lib/Padre/Wx/Dialog/Snippets.pm
+lib/Padre/Wx/Dialog/SpecialValues.pm
 lib/Padre/Wx/Dialog/Text.pm
 lib/Padre/Wx/Directory.pm
 lib/Padre/Wx/Directory/OpenInFileBrowserAction.pm
@@ -189,6 +194,7 @@ padre.yml
 privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
+share/doc/perlopref.pod
 share/examples/wx/01_simple_frame.pl
 share/examples/wx/02_label.pl
 share/examples/wx/03_button.pl
@@ -197,6 +203,7 @@ share/examples/wx/05_button_with_event_and_message_box.pl
 share/examples/wx/21_progress_bar.pl
 share/examples/wx/22_notebook.pl
 share/examples/wx/30_editor.pl
+share/examples/wx/40_draw.pl
 share/icons/gnome218/16x16/actions/document-new.png
 share/icons/gnome218/16x16/actions/document-open.png
 share/icons/gnome218/16x16/actions/document-print.png
@@ -289,6 +296,7 @@ t/07-log.t
 t/08-style.t
 t/10-copyright.t
 t/11-badcode.t
+t/12.pragmas.t
 t/50-docbrowser.t
 t/60-db.t
 t/70-document.t

@@ -1,9 +1,10 @@
 package Padre::DB::Plugin;
 
+use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.43';
+our $VERSION = '0.44';
 
 # Finds and returns a single element by name
 sub fetch_name {
