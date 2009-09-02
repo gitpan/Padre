@@ -40,7 +40,7 @@ use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 use Params::Util qw{ _IDENTIFIER _CLASS _INSTANCE };
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 
 
@@ -278,6 +278,10 @@ sub load_plugins {
 			next unless s/\.pm$//;
 			my $module = "Padre::Plugin::$_";
 			next if $seen{$module}++;
+
+			# Specifically ignore the redundant "Perl 5 Plugin"
+			next if $module eq 'Padre::Plugin::Perl5';
+
 			$self->_load_plugin($module);
 		}
 	}

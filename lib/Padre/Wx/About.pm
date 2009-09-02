@@ -9,7 +9,7 @@ use utf8;
 use Padre::Wx             ();
 use Padre::Wx::HtmlWindow ();
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -112,8 +112,11 @@ END_HTML
             <b>Arabic</b><br>
             Ahmad Zawawi - أحمد محمد زواوي<br>
             <br>
+            <b>Chinese (Simplified)</b><br>
+            Fayland Lam<br>
+            <br>
             <b>Chinese (Traditional)</b><br>
-            Matthew Lien - 練喆明</b><br>
+            Matthew Lien - 練喆明<br>
             <br>
             <b>Czech</b><br>
             Marcela Mašláňová<br>

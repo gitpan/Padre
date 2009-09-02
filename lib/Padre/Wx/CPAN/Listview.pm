@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -123,7 +123,7 @@ sub show_rows {
 	my $cpan    = $self->{cpan};
 	my $c       = 10;
 	my $modules = $cpan->get_modules($regex);
-	foreach my $module (@$modules) {
+	foreach my $module ( reverse sort @$modules ) {
 		my $idx = $self->InsertStringImageItem( 0, $module, 0 );
 
 		#$self->SetItem( $idx, 1,  Wx::gettext('Warning')  );

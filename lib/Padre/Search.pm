@@ -32,7 +32,7 @@ use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 
 use Class::XSAccessor getters => {
 	find_term    => 'find_term',
@@ -246,20 +246,37 @@ sub editor_replace {
 		die("Failed to provide editor object to replace in");
 	}
 
-	# Execute the search and move to the resulting location
+	# Execute the search
 	my ( $start, $end, @matches ) = $self->matches(
 		$editor->GetTextRange( 0, $editor->GetLength ),
 		$self->search_regex,
 		$editor->GetSelection,
 	);
 
-	# If they match replace it
-	if ( defined $start and $start == 0 and $end == $editor->GetLength ) {
-		$editor->ReplaceSelection( $self->replace_text );
-		return 1;
-	} else {
-		return 0;
+	# Are they perfectly selecting a match already?
+	my $selection = [ $editor->GetSelection ];
+	if ( $selection->[0] != $selection->[1] ) {
+		if ( grep { $selection->[0] == $_->[0] and $selection->[1] == $_->[1] } @matches ) {
+
+			# Yes, replace it
+			$editor->ReplaceSelection( $self->replace_term );
+
+			# Move our selection to a point just before/after the replace,
+			# so that it doesn't double-match
+			if ( $self->find_reverse ) {
+				$editor->SetSelection( $start, $start );
+			} else {
+
+				# TODO: There might be unicode bugs in this.
+				# TODO: Someone that understands needs to check.
+				$start = $start + length( $self->replace_term );
+				$editor->SetSelection( $start, $start );
+			}
+		}
 	}
+
+	# Move to the next match
+	$self->search_next($editor);
 }
 
 sub editor_replace_all {

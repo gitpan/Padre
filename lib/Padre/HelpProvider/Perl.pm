@@ -11,7 +11,7 @@ use Padre::HelpProvider    ();
 use Padre::DocBrowser::POD ();
 use Padre::Pod2HTML        ();
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 our @ISA     = 'Padre::HelpProvider';
 
 #
@@ -181,7 +181,7 @@ sub _parse_perlopref {
 #
 sub help_render {
 	my ( $self, $topic ) = @_;
-	my $html;
+	my ( $html, $location );
 
 	if ( $self->{perlopref}->{$topic} ) {
 
@@ -200,6 +200,13 @@ sub help_render {
 			# it is Perl function, handle q/.../, m//, y///, tr///
 			$hints->{perlfunc} = 1;
 			$topic =~ s/\/.*?\/$//;
+		} else {
+
+			# Append the module's release date to the topic
+			my $first_release_by_date = Module::CoreList->first_release_by_date($topic);
+			if ($first_release_by_date) {
+				$location = "$topic (Since Perl v$first_release_by_date)";
+			}
 		}
 
 		# Render using perldoc pseudo code package
@@ -209,7 +216,7 @@ sub help_render {
 		$html = $pod_html->body if $pod_html;
 	}
 
-	return ( $html, $topic );
+	return ( $html, $location || $topic );
 }
 
 #

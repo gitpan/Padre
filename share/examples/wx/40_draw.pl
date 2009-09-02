@@ -44,7 +44,7 @@ sub new {
                                  [-1, -1],
                                  [750, 700],
                                  );
-                                
+
     my $canvas = Demo::Canvas->new($self);
     EVT_CLOSE( $self, \&on_close_window);
 
@@ -101,7 +101,9 @@ sub OnDraw {
   $dc->SetPen( Wx::Pen->new( wxBLUE, 5, 0 ) );
   $dc->DrawEllipse( $x_size - 50 - 20, $y_size - 50 - 20, 50, 50 );
 
+  $dc->CrossHair(100, 100);
   $dc->SetPen( Wx::Pen->new( wxRED, 5, 0 ) );
+  
 
 }
 

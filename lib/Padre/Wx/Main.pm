@@ -22,20 +22,20 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use Cwd            ();
-use Carp           ();
-use File::Spec     ();
-use File::HomeDir  ();
-use File::Basename ();
-use File::Temp     ();
-use List::Util     ();
-use Scalar::Util   ();
-use Params::Util qw{_INSTANCE};
-use Padre::Constant ();
-use Padre::Util     ();
-use Padre::Perl     ();
-use Padre::Locale   ();
-use Padre::Current qw{_CURRENT};
+use Cwd                       ();
+use Carp                      ();
+use File::Spec                ();
+use File::HomeDir             ();
+use File::Basename            ();
+use File::Temp                ();
+use List::Util                ();
+use Scalar::Util              ();
+use Params::Util              ();
+use Padre::Constant           ();
+use Padre::Util               ();
+use Padre::Perl               ();
+use Padre::Locale             ();
+use Padre::Current            ();
 use Padre::Document           ();
 use Padre::DB                 ();
 use Padre::Wx                 ();
@@ -55,7 +55,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.44';
+our $VERSION = '0.45';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -86,7 +86,7 @@ object as argument, to get a reference to the Padre application.
 sub new {
 	my $class = shift;
 	my $ide   = shift;
-	unless ( _INSTANCE( $ide, 'Padre' ) ) {
+	unless ( Params::Util::_INSTANCE( $ide, 'Padre' ) ) {
 		Carp::croak("Did not provide an ide object to Padre::Wx::Main->new");
 	}
 
@@ -119,13 +119,8 @@ sub new {
 	# Create the underlying Wx frame
 	my $self = $class->SUPER::new(
 		undef, -1, $title,
-		[   $config->main_left,
-			$config->main_top,
-		],
-		[   $config->main_width,
-			$config->main_height,
-		],
-		$style,
+		[ $config->main_left, $config->main_top, ],
+		[ $config->main_width, $config->main_height, ], $style,
 	);
 
 	# Save a reference back to the parent IDE
@@ -247,10 +242,7 @@ sub new {
 	# at the beginning and hide it in the timer, if it was not needed
 	# TODO: there might be better ways to fix that issue...
 	$statusbar->Show;
-	my $timer = Wx::Timer->new(
-		$self,
-		Padre::Wx::ID_TIMER_POSTINIT,
-	);
+	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT, );
 	Wx::Event::EVT_TIMER(
 		$self,
 		Padre::Wx::ID_TIMER_POSTINIT,
@@ -262,10 +254,6 @@ sub new {
 
 	return $self;
 }
-
-
-
-
 
 #####################################################################
 
@@ -499,8 +487,7 @@ sub load_files {
 
 		# try to find the wanted session...
 		my ($session) = Padre::DB::Session->select(
-			'where name = ?',
-			$ide->opts->{session},
+			'where name = ?', $ide->opts->{session},
 		);
 
 		# ... and open it.
@@ -614,7 +601,10 @@ sub _timer_post_init {
 			$_[0]->timer_check_overwrite;
 		},
 	);
-	$timer->Start( $self->ide->config->update_file_from_disk_interval * SECONDS, 0 );
+	$timer->Start(
+		$self->ide->config->update_file_from_disk_interval * SECONDS,
+		0
+	);
 
 	return;
 }
@@ -1039,7 +1029,7 @@ sub refresh_functions {
 	return unless $self->menu->view->{functions}->IsChecked;
 
 	# Flush the list if there is no active document
-	my $current   = _CURRENT(@_);
+	my $current   = Padre::Current::_CURRENT(@_);
 	my $document  = $current->document;
 	my $functions = $self->functions;
 	unless ($document) {
@@ -1630,7 +1620,9 @@ sub run_command {
 	my $config = $self->config;
 	if ( $config->run_use_external_window ) {
 		if (Padre::Util::WIN32) {
-			system "start cmd /C \"$cmd\"";
+			my $title = $cmd;
+			$title =~ s/"//g;
+			system "start \"$title\" cmd /C \"$cmd\"";
 		} else {
 			system qq(xterm -e "$cmd; sleep 1000" &);
 		}
@@ -1696,8 +1688,7 @@ sub run_command {
 		# Failed to start the command. Clean up.
 		Wx::MessageBox(
 			sprintf( Wx::gettext("Failed to start '%s' command"), $cmd ),
-			Wx::gettext("Error"),
-			Wx::wxOK, $self
+			Wx::gettext("Error"), Wx::wxOK, $self
 		);
 		$self->menu->run->enable;
 	}
@@ -2009,7 +2000,7 @@ If no files are open, silently do nothing (don't even remember the new search)
 sub search_next {
 	my $self = shift;
 	my $editor = $self->current->editor or return;
-	if ( _INSTANCE( $_[0], 'Padre::Search' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
 		$self->{search} = shift;
 	} elsif (@_) {
 		die("Invalid argument to search_next");
@@ -2033,14 +2024,14 @@ sub search_next {
 
 Find the previous match for the current search, or spawn the Find dialog.
 
-If no files are open, do nothing
+If no files are open, do nothing.
 
 =cut
 
 sub search_previous {
 	my $self = shift;
 	my $editor = $self->current->editor or return;
-	if ( _INSTANCE( $_[0], 'Padre::Search' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
 		$self->{search} = shift;
 	} elsif (@_) {
 		die("Invalid argument to search_previous");
@@ -2049,6 +2040,68 @@ sub search_previous {
 		$self->search->search_previous($editor);
 	} else {
 		$self->find->find;
+	}
+}
+
+=pod
+
+=head2 replace_next
+
+  # Next replace for a new search
+  $main->replace_next( $search );
+  
+  # Next replace on current search (or show Find dialog if none)
+  $main->replace_next;
+
+Replace the next match for the current search, or spawn the Replace dialog.
+
+If no files are open, do nothing.
+
+=cut
+
+sub replace_next {
+	my $self = shift;
+	my $editor = $self->current->editor or return;
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
+		$self->{search} = shift;
+	} elsif (@_) {
+		die("Invalid argument to replace_next");
+	}
+	if ( $self->search ) {
+		$self->search->replace_next($editor);
+	} else {
+		$self->replace->find;
+	}
+}
+
+=pod
+
+=head2 replace_all
+
+  # Replace all for a new search
+  $main->replace_all( $search );
+  
+  # Replace all for the current search (or show Replace dialog if none)
+  $main->replace_all;
+
+Replace all matches for the current search, or spawn the Replace dialog.
+
+If no files are open, do nothing.
+
+=cut
+
+sub replace_all {
+	my $self = shift;
+	my $editor = $self->current->editor or return;
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
+		$self->{search} = shift;
+	} elsif (@_) {
+		die("Invalid argument to replace_all");
+	}
+	if ( $self->search ) {
+		$self->search->replace_all($editor);
+	} else {
+		$self->replace->find;
 	}
 }
 
@@ -2174,9 +2227,7 @@ sub on_autocompletion {
 	my ( $length, @words ) = $document->autocomplete;
 	if ( $length =~ /\D/ ) {
 		Wx::MessageBox(
-			$length,
-			Wx::gettext("Autocompletion error"),
-			Wx::wxOK,
+			$length, Wx::gettext("Autocompletion error"), Wx::wxOK,
 		);
 	}
 	if (@words) {
@@ -2466,7 +2517,8 @@ sub setup_editor {
 			return $self->error(
 				sprintf(
 					Wx::gettext(
-						"Cannot open %s as it is over the arbitrary file size limit of Padre which is currently %s"),
+						"Cannot open %s as it is over the arbitrary file size limit of Padre which is currently %s"
+					),
 					$file,
 					$config->editor_file_size_limit
 				)
@@ -2476,9 +2528,7 @@ sub setup_editor {
 
 	local $self->{_no_refresh} = 1;
 
-	my $doc = Padre::Document->new(
-		filename => $file,
-	);
+	my $doc = Padre::Document->new( filename => $file, );
 
 	$file ||= ''; #to avoid warnings
 	if ( $doc->errstr ) {
@@ -2579,8 +2629,7 @@ sub on_open_selection {
 		my $dialog = Wx::TextEntryDialog->new(
 			$self,
 			Wx::gettext("Nothing selected. Enter what should be opened:"),
-			Wx::gettext("Open selection"),
-			''
+			Wx::gettext("Open selection"), ''
 		);
 		return if $dialog->ShowModal == Wx::wxID_CANCEL;
 
@@ -2600,10 +2649,7 @@ sub on_open_selection {
 
 		# Try relative to the dir we started in?
 		SCOPE: {
-			my $filename = File::Spec->catfile(
-				$self->ide->{original_cwd},
-				$text,
-			);
+			my $filename = File::Spec->catfile( $self->ide->{original_cwd}, $text, );
 			if ( -e $filename ) {
 				push @files, $filename;
 			}
@@ -2611,10 +2657,7 @@ sub on_open_selection {
 
 		# Try relative to the current file
 		if ( $current->filename ) {
-			my $filename = File::Spec->catfile(
-				File::Basename::dirname( $current->filename ),
-				$text,
-			);
+			my $filename = File::Spec->catfile( File::Basename::dirname( $current->filename ), $text, );
 			if ( -e $filename ) {
 				push @files, $filename;
 			}
@@ -2624,10 +2667,7 @@ sub on_open_selection {
 		my $module = $text;
 		$module =~ s{::}{/}g;
 		$module .= ".pm";
-		my $filename = File::Spec->catfile(
-			$self->ide->{original_cwd},
-			$module,
-		);
+		my $filename = File::Spec->catfile( $self->ide->{original_cwd}, $module, );
 		if ( -e $filename ) {
 			push @files, $filename;
 		} else {
@@ -2635,8 +2675,7 @@ sub on_open_selection {
 			# relative to the project dir
 			my $filename = File::Spec->catfile(
 				$self->current->document->project_dir,
-				'lib',
-				$module,
+				'lib', $module,
 			);
 			if ( -e $filename ) {
 				push @files, $filename;
@@ -2659,8 +2698,7 @@ sub on_open_selection {
 		Wx::MessageBox(
 			sprintf( Wx::gettext("Could not find file '%s'"), $text ),
 			Wx::gettext("Open Selection"),
-			Wx::wxOK,
-			$self,
+			Wx::wxOK, $self,
 		);
 		return;
 	}
@@ -2735,26 +2773,30 @@ sub open_file_dialog {
 	# But I don't think Wx + Motif is in use nowadays
 	my $wildcards = join(
 		'|',
-		Wx::gettext("JavaScript Files"), "*.js;*.JS",
-		Wx::gettext("Perl Files"),       "*.pm;*.PM;*.pl;*.PL",
-		Wx::gettext("PHP Files"),        "*.php;*.php5;*.PHP",
-		Wx::gettext("Python Files"),     "*.py;*.PY",
-		Wx::gettext("Ruby Files"),       "*.rb;*.RB",
-		Wx::gettext("SQL Files"),        "*.slq;*.SQL",
-		Wx::gettext("Text Files"),       "*.txt;*.TXT;*.yml;*.conf;*.ini;*.INI",
-		Wx::gettext("Web Files"),        "*.html;*.HTML;*.htm;*.HTM;*.css;*.CSS",
+		Wx::gettext("JavaScript Files"),
+		"*.js;*.JS",
+		Wx::gettext("Perl Files"),
+		"*.pm;*.PM;*.pl;*.PL",
+		Wx::gettext("PHP Files"),
+		"*.php;*.php5;*.PHP",
+		Wx::gettext("Python Files"),
+		"*.py;*.PY",
+		Wx::gettext("Ruby Files"),
+		"*.rb;*.RB",
+		Wx::gettext("SQL Files"),
+		"*.slq;*.SQL",
+		Wx::gettext("Text Files"),
+		"*.txt;*.TXT;*.yml;*.conf;*.ini;*.INI",
+		Wx::gettext("Web Files"),
+		"*.html;*.HTML;*.htm;*.HTM;*.css;*.CSS",
 	);
 	$wildcards =
 		Padre::Constant::WIN32
 		? Wx::gettext("All Files") . "|*.*|" . $wildcards
 		: Wx::gettext("All Files") . "|*|" . $wildcards;
 	my $dialog = Wx::FileDialog->new(
-		$self,
-		Wx::gettext("Open File"),
-		$self->cwd,
-		"",
-		$wildcards,
-		Wx::wxFD_MULTIPLE,
+		$self, Wx::gettext("Open File"),
+		$self->cwd, "", $wildcards, Wx::wxFD_MULTIPLE,
 	);
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 		return;
@@ -2762,8 +2804,49 @@ sub open_file_dialog {
 	my @filenames = $dialog->GetFilenames;
 	$self->{cwd} = $dialog->GetDirectory;
 
-	my @files = map { File::Spec->catfile( $self->cwd, $_ ) } @filenames;
-	$self->setup_editors(@files);
+	my @files;
+	for (@filenames) {
+
+		if (/[\*\?]/) {
+
+			# Windows usually handles this at the dialog level, but Gnome doesn't,
+			# so this should never appear on Windows:
+			my $ret = Wx::MessageBox(
+				sprintf(
+					Wx::gettext('Filename %s contains * or ? which are special chars on most computers. Skip?'),
+					$_
+				),
+				Wx::gettext("Open Warning"),
+				Wx::wxYES_NO | Wx::wxCENTRE,
+				$self,
+			);
+
+			next if $ret == Wx::wxYES;
+		}
+
+		my $FN = File::Spec->catfile( $self->cwd, $_ );
+
+		if ( !-e $FN ) {
+
+			# This could be checked by a Windows dialog, but a Gnome dialog doesn't,
+			# and created empty files when you do a typo in the open box when
+			# entering and not selecting a filename to open:
+			my $ret = Wx::MessageBox(
+				sprintf(
+					Wx::gettext('Filename %s does not exist on disk. Skip?'),
+					$FN
+				),
+				Wx::gettext("Open Warning"),
+				Wx::wxYES_NO | Wx::wxCENTRE,
+				$self,
+			);
+
+			next if $ret == Wx::wxYES;
+		}
+
+		push @files, $FN;
+	}
+	$self->setup_editors(@files) if $#files > -1;
 
 	return;
 }
@@ -2772,7 +2855,6 @@ sub on_open_example {
 	my $self = shift;
 	return $self->open_file_dialog( Padre::Util::sharedir('examples') );
 }
-
 
 =pod
 
@@ -2827,12 +2909,8 @@ sub on_save_as {
 	}
 	while (1) {
 		my $dialog = Wx::FileDialog->new(
-			$self,
-			Wx::gettext("Save file as..."),
-			$self->{cwd},
-			"",
-			"*.*",
-			Wx::wxFD_SAVE,
+			$self, Wx::gettext("Save file as..."),
+			$self->{cwd}, "", "*.*", Wx::wxFD_SAVE,
 		);
 		if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 			return;
@@ -2856,9 +2934,7 @@ sub on_save_as {
 		if ( -e $path ) {
 			my $response = Wx::MessageBox(
 				Wx::gettext("File already exists. Overwrite it?"),
-				Wx::gettext("Exist"),
-				Wx::wxYES_NO,
-				$self,
+				Wx::gettext("Exist"), Wx::wxYES_NO, $self,
 			);
 			if ( $response == Wx::wxYES ) {
 				$document->_set_filename($path);
@@ -2980,9 +3056,7 @@ sub _save_buffer {
 	unless ( $doc->save_file ) {
 		Wx::MessageBox(
 			Wx::gettext("Could not save file: ") . $doc->errstr,
-			Wx::gettext("Error"),
-			Wx::wxOK,
-			$self,
+			Wx::gettext("Error"), Wx::wxOK, $self,
 		);
 		return;
 	}
@@ -3049,9 +3123,7 @@ sub close {
 		my $ret = Wx::MessageBox(
 			Wx::gettext("File changed. Do you want to save it?"),
 			$doc->filename || Wx::gettext("Unsaved File"),
-			Wx::wxYES_NO
-				| Wx::wxCANCEL
-				| Wx::wxCENTRE,
+			Wx::wxYES_NO | Wx::wxCANCEL | Wx::wxCENTRE,
 			$self,
 		);
 		if ( $ret == Wx::wxYES ) {
@@ -3243,7 +3315,10 @@ sub on_diff {
 	my $external_diff = $self->config->external_diff_tool;
 	if ($external_diff) {
 		my $dir = File::Temp::tempdir( CLEANUP => 1 );
-		my $filename = File::Spec->catdir( $dir, 'IN_EDITOR' . File::Basename::basename($file) );
+		my $filename = File::Spec->catdir(
+			$dir,
+			'IN_EDITOR' . File::Basename::basename($file)
+		);
 		if ( open my $fh, '>', $filename ) {
 			print $fh $text;
 			CORE::close($fh);
@@ -3411,7 +3486,8 @@ sub on_toggle_code_folding {
 
 	foreach my $editor ( $self->editors ) {
 		$editor->show_folding( $config->editor_folding );
-		$editor->fold_pod if ( $config->editor_folding && $config->editor_fold_pod );
+		$editor->fold_pod
+			if ( $config->editor_folding && $config->editor_fold_pod );
 	}
 
 	$config->write;
@@ -3484,10 +3560,7 @@ Toggle visibility of syntax panel. No return value.
 sub on_toggle_syntax_check {
 	my $self  = shift;
 	my $event = shift;
-	$self->config->set(
-		'main_syntaxcheck',
-		$event->IsChecked ? 1 : 0,
-	);
+	$self->config->set( 'main_syntaxcheck', $event->IsChecked ? 1 : 0, );
 	$self->show_syntax( $self->config->main_syntaxcheck );
 	$self->ide->save_config;
 	return;
@@ -3506,10 +3579,7 @@ Toggle visibility of error-list panel. No return value.
 sub on_toggle_errorlist {
 	my $self  = shift;
 	my $event = shift;
-	$self->config->set(
-		'main_errorlist',
-		$event->IsChecked ? 1 : 0,
-	);
+	$self->config->set( 'main_errorlist', $event->IsChecked ? 1 : 0, );
 	if ( $self->config->main_errorlist ) {
 		$self->errorlist->enable;
 	} else {
@@ -3561,10 +3631,7 @@ sub on_toggle_eol {
 	my $self   = shift;
 	my $config = $self->config;
 
-	$config->set(
-		'editor_eol',
-		$self->menu->view->{eol}->IsChecked ? 1 : 0,
-	);
+	$config->set( 'editor_eol', $self->menu->view->{eol}->IsChecked ? 1 : 0, );
 
 	foreach my $editor ( $self->editors ) {
 		$editor->SetViewEOL( $config->editor_eol );
@@ -3754,12 +3821,8 @@ sub on_insert_from_file {
 		$self->{cwd} = File::Basename::dirname($last_filename);
 	}
 	my $dialog = Wx::FileDialog->new(
-		$self,
-		Wx::gettext('Open file'),
-		$self->cwd,
-		'',
-		'*.*',
-		Wx::wxFD_OPEN,
+		$self, Wx::gettext('Open file'),
+		$self->cwd, '', '*.*', Wx::wxFD_OPEN,
 	);
 	unless (Padre::Constant::WIN32) {
 		$dialog->SetWildcard("*");
@@ -3877,8 +3940,7 @@ sub run_in_padre {
 		Wx::MessageBox(
 			sprintf( Wx::gettext("Error: %s"), $@ ),
 			Wx::gettext("Internal error"),
-			Wx::wxOK,
-			$self,
+			Wx::wxOK, $self,
 		);
 		return;
 	}
@@ -4078,7 +4140,10 @@ sub on_doc_stats {
 		sprintf( Wx::gettext("Chars with spaces: %d"),    $chars_with_space ),
 		sprintf( Wx::gettext("Newline type: %s"),         $newline_type ),
 		sprintf( Wx::gettext("Encoding: %s"),             $encoding ),
-		sprintf( Wx::gettext("Document type: %s"), ( defined ref($doc) ? ref($doc) : Wx::gettext("none") ) ),
+		sprintf(
+			Wx::gettext("Document type: %s"),
+			( defined ref($doc) ? ref($doc) : Wx::gettext("none") )
+		),
 		defined $filename
 		? sprintf( Wx::gettext("Filename: %s"), $filename )
 		: Wx::gettext("No filename"),
@@ -4118,7 +4183,9 @@ sub on_tab_and_space {
 
 	require Padre::Wx::History::TextEntryDialog;
 	my $dialog = Padre::Wx::History::TextEntryDialog->new(
-		$self, Wx::gettext('How many spaces for each tab:'), $title, $type,
+		$self,
+		Wx::gettext('How many spaces for each tab:'),
+		$title, $type,
 	);
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 		return;
@@ -4257,13 +4324,17 @@ sub timer_check_overwrite {
 	my $ret = Wx::MessageBox(
 		$Text,
 		$doc->filename || Wx::gettext("File not in sync"),
-		Wx::wxYES_NO | Wx::wxCENTRE,
-		$self,
+		Wx::wxYES_NO | Wx::wxCENTRE, $self,
 	);
 
 	if ( $ret == Wx::wxYES ) {
 		unless ( $doc->reload ) {
-			$self->error( sprintf( Wx::gettext("Could not reload file: %s"), $doc->errstr ) );
+			$self->error(
+				sprintf(
+					Wx::gettext("Could not reload file: %s"),
+					$doc->errstr
+				)
+			);
 		} else {
 			$doc->editor->configure_editor($doc);
 		}
@@ -4492,7 +4563,13 @@ sub show_as_numbers {
 		# TODO split lines, show location ?
 		foreach my $i ( 0 .. length($text) ) {
 			my $decimal = ord( substr( $text, $i, 1 ) );
-			$output->AppendText( ( $form eq 'decimal' ? $decimal : uc( sprintf( '%0.2x', $decimal ) ) ) . ' ' );
+			$output->AppendText(
+				(     $form eq 'decimal'
+					? $decimal
+					: uc( sprintf( '%0.2x', $decimal ) )
+				)
+				. ' '
+			);
 		}
 	} else {
 		$self->message( Wx::gettext('Need to select text in order to translate to hex') );
@@ -4553,9 +4630,11 @@ sub set_mimetype {
 
 =head3 new_document_from_string
 
-    $main->new_document_from_string( $string );
+    $main->new_document_from_string( $string, $mimetype );
 
 Create a new document in Padre with the string value.
+
+Pass in an optional mime type to have Padre colorize the text correctly.
 
 Note: this method may not belong here...
 
