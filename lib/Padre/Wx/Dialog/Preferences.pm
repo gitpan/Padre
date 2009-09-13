@@ -10,7 +10,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Padre::Wx::Dialog';
 
 =pod
@@ -556,7 +556,7 @@ END_TEXT
 			[ 'Wx::TextCtrl',   'run_script_args_default', $config->run_script_args_default ]
 		],
 		[   [   'Wx::CheckBox', 'run_use_external_window', ( $config->run_use_external_window ? 1 : 0 ),
-				Wx::gettext('Use external window for execution (xterm)')
+				Wx::gettext('Use external window for execution')
 			],
 			[]
 		],

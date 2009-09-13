@@ -55,7 +55,7 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -1588,7 +1588,7 @@ sub on_run_tests {
 	}
 
 	# Find the project
-	my $project_dir = Padre::Util::get_project_dir($filename);
+	my $project_dir = $document->project_dir;
 	unless ($project_dir) {
 		return $self->error( Wx::gettext("Could not find project root") );
 	}
@@ -1596,6 +1596,44 @@ sub on_run_tests {
 	my $dir = Cwd::cwd;
 	chdir $project_dir;
 	$self->run_command("prove -b $project_dir/t");
+	chdir $dir;
+}
+
+=pod
+
+=head3 on_run_this_test
+
+    $main->on_run_this_test;
+
+Callback method, to run the currently open test through prove.
+
+=cut
+
+sub on_run_this_test {
+	my $self     = shift;
+	my $document = $self->current->document;
+	unless ($document) {
+		return $self->error( Wx::gettext("No document open") );
+	}
+
+	# TODO probably should fetch the current project name
+	my $filename = $document->filename;
+	unless ($filename) {
+		return $self->error( Wx::gettext("Current document has no filename") );
+	}
+	unless ( $filename =~ /\.t$/ ) {
+		return $self->error( Wx::gettext("Current document is not a .t file") );
+	}
+
+	# Find the project
+	my $project_dir = $document->project_dir;
+	unless ($project_dir) {
+		return $self->error( Wx::gettext("Could not find project root") );
+	}
+
+	my $dir = Cwd::cwd;
+	chdir $project_dir;
+	$self->run_command("prove -bv $filename");
 	chdir $dir;
 }
 
@@ -1622,7 +1660,7 @@ sub run_command {
 		if (Padre::Util::WIN32) {
 			my $title = $cmd;
 			$title =~ s/"//g;
-			system "start \"$title\" cmd /C \"$cmd\"";
+			system qq(start "$title" cmd /C "$cmd & pause");
 		} else {
 			system qq(xterm -e "$cmd; sleep 1000" &);
 		}
@@ -1638,6 +1676,9 @@ sub run_command {
 	# Prepare the output window for the output
 	$self->show_output(1);
 	$self->output->Remove( 0, $self->output->GetLastPosition );
+
+	# ticket #205, reset output style to neutral
+	$self->output->style_neutral;
 
 	# If this is the first time a command has been run,
 	# set up the ProcessStream bindings.
@@ -2497,7 +2538,7 @@ sub setup_editor {
 	Padre::Util::debug( "setup_editor called for '" . ( $file || '' ) . "'" );
 
 	# These need to be TWO if's, because Cwd::realpath returns undef when opening an non-existent file!
-	if ($file) {
+	if ( $file && -f $file ) {
 		$file = Cwd::realpath($file); # get absolute path
 	}
 	if ($file) {

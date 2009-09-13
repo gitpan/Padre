@@ -13,8 +13,7 @@ BEGIN {
 	$ISCORE  = 1;
 }
 
-
-
+#line 21
 
 
 #####################################################################
@@ -37,20 +36,20 @@ sub mb {
 #####################################################################
 # Testing and Configuration Contexts
 
-#line 49
+#line 54
 
 sub interactive {
 	# Treat things interactively ONLY based on input
 	!! (-t STDIN and ! automated_testing());
 }
 
-#line 67
+#line 72
 
 sub automated_testing {
 	!! $ENV{AUTOMATED_TESTING};
 }
 
-#line 86
+#line 91
 
 sub release_testing {
 	!! $ENV{RELEASE_TESTING};
@@ -67,13 +66,13 @@ sub author_context {
 #####################################################################
 # Operating System Convenience
 
-#line 114
+#line 119
 
 sub win32 {
 	!! ($^O eq 'MSWin32');
 }
 
-#line 131
+#line 136
 
 sub winlike {
 	!! ($^O eq 'MSWin32' or $^O eq 'cygwin');
@@ -81,4 +80,4 @@ sub winlike {
 
 1;
 
-#line 159
+#line 164

@@ -24,7 +24,7 @@ use Padre::Wx                    ();
 use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -92,7 +92,7 @@ sub new {
 	$self->{find_regex} = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext('&Regular Expression'),
+		Wx::gettext('Regular &Expression'),
 	);
 	Wx::Event::EVT_CHECKBOX(
 		$self,
@@ -502,8 +502,6 @@ sub replace_button {
 	my $main   = $self->main;
 	my $config = $self->save;
 
-	$DB::single = 1;
-
 	# Generate the search object
 	my $search = $self->as_search;
 	unless ($search) {
@@ -512,48 +510,65 @@ sub replace_button {
 	}
 
 	# Apply the search to the current editor
-	$main->replace_next($search);
+	# The while is here to support replace_all without duplicate code
+	my $Replace_Count;
+	while ( $main->replace_next($search) ) {
+
+		++$Replace_Count;
+
+		$self->{replace_all}->GetValue or last; # Replace all
+
+	}
 
 	# If we're only searching once, we won't need the dialog any more
-	if ( $config->find_first ) {
+	if ( $Replace_Count and $self->{find_first}->GetValue ) {
 		$self->Hide;
+	} elsif ( $Replace_Count > 1 ) {
+		$main->message(
+			sprintf( Wx::gettext('Replaced %d matches'), $Replace_Count ),
+			Wx::gettext('Search and Replace')
+		);
+	} elsif ( $Replace_Count == 0 ) {
+		$main->message( Wx::gettext('No matches found'), Wx::gettext('Search and Replace') );
 	}
 
 	return;
 }
 
-=pod
-
-=head2 replace_all
-
-  $self->replace_all;
-
-Executed when Replace All button is clicked.
-
-Replace all appearances of given string in the current document.
-
-=cut
-
-sub replace_all {
-	my $self   = shift;
-	my $main   = $self->main;
-	my $config = $self->save;
-
-	# Generate the search object
-	my $search = $self->as_search;
-	unless ($search) {
-		$main->error("Not a valid search");
-		return;
-	}
-
-	# Apply the search to the current editor
-	$main->replace_all($search);
-
-	# Close the dialog
-	$self->Hide;
-
-	return;
-}
+# TODO: This function doesn't seem to work anymore, so it's now scheduled for removal
+#       It's still here because it's unclear if there may be references to it.
+#=pod
+#
+#=head2 replace_all
+#
+#  $self->replace_all;
+#
+#Executed when Replace All button is clicked.
+#
+#Replace all appearances of given string in the current document.
+#
+#=cut
+#
+#sub replace_all {
+#	my $self   = shift;
+#	my $main   = $self->main;
+#	my $config = $self->save;
+#
+#	# Generate the search object
+#	my $search = $self->as_search;
+#	unless ($search) {
+#		$main->error("Not a valid search");
+#		return;
+#	}
+#
+#	# Apply the search to the current editor
+#	$main->replace_all($search);
+#
+#	# Close the dialog
+#	$self->Hide;
+#
+#	return;
+#}
 
 
 

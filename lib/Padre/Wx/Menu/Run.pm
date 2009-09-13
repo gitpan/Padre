@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -68,12 +68,22 @@ sub new {
 			$_[0]->on_run_tests;
 		},
 	);
+
+	$self->{run_this_test} = $self->add_menu_item(
+		$self,
+		name       => 'run.run_this_test',
+		label      => Wx::gettext('Run This Test'),
+		menu_event => sub {
+			$_[0]->on_run_this_test;
+		},
+	);
+
 	$self->AppendSeparator;
 
 	$self->{stop} = $self->add_menu_item(
 		$self,
 		name       => 'run.stop',
-		label      => Wx::gettext('Run Tests'),
+		label      => Wx::gettext('Stop execution'),
 		shortcut   => 'F6',
 		menu_event => sub {
 			if ( $_[0]->{command} ) {
@@ -108,6 +118,11 @@ sub refresh {
 	);
 	$self->{run_tests}->Enable(
 		  $document
+		? $self->{run_command}->IsEnabled
+		: 0
+	);
+	$self->{run_this_test}->Enable(
+		  $document && defined( $document->filename ) && $document->filename =~ /\.t$/
 		? $self->{run_command}->IsEnabled
 		: 0
 	);

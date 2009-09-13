@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -207,6 +207,13 @@ sub _setup_events {
 		}
 	);
 
+	Wx::Event::EVT_HTML_LINK_CLICKED(
+		$self,
+		$self->_help_viewer,
+		\&on_link_clicked,
+	);
+
+
 	Wx::Event::EVT_LISTBOX(
 		$self,
 		$self->_list,
@@ -246,7 +253,7 @@ sub showIt {
 #
 # Search for files and cache result
 #
-sub _search() {
+sub _search {
 	my $self = shift;
 
 	# a default..
@@ -303,7 +310,7 @@ sub find_help_topic {
 #
 # Update matches list box from matched files list
 #
-sub _update_list_box() {
+sub _update_list_box {
 	my $self = shift;
 
 	if ( not $self->_index ) {
@@ -334,6 +341,28 @@ sub _update_list_box() {
 	return;
 }
 
+#
+# Called when the user clicks a link in the
+# help viewer HTML window
+#
+sub on_link_clicked {
+	my $self = shift;
+	require URI;
+	my $uri      = URI->new( $_[0]->GetLinkInfo->GetHref );
+	my $linkinfo = $_[0]->GetLinkInfo;
+	my $scheme   = $uri->scheme;
+	if ( $scheme eq 'perldoc' ) {
+
+		# handle 'perldoc' links
+		my $topic = $uri->path;
+		$topic =~ s/^\///;
+		$self->_search_text->SetValue($topic);
+	} else {
+
+		# otherwise, let the default browser handle it...
+		Padre::Wx::launch_browser($uri);
+	}
+}
 
 1;
 

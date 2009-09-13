@@ -9,7 +9,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Padre::Current    ();
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 
 my $categories = {
 	'Dates' => [
@@ -35,7 +35,7 @@ sub get_layout {
 
 	my @layout = (
 		[ [ 'Wx::StaticText', undef, Wx::gettext('Class:') ], [ 'Wx::Choice', '_find_cat_', $cats_list ], ],
-		[   [ 'Wx::StaticText', undef,                 Wx::gettext('SpecialValue:') ],
+		[   [ 'Wx::StaticText', undef,                 Wx::gettext('Special Value:') ],
 			[ 'Wx::Choice',     '_find_specialvalue_', $default_cat_values ],
 		],
 		[ [], [ 'Wx::Button', '_insert_', Wx::gettext('&Insert') ], [ 'Wx::Button', '_cancel_', Wx::wxID_CANCEL ], ],

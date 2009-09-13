@@ -10,7 +10,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # WIN is usually called WIN32, so WIN remains here for backwards compatiblity:
@@ -67,9 +67,12 @@ sub new {
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
 	Wx::Event::EVT_MIDDLE_UP( $self, \&on_middle_up );
 
-	# Smart highlighting...
+	# Smart highlighting:
+	# Selecting a word or small block of text causes all other occurrences to be highlighted
+	# with a round box around each of them
 	my @styles = ();
 	$self->{styles} = \@styles;
+	$self->IndicatorSetStyle( 0, 7 );
 	Wx::Event::EVT_STC_DOUBLECLICK( $self, -1, \&on_smart_highlight_begin );
 	Wx::Event::EVT_LEFT_DOWN( $self, \&on_smart_highlight_end );
 	Wx::Event::EVT_KEY_DOWN( $self, \&on_smart_highlight_end );
@@ -708,23 +711,30 @@ sub on_smart_highlight_begin {
 	my $selection_re     = quotemeta $selection;
 	my $line_count       = $self->GetLineCount;
 
-	for ( my $i = 0; $i < $line_count; $i++ ) {
+	# find matching occurrences
+	foreach my $i ( 0 .. $line_count - 1 ) {
 		my $line_start = $self->PositionFromLine($i);
 		my $line       = $self->GetLine($i);
 		while ( $line =~ /$selection_re/g ) {
 			my $start = $line_start + pos($line) - $selection_length;
 
-			#print "Found $selection at line $i column " . (pos $line) . ", position: $start\n";
 			push @{ $self->{styles} },
 				{
 				start => $start,
 				len   => $selection_length,
 				style => $self->GetStyleAt($start)
 				};
-			$self->StartStyling( $start, 0xFF );
-			$self->SetStyling( $selection_length, 32 );
 		}
 	}
+
+	# smart highlight if there are more than one occurrence...
+	if ( scalar @{ $self->{styles} } > 1 ) {
+		foreach my $style ( @{ $self->{styles} } ) {
+			$self->StartStyling( $style->{start}, 0xFF );
+			$self->SetStyling( $style->{len}, 32 );
+		}
+	}
+
 }
 
 sub on_smart_highlight_end {
@@ -866,7 +876,7 @@ sub on_right_down {
 	my $paste = $menu->Append( Wx::wxID_PASTE, Wx::gettext("&Paste\tCtrl-V") );
 	my $text = $self->get_text_from_clipboard();
 
-	if ( length($text) && $main->notebook->GetPage($id)->CanPaste ) {
+	if ( defined($text) and length($text) && $main->notebook->GetPage($id)->CanPaste ) {
 		Wx::Event::EVT_MENU(
 			$main, # Ctrl-V
 			$paste,
@@ -1222,7 +1232,7 @@ sub fold_pod {
 sub configure_editor {
 	my ( $self, $doc ) = @_;
 
-	my ( $newline_type, $convert_to ) = $doc->newline_type;
+	my $newline_type = $doc->newline_type;
 
 	$self->SetEOLMode( $mode{$newline_type} );
 
@@ -1230,11 +1240,6 @@ sub configure_editor {
 		$self->SetText( $doc->{original_content} );
 	}
 	$self->EmptyUndoBuffer;
-	if ($convert_to) {
-		my $file = $doc->filename;
-		warn "Converting $file to $convert_to";
-		$self->ConvertEOLs( $mode{$newline_type} );
-	}
 
 	$doc->{newline_type} = $newline_type;
 

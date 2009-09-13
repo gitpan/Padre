@@ -1,5 +1,28 @@
 Changes for Perl Application Development and Refactoring Environment
 
+0.46 2009.09.11
+    - Fixed Smart highlighting to show a pale green round box instead of an 
+      ugly squiggle (AZAWAWI)
+    - Run script waits now after completion for key to continue when run in an
+      external win32 window (AZAWAWI).
+    - Padre now supports the following extensions:
+        - For Perl 5, .pmc and .plx (AZAWAWI, SZABGAB)
+        - For Perl 6, .pl6, .pm6, .p6l and .p6m (AZAWAWI)
+    - Help search handles now http:// and perldoc:// links (AZAWAWI)
+    - Enabled "Syntax Check" tab is now shown when there is a problem without
+      losing editor focus (AZAWAWI)
+    - Bundled latest perlopref.pod to gain more Perl operator documentation
+      (AZAWAWI)
+    - Handle "Recent files" Padre crash when it is called with a file that no 
+      longer exists. The entry is deleted and a message box is shown (AZAWAWI)
+    - Added a "extract subroutine" function (RHEBUS)
+    - Handle "Open all Recent Files" Padre crash when setup_editor is called 
+      with a file that no longer exists (AZAWAWI)
+    - Fixed ticket:536 "Padre auto converts EOLs automatically" (AZAWAWI)
+    - Pod::Perldoc 3.15 is required now. Allowing help on $. and similar. (AZAWAWI)
+    - Fixed Arabic/Hebrew developer/translator names in Padre's about box (AZAWAWI)
+    - Bundled more Perl Operators documentation [perlopref.pod] (AZAWAWI, COWENS)
+
 0.45 2009.09.02
     - Disabled 'Test Plugin From Local Dir' menu option until it's properly fixed (GARU)
     - Fixed PluginManager Pod glitch for deprecated Perl5 plugin (ADAMK)

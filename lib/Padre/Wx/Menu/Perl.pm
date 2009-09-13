@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -56,6 +56,17 @@ sub new {
 		},
 	);
 
+	$self->{find_variable} = $self->add_menu_item(
+		$self,
+		name       => 'perl.beginner_check',
+		label      => Wx::gettext('Check for common (beginner) errors'),
+		menu_event => sub {
+			my $doc = $_[0]->current->document;
+			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+			$doc->beginner_check;
+		},
+	);
+
 	$self->AppendSeparator;
 
 	# Perl-Specific Refactoring
@@ -78,6 +89,37 @@ sub new {
 			$dialog->Destroy;
 			return unless defined $replacement;
 			$doc->lexical_variable_replacement($replacement);
+		},
+	);
+
+	$self->{extract_subroutine} = $self->add_menu_item(
+		$self,
+		name       => 'perl.extract_subroutine',
+		label      => Wx::gettext('Extract Subroutine'),
+		menu_event => sub {
+			my $doc    = $_[0]->current->document;
+			my $editor = $doc->editor;
+			my $code   = $editor->GetSelectedText();
+			require Padre::Wx::History::TextEntryDialog;
+			my $dialog = Padre::Wx::History::TextEntryDialog->new(
+				$_[0],
+				Wx::gettext("Please enter a name for the new subroutine"),
+				Wx::gettext("New Subroutine Name"),
+				'$foo',
+			);
+			return if $dialog->ShowModal == Wx::wxID_CANCEL;
+			my $newname = $dialog->GetValue;
+			$dialog->Destroy;
+			return unless defined $newname;
+
+			require Devel::Refactor;
+			my $refactory = Devel::Refactor->new;
+			my ( $new_sub_call, $new_code ) = $refactory->extract_subroutine( $newname, $code, 1 );
+			$editor->BeginUndoAction(); # do the edit atomically
+			$editor->ReplaceSelection($new_sub_call);
+			$editor->DocumentEnd();     # TODO: find a better place to put the new subroutine
+			$editor->AddText($new_code);
+			$editor->EndUndoAction();
 		},
 	);
 

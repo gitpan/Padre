@@ -68,6 +68,7 @@ requires:
   DBI: 1.58
   Data::Dumper: 0
   Devel::Dumpvar: 0.04
+  Devel::Refactor: 0.05
   Digest::MD5: 0
   Encode: 2.26
   ExtUtils::Manifest: 1.56
@@ -106,6 +107,7 @@ requires:
   Pod::Abstract: 0.16
   Pod::Functions: 0
   Pod::POM: 0.17
+  Pod::Perldoc: 3.15
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
   Probe::Perl: 0.01
@@ -128,4 +130,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.45
+version: 0.46

@@ -203,6 +203,7 @@ share/examples/wx/04_button_with_event.pl
 share/examples/wx/05_button_with_event_and_message_box.pl
 share/examples/wx/21_progress_bar.pl
 share/examples/wx/22_notebook.pl
+share/examples/wx/23_menu.pl
 share/examples/wx/30_editor.pl
 share/examples/wx/40_draw.pl
 share/examples/wx/41-drag-image.pl

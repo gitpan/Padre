@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION        = '0.45';
+our $VERSION        = '0.46';
 our @ISA            = 'Padre::Task';
 our $thread_running = 0;
 
@@ -64,7 +64,8 @@ sub run {
 	if ( $self->_skip_using_manifest_skip ) {
 		my $manifest_skip_file = File::Spec->catfile( $self->_directory, 'MANIFEST.SKIP' );
 		if ( -e $manifest_skip_file ) {
-			use ExtUtils::Manifest qw(maniskip);
+			require ExtUtils::Manifest;
+			ExtUtils::Manifest->import(qw(maniskip));
 			my $skip_check = maniskip($manifest_skip_file);
 			my $skip_files = sub {
 				my ( $shortname, $path, $fullname ) = @_;

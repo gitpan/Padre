@@ -10,8 +10,9 @@ use YAML::Tiny      ();
 use Padre::Document ();
 use Padre::Util     ();
 use Padre::Perl     ();
+use Padre::Document::Perl::Beginner;
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Padre::Document';
 
 #####################################################################
@@ -190,11 +191,15 @@ sub get_command {
 		$run_args{$arg} = Padre::DB::History->previous($type) if Padre::DB::History->previous($type);
 	}
 
+	# (Ticket #530) Pack args here, because adding the space later confuses the called Perls @ARGV
+	my $Script_Args = '';
+	$Script_Args = ' ' . $run_args{script} if defined( $run_args{script} ) and ( $run_args{script} ne '' );
+
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
 	return $debug
-		? qq{"$perl" -Mdiagnostics(-traceonly) $run_args{interpreter} "$filename" $run_args{script}}
-		: qq{"$perl" $run_args{interpreter} "$filename" $run_args{script}};
+		? qq{"$perl" -Mdiagnostics(-traceonly) $run_args{interpreter} "$filename"$Script_Args}
+		: qq{"$perl" $run_args{interpreter} "$filename"$Script_Args};
 }
 
 sub pre_process {
@@ -286,6 +291,27 @@ sub _check_syntax_internals {
 		$task->run();
 		return $task->{syntax_check};
 	}
+}
+
+# Run the checks for common beginner errors
+sub beginner_check {
+	my $self = shift;
+
+	# TODO: Make this cool
+	# It isn't, because it should show _all_ warnings instead of one and
+	# it should at least go to the line it's complaining about.
+
+	my $Beginner = Padre::Document::Perl::Beginner->new();
+
+	$Beginner->check( $self->text_get );
+
+	my $Error = $Beginner->error;
+
+	defined($Error) or return 1;
+
+	Padre->ide->wx->main->error( 'Warning: ' . $Error );
+
+	return 1;
 }
 
 sub get_outline {

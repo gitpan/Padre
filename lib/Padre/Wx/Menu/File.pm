@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.45';
+our $VERSION = '0.46';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -389,7 +389,20 @@ sub update_recentfiles {
 				++$idx < 10 ? "&$idx. $file" : "$idx. $file"
 			),
 			sub {
-				$_[0]->setup_editors($file);
+				if ( -f $file ) {
+					$_[0]->setup_editors($file);
+				} else {
+
+					# Handle "File not found" situation
+					Padre::DB::History->delete( 'where name = ? and type = ?', $file, 'files' );
+					$self->update_recentfiles;
+					Wx::MessageBox(
+						sprintf( Wx::gettext("File %s not found."), $file ),
+						Wx::gettext("Open cancelled"),
+						Wx::wxOK,
+						$self->{main},
+					);
+				}
 			},
 		);
 		Padre::Util::debug("Recent entry created for '$file'");
