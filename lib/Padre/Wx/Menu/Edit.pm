@@ -9,8 +9,12 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Padre::Wx::Menu';
+
+
+
+
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -59,6 +63,7 @@ sub new {
 		Wx::gettext("Select"),
 		$edit_select
 	);
+
 	$self->add_menu_item(
 		$edit_select,
 		name       => 'edit.select_all',
@@ -72,6 +77,7 @@ sub new {
 	);
 
 	$edit_select->AppendSeparator;
+
 	$self->add_menu_item(
 		$edit_select,
 		name       => 'edit.mark_selection_start',
@@ -286,17 +292,17 @@ sub new {
 		label      => Wx::gettext('&Toggle Comment'),
 		shortcut   => 'Ctrl-Shift-C',
 		menu_event => sub {
-			Padre::Wx::Main::on_comment_toggle_block(@_);
+			Padre::Wx::Main::on_comment_block( $_[0], 'TOGGLE' );
 		},
 	);
 
-	$self->{comment_out} = $self->add_menu_item(
+	$self->{comment} = $self->add_menu_item(
 		$self,
-		name       => 'edit.comment_out',
+		name       => 'edit.comment',
 		label      => Wx::gettext('&Comment Selected Lines'),
 		shortcut   => 'Ctrl-M',
 		menu_event => sub {
-			Padre::Wx::Main::on_comment_out_block(@_);
+			Padre::Wx::Main::on_comment_block( $_[0], 'COMMENT' );
 		},
 	);
 
@@ -306,9 +312,10 @@ sub new {
 		label      => Wx::gettext('&Uncomment Selected Lines'),
 		shortcut   => 'Ctrl-Shift-M',
 		menu_event => sub {
-			Padre::Wx::Main::on_uncomment_block(@_);
+			Padre::Wx::Main::on_comment_block( $_[0], 'UNCOMMENT' );
 		},
 	);
+
 	$self->AppendSeparator;
 
 	# Conversions and Transforms
@@ -361,7 +368,7 @@ sub new {
 		name       => 'edit.convert_nl_windows',
 		label      => Wx::gettext('EOL to Windows'),
 		menu_event => sub {
-			$_[0]->convert_to("WIN");
+			$_[0]->convert_to('WIN');
 		},
 	);
 
@@ -370,7 +377,7 @@ sub new {
 		name       => 'edit.convert_nl_unix',
 		label      => Wx::gettext('EOL to Unix'),
 		menu_event => sub {
-			$_[0]->convert_to("UNIX");
+			$_[0]->convert_to('UNIX');
 		},
 	);
 
@@ -379,7 +386,7 @@ sub new {
 		name       => 'edit.convert_nl_mac',
 		label      => Wx::gettext('EOL to Mac Classic'),
 		menu_event => sub {
-			$_[0]->convert_to("MAC");
+			$_[0]->convert_to('MAC');
 		},
 	);
 
@@ -560,9 +567,11 @@ sub refresh {
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{join_lines}->Enable($hasdoc);
+
+	$self->{insert_special}->Enable($hasdoc);
 	$self->{snippets}->Enable($hasdoc);
 	$self->{comment_toggle}->Enable($hasdoc);
-	$self->{comment_out}->Enable($hasdoc);
+	$self->{comment}->Enable($hasdoc);
 	$self->{uncomment}->Enable($hasdoc);
 	$self->{convert_encoding_system}->Enable($hasdoc);
 	$self->{convert_encoding_utf8}->Enable($hasdoc);

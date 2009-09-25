@@ -9,7 +9,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Padre::Current    ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 my $categories = {
 	'Dates' => [
@@ -67,8 +67,9 @@ sub dialog {
 }
 
 sub insert_special {
-	my $class  = shift;
-	my $main   = shift;
+	my $class = shift;
+	my $main  = shift;
+	return if not Padre::Current->editor;
 	my $dialog = $class->dialog( $main, {} );
 	$dialog->Show(1);
 	return;

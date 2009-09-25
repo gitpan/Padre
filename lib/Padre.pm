@@ -9,42 +9,24 @@ use utf8;
 
 # Non-Padre modules we need in order to the single-instance
 # check should be loaded early to simplify the load order.
-use Carp          ();
-use Cwd           ();
-use File::Spec    ();
-use File::HomeDir ();
-use List::Util    ();
-use Scalar::Util  ();
-use Getopt::Long  ();
-use YAML::Tiny    ();
-use DBI           ();
-use DBD::SQLite   ();
+use Carp               ();
+use Cwd                ();
+use File::Spec         ();
+use File::HomeDir      ();
+use List::Util         ();
+use Scalar::Util       ();
+use Getopt::Long       ();
+use YAML::Tiny         ();
+use DBI                ();
+use DBD::SQLite        ();
+use Padre::Splash      ();
+use Padre::Util::Win32 ();
 
 # load this before things are messed up to produce versions like '0,76'!
 # TODO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.46';
-
-# Load the splash screen here, before we get bogged
-# down running the database migration scripts.
-# TODO
-# This means we'll splash even if we run the single
-# instance server, but that's better than before.
-# We need it to be even less whacked.
-BEGIN {
-
-	# Display Padre's Splash Screen. It is saved as XPM
-	# as it seems (from wxWidgets documentation) that it
-	# is the most portable format (and we don't need to
-	# call Wx::InitAllImageHeaders() or whatever)
-	# NOTE:
-	# Don't show the splash screen during testing otherwise
-	# it will spoil the flashy surprise when they upgrade.
-	unless ( $ENV{HARNESS_ACTIVE} ) {
-		require Padre::Splash;
-	}
-}
+our $VERSION = '0.47';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -95,6 +77,9 @@ sub new {
 
 	}, $class;
 
+	# Display Padre's Splash Screen.
+	Padre::Splash->show;
+
 	# Save the startup dir before anyone can move us.
 	$self->{original_cwd} = Cwd::cwd();
 
@@ -121,15 +106,15 @@ sub new {
 			my $read = $socket->sysread( $pid, 10 );
 			if ( defined $read and $read == 10 ) {
 
+				# Kill the splash screen
+				Padre::Splash->destroy;
+
 				# Got the single instance PID
 				$pid =~ s/\s+\s//;
 				if (Padre::Constant::WIN32) {
-					require Win32::API;
-					Win32::API->new(
-						'User32.dll',
-						'AllowSetForegroundWindow',
-						'N', 'L',
-					)->Call($pid);
+
+					# The whole Win32-API moved to Padre::Util::Win32:
+					Padre::Util::Win32::AllowSetForegroundWindow($pid);
 				}
 			}
 			foreach my $file (@ARGV) {
@@ -141,6 +126,10 @@ sub new {
 			return 0;
 		}
 	}
+
+	# This allows scripts to detect that it is being executed
+	# within Padre or not
+	$ENV{PADRE_VERSION} = $VERSION;
 
 	# Load a few more bits and pieces now we know
 	# that we'll need them
@@ -182,6 +171,9 @@ sub run {
 	# HACK: Uncomment this to locate difficult-to-find crashes
 	#       that are throw silent exceptions.
 	# $SIG{__DIE__} = sub { print @_; die $_[0] };
+
+	# Kill the splash screen
+	Padre::Splash->destroy;
 
 	# Switch into runtime mode
 	$self->wx->MainLoop;
@@ -233,29 +225,15 @@ Padre - Perl Application Development and Refactoring Environment
 
 Padre is a text editor aimed to be an IDE for Perl.
 
-You should be able to just type in
+After installation you should be able to just type in
 
   padre
 
 and get the editor working.
 
-While I have been using this editor since version 0.01 myself there
-are still lots of missing features.
-
-Not only it is missing several important feature, everything is in
-a constant flux. Menus, shortcuts and the way they work will change
-from version to version.
-
-Configuration options are also changing which means if you configure it in
-one version you might need to configure it again.
-
-Having said that you can already use it for serious editing and you
-can even get involved and add the missing features.
-
-You should also know that I am mostly working on Linux and I
-have been using vi for many years now. This means that I am
-not that familiar with the expectations of people using
-Windows.
+Padre development started in June 2008 and made a lot of progress but
+there are still lots of missing features and the development is still
+very fast.
 
 =head1 Getting Started
 
@@ -328,7 +306,6 @@ B<File/Save As> - Offer the user to select a new filename and save the content u
 B<File/Save All> - Save all the currently opened files.
 
 B<File/Convert> - Convert line endings to Windows, Unix or Mac Classic style.
-(TODO stop the autoconversion of mixed files, just report them.)
 
 B<Files/Recent Files> - a list of recently opened files to open them easily.
 (TODO: update the list when we open a file, not only when opening padre)
@@ -406,7 +383,7 @@ clicking on the application. It should work...
   Run This (F5) - run the current buffer with the current perl
   this currently only works with files with .pl  extensions.
 
-  Run Any (Ctr-F5) - run any external application
+  Run Any (Ctrl-F5) - run any external application
   First time it will prompt you to a command line that you have to
   type in such as
 
@@ -417,6 +394,9 @@ option. Currently Ctrl-F5 does not save any file.
 (This will be added later.)
 
 You can edit the command line using the Run/Setup menu item.
+
+Please Note that you can use C<$ENV{PADRE_VERSION}> to detect whether the script 
+is running inside Padre or not.
 
 =head2 Bookmarks
 
@@ -437,21 +417,24 @@ bookmarks.
 
 =head2 Navigation
 
-  Ctr-1          matching brace
-  Ctr-P          Autocompletition
-  Alt-N          Nth Pane
-  Ctr-TAB        Next Pane
-  Ctr-Shift-TAB  Previous Pane
-  Alt-S          Jump to list of subs window
+  Ctrl-G          Goto Line
+  Ctrl-1          Matching Brace
+  Ctrl-2          Quick Fix
+  Ctrl-.          Next Problem
+  Ctrl-P          Word Auto-completion
+  Alt-N           Nth Pane
+  Ctrl-TAB        Next Pane
+  Ctrl-Shift-TAB  Previous Pane
+  Alt-S           Jump to list of subs window
 
-  Ctr-M Ctr-Shift-M  comment/uncomment selected lines of code
+  Ctrl-M Ctrl-Shift-M  comment/uncomment selected lines of code
 
-  Ctr-H opens a help window where you can see the documentation of
+  Ctrl-H opens a help window where you can see the documentation of
   any perl module. Just use open (in the help window) and type in the name
   of a module.
 
-  Ctr-Shift-H Highlight the name of a module in the editor and then
-  press Ctr-Shift-H. IT will open the help window for the module
+  Ctrl-Shift-H Highlight the name of a module in the editor and then
+  press Ctrl-Shift-H. IT will open the help window for the module
   whose name was highlighted.
 
   In the help window you can also start typing the name of a module. When the
@@ -473,7 +456,7 @@ bookmarks.
 Simple text editors usually only allow you to select contiguous lines of text with your mouse.
 Somtimes, however, it is handy to be able to select a rectangular area of text for more precise
 cutting/copying/pasting or performing search/replace on. You can select a rectangular area in Padre
-by holding down Ctr-Alt whilst selecting text with your mouse.
+by holding down Ctrl-Alt whilst selecting text with your mouse.
 
 For example, imagine you have the following nicely formatted hash assignment in a perl source file:
 

@@ -5,13 +5,14 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
 use Padre::DB       ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
+use Padre::Util     ();
 
 # accessors
 use Class::XSAccessor accessors => {
@@ -81,12 +82,14 @@ sub _on_ok_button_clicked {
 
 			eval { &$event($main); };
 			if ($@) {
+				my $error = $@;
 				Wx::MessageBox(
-					Wx::gettext('Error while trying to perform Padre action'),
+					sprintf( Wx::gettext('Error while trying to perform Padre action: %s'), $error ),
 					Wx::gettext('Error'),
 					Wx::wxOK,
 					$main,
 				);
+				Padre::Util::debug("Error while trying to perform Padre action: $error");
 			} else {
 
 				# And insert a recently used tuple if it is not found
@@ -303,7 +306,7 @@ sub _show_recently_opened_actions() {
 				value => $action->label_text,
 				};
 		} else {
-			warn "action '$action_name' is not defined anymore!";
+			Padre::Util::debug("action '$action_name' is not defined anymore!");
 		}
 	}
 	@recent_actions = sort { $a->{value} cmp $b->{value} } @recent_actions;

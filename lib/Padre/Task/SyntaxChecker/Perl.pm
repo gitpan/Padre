@@ -4,9 +4,11 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Perl                ();
+use Padre::Constant            ();
+use Padre::Util::Win32         ();
 use Padre::Task::SyntaxChecker ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Padre::Task::SyntaxChecker';
 
 use version;
@@ -57,34 +59,65 @@ sub _check_syntax {
 	# Execute the syntax check
 	my $stderr = '';
 	SCOPE: {
+
+		# Create a temporary file with the Perl text
 		require File::Temp;
-		my $file = File::Temp->new;
+		my $file = File::Temp->new( UNLINK => 0 );
 		binmode( $file, ":utf8" );
 		$file->print( $self->{text} );
 		$file->close;
+
+		# Run with console Perl to prevent unexpected results under wperl
 		my @cmd = (
-			Padre::Perl::perl(),
+			Padre::Perl::cperl(),
 		);
+
+		# Append Perl command line options
 		if ( $self->{perl_cmd} ) {
 			push @cmd, @{ $self->{perl_cmd} };
 		}
+
+		# Open a temporary file for standard error redirection
+		my $err = File::Temp->new( UNLINK => 0 );
+		$err->close;
+
+		# Redirect perl's output to temporary file
 		push @cmd,
 			(
 			'-Mdiagnostics',
 			'-c',
 			$file->filename,
+			'2>' . $err->filename,
 			);
-		require Capture::Tiny;
+
+		# We need shell redirection (list context does not give that)
+		my $cmd = join ' ', @cmd;
 
 		# Make sure we execute from the correct directory
 		if ( $self->{cwd} ) {
 			require File::pushd;
 			my $pushd = File::pushd::pushd( $self->{cwd} );
 
-			( undef, $stderr ) = Capture::Tiny::capture( sub { system @cmd; } );
+			if (Padre::Constant::WIN32) {
+				Padre::Util::Win32::ExecuteProcessAndWait( 'cmd.exe', "/C $cmd", 0 );
+			} else {
+				system $cmd;
+			}
 		} else {
-			( undef, $stderr ) = Capture::Tiny::capture( sub { system @cmd; } );
+			if (Padre::Constant::WIN32) {
+				Padre::Util::Win32::ExecuteProcessAndWait( 'cmd.exe', "/C $cmd", 0 );
+			} else {
+				system $cmd;
+			}
 		}
+
+		# Slurp Perl's stderr
+		open my $fh, '<', $err->filename or die $!;
+		local $/ = undef;
+		$stderr = <$fh>;
+
+		# and delete it
+		unlink $err->filename;
 	}
 
 	# Don't really know where that comes from...

@@ -54,8 +54,11 @@ use Padre::Wx::ErrorList      ();
 use Padre::Wx::AuiManager     ();
 use Padre::Wx::FunctionList   ();
 use Padre::Wx::FileDropTarget ();
+use Padre::Wx::Dialog::Text   ();
+use Padre::Wx::Progress       ();
 
-our $VERSION = '0.46';
+
+our $VERSION = '0.47';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -503,7 +506,7 @@ sub load_files {
 		return;
 	}
 
-	# otherwise, an explicit list on the command line overrides configuration
+	# Otherwise, an explicit list on the command line overrides configuration
 	my $files = $ide->{ARGV};
 	if ( Params::Util::_ARRAY($files) ) {
 		$self->setup_editors(@$files);
@@ -526,6 +529,13 @@ sub load_files {
 	# Config setting 'new' means startup with a single new file open
 	if ( $startup eq 'new' ) {
 		$self->setup_editors;
+		return;
+	}
+
+	# Config setting 'session' means: Show the session manager
+	if ( $startup eq 'session' ) {
+		require Padre::Wx::Dialog::SessionManager;
+		Padre::Wx::Dialog::SessionManager->new($self)->show;
 		return;
 	}
 
@@ -1010,6 +1020,22 @@ sub refresh_status {
 
 =pod
 
+=head3 refresh_cursorpos
+
+    $main->refresh_cursorpos;
+
+Force a refresh of the position of the cursor on Padre's status bar.
+
+=cut
+
+sub refresh_cursorpos {
+	my $self = shift;
+	return if $self->no_refresh;
+	$self->GetStatusBar->update_pos( $_[0] or $self->current );
+}
+
+=pod
+
 =head3 refresh_functions
 
     $main->refresh_functions;
@@ -1170,6 +1196,11 @@ sub relocale {
 
 	# Relocale the plugins
 	$self->ide->plugin_manager->relocale;
+
+	# Empty actions to stop getting false warnings about duplicated
+	# actions and shortcuts
+	my %actions = ();
+	$self->ide->actions( \%actions );
 
 	# The menu doesn't support relocale, replace it
 	delete $self->{menu};
@@ -1393,7 +1424,7 @@ sub show_output {
 	$self->config->write;
 
 	if ($on) {
-		$self->bottom->show( $self->output );
+		$self->bottom->show( $self->output, sub { $self->show_output(0); } );
 	} else {
 		$self->bottom->hide( $self->output );
 	}
@@ -1426,7 +1457,7 @@ sub show_syntax {
 	}
 
 	if ($on) {
-		$self->bottom->show($syntax);
+		$self->bottom->show( $syntax, sub { $self->show_syntax(0); } );
 		$syntax->start unless $syntax->running;
 	} else {
 		$self->bottom->hide( $self->syntax );
@@ -1595,7 +1626,24 @@ sub on_run_tests {
 
 	my $dir = Cwd::cwd;
 	chdir $project_dir;
-	$self->run_command("prove -b $project_dir/t");
+	require File::Which;
+	my $prove = File::Which::which('prove');
+	if (Padre::Constant::WIN32) {
+
+		# This is needed since prove does not work with path containing
+		# spaces. Please see ticket:582
+		require File::Temp;
+		require File::Glob::Windows;
+
+		my $tempfile = File::Temp->new( UNLINK => 0 );
+		print $tempfile join( "\n", File::Glob::Windows::glob("$project_dir/t/*.t") );
+		close $tempfile;
+
+		my $things_to_test = $tempfile->filename;
+		$self->run_command(qq{"$prove" - -b < "$things_to_test"});
+	} else {
+		$self->run_command("$prove -b $project_dir/t");
+	}
 	chdir $dir;
 }
 
@@ -1633,7 +1681,22 @@ sub on_run_this_test {
 
 	my $dir = Cwd::cwd;
 	chdir $project_dir;
-	$self->run_command("prove -bv $filename");
+	require File::Which;
+	my $prove = File::Which::which('prove');
+	if (Padre::Constant::WIN32) {
+
+		# This is needed since prove does not work with path containing
+		# spaces. Please see ticket:582
+		require File::Temp;
+		my $tempfile = File::Temp->new( UNLINK => 0 );
+		print $tempfile $filename;
+		close $tempfile;
+
+		my $things_to_test = $tempfile->filename;
+		$self->run_command(qq{"$prove" - -bv < "$things_to_test"});
+	} else {
+		$self->run_command("$prove -bv $filename");
+	}
 	chdir $dir;
 }
 
@@ -1657,7 +1720,7 @@ sub run_command {
 	# the external execution.
 	my $config = $self->config;
 	if ( $config->run_use_external_window ) {
-		if (Padre::Util::WIN32) {
+		if (Padre::Constant::WIN32) {
 			my $title = $cmd;
 			$title =~ s/"//g;
 			system qq(start "$title" cmd /C "$cmd & pause");
@@ -1712,6 +1775,7 @@ sub run_command {
 			sub {
 				$_[1]->Skip(1);
 				$_[1]->GetProcess->Destroy;
+				delete $self->{command};
 				$self->menu->run->enable;
 				$_[0]->errorlist->populate;
 			},
@@ -1834,8 +1898,8 @@ sub debug_perl {
 	# $self->_setup_debugger($host, $port);
 	local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
 
-	# Run with the same Perl that launched Padre
-	my $perl = Padre::Perl::perl();
+	# Run with console Perl to prevent unexpected results under wperl
+	my $perl = Padre::Perl::cperl();
 	$self->run_command(qq["$perl" -d "$filename"]);
 
 }
@@ -1898,26 +1962,43 @@ sub open_session {
 	# prevent redrawing until we're done
 	$self->Freeze;
 
-	# Close all files
-	$self->close_all;
-
 	# get list of files in the session
 	my @files = $session->files;
 	return unless @files;
 
+	my $progress = Padre::Wx::Progress->new(
+		$self,
+		sprintf(
+			Wx::gettext('Opening session %s...'),
+			$session->name,
+		),
+		$#files + 1,
+		lazy => 1
+	);
+
+	# Close all files
+	# This takes some time, so do it after the progress dialog was displayed
+	$self->close_all;
+
 	# opening documents
 	my $focus    = undef;
 	my $notebook = $self->notebook;
-	foreach my $document (@files) {
+	foreach my $file_no ( 0 .. $#files ) {
+		my $document = $files[$file_no];
+		$progress->update( $file_no, $document->file );
 		Padre::Util::debug( "Opening '" . $document->file . "' for $document" );
 		my $filename = $document->file;
-		next unless -f $filename;
+		my $file     = Padre::File->new($filename);
+		next unless defined($file);
+		next unless $file->exists;
 		my $id = $self->setup_editor($filename);
 		next unless $id; # documents already opened have undef $id
 		Padre::Util::debug("Setting focus on $filename");
 		$focus = $id if $document->focus;
 		$notebook->GetPage($id)->goto_pos_centerize( $document->position );
 	}
+
+	$progress->update( $#files + 1, Wx::gettext('Restore focus...') );
 	$self->on_nth_pane($focus) if defined $focus;
 
 	# now we can redraw
@@ -2184,70 +2265,53 @@ sub on_brace_matching {
 
 =pod
 
-=head3 on_comment_toggle_block
+=head3 on_comment_block
 
-    $main->on_comment_toggle_block;
+    $main->on_comment_block;
 
-Un/comment selected lines, depending on their current state.
+Performs one of the following depending the given operation
 
-=cut
+=over 4
 
-sub on_comment_toggle_block {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $editor   = $current->editor;
-	my $document = $current->document;
-	my $begin    = $editor->LineFromPosition( $editor->GetSelectionStart );
-	my $end      = $editor->LineFromPosition( $editor->GetSelectionEnd );
-	my $string   = $document->comment_lines_str;
-	return unless defined $string;
-	$editor->comment_toggle_lines( $begin, $end, $string );
-	return;
-}
+=item * Uncomment or comment selected lines, depending on their current state.
 
-=pod
+=item * Comment out selected lines unilateraly.
 
-=head3 on_comment_out_block
+=item * Uncomment selected lines unilateraly.
 
-    $main->on_comment_out_block;
-
-Comment out selected lines unilateraly.
+=back
 
 =cut
 
-sub on_comment_out_block {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $editor   = $current->editor;
-	my $document = $current->document;
-	my $begin    = $editor->LineFromPosition( $editor->GetSelectionStart );
-	my $end      = $editor->LineFromPosition( $editor->GetSelectionEnd );
-	my $string   = $document->comment_lines_str;
+sub on_comment_block {
+	my ( $self, $operation ) = @_;
+	my $current         = $self->current;
+	my $editor          = $current->editor or return;
+	my $document        = $current->document;
+	my $selection_start = $editor->GetSelectionStart;
+	my $selection_end   = $editor->GetSelectionEnd;
+	my $length          = length $document->text_get;
+	my $begin           = $editor->LineFromPosition($selection_start);
+	my $end             = $editor->LineFromPosition($selection_end);
+	my $string          = $document->comment_lines_str;
 	return unless defined $string;
-	$editor->comment_lines( $begin, $end, $string );
-	return;
-}
 
-=pod
+	if ( $operation eq 'TOGGLE' ) {
+		$editor->comment_toggle_lines( $begin, $end, $string );
+	} elsif ( $operation eq 'COMMENT' ) {
+		$editor->comment_lines( $begin, $end, $string );
+	} elsif ( $operation eq 'UNCOMMENT' ) {
+		$editor->uncomment_lines( $begin, $end, $string );
+	} else {
+		Padre::Util::debug("Invalid comment operation '$operation'");
+	}
 
-=head3 on_uncomment_block
-
-    $main->on_uncomment_block;
-
-Uncomment selected lines unilateraly.
-
-=cut
-
-sub on_uncomment_block {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $editor   = $current->editor;
-	my $document = $current->document;
-	my $begin    = $editor->LineFromPosition( $editor->GetSelectionStart );
-	my $end      = $editor->LineFromPosition( $editor->GetSelectionEnd );
-	my $string   = $document->comment_lines_str;
-	return unless defined $string;
-	$editor->uncomment_lines( $begin, $end, $string );
+	if ( $selection_end > $selection_start ) {
+		$editor->SetSelection(
+			$selection_start,
+			$selection_end + ( length $document->text_get ) - $length
+		);
+	}
 	return;
 }
 
@@ -2356,6 +2420,30 @@ sub on_close_window {
 			unless ($closed) {
 
 				# They cancelled at some point
+				$event->Veto;
+				return;
+			}
+		}
+
+		# Make sure the user is aware of any rogue processes he might have ran
+		if ( $self->{command} ) {
+			my $ret = Wx::MessageBox(
+				Wx::gettext("You still have a running process. Do you to kill it and exit?"),
+				Wx::gettext("Warning"),
+				Wx::wxYES_NO | Wx::wxCENTRE,
+				$self,
+			);
+
+			if ( $ret == Wx::wxYES ) {
+				if ( $self->{command} ) {
+					if (Padre::Constant::WIN32) {
+						$self->{command}->KillProcess;
+					} else {
+						$self->{command}->TerminateProcess;
+					}
+					delete $self->{command};
+				}
+			} else {
 				$event->Veto;
 				return;
 			}
@@ -2548,28 +2636,26 @@ sub setup_editor {
 			return;
 		}
 
+		# Scheduled for removal: This is done by document->new later and should be
+		# in only one place, please re-enable it and remove this comment if you think
+		# it should stay:
 		# if file does not exist, create it so that future access
 		# (such as size checking) won't warn / blow up padre
-		if ( not -f $file ) {
-			open my $fh, '>', $file;
-			close $fh;
-		}
-		if ( -s $file > $config->editor_file_size_limit ) {
-			return $self->error(
-				sprintf(
-					Wx::gettext(
-						"Cannot open %s as it is over the arbitrary file size limit of Padre which is currently %s"
-					),
-					$file,
-					$config->editor_file_size_limit
-				)
-			);
-		}
+		#		if ( not -f $file ) {
+		#			open my $fh, '>', $file;
+		#			close $fh;
+		#		}
+
 	}
 
 	local $self->{_no_refresh} = 1;
 
 	my $doc = Padre::Document->new( filename => $file, );
+
+	# Catch critical errors:
+	if ( !defined($doc) ) {
+		return;
+	}
 
 	$file ||= ''; #to avoid warnings
 	if ( $doc->errstr ) {
@@ -2636,6 +2722,7 @@ Create a new tab in the notebook, and return its id (an integer).
 
 sub create_tab {
 	my ( $self, $editor, $title ) = @_;
+	$title ||= '(' . Wx::gettext('Unknown') . ')';
 	$self->notebook->AddPage( $editor, $title, 1 );
 	$editor->SetFocus;
 	my $id = $self->notebook->GetSelection;
@@ -2774,6 +2861,29 @@ sub on_open_all_recent_files {
 	# debatable: "reverse" keeps order in "recent files" submenu
 	# but editor tab ordering may "feel" wrong
 	$_[0]->setup_editors( reverse @$files );
+}
+
+=pod
+
+=head3 on_open_url
+
+    $main->on_open_url;
+
+Prompt user for URL to open and open it as a new tab.
+
+Should be merged with ->on_open or at least a browsing function
+should be added.
+
+=cut
+
+sub on_open_url {
+	require Padre::Wx::Dialog::OpenURL;
+	my $self = shift;
+	my $url  = Padre::Wx::Dialog::OpenURL->modal($self);
+	unless ( defined $url ) {
+		return;
+	}
+	$self->setup_editor($url);
 }
 
 =pod
@@ -3213,11 +3323,20 @@ sub close_all {
 	my $self  = shift;
 	my $skip  = shift;
 	my $guard = $self->freezer;
-	foreach my $id ( reverse $self->pageids ) {
-		if ( defined $skip and $skip == $id ) {
+
+	my @pages = reverse $self->pageids;
+
+	my $progress = Padre::Wx::Progress->new(
+		$self, Wx::gettext('Close all'), $#pages,
+		lazy => 1
+	);
+
+	foreach my $no ( 0 .. $#pages ) {
+		$progress->update( $no, ( $no + 1 ) . '/' . scalar(@pages) );
+		if ( defined $skip and $skip == $pages[$no] ) {
 			next;
 		}
-		$self->close($id) or return 0;
+		$self->close( $pages[$no] ) or return 0;
 	}
 	$self->refresh;
 	return 1;
@@ -3896,10 +4015,11 @@ sub convert_to {
 	my $newline = shift;
 	my $current = $self->current;
 	my $editor  = $current->editor;
-	SCOPE: {
-		no warnings 'once'; # TODO eliminate?
-		$editor->ConvertEOLs( $Padre::Wx::Editor::mode{$newline} );
-	}
+
+	# Convert and Set the EOL mode for pastes to work correctly
+	my $eol_mode = $Padre::Wx::Editor::mode{$newline};
+	$editor->ConvertEOLs($eol_mode);
+	$editor->SetEOLMode($eol_mode);
 
 	# TODO: include the changing of file type in the undo/redo actions
 	# or better yet somehow fetch it from the document when it is needed.
@@ -4063,7 +4183,9 @@ sub on_stc_update_ui {
 	# TODO maybe we should refresh it on every 20s hit or so
 	# $self->refresh_menu;
 	$self->refresh_toolbar($current);
-	$self->refresh_status($current);
+
+	#	$self->refresh_status($current);
+	$self->refresh_cursorpos($current);
 
 	# $self->refresh_functions;
 	# $self->refresh_syntaxcheck;

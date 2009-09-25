@@ -51,7 +51,7 @@ use Class::XSAccessor accessors => {
 	_task_width  => '_task_width',  # Current width of task field
 };
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::StatusBar
@@ -166,7 +166,9 @@ sub refresh {
 		$filename
 		? File::Basename::basename($filename)
 		: substr( $old, 1 );
-	my $modified       = $editor->GetModify ? '*' : ' ';
+	$self->{_last_editor}   = $editor;
+	$self->{_last_modified} = $editor->GetModify;
+	my $modified       = $self->{_last_modified} ? '*' : ' ';
 	my $title          = $modified . $text;
 	my $position       = $editor->GetCurrentPos;
 	my $line           = $editor->GetCurrentLine;
@@ -199,7 +201,7 @@ sub refresh {
 		-1,
 		$self->_task_width,
 		( length($highlighter) + 2 ) * $width,
-		( length($mime_type_name) ) * $width,
+		( length($mime_type_name) + 2 ) * $width,
 		( length($newline) + 2 ) * $width,
 		( $length + 2 ) * $width,
 	);
@@ -256,6 +258,53 @@ sub update_task_status {
 	);
 	$sbmp->Show;
 	$self->_task_width(20);
+}
+
+=pod
+
+=head2 update_pos
+
+    $statusbar->update_pos;
+
+Update the cursor position
+
+=cut
+
+sub update_pos {
+	my $self = shift;
+
+	my $current  = $self->current;
+	my $editor   = $current->editor or return $self->clear;
+	my $position = $editor->GetCurrentPos;
+
+	# Skip expensive update if there is nothing to update:
+	return if defined( $self->{Last_Pos} ) and ( $self->{Last_Pos} == $position );
+
+	# Detect modification:
+	unless (defined( $self->{_last_editor} )
+		and ( $self->{_last_editor} eq $editor )
+		and defined( $self->{_last_modified} )
+		and ( $self->{_last_modified} == $editor->GetModify ) )
+	{
+
+		# Either the tab has changed or the file has been modified:
+		$self->refresh;
+
+	}
+
+	$self->{Last_Pos} = $position;
+
+	my $line    = $editor->GetCurrentLine;
+	my $start   = $editor->PositionFromLine($line);
+	my $lines   = $editor->GetLineCount;
+	my $char    = $position - $start;
+	my $percent = int( 100 * $line / $lines );
+
+	my $format = '%' . length( $lines + 1 ) . 's,%-3s %3s%%';
+	my $postring = sprintf( $format, ( $line + 1 ), $char, $percent );
+
+	$self->SetStatusText( $postring, POSTRING );
+
 }
 
 #####################################################################

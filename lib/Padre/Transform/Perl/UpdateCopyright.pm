@@ -34,7 +34,7 @@ use Params::Util qw{ _STRING };
 use Padre::Current         ();
 use Padre::Transform::Perl ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Padre::Transform::Perl';
 
 #####################################################################
@@ -91,7 +91,7 @@ sub name {
 
 sub document {
 	my $self = shift;
-	my $document = _INSTANCE( shift, 'PPI::Document' ) or return undef;
+	my $document = _INSTANCE( shift, 'PPI::Document' ) or return;
 
 	# Find things to transform
 	my $name     = quotemeta $self->name;

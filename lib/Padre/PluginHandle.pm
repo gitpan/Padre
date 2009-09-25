@@ -8,7 +8,7 @@ use Padre::Current ();
 use Padre::Locale  ();
 use Params::Util qw{ _STRING _IDENTIFIER _CLASS _INSTANCE };
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use overload
 	'bool' => sub () {1},
@@ -147,7 +147,7 @@ sub plugin_icon {
 	if ( _INSTANCE( $icon, 'Wx::Bitmap' ) ) {
 		return $icon;
 	} else {
-		return undef;
+		return;
 	}
 }
 
@@ -305,7 +305,7 @@ sub disable {
 # Support Methods
 
 sub _STATUS {
-	_STRING( $_[0] ) or return undef;
+	_STRING( $_[0] ) or return;
 	return {
 		error        => 1,
 		unloaded     => 1,

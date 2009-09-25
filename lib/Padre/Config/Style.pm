@@ -9,7 +9,7 @@ use Carp ();
 use Params::Util qw{ _IDENTIFIER _HASH };
 use YAML::Tiny ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 ######################################################################
 # Constructor
@@ -38,7 +38,7 @@ sub load {
 	my $data = eval { YAML::Tiny::LoadFile($file); };
 	if ($@) {
 		warn $@;
-		return undef;
+		return;
 	}
 
 	# Create the style

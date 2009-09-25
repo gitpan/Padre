@@ -23,7 +23,7 @@ use File::Basename ();
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 #####################################################################
 # Document Registration
@@ -503,8 +503,8 @@ sub get_mime_type_names {
 # given a mime-type
 # return its display-name
 sub get_mime_type_name {
-	my $self      = shift;
-	my $mime_type = shift;
+	my $self = shift;
+	my $mime_type = shift || '';
 	return $MIME_TYPES{$mime_type}{name};
 }
 
@@ -538,9 +538,29 @@ sub get_highlighters_of_mime_type_name {
 # innappropriate just to get them out of here.
 
 sub _guess_mimetype {
-	my $self     = shift;
-	my $text     = shift;
-	my $filename = shift;
+	warn join( ',', caller ) . ' called MimeTypes::_guess_mimetype which is depreached, use ::guess_mimetype!';
+	return $_[0]->guess_mimetype(@_);
+}
+
+sub guess_mimetype {
+	my $self = shift;
+	my $text = shift;
+	my $file = shift; # Could be a filename or a Padre::File - object
+
+	my $filename;
+
+	if ( ref($file) ) {
+		$filename = $file->{Filename};
+
+		# Combining this to one line would check if the method ->mime exists, not the result!
+		my $MIME = $file->mime;
+		defined($MIME) and return $MIME;
+
+	} else {
+		$filename = $file;
+		undef $file;
+	}
+
 
 	# Try derive the mime type from the file extension
 	if ( $filename and $filename =~ /\.([^.]+)$/ ) {

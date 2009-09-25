@@ -7,8 +7,9 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx         ();
 use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
+use Padre::Constant();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Wx::ToolBar';
 
 # NOTE: Something is wrong with dockable toolbars on Windows
@@ -155,6 +156,18 @@ sub new {
 		icon   => 'status/info',
 	);
 
+	$self->AddSeparator;
+
+	$self->{run} = $self->add_tool_item(
+		action => 'run.run_document',
+		icon   => 'actions/player_play',
+	);
+
+	$self->{stop} = $self->add_tool_item(
+		action => 'run.stop',
+		icon   => 'actions/stop',
+	);
+
 	return $self;
 }
 
@@ -217,6 +230,9 @@ sub refresh {
 	$self->EnableTool( $self->{replace},        ( $editor   ? 1 : 0 ) );
 	$self->EnableTool( $self->{comment_toggle}, ( $document ? 1 : 0 ) );
 	$self->EnableTool( $self->{doc_stat},       ( $editor   ? 1 : 0 ) );
+
+	$self->EnableTool( $self->{run},  ( $document and not $self->GetParent->{command} ) ? 1 : 0 );
+	$self->EnableTool( $self->{stop}, ( $document and $self->GetParent->{command} )     ? 1 : 0 );
 
 	return;
 }

@@ -32,7 +32,7 @@ use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 use Class::XSAccessor getters => {
 	find_term    => 'find_term',
@@ -52,7 +52,7 @@ sub new {
 	unless ( length $self->find_term ) {
 
 		# Pointless zero-length search
-		return undef;
+		return;
 	}
 	unless ( defined $self->find_case ) {
 		$self->{find_case} = $self->config->find_case;
@@ -290,6 +290,7 @@ sub editor_replace_all {
 	my ( undef, undef, @matches ) = $self->matches(
 		$editor->GetTextRange( 0, $editor->GetLength ),
 		$self->search_regex,
+		$editor->GetSelection
 	);
 
 	# Replace all matches as a single undo

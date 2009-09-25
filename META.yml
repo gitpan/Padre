@@ -8,7 +8,7 @@ build_requires:
   Test::Exception: 0.27
   Test::More: 0.88
   Test::NoWarnings: 0.084
-  Test::Script: 1.03
+  Test::Script: 1.05
 configure_requires:
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
@@ -57,7 +57,6 @@ no_index:
     - xt
 requires:
   App::Ack: 1.86
-  Capture::Tiny: 0.06
   Carp: 0
   Class::Adapter: 1.05
   Class::Unload: 0.03
@@ -83,7 +82,7 @@ requires:
   File::ShareDir: 1.00
   File::Spec: 3.2701
   File::Spec::Functions: 3.2701
-  File::Which: 0.05
+  File::Which: 1.08
   FindBin: 0
   Getopt::Long: 0
   HTML::Entities: 3.57
@@ -100,7 +99,7 @@ requires:
   ORLite::Migrate: 0.03
   POSIX: 0
   PPI: 1.205
-  PPIx::EditorTools: 0.08
+  PPIx::EditorTools: 0.09
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
   Parse::ExuberantCTags: 1.00
@@ -125,9 +124,10 @@ requires:
   pip: 0.13
   threads: 1.71
   threads::shared: 1.26
+  version: 0
 resources:
   bugtracker: http://padre.perlide.org/trac/
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.46
+version: 0.47

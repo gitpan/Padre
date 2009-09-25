@@ -10,7 +10,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Padre::Wx::Dialog';
 
 =pod
@@ -377,6 +377,8 @@ sub _appearance_panel {
 
 	$preview_sizer->Add( $notebook, 1, Wx::wxGROW, 5 );
 
+	# These options are only configurable after adding func_config: 1 to the
+	# config.yml - file to advoid overloading the Preferences dialog:
 	if ( $config->func_config ) {
 
 		my @table2 =
@@ -775,7 +777,7 @@ sub run {
 	my $main_startup       = $config->main_startup;
 	my @main_startup_items = (
 		$main_startup,
-		grep { $_ ne $main_startup } qw{new nothing last}
+		grep { $_ ne $main_startup } qw{new nothing last session}
 	);
 	my @main_startup_localized = map { Wx::gettext($_) } @main_startup_items;
 
@@ -803,7 +805,7 @@ sub run {
 	my $default_line_ending       = $config->default_line_ending;
 	my @default_line_ending_items = (
 		$default_line_ending,
-		grep { $_ ne $default_line_ending } qw{WIN32 MAC UNIX}
+		grep { $_ ne $default_line_ending } qw{WIN MAC UNIX}
 	);
 	my @default_line_ending_localized = map { Wx::gettext($_) } @default_line_ending_items;
 
@@ -930,11 +932,17 @@ sub run {
 		$data->{autocomplete_multiclosebracket} ? 1 : 0
 	);
 
-	for (@Func_List) {
-		$config->set(
-			'func_' . $_->[0],
-			$data->{ 'func_' . $_->[0] } ? 1 : 0
-		);
+	# Don't save options which are not shown as this may result in
+	# clearing them:
+	if ( $config->func_config ) {
+
+		for (@Func_List) {
+			$config->set(
+				'func_' . $_->[0],
+				$data->{ 'func_' . $_->[0] } ? 1 : 0
+			);
+		}
+
 	}
 
 	# Quite like in _run_params_panel, trap exception if there

@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -100,6 +100,27 @@ sub new {
 		},
 	);
 
+	$self->add_menu_item(
+		$self,
+		name  => 'file.openurl',
+		label => Wx::gettext('Open &URL...'),
+
+		# Is shown as Ctrl-O and I don't know why
+		# shortcut => 'Ctrl-Shift-O',
+		menu_event => sub {
+			$_[0]->on_open_url;
+		},
+	);
+
+	$self->{open_example} = $self->add_menu_item(
+		$self,
+		name       => 'file.open_example',
+		label      => Wx::gettext('Open Example'),
+		menu_event => sub {
+			$_[0]->on_open_example;
+		},
+	);
+
 	$self->{close} = $self->add_menu_item(
 		$self,
 		name       => 'file.close',
@@ -119,26 +140,6 @@ sub new {
 		Wx::gettext("Close..."),
 		$file_close,
 	);
-
-	$self->{close_all} = $self->add_menu_item(
-		$file_close,
-		name       => 'file.close_all',
-		label      => Wx::gettext('Close All Files'),
-		menu_event => sub {
-			$_[0]->close_all;
-		},
-	);
-
-	$self->{close_all_but_current} = $self->add_menu_item(
-		$file_close,
-		name       => 'file.close_all_but_current',
-		label      => Wx::gettext('Close All Other Files'),
-		menu_event => sub {
-			$_[0]->close_all( $_[0]->notebook->GetSelection );
-		},
-	);
-
-	$file_close->AppendSeparator;
 
 	$self->{close_current_project} = $self->add_menu_item(
 		$file_close,
@@ -180,21 +181,32 @@ sub new {
 		},
 	);
 
+	$file_close->AppendSeparator;
+
+	$self->{close_all} = $self->add_menu_item(
+		$file_close,
+		name       => 'file.close_all',
+		label      => Wx::gettext('Close All Files'),
+		menu_event => sub {
+			$_[0]->close_all;
+		},
+	);
+
+	$self->{close_all_but_current} = $self->add_menu_item(
+		$file_close,
+		name       => 'file.close_all_but_current',
+		label      => Wx::gettext('Close All Other Files'),
+		menu_event => sub {
+			$_[0]->close_all( $_[0]->notebook->GetSelection );
+		},
+	);
+
 	$self->{reload_file} = $self->add_menu_item(
 		$self,
 		name       => 'file.reload_file',
 		label      => Wx::gettext('Reload File'),
 		menu_event => sub {
 			$_[0]->on_reload_file;
-		},
-	);
-
-	$self->{open_example} = $self->add_menu_item(
-		$self,
-		name       => 'file.open_example',
-		label      => Wx::gettext('Open Example'),
-		menu_event => sub {
-			$_[0]->on_open_example;
 		},
 	);
 
@@ -211,6 +223,7 @@ sub new {
 			$_[0]->on_save;
 		},
 	);
+
 	$self->{save_as} = $self->add_menu_item(
 		$self,
 		name       => 'file.save_as',
@@ -221,6 +234,7 @@ sub new {
 			$_[0]->on_save_as;
 		},
 	);
+
 	$self->{save_all} = $self->add_menu_item(
 		$self,
 		name       => 'file.save_all',

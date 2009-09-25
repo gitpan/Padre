@@ -68,6 +68,9 @@ lib/Padre/Document/Perl/Beginner.pm
 lib/Padre/Document/Perl/Lexer.pm
 lib/Padre/Document/Perl/PPILexer.pm
 lib/Padre/Document/POD.pm
+lib/Padre/File.pm
+lib/Padre/File/HTTP.pm
+lib/Padre/File/Local.pm
 lib/Padre/HelpProvider.pm
 lib/Padre/HelpProvider/Perl.pm
 lib/Padre/Locale.pm
@@ -119,6 +122,7 @@ lib/Padre/Transform.pm
 lib/Padre/Transform/Perl.pm
 lib/Padre/Transform/Perl/UpdateCopyright.pm
 lib/Padre/Util.pm
+lib/Padre/Util/Win32.pm
 lib/Padre/Wx.pm
 lib/Padre/Wx/About.pm
 lib/Padre/Wx/Ack.pm
@@ -135,6 +139,7 @@ lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/OpenResource.pm
+lib/Padre/Wx/Dialog/OpenURL.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
@@ -178,6 +183,7 @@ lib/Padre/Wx/Output.pm
 lib/Padre/Wx/PodFrame.pm
 lib/Padre/Wx/Popup.pm
 lib/Padre/Wx/Printout.pm
+lib/Padre/Wx/Progress.pm
 lib/Padre/Wx/Right.pm
 lib/Padre/Wx/RightClick.pm
 lib/Padre/Wx/Role/MainChild.pm
@@ -195,7 +201,9 @@ padre.yml
 privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
+script/padre.exe
 share/doc/perlopref.pod
+share/examples/absolute_beginner/01_hello_world.pl
 share/examples/wx/01_simple_frame.pl
 share/examples/wx/02_label.pl
 share/examples/wx/03_button.pl
@@ -226,7 +234,9 @@ share/icons/gnome218/16x16/actions/edit-select-all.png
 share/icons/gnome218/16x16/actions/edit-undo.png
 share/icons/gnome218/16x16/actions/go-next.png
 share/icons/gnome218/16x16/actions/go-previous.png
+share/icons/gnome218/16x16/actions/player_play.png
 share/icons/gnome218/16x16/actions/stock_data-save.png
+share/icons/gnome218/16x16/actions/stop.png
 share/icons/gnome218/16x16/places/folder-saved-search.png
 share/icons/gnome218/16x16/places/stock_folder.png
 share/icons/gnome218/16x16/status/info.png
@@ -302,6 +312,7 @@ t/08-style.t
 t/10-copyright.t
 t/11-badcode.t
 t/12.pragmas.t
+t/13-eol.t
 t/50-docbrowser.t
 t/60-db.t
 t/70-document.t
@@ -316,6 +327,8 @@ t/84-task.t
 t/85-task-manager.t
 t/86-service.t
 t/91-vi.t
+t/92-padre-file.t
+t/93-padre-filename-win.t
 t/collection/Config-Tiny/Changes
 t/collection/Config-Tiny/lib/Config/Tiny.pm
 t/collection/Config-Tiny/Makefile.PL
@@ -327,6 +340,7 @@ t/collection/Padre-Null/padre.yml
 t/files/beginner/boolean_expression_or.pl
 t/files/beginner/boolean_expression_pipes.pl
 t/files/beginner/chomp.pl
+t/files/beginner/else_if.pl
 t/files/beginner/grep_always_true.pl
 t/files/beginner/match_default_scalar.pl
 t/files/beginner/my_argv.pl
@@ -341,6 +355,7 @@ t/files/error_stack.pl
 t/files/find_variable_declaration_1.pm
 t/files/find_variable_declaration_2.pm
 t/files/hello_with_warn.pl
+t/files/lexically_rename_variable.pl
 t/files/missing_brace_1.pl
 t/files/missing_semicolon.pl
 t/files/no_strict.pl
@@ -363,4 +378,5 @@ xt/95_critic.t
 xt/97_meta.t
 xt/98_pod.t
 xt/99_pmv.t
+xt/critic.ini
 xt/files/lexical_replace_stress_test.pl

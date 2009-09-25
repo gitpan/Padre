@@ -22,7 +22,7 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -178,6 +178,7 @@ setting(
 		'last'    => _T('Previous open files'),
 		'new'     => _T('A new empty file'),
 		'nothing' => _T('No open files'),
+		'session' => _T('Open session'),
 	],
 );
 

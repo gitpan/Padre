@@ -24,7 +24,7 @@ use Padre::Wx                    ();
 use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -497,6 +497,12 @@ again.
 
 =cut
 
+# TODO: The change to this function that turned it into a dual-purpose function
+#       unintentionally transfered responsibility for the implementation of
+#       "Replace All" from the main class to a dialog class.
+#       This was a mistake, the dialog should not be where this is implemented.
+#       Revert this change and restore the independant "Replace All" code, so
+#       that the dialog goes back to acting only as controller.
 sub replace_button {
 	my $self   = shift;
 	my $main   = $self->main;
@@ -509,15 +515,32 @@ sub replace_button {
 		return;
 	}
 
-	# Apply the search to the current editor
-	# The while is here to support replace_all without duplicate code
-	my $Replace_Count;
-	while ( $main->replace_next($search) ) {
+	# Apply the search to the current editor.
+	# The while is here to support replace_all without duplicate code in the same modul.
+	my $Replace_Count = 0;
 
-		++$Replace_Count;
+	my $use_search_pm = 0;
+	if ($use_search_pm) {
+		if ( $self->{replace_all}->GetValue ) { # Replace all
+			$Replace_Count = $main->replace_all($search) . "\n";
+			return;
+		} else {
+			$Replace_Count = 1 if $main->replace_next($search);
+		}
+	} else {
+		while ( $main->replace_next($search) ) {
+			++$Replace_Count;
+			$self->{replace_all}->GetValue or last; # Replace all
+			next if $Replace_Count < 100;
 
-		$self->{replace_all}->GetValue or last; # Replace all
-
+			# This is just left here to have working replace function until Search.pm
+			# is fixed:
+			$main->message( 'This replace_all function could cause a endless loop '
+					. 'and should be removed as soon as Search.pm is repaired. '
+					. 'Your replace_all run has been aborted after 100 replaces, '
+					. 'click the button again to continue.', 'Warning' );
+			last;
+		}
 	}
 
 	# If we're only searching once, we won't need the dialog any more
@@ -529,7 +552,10 @@ sub replace_button {
 			Wx::gettext('Search and Replace')
 		);
 	} elsif ( $Replace_Count == 0 ) {
-		$main->message( Wx::gettext('No matches found'), Wx::gettext('Search and Replace') );
+		$main->message(
+			Wx::gettext('No matches found'),
+			Wx::gettext('Search and Replace'),
+		);
 	}
 
 	return;
@@ -537,6 +563,7 @@ sub replace_button {
 
 # TODO: This function doesn't seem to work anymore, so it's now scheduled for removal
 #       It's still here because it's unclear if there may be references to it.
+#
 #=pod
 #
 #=head2 replace_all
@@ -556,7 +583,7 @@ sub replace_button {
 #
 #	# Generate the search object
 #	my $search = $self->as_search;
-#	unless ($search) {
+#	unless ( $search ) {
 #		$main->error("Not a valid search");
 #		return;
 #	}

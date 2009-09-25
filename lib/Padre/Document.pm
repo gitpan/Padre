@@ -132,8 +132,9 @@ use Padre::Util      ();
 use Padre::Wx        ();
 use Padre            ();
 use Padre::MimeTypes ();
+use Padre::File      ();
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 
 
@@ -174,6 +175,7 @@ sub menu_view_mimes {
 use Class::XSAccessor getters => {
 	editor           => 'editor',
 	filename         => 'filename',    # TODO is this read_only or what?
+	file             => 'file',        # Padre::File - object
 	get_mimetype     => 'mimetype',
 	get_newline_type => 'newline_type',
 	errstr           => 'errstr',
@@ -181,7 +183,6 @@ use Class::XSAccessor getters => {
 	get_highlighter  => 'highlighter',
 	},
 	setters => {
-	_set_filename    => 'filename',    # TODO temporary hack
 	set_newline_type => 'newline_type',
 	set_mimetype     => 'mimetype',
 	set_errstr       => 'errstr',
@@ -209,6 +210,29 @@ sub new {
 	my $self = bless {@_}, $class;
 
 	if ( $self->{filename} ) {
+		$self->{file} = Padre::File->new( $self->{filename} );
+
+		# The Padre::File - module knows how to format the filename to the right
+		# syntax to correct (for example) .//file.pl to ./file.pl)
+		$self->{filename} = $self->{file}->{Filename};
+
+		if ( $self->{file}->exists ) {
+
+			# Test script must be able to pass an alternate config object:
+			my $config = $self->{config} || Padre->ide->config;
+			if ( defined( $self->{file}->size ) and ( $self->{file}->size > $config->editor_file_size_limit ) ) {
+				$self->error(
+					sprintf(
+						Wx::gettext(
+							"Cannot open %s as it is over the arbitrary file size limit of Padre which is currently %s"
+						),
+						$self->{filename},
+						$config->editor_file_size_limit
+					)
+				);
+				return;
+			}
+		}
 		$self->load_file;
 	} else {
 		$unsaved_number++;
@@ -231,7 +255,7 @@ sub rebless {
 	# to the the base class,
 	# This isn't exactly the most elegant way to do this, but will
 	# do for a first implementation.
-	my $mime_type = $self->get_mimetype;
+	my $mime_type = $self->get_mimetype or return;
 	my $class = Padre::MimeTypes->get_mime_class($mime_type) || __PACKAGE__;
 	Padre::Util::debug("Reblessing to mimetype: '$class'");
 	if ($class) {
@@ -244,7 +268,7 @@ sub rebless {
 
 	my $module = Padre::MimeTypes->get_current_highlighter_of_mime_type($mime_type);
 	my $filename = $self->filename || '';
-	warn("No module  mime_type='$mime_type' filename='$filename'\n") if not $module;
+	warn("No module  mime_type='$mime_type' filename='$filename'\n") unless $module;
 
 	#warn("Module '$module' mime_type='$mime_type' filename='$filename'\n") if $module;
 	$self->set_highlighter($module);
@@ -260,8 +284,7 @@ sub rebless {
 # Padre::Document GUI Integration
 
 sub colourize {
-	my $self = shift;
-
+	my $self   = shift;
 	my $lexer  = $self->lexer;
 	my $editor = $self->editor;
 	$editor->SetLexer($lexer);
@@ -294,7 +317,7 @@ sub colorize {
 	}
 
 	# allow virtual modules if they have a colorize method
-	if ( not $module->can('colorize') ) {
+	unless ( $module->can('colorize') ) {
 		eval "use $module";
 		if ($@) {
 			Carp::cluck( "Could not load module '$module' for file '" . ( $self->filename || '' ) . "'\n" );
@@ -314,22 +337,15 @@ sub last_sync {
 }
 
 sub basename {
-	my $filename = $_[0]->filename;
-	defined($filename) ? File::Basename::basename($filename) : undef;
+	my $self = shift;
+	return $self->{file}->basename if defined( $self->{file} );
+	return $self->{filename};
 }
 
 sub dirname {
-	my $filename = $_[0]->filename;
-	defined($filename) ? File::Basename::dirname($filename) : undef;
-}
-
-#left here a it is used in many places. Maybe we need to remove this sub.
-sub guess_mimetype {
-	my $self     = shift;
-	my $text     = $self->{original_content};
-	my $filename = $self->filename || q{};
-
-	return Padre::MimeTypes->_guess_mimetype( $text, $filename );
+	my $self = shift;
+	return $self->{file}->dirname if defined( $self->{file} );
+	return;
 }
 
 # For ts without a newline type
@@ -344,13 +360,34 @@ sub _get_default_newline_type {
 	}
 }
 
+=pod
+
+=head3 error
+
+    $document->error( $msg );
+
+Open an error dialog box with C<$msg> as main text. There's only one OK
+button. No return value.
+
+=cut
+
+# TODO: A globally used error/message box function may be better instead
+#       of replicating the same function in many files:
+sub error {
+	Padre->ide->wx->main->message( $_[1], Wx::gettext('Error') );
+}
+
+
+
+
+
 #####################################################################
 # Disk Interaction Methods
 # These methods implement the interaction between the document and the
 # filesystem.
 
 sub is_new {
-	return !!( not defined $_[0]->filename );
+	return !!( not defined $_[0]->file );
 }
 
 sub is_modified {
@@ -358,7 +395,7 @@ sub is_modified {
 }
 
 sub is_saved {
-	return !!( defined $_[0]->filename and not $_[0]->is_modified );
+	return !!( defined $_[0]->file and not $_[0]->is_modified );
 }
 
 # Returns true if this is a new document that is too insignificant to
@@ -380,38 +417,40 @@ sub is_unused {
 # 3) every time we type something ????
 sub has_changed_on_disk {
 	my ($self) = @_;
-	return 0 unless defined $self->filename;
+	return 0 unless defined $self->file;
 	return 0 unless defined $self->last_sync;
 
 	# Caching the result for two lines saved one stat-I/O each time this sub is run
-	my $Time_on_file = $self->time_on_file;
+	my $time_on_file = $self->time_on_file;
+	return 0 unless defined $time_on_file; # there may be no mtime on remote files
 
 	# Return -1 if file has been deleted from disk
-	return -1 unless $Time_on_file;
+	return -1 unless $time_on_file;
 
 	# Return 1 if the file has changed on disk, otherwise 0
-	return $self->last_sync < $Time_on_file ? 1 : 0;
+	return $self->last_sync < $time_on_file ? 1 : 0;
 }
 
 sub time_on_file {
-	my $filename = $_[0]->filename;
-	return 0 unless defined $filename;
+	my $self = shift;
+	my $file = $self->file;
+	return 0 unless defined $file;
 
-	# using one stat instead of -e and does one I/O instead of two every few seconds
-	my @FileInfo = stat($filename);
-	return 0 if $#FileInfo == -1; # file does not exist
-	return $FileInfo[9];
+	# It's important to return undef if there is no ->mtime for this filetype
+	my $Time = $file->mtime;
+	return $Time;
 }
 
 # Generate MD5-checksum for current file stored on disk
 sub checksum_on_file {
+	warn join( ',', caller ) . ' called Document::checksum_on_file which is out-of-service.';
 	return 1;
 	my $filename = $_[0]->filename;
 	return undef unless defined $filename;
 
 	require Digest::MD5;
 
-	open my $FH, $filename or return undef;
+	open my $FH, $filename or return;
 	binmode($FH);
 	return Digest::MD5->new->addfile(*$FH)->hexdigest;
 }
@@ -428,8 +467,6 @@ Sets the B<Encoding> bit using L<Encode::Guess> and tries to figure
 out what kind of newlines are in the file. Defaults to utf-8 if
 could not figure out the encoding.
 
-Currently it autoconverts files with mixed newlines. TODO we should stop autoconverting.
-
 Returns true on success false on failure. Sets $doc->errstr;
 
 =cut
@@ -437,32 +474,27 @@ Returns true on success false on failure. Sets $doc->errstr;
 sub load_file {
 	my ($self) = @_;
 
-	my $file = $self->{filename};
+	my $file = $self->file;
 
-	Padre::Util::debug("Loading file '$file'");
+	Padre::Util::debug("Loading file '$file->{Filename}'");
 
 	# check if file exists
-	if ( !-e $file ) {
+	if ( !$file->exists ) {
 
 		# file doesn't exist, try to create an empty one
-		if ( not open my $fh, '>', $file ) {
+		if ( !$file->write('') ) {
 
 			# oops, error creating file. abort operation
-			print ">>$file $!\n";
-			$self->set_errstr($!);
+			$self->set_errstr( $file->error );
 			return;
 		}
 	}
 
 	# load file
 	$self->set_errstr('');
-	my $content;
-	if ( open my $fh, '<', $file ) {
-		binmode($fh);
-		local $/ = undef;
-		$content = <$fh>;
-	} else {
-		$self->set_errstr($!);
+	my $content = $file->read;
+	if ( !defined($content) ) {
+		$self->set_errstr( $file->error );
 		return;
 	}
 	$self->{_timestamp} = $self->time_on_file;
@@ -476,16 +508,20 @@ sub load_file {
 
 	$self->{original_content} = $content;
 
+	# Determine new line type using file content.
+	$self->{newline_type} = Padre::Util::newline_type($content);
+
 	return 1;
 }
 
-#
 # New line type can be one of these values:
-# WIN32, MAC (for classic Mac) or UNIX (for Mac OS X and Linux/*BSD)
-#
+# WIN, MAC (for classic Mac) or UNIX (for Mac OS X and Linux/*BSD)
+# Special cases:
+# 'Mixed' for mixed end of lines,
+# 'None' for one-liners (no EOL)
 sub newline_type {
-	my ($self) = @_;
-	return $self->_get_default_newline_type;
+	my $self = shift;
+	return $self->{newline_type} or $self->_get_default_newline_type;
 }
 
 # Get the newline char(s) for this document.
@@ -493,7 +529,7 @@ sub newline_type {
 #       because of speed issues:
 sub newline {
 	my $self = shift;
-	if ( $self->get_newline_type eq 'WIN32' ) {
+	if ( $self->get_newline_type eq 'WIN' ) {
 		return "\r\n";
 	} elsif ( $self->get_newline_type eq 'MAC' ) {
 		return "\r";
@@ -501,12 +537,50 @@ sub newline {
 	return "\n";
 }
 
+sub _set_filename {
+	my $self     = shift;
+	my $filename = shift;
+
+	if ( !defined($filename) ) {
+		warn 'Request to set filename to undef from ' . join( ',', caller );
+		return 0;
+	}
+
+	return 1 if defined( $self->{filename} ) and ( $self->{filename} eq $filename );
+
+	undef $self->{file}; # close file object
+	$self->{file} = Padre::File->new($filename);
+
+	# Padre::File reformats filenames to the protocol/OS specific format, so use this:
+	$self->{filename} = $self->{file}->{Filename};
+}
+
 sub save_file {
 	my ($self) = @_;
 	$self->set_errstr('');
 
-	my $content  = $self->text_get;
-	my $filename = $self->filename;
+	my $content = $self->text_get;
+	my $file    = $self->file;
+	if ( !defined($file) ) {
+		$file = Padre::File->new( $self->filename );
+		$self->{file} = $file;
+	}
+
+	# This is just temporary for security and should prevend data loss:
+	if ( $self->{filename} ne $file->{Filename} ) {
+		my $ret = Wx::MessageBox(
+			sprintf(
+				Wx::gettext('Visual filename %s does not match the internal filename %s, do you want to abort saving?'),
+				$self->{filename},
+				$file->{Filename}
+			),
+			Wx::gettext("Save Warning"),
+			Wx::wxYES_NO | Wx::wxCENTRE,
+			Padre->ide->wx->main,
+		);
+
+		return 0 if $ret == Wx::wxYES;
+	}
 
 	# not set when first time to save
 	# allow the upgrade from ascii to utf-8 if there were unicode characters added
@@ -519,19 +593,19 @@ sub save_file {
 	if ( defined $self->{encoding} ) {
 		$encode = ":raw:encoding($self->{encoding})";
 	} else {
-		warn "encoding is not set, (couldn't get from contents) when saving file $filename\n";
+		warn "encoding is not set, (couldn't get from contents) when saving file $file->{Filename}\n";
 	}
 
-	if ( open my $fh, ">$encode", $filename ) {
-		print {$fh} $content;
-		close $fh;
-	} else {
-		$self->set_errstr($!);
+	if ( !$file->write( $content, $encode ) ) {
+		$self->set_errstr( $file->error );
 		return;
 	}
 
 	# File must be closed at this time, slow fs/userspace-fs may not return the correct result otherwise!
 	$self->{_timestamp} = $self->time_on_file;
+
+	# Determine new line type using file content.
+	$self->{newline_type} = Padre::Util::newline_type($content);
 
 	return 1;
 }
@@ -551,7 +625,7 @@ TODO: In the future it should backup the changes in case the user regrets the ac
 sub reload {
 	my ($self) = @_;
 
-	my $filename = $self->filename or return;
+	my $file = $self->file or return;
 	return $self->load_file;
 }
 
@@ -584,6 +658,10 @@ sub remove_tempfile {
 	return;
 }
 
+
+
+
+
 #####################################################################
 # Basic Content Manipulation
 
@@ -612,9 +690,6 @@ sub text_with_one_nl {
 	$text =~ s/$nlchar/\n/g;
 	return $text;
 }
-
-
-# --
 
 #
 # $doc->store_cursor_position()
@@ -647,6 +722,10 @@ sub restore_cursor_position {
 	$editor->SetCurrentPos($pos);
 	$editor->SetSelection( $pos, $pos );
 }
+
+
+
+
 
 #####################################################################
 # GUI Integration Methods
@@ -749,6 +828,126 @@ sub set_indentation_style {
 	return ();
 }
 
+=head2 event_on_char
+
+NOT IMPLEMENTED IN THE BASE CLASS
+
+This method - if implemented - is called after any addition of a character
+to the current document. This enables document classes to aid the user
+in the editing process in various ways, e.g. by auto-pairing of brackets
+or by suggesting usable method names when method-call syntax is detected.
+
+Parameters retrieved are the objects for the document, the editor, and the 
+wxWidgets event.
+
+Returns nothing.
+
+Cf. C<Padre::Document::Perl> for an example.
+
+=head2 event_on_right_down
+
+NOT IMPLEMENTED IN THE BASE CLASS
+
+This method - if implemented - is called when a user right-clicks in an 
+editor to open a context menu and after the standard context menu was 
+created and populated in the C<Padre::Wx::Editor> class.
+By manipulating the menu document classes may provide the user with 
+additional options.
+
+Parameters retrieved are the objects for the document, the editor, the 
+context menu (C<Wx::Menu>) and the event.
+
+Returns nothing.
+
+=head2 event_on_left_up
+
+NOT IMPLEMENTED IN THE BASE CLASS
+
+This method - if implemented - is called when a user left-clicks in an 
+editor. This can be used to implement context-sensitive actions if
+the user presses modifier keys while clicking.
+
+Parameters retrieved are the objects for the document, the editor,
+and the event.
+
+Returns nothing.
+
+=cut
+
+
+
+
+
+#####################################################################
+# Project Integration Methods
+
+sub project {
+	my $self = shift;
+	my $root = $self->project_dir;
+	if ( defined $root ) {
+		return Padre->ide->project($root);
+	} else {
+		return;
+	}
+}
+
+sub project_dir {
+	my $self = shift;
+	$self->{project_dir}
+		or $self->{project_dir} = $self->project_find;
+}
+
+sub project_find {
+	my $self = shift;
+
+	# Anonymous files don't have a project
+	unless ( defined $self->file ) {
+		return;
+	}
+
+	# Currently no project support for remote files:
+	if ( $self->{file}->{protocol} ne 'local' ) { return; }
+
+	# Search upwards from the file to find the project root
+	my ( $v, $d, $f ) = File::Spec->splitpath( $self->filename );
+	my @d = File::Spec->splitdir($d);
+	pop @d if $d[-1] eq '';
+	my $dirs = List::Util::first {
+		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
+			or -f File::Spec->catpath( $v, $_, 'Build.PL' )
+			or -f File::Spec->catpath( $v, $_, 'padre.yml' );
+	}
+	map { File::Spec->catdir( @d[ 0 .. $_ ] ) } reverse( 0 .. $#d );
+
+	unless ( defined $dirs ) {
+
+		# This document is part of the null project
+		return File::Spec->catpath( $v, File::Spec->catdir(@d), '' );
+	}
+	$self->{is_project} = 1;
+	return File::Spec->catpath( $v, $dirs, '' );
+}
+
+
+
+
+
+#####################################################################
+# Document Analysis Methods
+
+# Unreliable methods that provide heuristic best-attempts at automatically
+# determining various document properties.
+
+# Left here a it is used in many places.
+# Maybe we need to remove this sub.
+sub guess_mimetype {
+	my $self = shift;
+	Padre::MimeTypes->guess_mimetype(
+		$self->{original_content},
+		$self->file,
+	);
+}
+
 =head2 guess_indentation_style
 
 Automatically infer the indentation style of the document using
@@ -799,101 +998,27 @@ sub guess_indentation_style {
 	return $style;
 }
 
-=head2 event_on_char
+=head2 guess_filename
 
-NOT IMPLEMENTED IN THE BASE CLASS
+  my $name = $document->guess_filename
 
-This method - if implemented - is called after any addition of a character
-to the current document. This enables document classes to aid the user
-in the editing process in various ways, e.g. by auto-pairing of brackets
-or by suggesting usable method names when method-call syntax is detected.
+When creating new code, one job that the editor should really be able to do
+for you without needing to be told is to work out where to save the file.
 
-Parameters retrieved are the objects for the document, the editor, and the 
-wxWidgets event.
+When called on a new unsaved file, this method attempts to guess what the
+name of the file should be based purely on the content of the file.
 
-Returns nothing.
+In the base implementation, this returns C<undef> to indicate that the
+method cannot make a reasonable guess at the name of the file.
 
-Cf. C<Padre::Document::Perl> for an example.
-
-=head2 event_on_right_down
-
-NOT IMPLEMENTED IN THE BASE CLASS
-
-This method - if implemented - is called when a user right-clicks in an 
-editor to open a context menu and after the standard context menu was 
-created and populated in the C<Padre::Wx::Editor> class.
-By manipulating the menu document classes may provide the user with 
-additional options.
-
-Parameters retrieved are the objects for the document, the editor, the 
-context menu (C<Wx::Menu>) and the event.
-
-Returns nothing.
-
-=head2 event_on_left_up
-
-NOT IMPLEMENTED IN THE BASE CLASS
-
-This method - if implemented - is called when a user left-clicks in an 
-editor. This can be used to implement context-sensitive actions if
-the user presses modifier keys while clicking.
-
-Parameters retrieved are the objects for the document, the editor,
-and the event.
-
-Returns nothing.
+Your mime-type specific document subclass should implement any file name
+detection as it sees fit, returning the file name as a string.
 
 =cut
 
-#####################################################################
-# Project Integration Methods
-
-sub project {
-	my $self = shift;
-	my $root = $self->project_dir;
-	if ( defined $root ) {
-		return Padre->ide->project($root);
-	} else {
-		return undef;
-	}
+sub guess_filename {
+	return undef;
 }
-
-sub project_dir {
-	my $self = shift;
-	$self->{project_dir}
-		or $self->{project_dir} = $self->project_find;
-}
-
-sub project_find {
-	my $self = shift;
-
-	# Anonymous files don't have a project
-	unless ( defined $self->filename ) {
-		return;
-	}
-
-	# Search upwards from the file to find the project root
-	my ( $v, $d, $f ) = File::Spec->splitpath( $self->filename );
-	my @d = File::Spec->splitdir($d);
-	pop @d if $d[-1] eq '';
-	my $dirs = List::Util::first {
-		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
-			or -f File::Spec->catpath( $v, $_, 'Build.PL' )
-			or -f File::Spec->catpath( $v, $_, 'padre.yml' );
-	}
-	map { File::Spec->catdir( @d[ 0 .. $_ ] ) } reverse( 0 .. $#d );
-
-	unless ( defined $dirs ) {
-
-		# This document is part of the null project
-		return File::Spec->catpath( $v, File::Spec->catdir(@d), '' );
-	}
-	$self->{is_project} = 1;
-	return File::Spec->catpath( $v, $dirs, '' );
-}
-
-#####################################################################
-# Document Analysis Methods
 
 # Abstract methods, each subclass should implement it
 # TODO: Clearly this isn't ACTUALLY abstract (since they exist)
@@ -1033,6 +1158,10 @@ the C<force =E<gt> 1> parameter to override this.
 
 =cut
 
+
+
+
+
 #####################################################################
 # Document Manipulation Methods
 
@@ -1048,6 +1177,10 @@ the C<force =E<gt> 1> parameter to override this.
 # if the document class does not define this method.
 sub comment_lines_str { }
 
+
+
+
+
 #####################################################################
 # Unknown Methods
 # Dumped here because it's not clear which section they belong in
@@ -1058,8 +1191,7 @@ sub comment_lines_str { }
 # return ($error_message)
 # in case of some error
 sub autocomplete {
-	my $self = shift;
-
+	my $self   = shift;
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
 	my $line   = $editor->LineFromPosition($pos);
@@ -1068,21 +1200,20 @@ sub autocomplete {
 	# line from beginning to current position
 	my $prefix = $editor->GetTextRange( $first, $pos );
 	$prefix =~ s{^.*?(\w+)$}{$1};
-	my $last      = $editor->GetLength();
-	my $text      = $editor->GetTextRange( 0, $last );
-	my $pre_text  = $editor->GetTextRange( 0, $first + length($prefix) );
-	my $post_text = $editor->GetTextRange( $first, $last );
+	my $last = $editor->GetLength();
+	my $text = $editor->GetTextRange( 0, $last );
+	my $pre  = $editor->GetTextRange( 0, $first + length($prefix) );
+	my $post = $editor->GetTextRange( $first, $last );
 
-	my $regex;
-	eval { $regex = qr{\b($prefix\w+)\b} };
+	my $regex = eval {qr{\b($prefix\w+)\b}};
 	if ($@) {
 		return ("Cannot build regex for '$prefix'");
 	}
 
 	my %seen;
 	my @words;
-	push @words, grep { !$seen{$_}++ } reverse( $pre_text =~ /$regex/g );
-	push @words, grep { !$seen{$_}++ } ( $post_text =~ /$regex/g );
+	push @words, grep { !$seen{$_}++ } reverse( $pre =~ /$regex/g );
+	push @words, grep { !$seen{$_}++ } ( $post =~ /$regex/g );
 
 	if ( @words > 20 ) {
 		@words = @words[ 0 .. 19 ];
@@ -1090,7 +1221,6 @@ sub autocomplete {
 
 	return ( length($prefix), @words );
 }
-
 
 1;
 

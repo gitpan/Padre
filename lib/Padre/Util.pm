@@ -32,8 +32,9 @@ use File::Spec     ();
 use File::Basename ();
 use List::Util     ();
 use POSIX          ();
+use Padre::Constant();
 
-our $VERSION   = '0.46';
+our $VERSION   = '0.47';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw{ newline_type get_matches _T };
 
@@ -45,9 +46,10 @@ our @EXPORT_OK = qw{ newline_type get_matches _T };
 # Officially Supported Constants
 
 # Convenience constants for the operating system
-use constant WIN32 => !!( $^O eq 'MSWin32' );
-use constant MAC   => !!( $^O eq 'darwin' );
-use constant UNIX => !( WIN32 or MAC );
+# NOTE: They're now in Padre::Constant, if you miss them, please use them from there
+#use constant WIN32 => !!( $^O eq 'MSWin32' );
+#use constant MAC   => !!( $^O eq 'darwin' );
+#use constant UNIX => !( WIN32 or MAC );
 
 # Padre targets the three largest Wx backends
 # 1. Win32 Native
@@ -56,12 +58,14 @@ use constant UNIX => !( WIN32 or MAC );
 # The following defined reusable constants for these platforms,
 # suitable for use in Wx platform-specific adaptation code.
 # Currently (and a bit naively) we align these to the platforms.
-use constant WXWIN32 => WIN32;
-use constant WXMAC   => MAC;
-use constant WXGTK   => UNIX;
+# NOTE: They're now in Padre::Constant, if you miss them, please use them from there
+#use constant WXWIN32 => WIN32;
+#use constant WXMAC   => MAC;
+#use constant WXGTK   => UNIX;
 
 # The local newline type
-use constant NEWLINE => WIN32 ? 'WIN' : MAC ? 'MAC' : 'UNIX';
+# NOTE: It's now in Padre::Constant, if you miss them, please use it from there
+#use constant NEWLINE => Padre::Constant::WIN32 ? 'WIN' : Padre::Constant::MAC ? 'MAC' : 'UNIX';
 
 
 
@@ -244,7 +248,7 @@ sub svn_directory_revision {
 
 	# Find the first number after the first occurance of "dir".
 	unless ( $buffer =~ /\bdir\b\s+(\d+)/m ) {
-		return undef;
+		return;
 	}
 
 	# Quote this to prevent certain aliasing bugs
@@ -473,6 +477,28 @@ SCOPE: {
 			print STDERR "           in line $line of $filename\n";
 		}
 	}
+}
+
+sub humanbytes {
+	my $Bytes = $_[0] || 0;
+	if    ( $Bytes > 8192000000000 ) { return int( $Bytes / 1099511627776 ) . "TB"; }
+	elsif ( $Bytes > 8192000000 )    { return int( $Bytes / 1073741824 ) . "GB"; }
+	elsif ( $Bytes > 8192000 )       { return int( $Bytes / 1048576 ) . "MB"; }
+	elsif ( $Bytes > 8192 )          { return int( $Bytes / 1024 ) . "kB"; }
+	elsif ( $Bytes == 0 )            { return "0"; }
+	else                             { return $Bytes . "B"; }
+}
+
+# Returns the memory currently used by this application:
+sub process_memory {
+	if (Padre::Constant::UNIX) {
+		open my $meminfo, "/proc/self/stat" or return;
+		return ( split( / /, <$meminfo> ) )[22];
+	} elsif (Padre::Constant::WIN32) {
+		require Padre::Util::Win32;
+		return Padre::Util::Win32::GetCurrentProcessMemorySize();
+	}
+	return;
 }
 
 1;

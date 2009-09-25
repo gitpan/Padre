@@ -8,7 +8,7 @@ use Padre::Wx;
 use Padre::Wx::Dialog;
 use Wx::Locale qw(:default);
 
-our $VERSION = '0.46';
+our $VERSION = '0.47';
 
 sub get_layout {
 	my ($text) = @_;
@@ -53,7 +53,7 @@ sub show {
 
 	my $dialog = $class->dialog( $main, $title, $text );
 	$dialog->show_modal;
-	return;
+	return $dialog->get_widget_value('display');
 }
 
 1;
