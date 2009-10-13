@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 =head1 NAME
 
@@ -13,9 +13,9 @@ Padre::Document::Perl::Beginner - naive implementation of some beginner specific
 =head1 SYNOPSIS
 
   use Padre::Document::Perl::Beginner;
-  my $b = Padre::Document::Perl::Beginner->new;
-  if (not $b->check($data)) {
-      warn $b->error;
+  my $beginner = Padre::Document::Perl::Beginner->new;
+  if (not $beginner->check($data)) {
+      warn $beginner->error;
   }
 
 =head1 DESCRIPTION
@@ -26,7 +26,7 @@ In Perl 5 there are lots of pitfals the unaware, especially
 the beginner can easily fall in. While some might expect the perl 
 compiler itself would catch those it does not (yet ?) do it. So we took the 
 initiative and added a beginners mode to Padre in which these extra issues
-are checked. Some are real problems that would trigger a an error anyway
+are checked. Some are real problems that would trigger an error anyway
 we just make them a special case with a more specific error message.
 (e.g. use warning; without the trailing s)
 Others are valid code that can be useful in the hands of a master but that
@@ -49,15 +49,38 @@ See L<http://padre.perlide.org/ticket/52> and L<http://www.perlmonks.org/?node_i
 
 
 sub new {
-	return bless {}, shift;
+	my $class = shift;
+
+	return bless {@_}, $class;
 }
 
 sub error {
 	return $_[0]->{error};
 }
 
+sub _report {
+	my $self    = shift;
+	my $text    = shift;
+	my @samples = @_;
+
+	my $document = $self->{document};
+	my $editor   = $document->{editor};
+
+	my $prematch = $1 || '';
+	my $error_start_position = length($prematch);
+
+	my $line = $editor->LineFromPosition($error_start_position);
+	++$line; # Editor starts counting at 0
+
+	# These are two lines to enable the translators to use argument numbers:
+	$self->{error} = Wx::gettext( sprintf( 'Line %d: ', $line ) ) . Wx::gettext( sprintf( $text, @_ ) );
+
+	return;
+}
+
 sub check {
 	my ( $self, $text ) = @_;
+
 	$self->{error} = undef;
 
 =item *
@@ -70,10 +93,10 @@ Here @data is in scalar context returning the number of elemenets. Spotted in th
 
 =cut
 
-	if ( $text =~ m{split([^;]+);} ) {
+	if ( $text =~ m/^(.*?)split([^;]+);/s ) {
 		my $cont = $1;
 		if ( $cont =~ m{\@} ) {
-			$self->{error} = "The second parameter of split is a string, not an array";
+			$self->_report("The second parameter of split is a string, not an array");
 			return;
 		}
 	}
@@ -86,8 +109,8 @@ s is missing at the end.
 
 =cut
 
-	if ( $text =~ /use\s+warning\s*;/ ) {
-		$self->{error} = "You need to write use warnings (with an s at the end) and not use warning.";
+	if ( $text =~ /^(.*?)use\s+warning\s*;/s ) {
+		$self->_report("You need to write use warnings (with an s at the end) and not use warning.");
 		return;
 	}
 
@@ -107,8 +130,8 @@ which means: map all @items and them add $extra_item without map'ing it.
 
 =cut
 
-	if ( $text =~ /map[\s\t\r\n]*\{.+?\}[\s\t\r\n]*\(.+?\)[\s\t\r\n]*\,/ ) {
-		$self->{error} = "map (),x uses x also as list value for map.";
+	if ( $text =~ /^(.*?)map[\s\t\r\n]*\{.+?\}[\s\t\r\n]*\(.+?\)[\s\t\r\n]*\,/s ) {
+		$self->_report("map (),x uses x also as list value for map.");
 		return;
 	}
 
@@ -120,8 +143,8 @@ Warn about Perl-standard package names being reused
 
 =cut
 
-	if ( $text =~ /package DB[\;\:]/ ) {
-		$self->{error} = "This file uses the DB-namespace which is used by the Perl Debugger.";
+	if ( $text =~ /^(.*?)package DB[\;\:]/s ) {
+		$self->_report("This file uses the DB-namespace which is used by the Perl Debugger.");
 		return;
 	}
 
@@ -136,8 +159,11 @@ Warn about Perl-standard package names being reused
 	#	if ( $text =~ /[^\{\;][\s\t\r\n]*chomp\b/ ) {
 	# as soon as this module could set the cursor to the occurence line
 	# because it may trigger a higher amount of false positives.
-	if ( $text =~ /(print|[\=\.\,])[\s\t\r\n]*chomp\b/ ) {
-		$self->{error} = "chomp doesn't return the chomped value, it modifies the variable given as argument.";
+
+	# (Ticket #675)
+
+	if ( $text =~ /^(.*?)(print|[\=\.\,])[\s\t\r\n]*chomp\b/s ) {
+		$self->_report("chomp doesn't return the chomped value, it modifies the variable given as argument.");
 		return;
 	}
 
@@ -155,8 +181,8 @@ to actually change the array via s///.
 
 =cut
 
-	if ( $text =~ /map[\s\t\r\n]*\{[\s\t\r\n]*(\$_[\s\t\r\n]*\=\~[\s\t\r\n]*)?s\// ) {
-		$self->{error} = "Substitute (s///) doesn't return the changed value even if map.";
+	if ( $text =~ /^(.*?)map[\s\t\r\n]*\{[\s\t\r\n]*(\$_[\s\t\r\n]*\=\~[\s\t\r\n]*)?s\//s ) {
+		$self->_report("Substitute (s///) doesn't return the changed value even if map.");
 		return;
 	}
 
@@ -166,8 +192,8 @@ to actually change the array via s///.
 
 =cut
 
-	if ( $text =~ /\(\<\@\w+\>\)/ ) {
-		$self->{error} = "(<\@Foo>) is Perl6 syntax and usually not valid in Perl5.";
+	if ( $text =~ /^(.*?)\(\<\@\w+\>\)/s ) {
+		$self->_report("(<\@Foo>) is Perl6 syntax and usually not valid in Perl5.");
 		return;
 	}
 
@@ -178,8 +204,8 @@ to actually change the array via s///.
 
 =cut
 
-	if ( $text =~ /if[\s\t\r\n]*\(?[\$\s\t\r\n\w]+\=[\s\t\r\n\$\w]/ ) {
-		$self->{error} = "A single = in a if-condition is usually a typo, use == or eq to compare.";
+	if ( $text =~ /^(.*?)if[\s\t\r\n]*\(?[\$\s\t\r\n\w]+\=[\s\t\r\n\$\w]/s ) {
+		$self->_report("A single = in a if-condition is usually a typo, use == or eq to compare.");
 		return;
 	}
 
@@ -189,9 +215,11 @@ Pipe | in open() not at the end or the beginning.
 
 =cut
 
-	if ( ($text =~ /open[\s\t\r\n]*\(?\$?\w+[\s\t\r\n]*(\,.+?)?[\s\t\r\n]*\,[\s\t\r\n]*?([\"\'])(.*?)\|(.*?)\2/)
-	   and (length($3) > 0) and (length($4) > 0)) {
-		$self->{error} = "Using a | char in open without a | at the beginning or end is usually a typo.";
+	if ( ( $text =~ /^(.*?)open[\s\t\r\n]*\(?\$?\w+[\s\t\r\n]*(\,.+?)?[\s\t\r\n]*\,[\s\t\r\n]*?([\"\'])(.*?)\|(.*?)\3/ )
+		and ( length($4) > 0 )
+		and ( length($5) > 0 ) )
+	{
+		$self->_report("Using a | char in open without a | at the beginning or end is usually a typo.");
 		return;
 	}
 
@@ -201,8 +229,8 @@ Pipe | in open() not at the end or the beginning.
 
 =cut
 
-	if ( $text =~ /open[\s\t\r\n]*\(?\$?\w+[\s\t\r\n]*\,(.+?\,)?([\"\'])\|.+?\|\2/ ) {
-		$self->{error} = "You can't use open to pipe to and from a command at the same time.";
+	if ( $text =~ /^(.*?)open[\s\t\r\n]*\(?\$?\w+[\s\t\r\n]*\,(.+?\,)?([\"\'])\|.+?\|\3/s ) {
+		$self->_report("You can't use open to pipe to and from a command at the same time.");
 		return;
 	}
 
@@ -214,9 +242,10 @@ Regex starting witha a quantifier such as
 
 =cut
 
-	if ( $text =~ m{\=\~  [\s\t\r\n]*  \/ \^?  [\+\*\?\{] }x ) {
-		$self->{error} =
-			"A regular expression starting with a quantifier ( + * ? { ) doesn't make sense, you may want to escape it with a \\.";
+	if ( $text =~ m/^(.*?)\=\~  [\s\t\r\n]*  \/ \^?  [\+\*\?\{] /xs ) {
+		$self->_report(
+			"A regular expression starting with a quantifier ( + * ? { ) doesn't make sense, you may want to escape it with a \\."
+		);
 		return;
 	}
 
@@ -226,8 +255,8 @@ Regex starting witha a quantifier such as
 
 =cut
 
-	if ( $text =~ /else[\s\t\r\n]+if/ ) {
-		$self->{error} = "'else if' is wrong syntax, correct if 'elsif'.";
+	if ( $text =~ /^(.*?)else[\s\t\r\n]+if/s ) {
+		$self->_report("'else if' is wrong syntax, correct if 'elsif'.");
 		return;
 	}
 
@@ -237,8 +266,19 @@ Regex starting witha a quantifier such as
  	
 =cut
 
-	if ( $text =~ /elseif/ ) {
-		$self->{error} = "'elseif' is wrong syntax, correct if 'elsif'.";
+	if ( $text =~ /^(.*?)elseif/s ) {
+		$self->_report("'elseif' is wrong syntax, correct if 'elsif'.");
+		return;
+	}
+
+=item *
+
+ close;
+ 	
+=cut
+
+	if ( $text =~ /close;/s ) {
+		$self->_report("close; usually closes STDIN, STDOUT or something else you don't want.");
 		return;
 	}
 

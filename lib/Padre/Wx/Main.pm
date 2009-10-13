@@ -31,6 +31,7 @@ use File::Temp                ();
 use List::Util                ();
 use Scalar::Util              ();
 use Params::Util              ();
+use Padre::Action             ();
 use Padre::Constant           ();
 use Padre::Util               ();
 use Padre::Perl               ();
@@ -58,7 +59,7 @@ use Padre::Wx::Dialog::Text   ();
 use Padre::Wx::Progress       ();
 
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -101,17 +102,6 @@ sub new {
 	Padre::Util::debug('Logging started');
 	Wx::InitAllImageHandlers();
 
-	# Determine the window title
-	my $title = 'Padre';
-	if ( $0 =~ /padre$/ ) {
-		my $dir = $0;
-		$dir =~ s/padre$//;
-		my $revision = Padre::Util::svn_directory_revision($dir);
-		if ( -d "$dir.svn" ) {
-			$title .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
-		}
-	}
-
 	# Determine the initial frame style
 	my $style = Wx::wxDEFAULT_FRAME_STYLE;
 	if ( $config->main_maximized ) {
@@ -121,7 +111,7 @@ sub new {
 
 	# Create the underlying Wx frame
 	my $self = $class->SUPER::new(
-		undef, -1, $title,
+		undef, -1, 'Padre: New window',
 		[ $config->main_left, $config->main_top, ],
 		[ $config->main_width, $config->main_height, ], $style,
 	);
@@ -133,8 +123,8 @@ sub new {
 	# This prevents tons of ide->config
 	$self->{config} = $config;
 
-	# Remember the original title we used for later
-	$self->{title} = $title;
+	# Determine the window title (needs ide & config)
+	$self->set_title;
 
 	# Having recorded the "current working directory" move
 	# the OS directory cursor away from this directory, so
@@ -153,10 +143,6 @@ sub new {
 	# Drag and drop support
 	Padre::Wx::FileDropTarget->set($self);
 
-	# Temporary store for the function list.
-	# TODO: Storing this here violates encapsulation.
-	$self->{_methods} = [];
-
 	# Temporary store for the notebook tab history
 	# TODO: Storing this here (might) violate encapsulation.
 	#       It should probably be in the notebook object.
@@ -167,6 +153,9 @@ sub new {
 
 	# Add some additional attribute slots
 	$self->{marker} = {};
+
+	# Create the actions
+	Padre::Action::create;
 
 	# Create the menu bar
 	$self->{menu} = Padre::Wx::Menubar->new($self);
@@ -224,9 +213,7 @@ sub new {
 	Wx::Event::EVT_STC_CHARADDED( $self, -1, \&on_stc_char_added );
 	Wx::Event::EVT_STC_DWELLSTART( $self, -1, \&on_stc_dwell_start );
 
-	# As ugly as the WxPerl icon is, the new file toolbar image we
-	# used to use was far uglier
-	# Wx::GetWxPerlIcon()
+	# Use Padre's icon
 	$self->SetIcon(Padre::Wx::Icon::PADRE);
 
 	# Show the tools that the configuration dictates
@@ -912,6 +899,7 @@ sub refresh {
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 	$self->refresh_functions($current);
+	$self->set_title;
 
 	my $notebook = $self->notebook;
 	if ( $notebook->GetPageCount ) {
@@ -1046,53 +1034,14 @@ Force a refresh of the function list on the right.
 
 sub refresh_functions {
 
-	# TODO now on every ui chnage (move of the mouse) we refresh
+	# TODO now on every ui change (move of the mouse) we refresh
 	# this even though that should not be necessary can that be
 	# eliminated ?
-
-	my $self = shift;
+	my ( $self, $current ) = @_;
 	return if $self->no_refresh;
 	return unless $self->menu->view->{functions}->IsChecked;
 
-	# Flush the list if there is no active document
-	my $current   = Padre::Current::_CURRENT(@_);
-	my $document  = $current->document;
-	my $functions = $self->functions;
-	unless ($document) {
-		$functions->DeleteAllItems;
-		return;
-	}
-
-	my $config  = $self->config;
-	my @methods = $document->get_functions;
-	if ( $config->main_functions_order eq 'original' ) {
-
-		# That should be the one we got from get_functions
-	} elsif ( $config->main_functions_order eq 'alphabetical_private_last' ) {
-
-		# ~ comes after \w
-		@methods = map { tr/~/_/; $_ } ## no critic
-			sort
-			map { tr/_/~/; $_ }        ## no critic
-			@methods;
-	} else {
-
-		# Alphabetical (aka 'abc')
-		@methods = sort @methods;
-	}
-
-	if ( scalar(@methods) == scalar( @{ $self->{_methods} } ) ) {
-		my $new = join ';', @methods;
-		my $old = join ';', @{ $self->{_methods} };
-		return if $old eq $new;
-	}
-
-	$functions->DeleteAllItems;
-	foreach my $method ( reverse @methods ) {
-		$functions->InsertStringItem( 0, $method );
-	}
-	$functions->SetColumnWidth( 0, Wx::wxLIST_AUTOSIZE );
-	$self->{_methods} = \@methods;
+	$self->functions->refresh($current);
 
 	return;
 }
@@ -1613,7 +1562,7 @@ sub on_run_tests {
 	}
 
 	# TODO probably should fetch the current project name
-	my $filename = $document->filename;
+	my $filename = $document->{file}->filename if defined( $document->{file} );
 	unless ($filename) {
 		return $self->error( Wx::gettext("Current document has no filename") );
 	}
@@ -1665,7 +1614,7 @@ sub on_run_this_test {
 	}
 
 	# TODO probably should fetch the current project name
-	my $filename = $document->filename;
+	my $filename = $document->{file}->filename if defined( $document->{file} );
 	unless ($filename) {
 		return $self->error( Wx::gettext("Current document has no filename") );
 	}
@@ -1783,9 +1732,10 @@ sub run_command {
 	}
 
 	# Start the command
-	$self->{command} = Wx::Perl::ProcessStream->OpenProcess( $cmd, 'MyName1', $self );
+	$self->{command} = Wx::Perl::ProcessStream::Process->new( $cmd, 'MyName1', $self );
+	$self->{command}->Run;
 
-	# TODO: It appears that Wx::Perl::ProcessStream's OpenProcess()
+	# TODO: It appears that Wx::Perl::ProcessStream::Process's Run()
 	# does not honour the docs, as we don't get to this cleanup code
 	# even if we try to run a program that doesn't exist.
 	unless ( $self->{command} ) {
@@ -1849,7 +1799,16 @@ sub run_document {
 		if ( $document->pre_process ) {
 			$self->run_command($cmd);
 		} else {
-			$self->error( $document->errstr );
+			my $styles = Wx::wxCENTRE | Wx::wxICON_HAND | Wx::wxYES_NO;
+			my $ret    = Wx::MessageBox(
+				$document->errstr . "\n" . Wx::gettext('Do you want to continue?'),
+				Wx::gettext("Warning"),
+				$styles,
+				$self,
+			);
+			if ( $ret == Wx::wxYES ) {
+				$self->run_command($cmd);
+			}
 		}
 	}
 	return;
@@ -1874,7 +1833,7 @@ sub debug_perl {
 	}
 
 	# Check the file name
-	my $filename = $document->filename;
+	my $filename = $document->{file}->filename if defined( $document->{file} );
 
 	#	unless ( $filename =~ /\.pl$/i ) {
 	#		return $self->error(Wx::gettext("Only .pl files can be executed"));
@@ -1959,12 +1918,12 @@ C<$session> (a C<Padre::DB::Session> object). No return value.
 sub open_session {
 	my ( $self, $session ) = @_;
 
-	# prevent redrawing until we're done
-	$self->Freeze;
-
 	# get list of files in the session
 	my @files = $session->files;
 	return unless @files;
+
+	# prevent redrawing until we're done
+	$self->Freeze;
 
 	my $progress = Padre::Wx::Progress->new(
 		$self,
@@ -2001,8 +1960,15 @@ sub open_session {
 	$progress->update( $#files + 1, Wx::gettext('Restore focus...') );
 	$self->on_nth_pane($focus) if defined $focus;
 
+	$self->ide->{session} = $session->{id};
+
 	# now we can redraw
 	$self->Thaw;
+
+	# This could run in non-blocking space:
+	my $editor = $self->current->editor;
+	$self->update_directory;
+	$self->set_title;
 }
 
 =pod
@@ -2027,6 +1993,19 @@ sub save_session {
 	}
 	Padre::DB->commit;
 }
+
+sub update_directory {
+	my $self = shift;
+
+	# update the directory listing
+	if ( $self->has_directory ) {
+		if ( $self->menu->view->{directory}->IsChecked ) {
+			$self->directory->refresh;
+		}
+	}
+
+}
+
 
 =pod
 
@@ -2063,7 +2042,9 @@ button. No return value.
 =cut
 
 sub error {
-	$_[0]->message( $_[1], Wx::gettext('Error') );
+	my ( $self, $message ) = @_;
+	my $styles = Wx::wxOK | Wx::wxCENTRE | Wx::wxICON_HAND;
+	Wx::MessageBox( $message, Wx::gettext('Error'), $styles, $self );
 }
 
 =pod
@@ -2396,10 +2377,8 @@ sub on_close_window {
 	Padre::Util::debug("on_close_window");
 
 	# Capture the current session, before we start the interactive
-	# part of the shutdown which will mess it up. Don't save it to
-	# the config yet, because we haven't committed to the shutdown
-	# until we get past the interactive phase.
-	my @session = $self->capture_session;
+	# part of the shutdown which will mess it up.
+	$self->update_last_session;
 
 	Padre::Util::debug("went over list of files");
 
@@ -2428,7 +2407,7 @@ sub on_close_window {
 		# Make sure the user is aware of any rogue processes he might have ran
 		if ( $self->{command} ) {
 			my $ret = Wx::MessageBox(
-				Wx::gettext("You still have a running process. Do you to kill it and exit?"),
+				Wx::gettext("You still have a running process. Do you want to kill it and exit?"),
 				Wx::gettext("Warning"),
 				Wx::wxYES_NO | Wx::wxCENTRE,
 				$self,
@@ -2485,13 +2464,6 @@ sub on_close_window {
 	$ide->plugin_manager->shutdown;
 	Padre::Util::debug("After plugin manager shutdown");
 
-	# Write the session to the database
-	Padre::DB->begin;
-	my $session = Padre::DB::Session->last_padre_session;
-	Padre::DB::SessionFile->delete( 'where session = ?', $session->id );
-	Padre::DB->commit;
-	$self->save_session( $session, @session );
-
 	# Write the configuration to disk
 	$ide->save_config;
 	$event->Skip;
@@ -2506,36 +2478,16 @@ sub on_close_window {
 	return;
 }
 
-=pod
+sub update_last_session {
+	my $self = shift;
 
-=head3 on_split_window
+	# Write the current session to the database
+	Padre::DB->begin;
+	my $session = Padre::DB::Session->last_padre_session;
+	Padre::DB::SessionFile->delete( 'where session = ?', $session->id );
+	Padre::DB->commit;
+	$self->save_session( $session, $self->capture_session );
 
-    $main->on_split_window;
-
-Open a new editor with the same current document. No return value.
-
-=cut
-
-sub on_split_window {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $notebook = $current->notebook;
-	my $editor   = $current->editor;
-	my $title    = $current->title;
-	my $file     = $current->filename or return;
-	my $pointer  = $editor->GetDocPointer;
-	$editor->AddRefDocument($pointer);
-
-	my $_editor = Padre::Wx::Editor->new( $self->notebook );
-	$_editor->{Document} = $editor->{Document};
-	$_editor->padre_setup;
-	$_editor->SetDocPointer($pointer);
-	$_editor->set_preferences;
-
-	$self->ide->plugin_manager->editor_enable($_editor);
-	$self->create_tab( $_editor, " $title" );
-
-	return;
 }
 
 =pod
@@ -2571,8 +2523,9 @@ sub setup_editors {
 
 		if (@files) {
 			foreach my $f (@files) {
-				$self->setup_editor($f);
+				$self->setup_editor( $f, 1 );
 			}
+			$self->update_last_session;
 		} else {
 			$self->setup_editor;
 		}
@@ -2620,16 +2573,17 @@ exist, create an empty file before opening it.
 =cut
 
 sub setup_editor {
-	my ( $self, $file ) = @_;
+	my ( $self, $file, $skip_update_session ) = @_;
 	my $config = $self->config;
 
 	Padre::Util::debug( "setup_editor called for '" . ( $file || '' ) . "'" );
 
-	# These need to be TWO if's, because Cwd::realpath returns undef when opening an non-existent file!
-	if ( $file && -f $file ) {
-		$file = Cwd::realpath($file); # get absolute path
-	}
 	if ($file) {
+
+		# Get the absolute path
+		# Please Dont use Cwd::realpath, UNC paths do not work on win32)
+		$file = File::Spec->rel2abs($file) if -f $file;
+
 		my $id = $self->find_editor_of_file($file);
 		if ( defined $id ) {
 			$self->on_nth_pane($id);
@@ -2646,6 +2600,19 @@ sub setup_editor {
 		#			close $fh;
 		#		}
 
+
+		#not sure where the best place for this checking is..
+		#I'd actually like to make it recursivly open files
+		#(but that will require a dialog listing them to avoid opening an infinite number of files)
+		if ( -d $file ) {
+			$self->error(
+				sprintf(
+					Wx::gettext("Cannot open a Directory: %s"),
+					$file
+				)
+			);
+			return;
+		}
 	}
 
 	local $self->{_no_refresh} = 1;
@@ -2706,6 +2673,8 @@ sub setup_editor {
 	Wx::Event::EVT_MOTION( $editor, \&Padre::Wx::Editor::on_mouse_motion );
 
 	$doc->restore_cursor_position;
+
+	$self->update_last_session unless $skip_update_session;
 
 	return $id;
 }
@@ -3052,16 +3021,23 @@ Returns true if saved, false if cancelled.
 sub on_save_as {
 	my $self     = shift;
 	my $document = $self->current->document or return;
-	my $current  = $document->filename;
+	my $current  = $document->{file}->filename if defined( $document->{file} );
+
+	# Guess the directory to save to
 	if ( defined $current ) {
 		$self->{cwd} = File::Basename::dirname($current);
 	} elsif ( defined $document->project_dir ) {
 		$self->{cwd} = $document->project_dir;
 	}
+
+	# Guess the filename to save to
+	my $filename = $document->guess_filename;
+	$filename = '' unless defined $filename;
+
 	while (1) {
 		my $dialog = Wx::FileDialog->new(
 			$self, Wx::gettext("Save file as..."),
-			$self->{cwd}, "", "*.*", Wx::wxFD_SAVE,
+			$self->{cwd}, $filename, "*.*", Wx::wxFD_SAVE,
 		);
 		if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 			return;
@@ -3109,11 +3085,14 @@ sub on_save_as {
 	$document->rebless;
 	$document->colourize;
 
-	Padre::DB::History->create(
-		type => 'files',
-		name => $document->filename,
-	);
-	$self->menu->file->update_recentfiles;
+	$filename = $document->{file}->filename if defined( $document->{file} );
+	if ( defined($filename) ) {
+		Padre::DB::History->create(
+			type => 'files',
+			name => $filename,
+		);
+		$self->menu->file->update_recentfiles;
+	}
 
 	$self->refresh;
 
@@ -3305,6 +3284,8 @@ sub close {
 	# Remove the entry from the Window menu
 	$self->menu->window->refresh( $self->current );
 
+	#	$self->update_last_session;
+
 	return 1;
 }
 
@@ -3324,6 +3305,10 @@ sub close_all {
 	my $skip  = shift;
 	my $guard = $self->freezer;
 
+	# Remove current session ID from IDE object
+	# Do this before closing as the session shouldn't be affected by a close-all
+	undef $self->ide->{session};
+
 	my @pages = reverse $self->pageids;
 
 	my $progress = Padre::Wx::Progress->new(
@@ -3338,7 +3323,12 @@ sub close_all {
 		}
 		$self->close( $pages[$no] ) or return 0;
 	}
+
 	$self->refresh;
+
+	# Recalculate window title
+	$self->set_title;
+
 	return 1;
 }
 
@@ -3467,7 +3457,7 @@ sub on_diff {
 	my $self     = shift;
 	my $document = $self->current->document or return;
 	my $text     = $document->text_get;
-	my $file     = $document->filename;
+	my $file     = $document->{file}->filename if defined( $document->{file} );
 	unless ($file) {
 		return $self->error( Wx::gettext("Cannot diff if file was never saved") );
 	}
@@ -3517,6 +3507,9 @@ Join current line with next one (a-la vi with Ctrl+J). No return value.
 sub on_join_lines {
 	my $self = shift;
 	my $page = $self->current->editor;
+
+	# Don't crash if no document is open
+	return if !defined($page);
 
 	# find positions
 	my $pos1 = $page->GetCurrentPos;
@@ -4042,13 +4035,15 @@ C<$file>, or undef if file is not opened currently.
 
 sub find_editor_of_file {
 	my $self     = shift;
-	my $file     = shift;
+	my $filename = shift;
+	my $file     = Padre::File->new($filename); # This reformats our filename
 	my $notebook = $self->notebook;
 	foreach my $id ( $self->pageids ) {
 		my $editor   = $notebook->GetPage($id) or return;
 		my $document = $editor->{Document}     or return;
-		my $filename = $document->filename     or next;
-		return $id if $filename eq $file;
+		defined( $document->{file} ) or next;
+		my $doc_filename = $document->{file}->{filename} or next;
+		return $id if $doc_filename eq $file->{filename};
 	}
 	return;
 }
@@ -4296,12 +4291,20 @@ sub on_doc_stats {
 		$filename, $newline_type,     $encoding
 	) = $doc->stats;
 
+	my $disksize = '';
+	if ( defined($doc) and defined( $doc->{file} ) ) {
+		$disksize = Padre::Util::humanbytes( $doc->{file}->size );
+	} else {
+		$disksize = Wx::gettext('(Document not on disk)');
+	}
+
 	my @messages = (
 		sprintf( Wx::gettext("Words: %s"),                $words ),
 		sprintf( Wx::gettext("Lines: %d"),                $lines ),
 		sprintf( Wx::gettext("Chars without spaces: %s"), $chars_without_space ),
 		sprintf( Wx::gettext("Chars with spaces: %d"),    $chars_with_space ),
 		sprintf( Wx::gettext("Newline type: %s"),         $newline_type ),
+		sprintf( Wx::gettext('Size on disk: %s'),         $disksize ),
 		sprintf( Wx::gettext("Encoding: %s"),             $encoding ),
 		sprintf(
 			Wx::gettext("Document type: %s"),
@@ -4641,7 +4644,8 @@ sub change_highlighter {
 		my $document = $editor->{Document};
 		next if $document->get_mimetype ne $mime_type;
 		$document->set_highlighter($module);
-		Padre::Util::debug( "Set highlighter to to $module for $document in file " . ( $document->filename || '' ) );
+		my $filename = $document->{file}->filename if defined( $document->{file} );
+		Padre::Util::debug( "Set highlighter to to $module for $document in file " . ( $filename || '' ) );
 		my $lexer = $document->lexer;
 		$editor->SetLexer($lexer);
 
@@ -4787,6 +4791,67 @@ sub set_mimetype {
 		$doc->colourize;
 	}
 	$self->refresh;
+}
+
+sub set_title {
+
+	# Determine the window title
+
+	# The syntax string could be set in the preferences dialog.
+
+	my $self   = shift;
+	my $config = $self->{config};
+
+	my %variable_data = (
+		'%' => '%',
+		'v' => $Padre::VERSION,
+		'f' => '',             # Initlize space for filename
+		'b' => '',             # Initlize space for filename - basename
+		'd' => '',             # Initlize space for filename - dirname
+		'F' => '',             # Initlize space for filename relative to project dir
+		'p' => '',             # Initlize space for project name
+	);
+
+	# We may run within window startup, there may be no "current" or
+	# "document" or "document->file":
+	if (    defined( $self->current )
+		and defined( $self->current->document )
+		and defined( $self->current->document->file ) )
+	{
+		my $document = $self->current->document;
+		$variable_data{'f'} = $document->file->{filename};
+		$variable_data{'b'} = $document->file->basename;
+		$variable_data{'d'} = $document->file->dirname;
+
+		$variable_data{'F'} = $document->file->{filename};
+		my $project_dir = quotemeta $document->project_dir;
+		$variable_data{'F'} =~ s/^$project_dir//;
+	}
+
+	# Fill in the session, if any
+	if ( defined( $self->ide->{session} ) ) {
+		my ($session) = Padre::DB::Session->select(
+			'where id = ?', $self->ide->{session},
+		);
+		$variable_data{'p'} = $session->{name};
+	}
+
+	# Keep it for later usage
+	$self->{title} = $config->window_title;
+
+	my $Vars = join( '', keys(%variable_data) );
+
+	$self->{title} =~ s/\%([$Vars])/$variable_data{$1}/g;
+
+	$self->{title} = 'Padre ' . $Padre::VERSION
+		if !defined( $self->{title} );
+
+	my $revision = Padre::Util::revision();
+	$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)"
+		if defined($revision);
+
+	# Push the title to the window
+	$self->SetTitle( $self->{title} );
 }
 
 =pod

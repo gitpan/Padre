@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -157,6 +157,11 @@ sub _create {
 	$box->SetSizeHints($self);
 	$self->CenterOnParent;
 	$self->_combo->SetFocus;
+
+	# Update description/button status in case of preloaded values
+	# Better re-use the existing functions than rewrite the same
+	# code during component creation
+	$self->_on_combo_text_changed;
 }
 
 #
@@ -172,9 +177,19 @@ sub _create_fields {
 	my $self  = shift;
 	my $sizer = $self->_sizer;
 
+	my $Current_Session = (
+		Padre::DB::Session->select(
+			'name where id = ?',
+			Padre->ide->{session}
+		)
+		)[0]->{name}
+		if defined( Padre->ide->{session} );
+	$Current_Session ||= ''; # Empty value for combo box, better than undef
+
+
 	# session name
 	my $lab1 = Wx::StaticText->new( $self, -1, Wx::gettext('Session name:') );
-	my $combo = Wx::ComboBox->new( $self, -1, '' );
+	my $combo = Wx::ComboBox->new( $self, -1, $Current_Session );
 	$sizer->Add( $lab1, Wx::GBPosition->new( 0, 0 ) );
 	$sizer->Add( $combo, Wx::GBPosition->new( 0, 1 ), Wx::GBSpan->new( 1, 3 ), Wx::wxEXPAND );
 	$self->_combo($combo);
@@ -211,7 +226,7 @@ sub _create_buttons {
 
 	$bs->SetDefault;
 
-	# save button is disabled at first
+	# save button is disabled at first if there is nothing to save
 	$bs->Disable;
 	$self->_butsave($bs);
 }

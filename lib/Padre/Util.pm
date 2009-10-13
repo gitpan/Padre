@@ -34,7 +34,7 @@ use List::Util     ();
 use POSIX          ();
 use Padre::Constant();
 
-our $VERSION   = '0.47';
+our $VERSION   = '0.48';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw{ newline_type get_matches _T };
 
@@ -299,6 +299,11 @@ sub sharefile {
 	File::Spec->catfile( share(), @_ );
 }
 
+sub splash {
+	my $original = Padre::Util::sharefile('padre-splash-ccnc.bmp');
+	return -f $original ? $original : Padre::Util::sharefile('padre-splash.bmp');
+}
+
 sub find_perldiag_translations {
 	my %languages;
 	foreach my $path (@INC) {
@@ -468,25 +473,30 @@ SCOPE: {
 	sub debug {
 		return if not $logging;
 
+		my $logfile = Padre::Constant::LOG_FILE;
+		open my $fh, '>>', $logfile or return;
+
 		my $ts = POSIX::strftime( "%H:%M:%S", localtime() );
-		print STDERR "$ts - @_\n";
+
+		print $fh "$ts - @_\n";
 		if ($trace) {
-			print STDERR Carp::longmess();
+			print $fh Carp::longmess();
 		} else {
 			my ( $package, $filename, $line ) = caller;
-			print STDERR "           in line $line of $filename\n";
+			print $fh "           in line $line of $filename\n";
 		}
 	}
 }
 
 sub humanbytes {
+
 	my $Bytes = $_[0] || 0;
-	if    ( $Bytes > 8192000000000 ) { return int( $Bytes / 1099511627776 ) . "TB"; }
-	elsif ( $Bytes > 8192000000 )    { return int( $Bytes / 1073741824 ) . "GB"; }
-	elsif ( $Bytes > 8192000 )       { return int( $Bytes / 1048576 ) . "MB"; }
-	elsif ( $Bytes > 8192 )          { return int( $Bytes / 1024 ) . "kB"; }
-	elsif ( $Bytes == 0 )            { return "0"; }
-	else                             { return $Bytes . "B"; }
+
+	eval { require Format::Human::Bytes; };
+	return $Bytes if $@; # Doesn't look good, but works
+
+	return Format::Human::Bytes::base2( $Bytes, 1 );
+
 }
 
 # Returns the memory currently used by this application:
@@ -497,6 +507,19 @@ sub process_memory {
 	} elsif (Padre::Constant::WIN32) {
 		require Padre::Util::Win32;
 		return Padre::Util::Win32::GetCurrentProcessMemorySize();
+	}
+	return;
+}
+
+# TODO: A much better variant would be a constant set by svn.
+sub revision {
+	if ( $0 =~ /padre$/ ) {
+		my $dir = $0;
+		$dir =~ s/padre$//;
+		my $revision = Padre::Util::svn_directory_revision($dir);
+		if ( -d "$dir.svn" ) {
+			return 'r' . $revision;
+		}
 	}
 	return;
 }

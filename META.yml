@@ -84,6 +84,7 @@ requires:
   File::Spec::Functions: 3.2701
   File::Which: 1.08
   FindBin: 0
+  Format::Human::Bytes: 0
   Getopt::Long: 0
   HTML::Entities: 3.57
   HTML::Parser: 3.58
@@ -118,7 +119,7 @@ requires:
   Thread::Queue: 2.11
   URI: 0
   Wx: 0.91
-  Wx::Perl::ProcessStream: 0.11
+  Wx::Perl::ProcessStream: 0.20
   YAML::Tiny: 1.32
   perl: 5.008005
   pip: 0.13
@@ -130,4 +131,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.47
+version: 0.48

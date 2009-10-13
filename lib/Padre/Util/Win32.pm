@@ -30,7 +30,7 @@ use Padre::Constant ();
 # This module may be loaded by others, so don't crash on Linux when just being loaded:
 require Win32::API if Padre::Constant::WIN32;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 my %Types = ();
 
@@ -248,6 +248,29 @@ CODE
 
 	# Returns the peak memory size as bytes
 	return $stats->{PeakWorkingSetSize};
+}
+
+=head2 GetLastError
+
+  Padre::Util::Win32::GetLastError;
+
+Returns the error code of the last WIN32-API - call.
+
+The list of error codes could be found at
+http://msdn.microsoft.com/en-us/library/ms681381(VS.85).aspx
+
+=cut
+
+# This sub is here to remember everyone that $^E could also be
+# used and to keep the link to the error code list in a public
+# place.
+
+sub GetLastError {
+
+	#	return Win32::API->new( kernel32 => <<'CODE')->Call();
+	#DWORD GetLastError()
+	#CODE
+	return $^E;
 }
 
 1;

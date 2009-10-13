@@ -6,7 +6,7 @@ use Test::More;
 
 use Padre::File;
 
-if ( $^O !~ /win/i ) {
+if ( ( $^O ne 'MSWin32' ) and ( $^O ne 'cygwin' ) ) {
 	plan( tests => 1 );
 	ok( 1, 'Skipped, only applies to Windows' );
 	exit;
@@ -14,31 +14,38 @@ if ( $^O !~ /win/i ) {
 
 plan( tests => 7 );
 
-# The test file name is hard-coded because we need to play around with the pathname (/ or \):
+{
 
-ok( open( my $fh, '>', 't/files/padre-file-test' ), 'Create test file' );
-print $fh "foo";
-close $fh;
-ok( -s 't/files/padre-file-test' == 3, 'Check test file size' );
+	local $TODO;
+	$TODO = 'Failing this is no reason to stop install' unless $ENV{AUTOMATED_TESTING};
 
-my $file = Padre::File->new('t/files/padre-file-test');
-ok( defined($file), 'Create Padre::File object' );
-ok( $file->exists,  'File exists' );
+	# The test file name is hard-coded because we need to play around with the pathname (/ or \):
 
-# Now we have a Padre::File object and a testfile to play with...
+	ok( open( my $fh, '>', 't/files/padre-file-test' ), 'Create test file' );
+	print $fh "foo";
+	close $fh;
+	ok( -s 't/files/padre-file-test' == 3, 'Check test file size' );
 
-$file->{Filename} = 'T/Files/Padre-File-Test';
-$file->_reformat_filename;
-ok( $file->{Filename} eq 't\files\Padre-File-Test', 'Correct wrong case' );
+	my $file = Padre::File->new('t/files/padre-file-test');
+	ok( defined($file), 'Create Padre::File object' );
+	ok( $file->exists,  'File exists' );
 
-$file->{Filename} = 'T\Files\Padre-File-Test';
-$file->_reformat_filename;
-ok( $file->{Filename} eq 't\files\Padre-File-Test', 'Correct wrong case' );
+	# Now we have a Padre::File object and a testfile to play with...
 
-my $Crap = 'X:\foo\bar\padre-nonexistent\testfile';
-$file->{Filename} = $Crap;
-$file->_reformat_filename;
-ok( $file->{Filename} eq $Crap, 'Keep the filename on nonexistent file' );
+	$file->{Filename} = 'T/Files/Padre-File-Test';
+	$file->_reformat_filename;
+	ok( $file->{Filename} eq 't\files\Padre-File-Test', 'Correct wrong case' );
+
+	$file->{Filename} = 'T\Files\Padre-File-Test';
+	$file->_reformat_filename;
+	ok( $file->{Filename} eq 't\files\Padre-File-Test', 'Correct wrong case' );
+
+	my $Crap = 'X:\foo\bar\padre-nonexistent\testfile';
+	$file->{Filename} = $Crap;
+	$file->_reformat_filename;
+	ok( $file->{Filename} eq $Crap, 'Keep the filename on nonexistent file' );
+
+}
 
 END {
 	unlink 't/files/padre-file-test';

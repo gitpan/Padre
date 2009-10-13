@@ -10,7 +10,7 @@ use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -80,6 +80,14 @@ sub new {
 	Wx::Event::EVT_STC_DOUBLECLICK( $self, -1, \&on_smart_highlight_begin );
 	Wx::Event::EVT_LEFT_DOWN( $self, \&on_smart_highlight_end );
 	Wx::Event::EVT_KEY_DOWN( $self, \&on_smart_highlight_end );
+
+	# No more unsafe CTRL-L for you :)
+	# CTRL-L or line cut should only work when there is no empty line
+	# This prevents the accidental destruction of the clipboard
+	$self->CmdKeyClear( ord('L'), Wx::wxSTC_SCMOD_CTRL );
+
+	# Setup EVT_KEY_UP for smart highlighting and non-destructive CTRL-L
+	Wx::Event::EVT_KEY_UP( $self, \&on_key_up );
 
 	if ( $config->editor_wordwrap ) {
 		$self->SetWrapMode(Wx::wxSTC_WRAP_WORD);
@@ -171,6 +179,32 @@ sub padre_setup {
 	}
 
 	return;
+}
+
+#
+# Called a key is released in the editor
+#
+sub on_key_up {
+	my ( $self, $event ) = @_;
+
+	# The new behavior for a non-destructive CTRL-L
+	if ( $event->GetKeyCode == ord('L') and $event->ControlDown ) {
+		my $line = $self->GetLine( $self->GetCurrentLine() );
+		if ( $line !~ /^\s*$/ ) {
+
+			# Only cut on non-black lines
+			$self->CmdKeyExecute(Wx::wxSTC_CMD_LINECUT);
+		} else {
+
+			# Otherwise delete the line
+			$self->CmdKeyExecute(Wx::wxSTC_CMD_LINEDELETE);
+		}
+	}
+
+	# Apply smart highlighting when the shift key is down
+	if ( $self->main->ide->config->editor_smart_highlight_enable && $event->ShiftDown ) {
+		$self->on_smart_highlight_begin($event);
+	}
 }
 
 sub padre_setup_plain {
@@ -650,12 +684,7 @@ sub on_focus {
 	# to show/hide the document specific Perl menu
 	$main->refresh_menu;
 
-	# update the directory listing
-	if ( $main->has_directory ) {
-		if ( $main->menu->view->{directory}->IsChecked ) {
-			$main->directory->refresh;
-		}
-	}
+	$main->update_directory;
 
 	# TODO
 	# this is called even if the mouse is moved away from padre and back again
@@ -688,6 +717,12 @@ sub on_char {
 		$doc->event_on_char( $self, $event );
 	}
 
+	if ( $self->main->ide->{has_Time_HiRes} ) {
+		$doc->{last_char_time} = Time::HiRes::time();
+	} else {
+		$doc->{last_char_time} = time;
+	}
+
 	$event->Skip;
 	return;
 }
@@ -708,15 +743,25 @@ sub clear_smart_highlight {
 sub on_smart_highlight_begin {
 	my ( $self, $event ) = @_;
 
+	my $selection        = $self->GetSelectedText;
+	my $selection_length = length $selection;
+	return if $selection_length == 0;
+
+	my $selection_re = quotemeta $selection;
+	my $line_count   = $self->GetLineCount;
+	my $line_num     = $self->GetCurrentLine;
+
+	# Limits search to C+N..C-N from current line respecting limits ofcourse
+	# to optimize CPU usage
+	my $NUM_LINES = 400;
+	my $from      = ( $line_num - $NUM_LINES <= 0 ) ? 0 : $line_num - $NUM_LINES;
+	my $to        = ( $line_count <= $line_num + $NUM_LINES ) ? $line_count : $line_num + $NUM_LINES;
+
+	# Clear previous smart highlights
 	$self->clear_smart_highlight;
 
-	my $selection        = $self->GetSelectedText or return;
-	my $selection_length = length $selection;
-	my $selection_re     = quotemeta $selection;
-	my $line_count       = $self->GetLineCount;
-
 	# find matching occurrences
-	foreach my $i ( 0 .. $line_count - 1 ) {
+	foreach my $i ( $from .. $to ) {
 		my $line_start = $self->PositionFromLine($i);
 		my $line       = $self->GetLine($i);
 		while ( $line =~ /$selection_re/g ) {
@@ -918,11 +963,11 @@ sub on_right_down {
 		},
 	);
 
-	$menu->AppendSeparator;
-
 	if (    $event->isa('Wx::MouseEvent')
 		and $self->main->ide->config->editor_folding )
 	{
+		$menu->AppendSeparator;
+
 		my $mousePos         = $event->GetPosition;
 		my $line             = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
 		my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
@@ -947,14 +992,6 @@ sub on_right_down {
 			$menu->AppendSeparator;
 		}
 	}
-
-	Wx::Event::EVT_MENU(
-		$main,
-		$menu->Append( -1, Wx::gettext("&Split window") ),
-		sub {
-			Padre::Wx::Main::on_split_window(@_);
-		},
-	);
 
 	my $doc = $self->{Document};
 	if ( $doc->can('event_on_right_down') ) {

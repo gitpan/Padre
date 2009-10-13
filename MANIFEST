@@ -37,6 +37,8 @@ inc/Module/Install/With.pm
 inc/Module/Install/WriteAll.pm
 lib/Padre.pm
 lib/Padre/Action.pm
+lib/Padre/Action/Refactor.pm
+lib/Padre/Action/Run.pm
 lib/Padre/Autosave.pm
 lib/Padre/Config.pm
 lib/Padre/Config/Host.pm
@@ -45,6 +47,7 @@ lib/Padre/Config/Patch.pm
 lib/Padre/Config/Project.pm
 lib/Padre/Config/Setting.pm
 lib/Padre/Config/Style.pm
+lib/Padre/Config/Upgrade.pm
 lib/Padre/Constant.pm
 lib/Padre/CPAN.pm
 lib/Padre/Current.pm
@@ -105,6 +108,7 @@ lib/Padre/Task/DocBrowser.pm
 lib/Padre/Task/ErrorParser.pm
 lib/Padre/Task/Examples/WxEvent.pm
 lib/Padre/Task/HTTPClient.pm
+lib/Padre/Task/HTTPClient/LWP.pm
 lib/Padre/Task/LaunchDefaultBrowser.pm
 lib/Padre/Task/LWP.pm
 lib/Padre/Task/OpenResource/SearchTask.pm
@@ -144,6 +148,7 @@ lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
 lib/Padre/Wx/Dialog/QuickMenuAccess.pm
+lib/Padre/Wx/Dialog/RefactorSelectFunction.pm
 lib/Padre/Wx/Dialog/Replace.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/SessionManager.pm
@@ -172,6 +177,7 @@ lib/Padre/Wx/Menu/File.pm
 lib/Padre/Wx/Menu/Help.pm
 lib/Padre/Wx/Menu/Perl.pm
 lib/Padre/Wx/Menu/Plugins.pm
+lib/Padre/Wx/Menu/Refactor.pm
 lib/Padre/Wx/Menu/Run.pm
 lib/Padre/Wx/Menu/Search.pm
 lib/Padre/Wx/Menu/View.pm
@@ -202,8 +208,16 @@ privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
 script/padre.exe
+script/padre.ico
 share/doc/perlopref.pod
 share/examples/absolute_beginner/01_hello_world.pl
+share/examples/absolute_beginner/02_time.pl
+share/examples/absolute_beginner/03_good_morning.pl
+share/examples/absolute_beginner/04_math.pl
+share/examples/absolute_beginner/05_do_it_again.pl
+share/examples/absolute_beginner/06_salat.pl
+share/examples/absolute_beginner/07_short_salat.pl
+share/examples/absolute_beginner/README
 share/examples/wx/01_simple_frame.pl
 share/examples/wx/02_label.pl
 share/examples/wx/03_button.pl
@@ -278,6 +292,7 @@ share/locale/pt-br.po
 share/locale/ru.po
 share/locale/zh-cn.po
 share/locale/zh-tw.po
+share/padre-splash-ccnc.bmp
 share/padre-splash.bmp
 share/ppm/README.txt
 share/README.txt

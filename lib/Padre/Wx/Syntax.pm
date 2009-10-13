@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -35,6 +35,9 @@ sub new {
 		sub {
 			$self->on_list_item_activated( $_[1] );
 		},
+	);
+	Wx::Event::EVT_RIGHT_DOWN(
+		$self, \&on_right_down,
 	);
 
 	$self->Hide;
@@ -252,9 +255,28 @@ sub on_timer {
 	my $editor = Padre::Current->main($self)->current->editor or return;
 
 	my $document = $editor->{Document};
+
+	# Don't check without document of if the document has no checker
 	unless ( $document and $document->can('check_syntax') ) {
 		$self->clear;
 		return;
+	}
+
+	# Don't really check while typing but check if typing pauses,
+	# because the user usually won't stop typing to correct a
+	# syntax error but finish the current line and then fix the typo
+	if ( defined( $document->{last_char_time} ) ) {
+		if ( $self->main->ide->{has_Time_HiRes} ) {
+
+			# Not typing for 500ms usually means that you got
+			# time to look at the syntax check results
+			return if ( Time::HiRes::time() - $document->{last_char_time} ) < .5;
+		} else {
+
+			# Without HiRes, we could only set the timeout to
+			# one second, but this is very inaccurate
+			return if $document->{last_char_time} == time;
+		}
 	}
 
 	my $pre_exec_result = $document->check_syntax_in_background( force => $force );
@@ -292,6 +314,75 @@ sub relocale {
 	}
 
 	return;
+}
+
+#
+# Called when the user presses a right click or a context menu key (on win32)
+#
+sub on_right_down {
+	my ( $self, $event ) = @_;
+
+	return if $self->GetItemCount == 0;
+
+	# Create the popup menu
+	my $menu = Wx::Menu->new;
+
+	if ( $self->GetFirstSelected != -1 ) {
+
+		# Copy selected
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append( -1, Wx::gettext("Copy &Selected") ),
+			sub {
+
+				# Get selected message
+				my $msg       = '';
+				my $selection = $self->GetFirstSelected;
+				if ( $selection != -1 ) {
+					my $line = $self->GetItem( $selection, 0 )->GetText || '';
+					my $type = $self->GetItem( $selection, 1 )->GetText || '';
+					my $desc = $self->GetItem( $selection, 2 )->GetText || '';
+					$msg = "$line, $type, $desc\n";
+
+					# And copy it to clipboard
+					if ( ( length $msg > 0 ) and Wx::wxTheClipboard->Open() ) {
+						Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($msg) );
+						Wx::wxTheClipboard->Close();
+					}
+				}
+			}
+		);
+	}
+
+	# Copy all
+	Wx::Event::EVT_MENU(
+		$self,
+		$menu->Append( -1, Wx::gettext("Copy &All") ),
+		sub {
+
+			# Append messages in one string
+			my $msg = '';
+			foreach my $i ( 0 .. $self->GetItemCount - 1 ) {
+
+				my $line = $self->GetItem( $i, 0 )->GetText || '';
+				my $type = $self->GetItem( $i, 1 )->GetText || '';
+				my $desc = $self->GetItem( $i, 2 )->GetText || '';
+				$msg .= "$line, $type, $desc\n";
+			}
+
+			# And copy it to clipboard
+			if ( ( length $msg > 0 ) and Wx::wxTheClipboard->Open() ) {
+				Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($msg) );
+				Wx::wxTheClipboard->Close();
+			}
+		}
+	);
+
+	if ( $event->isa('Wx::MouseEvent') ) {
+		$self->PopupMenu( $menu, $event->GetX, $event->GetY );
+	} else { #Wx::CommandEvent
+		$self->PopupMenu( $menu, 50, 50 ); # TODO better location
+	}
 }
 
 1;

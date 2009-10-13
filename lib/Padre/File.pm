@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 my %Registered_Modules;
 
@@ -79,7 +79,7 @@ If you know the protocol (which should be true every time you build the URL
 by source), it's better to call Padre::File::Protocol->new($URL) directly
 (replacing Protocol by the protocol which should be used, of course).
 
-The module for the selected protocol should fill ->{Filename} property. This
+The module for the selected protocol should fill ->{filename} property. This
 should be used for all further references to the file as it will contain the
 filename in universal correct format (for example correct the C:\ eq C:/ problem
 on windows).
@@ -100,7 +100,7 @@ sub new { # URL
 	for ( keys(%Registered_Modules) ) {
 		next if $URL !~ /$_/;
 		require $_;
-		$self = $_->new($URL);
+		$self = $Registered_Modules{$_}->new($URL);
 		return $self;
 	}
 
@@ -115,6 +115,8 @@ sub new { # URL
 		require Padre::File::Local;
 		$self = Padre::File::Local->new($URL);
 	}
+
+	$self->{Filename} = $self->{filename}; # Temporary hack
 
 	return $self;
 
@@ -150,7 +152,7 @@ exists for this module.
 # than returning undef for this function:
 sub basename {
 	my $self = shift;
-	return $self->{Filename};
+	return $self->{filename};
 }
 
 =head2 blksize
@@ -183,6 +185,26 @@ is returned.
 # Fallback if the module has no such function:
 sub blocks {
 	return;
+}
+
+=head2 can_run
+
+  $file->can_run;
+
+Returns 1 if the protocol allows execution of files or 0 if it doesn't.
+
+This is usually not possible for non-local files (which return 1),
+because there is no way to reproduce a save environment for running
+a HTTP or FTP based file (they return 0).
+
+=cut
+
+# Fallback if the module has no such function:
+sub can_run {
+
+	# If the module does not state that it could do "run",
+	# we return a safe default of 0.
+	return 0;
 }
 
 =head2 ctime
@@ -243,7 +265,32 @@ Returns undef if unsure (network problem, not implemented).
 
 # Fallback if the module has no such function:
 sub exists {
+
+	my $self = shift;
+
+	# A size indicates that the file exists:
+	return 1 if $self->size;
+
 	return;
+}
+
+=head2 filename
+
+  $file->filename;
+
+Returns the the filename including path handled by this object
+
+Please remember that Padre::File is able to open many URL types. This
+"filename" may also be a URL. Please use the ->basename and ->dirname
+methods to split it (assuming that a path exists in the current
+protocol).
+
+=cut
+
+# Fallback if the module has no such function:
+sub filename {
+	my $self = shift;
+	return $self->{filename};
 }
 
 =head2 gid

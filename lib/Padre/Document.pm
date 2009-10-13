@@ -127,6 +127,7 @@ use strict;
 use warnings;
 use Carp             ();
 use File::Spec       ();
+use File::Temp       ();
 use Padre::Constant  ();
 use Padre::Util      ();
 use Padre::Wx        ();
@@ -134,7 +135,7 @@ use Padre            ();
 use Padre::MimeTypes ();
 use Padre::File      ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 
 
@@ -209,12 +210,16 @@ sub new {
 	my $class = shift;
 	my $self = bless {@_}, $class;
 
+	# This sub creates the document object and is allowed to use self->filename,
+	# once noone else uses it, it shout be deleted from the $self - hash before
+	# leaving the sub.
+	# Use document->{file}->filename instead!
 	if ( $self->{filename} ) {
 		$self->{file} = Padre::File->new( $self->{filename} );
 
 		# The Padre::File - module knows how to format the filename to the right
 		# syntax to correct (for example) .//file.pl to ./file.pl)
-		$self->{filename} = $self->{file}->{Filename};
+		$self->{filename} = $self->{file}->{filename};
 
 		if ( $self->{file}->exists ) {
 
@@ -226,7 +231,7 @@ sub new {
 						Wx::gettext(
 							"Cannot open %s as it is over the arbitrary file size limit of Padre which is currently %s"
 						),
-						$self->{filename},
+						$self->{file}->{filename},
 						$config->editor_file_size_limit
 					)
 				);
@@ -243,7 +248,13 @@ sub new {
 		$self->set_mimetype( $self->guess_mimetype );
 	}
 
+
+
 	$self->rebless;
+
+	Padre->ide->{_popularity_contest}->count( 'mime.' . $self->get_mimetype )
+		if ( !defined( $ENV{PADRE_IS_TEST} ) )
+		and defined( Padre->ide->{_popularity_contest} );
 
 	return $self;
 }
@@ -266,8 +277,11 @@ sub rebless {
 		bless $self, $class;
 	}
 
-	my $module = Padre::MimeTypes->get_current_highlighter_of_mime_type($mime_type);
-	my $filename = $self->filename || '';
+	my $module   = Padre::MimeTypes->get_current_highlighter_of_mime_type($mime_type);
+	my $filename = '';                                                                # Not undef
+	$filename = $self->{file}->filename
+		if defined( $self->{file} )
+			and defined( $self->{file}->{filename} );
 	warn("No module  mime_type='$mime_type' filename='$filename'\n") unless $module;
 
 	#warn("Module '$module' mime_type='$mime_type' filename='$filename'\n") if $module;
@@ -303,6 +317,7 @@ sub colorize {
 	Padre::Util::debug("colorize called");
 
 	my $module = $self->get_highlighter;
+	Padre::Util::debug("module: '$module'");
 	if ( $module eq 'stc' ) {
 
 		#TODO sometime this happens when I open Padre with several file
@@ -320,11 +335,12 @@ sub colorize {
 	unless ( $module->can('colorize') ) {
 		eval "use $module";
 		if ($@) {
-			Carp::cluck( "Could not load module '$module' for file '" . ( $self->filename || '' ) . "'\n" );
+			Carp::cluck( "Could not load module '$module' for file '" . ( $self->{file}->filename || '' ) . "'\n" );
 			return;
 		}
 	}
 	if ( $module->can('colorize') ) {
+		Padre::Util::debug("Call '$module->colorize(@_)'");
 		$module->colorize(@_);
 	} else {
 		warn("Module $module does not have a colorize method\n");
@@ -339,7 +355,7 @@ sub last_sync {
 sub basename {
 	my $self = shift;
 	return $self->{file}->basename if defined( $self->{file} );
-	return $self->{filename};
+	return $self->{file}->{filename};
 }
 
 sub dirname {
@@ -445,7 +461,10 @@ sub time_on_file {
 sub checksum_on_file {
 	warn join( ',', caller ) . ' called Document::checksum_on_file which is out-of-service.';
 	return 1;
-	my $filename = $_[0]->filename;
+
+	my $self = shift;
+
+	my $filename = $self->{file}->filename;
 	return undef unless defined $filename;
 
 	require Digest::MD5;
@@ -476,7 +495,8 @@ sub load_file {
 
 	my $file = $self->file;
 
-	Padre::Util::debug("Loading file '$file->{Filename}'");
+	Padre::Util::debug(
+		"Loading file '" . ( defined( $file->{file}->{filename} ) and $file->{file}->{filename} ) . "'" );
 
 	# check if file exists
 	if ( !$file->exists ) {
@@ -552,7 +572,7 @@ sub _set_filename {
 	$self->{file} = Padre::File->new($filename);
 
 	# Padre::File reformats filenames to the protocol/OS specific format, so use this:
-	$self->{filename} = $self->{file}->{Filename};
+	$self->{filename} = $self->{file}->{filename};
 }
 
 sub save_file {
@@ -567,12 +587,12 @@ sub save_file {
 	}
 
 	# This is just temporary for security and should prevend data loss:
-	if ( $self->{filename} ne $file->{Filename} ) {
+	if ( $self->{filename} ne $file->{filename} ) {
 		my $ret = Wx::MessageBox(
 			sprintf(
 				Wx::gettext('Visual filename %s does not match the internal filename %s, do you want to abort saving?'),
 				$self->{filename},
-				$file->{Filename}
+				$file->{filename}
 			),
 			Wx::gettext("Save Warning"),
 			Wx::wxYES_NO | Wx::wxCENTRE,
@@ -593,7 +613,7 @@ sub save_file {
 	if ( defined $self->{encoding} ) {
 		$encode = ":raw:encoding($self->{encoding})";
 	} else {
-		warn "encoding is not set, (couldn't get from contents) when saving file $file->{Filename}\n";
+		warn "encoding is not set, (couldn't get from contents) when saving file $file->{filename}\n";
 	}
 
 	if ( !$file->write( $content, $encode ) ) {
@@ -644,8 +664,6 @@ sub store_in_tempfile {
 }
 
 sub create_tempfile {
-	use File::Temp;
-
 	my $tempfile = File::Temp->new( UNLINK => 0 );
 	$_[0]->set_tempfile( $tempfile->filename );
 	close $tempfile;
@@ -699,7 +717,7 @@ sub text_with_one_nl {
 #
 sub store_cursor_position {
 	my $self     = shift;
-	my $filename = $self->filename;
+	my $filename = $self->{file}->filename if defined( $self->{file} );
 	my $editor   = $self->editor;
 	return unless $filename && $editor;
 	my $pos = $editor->GetCurrentPos;
@@ -714,7 +732,7 @@ sub store_cursor_position {
 #
 sub restore_cursor_position {
 	my $self     = shift;
-	my $filename = $self->filename;
+	my $filename = $self->{file}->filename if defined( $self->{file} );
 	my $editor   = $self->editor;
 	return unless $filename && $editor;
 	my $pos = Padre::DB::LastPositionInFile->get_last_pos($filename);
@@ -752,7 +770,7 @@ sub lexer {
 # What should be shown in the notebook tab
 sub get_title {
 	my $self = shift;
-	if ( $self->filename ) {
+	if ( defined( $self->{file} ) and defined( $self->{file}->filename ) and ( $self->{file}->filename ne '' ) ) {
 		return $self->basename;
 	} else {
 		my $str = sprintf( Wx::gettext("Unsaved %d"), $unsaved_number );
@@ -766,7 +784,11 @@ sub get_title {
 sub remove_color {
 	my ($self) = @_;
 
+	Padre::Util::debug("remove_color called (@_)");
+
 	my $editor = $self->editor;
+
+	Padre::Util::debug("editor '$editor'");
 
 	# TODO this is strange, do we really need to do it with all?
 	for my $i ( 0 .. 31 ) {
@@ -909,7 +931,7 @@ sub project_find {
 	if ( $self->{file}->{protocol} ne 'local' ) { return; }
 
 	# Search upwards from the file to find the project root
-	my ( $v, $d, $f ) = File::Spec->splitpath( $self->filename );
+	my ( $v, $d, $f ) = File::Spec->splitpath( $self->{file}->filename );
 	my @d = File::Spec->splitdir($d);
 	pop @d if $d[-1] eq '';
 	my $dirs = List::Util::first {
@@ -1017,6 +1039,14 @@ detection as it sees fit, returning the file name as a string.
 =cut
 
 sub guess_filename {
+	my $self = shift;
+
+	# If the file already has an existing name, guess that
+	my $filename = $self->filename;
+	if ( defined $filename ) {
+		return ( File::Spec->splitpath($filename) )[2];
+	}
+
 	return undef;
 }
 
@@ -1074,7 +1104,8 @@ sub stats {
 		$chars_without_space = Wx::gettext("Skipped for large files");
 	}
 
-	my $filename = $self->filename;
+	my $filename = $self->{file}->filename
+		if defined( $self->{file} );
 
 	# not set when first time to save
 	# allow the upgread of ascii to utf-8

@@ -1,5 +1,70 @@
 Changes for Perl Application Development and Refactoring Environment
 
+0.48 2009.10.12
+    - "Last session" now restores the last state even if Padre crashed and not
+      the last stated saved by a planned exit (SEWI)
+    - Fixed Wx::Perl::ProcessStream installation failure on vista/win7 by
+      upgrading to 0.16 (AZAWAWI, Mark Dootson - mdootson)
+    - Fixed the error dialog so that it displays the error icon (AZAWAWI)
+    - Fixed ticket #292: "Split window" command does not work by removing
+      the non-working feature (AZAWAWI)
+    - Added examples for Perl newbies (SEWI)
+    - Added a search field for functions list accessible via ALT-N (AZAWAWI)
+    - Added random instance ID (SEWI)
+    - Added multiple events per action (SEWI)
+    - Fixed win32's context menu key to work exactly as the right click behavior 
+      or ALT-/ (AZAWAWI)
+    - Fixed ticket #598: CTRL-L kills clipboard (AZAWAWI)
+    - Case sensitive was labeled case insensitive in replace, fixed. (SEWI)
+    - Windows filename test doesn't run on darwin (Mac) any longer and runs as TODO
+      because a failure must not stop the Padre installation. (SEWI)
+    - Padre::File::HTTP uses environment settings for proxy (SEWI)
+    - First real working version of the PopularityContest - module (SEWI)
+    - Smart highlighting works now in realtime as you select text (AZAWAWI)
+    - Fixed ticket #611: File | Open does not support UNC path (AZAWAWI)
+    - Save session now suggest the name of the last opened session for saving (SEWI)
+    - Fixed ticket #627: Suggestion: Make it possible to copy 'Syntax Check'
+      messages (AZAWAWI)
+    - require version 0.20 of Wx::Perl::ProcessStream to fix #628 (AZAWAWI, SZABGAB)
+    - Fixed ticket #493: splash image license not suitable for Debian (AZAWAWI)
+    - Fixed t/86-service.t to work again on win32 (AZAWAWI)
+    - Fixed ticket #314: Padre broken on MS Vista when starting with no file
+      to be opened (AZAWAWI)
+    - Added a 'padre --desktop' option that improves Padre-Windows integration.
+      This creates a desktop shortcut and an "Edit with Padre" in the shell 
+      context menu (AZAWAWI)
+    - Made beginner error checks report the line where an error was located (SEWI)
+    - Fixed: Syntax checker now only shows errors from current file (SEWI)
+    - padre --version displays a MessageBox under wperl.exe (AZAWAWI)
+    - Option to continue on beginner errors (SEWI)
+    - Made title bar configurable (SEWI)
+    - Autocomplete on every char (enable it in the preferences) (SEWI)
+    - Add logfile so the developer debugger of padre will print there
+      and not on STDERR. (SZABGAB)
+    - Show file size on disk in statistics (SEWI)
+    - Under Linux and BSD, 'padre --desktop' adds a Padre.desktop inside
+      /usr/share/applications (AZAWAWI)
+    - When saving a module for the first time, Padre will attempt to guess the
+      name of the file so you don't need to type it (ADAMK)
+    - Added "Dump Expression" to Developer Plugin to evaluate and dump a single
+      expression within the Padre context (ADAMK)
+    - Perl interpreter for running scripts is now configurable (SEWI)
+    - Added MIME type count to PopularityContest, but it's still not sending
+      anything (SEWI)
+    - Added a runnable-flag to Padre::File and it's current modules (SEWI)
+    - Syntax check now doesn't slow down typing (SEWI)
+    - Add autocomplete feature for new methods (SEWI)
+    - Update directory tree on load session (SEWI)
+    - New Padre launcher for Windows (DOLMEN)
+    - Fixed Open Resource status text display on Linux (AZAWAWI)
+    - Added configuration version checking and prepared auto-config-upgrades (SEWI)
+    - The Perl help search (F2) destroyed the code refernce calling it, so F2
+      was usable only once per Padre start, may also apply to other actions.
+      Fixed. (SEWI)
+    - Ticket #660 - Moved Perl Refactoring tools to it's own Refactor Menu (PLAVEN)
+    - Added the ability to select where to place the "extracted subroutine" in the current
+      document (PLAVEN)
+
 0.47 2009.09.25
     - Bundled more Perl Operators documentation [perlopref.pod] (AZAWAWI, COWENS)
     - Fixed crash when inserting a special value without any document (AZAWAWI)

@@ -21,8 +21,9 @@ use Padre::Config::Setting ();
 use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
+use Padre::Config::Upgrade ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -182,6 +183,14 @@ setting(
 	],
 );
 
+# Window
+setting(
+	name    => 'window_title',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'Padre [%p]',
+);
+
 # Pages and panels
 setting(
 	name    => 'main_singleinstance',
@@ -214,6 +223,9 @@ setting(
 		# The toolbar can't dynamically switch between
 		# tearable and non-tearable so rebuild it.
 		# TODO: Review this assumption
+
+		# (Ticket #668)
+
 		if ($Padre::Wx::Toolbar::DOCKABLE) {
 			$main->rebuild_toolbar;
 		}
@@ -429,6 +441,12 @@ setting(
 	default => 80,
 );
 setting(
+	name    => 'editor_smart_highlight_enable',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+setting(
 	name    => 'find_case',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -482,6 +500,18 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 );
+setting(
+	name    => 'autocomplete_always',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
+	name    => 'autocomplete_method',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
 
 # Behaviour Tuning
 # When running a script from the application some of the files might have
@@ -497,6 +527,16 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 'same',
+);
+setting(
+	name  => 'run_perl_cmd',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HOST,
+
+	# We don't get a default from Padre::Perl, because the saved value
+	# may be outdated sometimes in the future, reading it fresh on
+	# every run makes us more future-compatible
+	default => '',
 );
 
 # Move of stacktrace to run menu: will be removed (run_stacktrace)
@@ -515,6 +555,8 @@ setting(
 
 # By default use background threads unless profiling
 # TODO - Make the default actually change
+
+# (Ticket # 669)
 setting(
 	name    => 'threads',
 	type    => Padre::Constant::BOOLEAN,
@@ -687,7 +729,7 @@ sub read {
 		# Hand off to the constructor
 		$SINGLETON = $class->new( $host, $human );
 
-		# TODO - Check the version
+		$SINGLETON->Padre::Config::Upgrade::check();
 	}
 
 	return $SINGLETON;
@@ -822,6 +864,16 @@ Padre::Config - Configuration subsystem for Padre
 
 =head1 DESCRIPTION
 
+This module not only stores the complete Padre configuration, it also holds
+the functions for loading and saving the configuration.
+
+The Padre configuration lives in two places:
+
+ - A user-editable text file usually called config.yml
+
+ - A SQlite - database which shouldn't be edited by the
+   user.
+
 =head2 Generic usage
 
 Every setting is accessed by a method named after it, which is a mutator.
@@ -860,6 +912,15 @@ Those preferences are related to the project of the file you are currently
 editing. Examples of those settings are whether to use tabs or spaces, etc.
 
 Those settings are accessed with C<Padre::Config::Project>.
+
+=head1 ADDING CONFIGURATION OPTIONS
+
+Add a "setting()" - call to the correct section of this file.
+
+The setting() call initially creates the option and defines some
+metadata like the type of the option, it's living place and the
+default value which should be used until the user configures
+a own value.
 
 =back
 

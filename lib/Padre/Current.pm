@@ -9,7 +9,7 @@ use Carp         ();
 use Exporter     ();
 use Params::Util ();
 
-our $VERSION   = '0.47';
+our $VERSION   = '0.48';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_CURRENT';
 
@@ -125,15 +125,17 @@ sub editor {
 	my $self = ref( $_[0] ) ? $_[0] : $_[0]->new;
 	unless ( exists $self->{editor} ) {
 		my $notebook = $self->notebook;
-		my $selected = $notebook->GetSelection;
-		if ( $selected == -1 ) {
-			$self->{editor} = undef;
-		} elsif ( $selected >= $notebook->GetPageCount ) {
-			$self->{editor} = undef;
-		} else {
-			$self->{editor} = $notebook->GetPage($selected);
-			unless ( $self->{editor} ) {
-				Carp::croak("Failed to find page");
+		if ( defined($notebook) ) {
+			my $selected = $notebook->GetSelection;
+			if ( $selected == -1 ) {
+				$self->{editor} = undef;
+			} elsif ( $selected >= $notebook->GetPageCount ) {
+				$self->{editor} = undef;
+			} else {
+				$self->{editor} = $notebook->GetPage($selected);
+				unless ( $self->{editor} ) {
+					Carp::croak("Failed to find page");
+				}
 			}
 		}
 	}

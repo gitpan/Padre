@@ -4,7 +4,7 @@ use 5.008005;
 use strict;
 use warnings;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 # Load just enough modules to get Wx bootstrapped far enough
 # to show the splash screen;
@@ -29,12 +29,15 @@ my $SPLASH = undef;
 sub show {
 	return if $SPLASH;
 
+	# use CCNC version if it exists and fallback to boring splash
+	# so that we can bundle it in Debian
+
 	# Don't show the splash screen during testing otherwise
 	# it will spoil the flashy surprise when they upgrade.
 	unless ( $ENV{HARNESS_ACTIVE} or $ENV{PADRE_NOSPLASH} ) {
 		$SPLASH = Wx::SplashScreen->new(
 			Wx::Bitmap->new(
-				Padre::Util::sharefile('padre-splash.bmp'),
+				Padre::Util::splash(),
 				Wx::wxBITMAP_TYPE_BMP()
 			),
 			Wx::wxSPLASH_CENTRE_ON_SCREEN() | Wx::wxSPLASH_TIMEOUT(),

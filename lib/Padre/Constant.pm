@@ -10,7 +10,7 @@ use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 # Convenience constants for the operating system
 use constant WIN32 => !!( ( $^O eq 'MSWin32' ) or ( $^O eq 'cygwin' ) );
@@ -103,6 +103,7 @@ use constant CONFIG_HUMAN => File::Spec->catfile( CONFIG_DIR, 'config.yml' );
 use constant CONFIG_HOST  => File::Spec->catfile( CONFIG_DIR, 'config.db' );
 use constant PLUGIN_DIR => File::Spec->catdir( CONFIG_DIR, 'plugins' );
 use constant PLUGIN_LIB => File::Spec->catdir( PLUGIN_DIR, 'Padre', 'Plugin' );
+use constant LOG_FILE => File::Spec->catfile( CONFIG_DIR, 'debug.log' );
 
 # Check and create the directories that need to exist
 unless ( -e CONFIG_DIR or File::Path::mkpath(CONFIG_DIR) ) {
@@ -170,6 +171,14 @@ Private directory where Padre can look for plugins.
 Subdir of C<PLUGIN_DIR> with the path C<Padre/Plugin> added
 (or whatever depending on your platform) so that perl can
 load a C<Padre::Plugin::> plugin.
+
+=head2 LOG_FILE
+
+Path and name of Padre's logfile.
+
+=head2 NEWLINE
+
+Newline style (UNIX, WIN or MAC) on the currently used operating system.
 
 =head1 COPYRIGHT & LICENSE
 

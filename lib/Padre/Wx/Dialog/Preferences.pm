@@ -10,7 +10,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Padre::Wx::Dialog';
 
 =pod
@@ -264,6 +264,27 @@ sub _behaviour_panel {
 			],
 			[]
 		],
+		[   [   'Wx::CheckBox',
+				'editor_smart_highlight_enable',
+				( $config->editor_smart_highlight_enable ? 1 : 0 ),
+				Wx::gettext("Enable Smart highlighting while typing")
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox',
+				'autocomplete_always',
+				( $config->autocomplete_always ? 1 : 0 ),
+				Wx::gettext("Autocomplete always while typing")
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox',
+				'autocomplete_method',
+				( $config->autocomplete_method ? 1 : 0 ),
+				Wx::gettext("Autocomplete new methods in packages")
+			],
+			[]
+		],
 	];
 
 	my $panel = $self->_new_panel($treebook);
@@ -296,7 +317,39 @@ sub _appearance_panel {
 		? '#' . $config->editor_currentline_color
 		: '#ffff04';
 
+	my %window_title_vars = (
+		'%p' => 'Project name',
+		'%v' => 'Padre version',
+		'%f' => 'Current filename',
+		'%d' => 'Current files dirname',
+		'%b' => 'Current files basename',
+		'%F' => 'Current filename relative to project',
+	);
+	my @window_title_keys = sort { lc($a) cmp lc($b); } ( keys(%window_title_vars) );
+	my $window_title_left;
+	my $window_title_right;
+
+	while ( $#window_title_keys > -1 ) {
+
+		my $key = shift @window_title_keys;
+		$window_title_left .= $key . ' => ' . Wx::gettext( $window_title_vars{$key} ) . "\n";
+
+		last if $#window_title_keys < 0;
+
+		$key = shift @window_title_keys;
+		$window_title_right .= $key . ' => ' . Wx::gettext( $window_title_vars{$key} ) . "\n";
+
+	}
+	$window_title_left  =~ s/\n$//;
+	$window_title_right =~ s/\n$//;
+
 	my $table = [
+		[   [ 'Wx::StaticText', 'undef',        Wx::gettext('Window title:') ],
+			[ 'Wx::TextCtrl',   'window_title', $config->window_title ],
+		],
+		[   [ 'Wx::StaticText', 'undef', Wx::gettext($window_title_left) ],
+			[ 'Wx::StaticText', 'undef', Wx::gettext($window_title_right) ],
+		],
 		[   [   'Wx::CheckBox', 'main_output_ansi', ( $config->main_output_ansi ? 1 : 0 ),
 				Wx::gettext('Colored text in output window (ANSI)')
 			],
@@ -548,6 +601,9 @@ END_TEXT
 
 	# Default values stored in host configuration
 	my $defaults_table = [
+		[   [ 'Wx::StaticText', undef,          Wx::gettext('Perl interpreter:') ],
+			[ 'Wx::TextCtrl',   'run_perl_cmd', $config->run_perl_cmd ]
+		],
 		[   [ 'Wx::StaticText', undef,                          Wx::gettext('Interpreter arguments:') ],
 			[ 'Wx::TextCtrl',   'run_interpreter_args_default', $config->run_interpreter_args_default ]
 		],
@@ -675,6 +731,7 @@ sub dialog {
 
 	my $appearance = $self->_appearance_panel($tb);
 	$tb->AddPage( $appearance, Wx::gettext('Appearance') );
+
 	$tb->AddPage(
 		$self->_run_params_panel($tb),
 		Wx::gettext('Run Parameters')
@@ -896,6 +953,10 @@ sub run {
 		$data->{main_output_ansi} ? 1 : 0
 	);
 	$config->set(
+		'window_title',
+		$data->{window_title}
+	);
+	$config->set(
 		'editor_right_margin_enable',
 		$data->{editor_right_margin_enable} ? 1 : 0
 	);
@@ -903,6 +964,33 @@ sub run {
 		'editor_right_margin_column',
 		$data->{editor_right_margin_column},
 	);
+
+	# Warn if the Perl interpreter is not executable:
+	if ( defined( $data->{run_perl_cmd} ) and ( $data->{run_perl_cmd} ne '' ) and ( !-x $data->{run_perl_cmd} ) ) {
+		my $ret = Wx::MessageBox(
+			Wx::gettext(
+				sprintf(
+					'%s seems to be no executable Perl interpreter, abandon the new value?', $data->{run_perl_cmd}
+				)
+			),
+			Wx::gettext('Save settings'),
+			Wx::wxYES_NO | Wx::wxCENTRE,
+			$self,
+		);
+		if ( $ret == Wx::wxNO ) {
+			$config->set(
+				'run_perl_cmd',
+				$data->{run_perl_cmd}
+			);
+		}
+
+	} else {
+		$config->set(
+			'run_perl_cmd',
+			$data->{run_perl_cmd}
+		);
+	}
+
 	$config->set(
 		'run_interpreter_args_default',
 		$data->{run_interpreter_args_default}
@@ -931,6 +1019,19 @@ sub run {
 		'autocomplete_multiclosebracket',
 		$data->{autocomplete_multiclosebracket} ? 1 : 0
 	);
+	$config->set(
+		'editor_smart_highlight_enable',
+		$data->{editor_smart_highlight_enable} ? 1 : 0
+	);
+	$config->set(
+		'autocomplete_always',
+		$data->{autocomplete_always} ? 1 : 0
+	);
+	$config->set(
+		'autocomplete_method',
+		$data->{autocomplete_method} ? 1 : 0
+	);
+
 
 	# Don't save options which are not shown as this may result in
 	# clearing them:

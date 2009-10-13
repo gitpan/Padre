@@ -22,7 +22,7 @@ use Padre::Util ();
 use Padre::Wx   ();
 use Params::Util qw( _HASH );
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -50,7 +50,7 @@ our $DEFAULT_ICON;
 
 # Convenience access to the official Padre icon
 sub PADRE () {
-	icon('logo');
+	return icon('logo');
 }
 
 

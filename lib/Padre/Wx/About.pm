@@ -6,12 +6,13 @@ use 5.008;
 use strict;
 use warnings;
 use utf8;
-use Padre::Wx             ();
-use Padre::Wx::HtmlWindow ();
-use Padre::Wx::Icon       ();
-use Padre::Util           ();
+use Padre::Wx               ();
+use Padre::Wx::HtmlWindow   ();
+use Padre::Wx::Icon         ();
+use Padre::Util             ();
+use Wx::Perl::ProcessStream ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -98,7 +99,7 @@ sub _content_about {
 
 	# Create the content for the About window
 	my $self   = shift;
-	my $splash = Padre::Util::sharefile('padre-splash.bmp');
+	my $splash = Padre::Util::splash();
 	$self->{about}->SetPage( $self->_rtl(<<"END_HTML") );
 <html>
   <body bgcolor="#EEEEEE">
@@ -316,6 +317,14 @@ sub _content_info {
       <tr>
         <td valign="top">wxWidgets</td>
         <td>$wx_widgets</td>
+      </tr>
+      <tr>
+        <td valign="top">
+        Wx::Perl::ProcessStream
+        </td>
+        <td>
+        $Wx::Perl::ProcessStream::VERSION
+        </td>
       </tr>
       <tr>
         <td valign="top">$config_dir_txt</td><td>$config_dir</td>

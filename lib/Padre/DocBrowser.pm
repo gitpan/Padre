@@ -7,7 +7,7 @@ use Carp                   ();
 use Scalar::Util           ();
 use Padre::DocBrowser::POD ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 
 use Class::XSAccessor getters => {
 	get_providers => 'providers',
@@ -194,6 +194,9 @@ sub register_providers {
 	while ( my ( $type, $class ) = each %provides ) {
 
 		# TODO - handle collisions, ie multi providers
+
+		# (Ticket #673)
+
 		$self->get_providers->{$type} = $class;
 	}
 	$self;
@@ -271,6 +274,9 @@ sub resolve {
 
 	# TODO this doubles up if a provider subscribes to multi
 	# mimetypes .
+
+	# (Ticket #674)
+
 	foreach my $class ( values %{ $self->get_providers } ) {
 		my $resp = $class->resolve( $ref, $hints );
 		push @refs, $resp if $resp;

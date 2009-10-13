@@ -2,16 +2,33 @@
 
 use strict;
 use warnings;
+
+# Create test environment...
+package local::t75;
+
+sub LineFromPosition {
+	return 0;
+}
+
+package Wx;
+
+sub gettext {
+	return $_[0];
+}
+
+# The real test...
+package main;
+
 use Test::More;
 use Test::NoWarnings;
 use Data::Dumper qw(Dumper);
 use File::Spec ();
 
 my %TEST = (
-	'split1.pl'                    => "The second parameter of split is a string, not an array",
-	'split2.pl'                    => "The second parameter of split is a string, not an array",
-	'warning.pl'                   => "You need to write use warnings (with an s at the end) and not use warning.",
-	'boolean_expressions_or.pl'    => 'TODO',
+	'split1.pl'                 => "Line 1: The second parameter of split is a string, not an array",
+	'split2.pl'                 => "Line 1: The second parameter of split is a string, not an array",
+	'warning.pl'                => "Line 1: You need to write use warnings (with an s at the end) and not use warning.",
+	'boolean_expressions_or.pl' => 'TODO',
 	'boolean_expressions_pipes.pl' => 'TODO',
 	'match_default_scalar.pl'      => 'TODO',
 	'chomp.pl'                     => 'TODO',
@@ -19,18 +36,18 @@ my %TEST = (
 	'unintented_glob.pl'           => 'TODO',
 	'return_stronger_than_or.pl'   => 'TODO',
 	'grep_always_true.pl'          => 'TODO',
-	'my_argv.pl' => 'TODO',                                          # "my" variable @ARGV masks global variable at ...
-	'else_if.pl' => "'else if' is wrong syntax, correct if 'elsif'.",
+	'my_argv.pl'                   => 'TODO', # "my" variable @ARGV masks global variable at ...
+	'else_if.pl' => "Line 1: 'else if' is wrong syntax, correct if 'elsif'.",
 
 	# @ARGV, $ARGV, @INC, %INC, %ENV, %SIG, @ISA,
 	# other special variables ? $a, $b, $ARGV, $AUTOLOAD, etc ? $_ in perls older than 5.10?
 	# @_ ?
 );
 
-plan( tests => scalar( keys %TEST ) * 2 + 18 );
+plan( tests => scalar( keys %TEST ) * 2 + 19 );
 
 use Padre::Document::Perl::Beginner;
-my $b = Padre::Document::Perl::Beginner->new;
+my $b = Padre::Document::Perl::Beginner->new( document => { editor => bless {}, 'local::t75' } );
 
 isa_ok $b, 'Padre::Document::Perl::Beginner';
 
@@ -113,7 +130,7 @@ ok( $b->error =~ /open/, 'pipe-open with in and out redirection (3 args)' );
 
 # Thanks to meironC for this sample:
 $b->check('open LYNX, "lynx -source http://www.perl.com |" or die " Cant open lynx: $!";');
-ok( ! $b->error, 'Open with pipe and result check' );
+ok( !$b->error, 'Open with pipe and result check' );
 
 $b->check('elseif');
 ok( $b->error =~ /elseif.*elsif/, 'elseif - typo' );
@@ -123,6 +140,9 @@ ok( $b->error =~ /regular expression.*quantifier/, 'RegExp with quantifier (1)' 
 
 $b->check('$x =~ /*/');
 ok( $b->error =~ /regular expression.*quantifier/, 'RegExp with quantifier (2)' );
+
+$b->check('close; ');
+ok( $b->error =~ /close.+STDOUT/, 'close;' );
 
 sub slurp {
 	my $file = shift;

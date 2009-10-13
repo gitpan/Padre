@@ -9,7 +9,7 @@ use Carp            ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Wx::Dialog';
 
 
@@ -407,7 +407,7 @@ sub _refresh_list {
 	my $idx          = -1;
 	my %plugin_class = ();
 	$self->{list}->DeleteAllItems;
-	foreach my $plugin ( reverse @plugins ) {
+	foreach my $plugin (@plugins) {
 		$plugin_class{ $plugin->plugin_name } = $plugin->class;
 
 		# Check if plugin is supplying its own icon

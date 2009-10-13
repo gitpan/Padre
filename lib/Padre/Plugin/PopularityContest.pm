@@ -1,5 +1,10 @@
 package Padre::Plugin::PopularityContest;
 
+# Note to developers: This module collects data and transmit it to the Padre
+# dev team over the internet. Be very careful which data you collect and
+# always check that it is listed in the following POD and keep this module
+# very very good commented. Each user should be able to verify what it does.
+
 =pod
 
 =head1 NAME
@@ -21,13 +26,38 @@ ones after that.
 
 =head2 What information will we collect?
 
-Right now? Nothing. It does nothing, and it collects nothing whatsoever.
+At the moment, the following information is collected:
+ - Run time of Padre (Time between start and exit of Padre)
+ - Type of operating system (plattform only: Windows, Linux, MAC, etc.)
+ - Padre version number
+ - Perl, Wx and WxWidgets version numbers
+ - Number of times each menu option is used (directly or via shortcut
+   or toolbar)
+ - MIME type of files (like text/plain or application/perl) which are
+   opened in Padre
 
-It is merely a stub to store your permission to allow us to collect 
-information later.
+In addition, a random process ID for Padre is created and transmitted just
+to identify multiple reports from a single running instance of Padre. It
+doesn't match or contain your OS process ID but it allows us to count
+duplicate reports from a single running copy only once.
+A new ID is generated each time you start Padre and it doesn't allow any
+identification of you or your computer.
 
-We're not B<exactly> sure what we'll need yet, and the plan is to
-gradually add hooks one at a time as needed.
+The following information may be added sooner or later:
+ - Enabled/disabled features (like: are tooltips enabled or not?)
+ - Selected Padre language
+
+=head2 I feel observed.
+
+Disable this module and no information would be transmitted at all.
+
+All information is anonymus and can't be tracked to you, but it helps
+the developer team to know which functions and features are used and
+which aren't.
+
+This is an open source project and you're invited to check what this
+module does by just opening Padre/Plugin/PopularityContest.pm and check
+that it does.
 
 =head2 What information WON'T we collect?
 
@@ -67,10 +97,16 @@ this plugin entirely.
 use 5.008;
 use strict;
 use warnings;
+use Config        ();
+use Scalar::Util  ();
 use Padre::Plugin ();
+use Padre::Task::HTTPClient;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Padre::Plugin';
+
+# Track the number of times actions are used
+our %ACTION = ();
 
 
 
@@ -94,16 +130,34 @@ sub plugin_enable {
 	# Load the config
 	$self->{config} = $self->config_read;
 
-	# Trigger the ping at enable time.
-	# Not sure how load'y this will be, but lets try it
-	# for now and see how things end up.
-	$self->_ping;
+	# Enable data collection everywhere in Padre
+	$self->ide->{_popularity_contest} = $self;
+
+	# Enable counting on all events:
+	my $actions = $self->ide->actions;
+	foreach ( keys %$actions ) {
+		my $action = $actions->{$_};
+		my $name   = $action->name;
+
+		# Don't add my event twice in case someone diables/enables me:
+		next if exists $ACTION{$name};
+
+		$ACTION{$name} = 0;
+		$action->add_event( sub { $ACTION{$name}++ } );
+	}
 
 	return 1;
 }
 
+# Called when the plugin is disabled by the user or due to an exit-call for Padre
 sub plugin_disable {
 	my $self = shift;
+
+	# End data collection
+	delete $self->ide->{_popularity_contest};
+
+	# Send a report using the data we collected so far
+	$self->report;
 
 	# Save the config (if set)
 	if ( $self->{config} ) {
@@ -118,10 +172,114 @@ sub plugin_disable {
 }
 
 sub menu_plugins_simple {
+
+	# TODO: Add menu options to force sending of a report and to show
+	#       the contents of a report.
+
 	return shift->plugin_name => [
-		Wx::gettext("About") => '_about',
-		Wx::gettext("Ping")  => '_ping',
+		Wx::gettext("About")               => '_about',
+		Wx::gettext("Show current report") => 'report_show',
 	];
+}
+
+# Add one to the usage statistic of an item
+sub count { # Item to count
+	my $self = shift;
+	my $item = shift;
+
+	$self->{stats} = {} if ( !defined( $self->{stats} ) ) or ( ref( $self->{stats} ) ne 'HASH' );
+
+	# We want to keep our namespace limited to a reduced amount of chars:
+	$item =~ s/[^\w\.\-\+]+/\_/g;
+
+	++$self->{stats}->{$item};
+
+	return 1;
+}
+
+# Compile the report hash
+sub _generate {
+	my $self   = shift;
+	my %report = ();
+
+	# The instance ID id generated randomly on Padre's startup, it is used
+	# to identify multiple reports from one running instance of Padre and
+	# to throw away old data once a fresh report with newer data arrives from
+	# the same instance ID. Otherwise we would double-count the data from
+	# the first report (once at the first and once at the second report which
+	# also includs it).
+	$report{'padre.instance'} = $self->ide->{instance_id};
+
+	# Versioning information
+	my $revision = Padre::Util::revision;
+	if ( defined $revision ) {
+
+		# This is a developer build
+		$report{'DEV'}            = 1;
+		$report{'padre.version'}  = $Padre::VERSION;
+		$report{'padre.revision'} = $revision;
+	} else {
+
+		# This is a regular build
+		$report{'padre.version'} = $Padre::VERSION;
+	}
+
+	# The OS is transmitted as Win32, Linux or MAC (or other common names)
+	$report{'perl.osname'}   = $^O;
+	$report{'perl.archname'} = $Config::Config{archname};
+
+	# The time this Padre has been running until now
+	$report{'padre.uptime'} = time - $^T;
+
+	# Perl and WxWidgets version numbers. They help to know which minimal
+	# version could be required
+	$report{'perl.version'}      = scalar($^V) . '';
+	$report{'perl.wxversion'}    = $Wx::VERSION;
+	$report{'wx.version_string'} = Wx::wxVERSION_STRING();
+
+	# Add all the action tracking data
+	foreach ( grep { $ACTION{$_} } sort keys %ACTION ) {
+		$report{"action.$_"} = $ACTION{$_};
+	}
+
+	# Add the stats data
+	if ( defined( $self->{stats} ) and ( ref( $self->{stats} ) eq 'HASH' ) ) {
+		foreach ( keys( %{ $self->{stats} } ) ) {
+			$report{$_} = $self->{stats}->{$_};
+		}
+	}
+
+	return \%report;
+}
+
+# Report data to server
+sub report {
+	my $self   = shift;
+	my $report = $self->_generate;
+
+	# TODO: Enable as soon as the server is functional:
+	#	my $response = Padre::Task::HTTPClient->new(
+	#		URL   => 'http://padre.perlide.org/popularity_contest.cgi',
+	#		query => \%STATS, method => 'POST'
+	#	)->run;
+
+	return 1;
+}
+
+sub report_show {
+	my $self   = shift;
+	my $report = $self->_generate;
+
+	# Display the report as YAML for mid-level readability
+	require YAML::Tiny;
+	my $yaml = YAML::Tiny::Dump($report);
+
+	# Show the result in a text box
+	Padre::Wx::Dialog::Text->show(
+		$self->main,
+		Wx::gettext('Popularity Contest Report'),
+		$yaml,
+	);
 }
 
 
@@ -137,16 +295,6 @@ sub _about {
 	$about->SetName(__PACKAGE__);
 	$about->SetDescription("Trying to figure out what do people use?\n");
 	Wx::AboutBox($about);
-	return;
-}
-
-sub _ping {
-	my $self = shift;
-
-	# Send the request
-	require Padre::Plugin::PopularityContest::Ping;
-	Padre::Plugin::PopularityContest::Ping->new->schedule;
-
 	return;
 }
 

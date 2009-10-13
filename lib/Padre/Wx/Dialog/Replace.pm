@@ -24,7 +24,7 @@ use Padre::Wx                    ();
 use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -78,7 +78,7 @@ sub new {
 	$self->{find_case} = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext('Case &Insensitive'),
+		Wx::gettext('Case &sensitive'),
 	);
 	Wx::Event::EVT_CHECKBOX(
 		$self,

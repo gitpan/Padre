@@ -12,7 +12,7 @@ use Padre::Util     ();
 use Padre::Perl     ();
 use Padre::Document::Perl::Beginner;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Padre::Document';
 
 
@@ -22,6 +22,7 @@ our @ISA     = 'Padre::Document';
 #####################################################################
 # Padre::Document::Perl Methods
 
+# Ticket #637:
 # TODO watch out! These PPI methods may be VERY expensive!
 # (Ballpark: Around 1 Gigahertz-second of *BLOCKING* CPU per 1000 lines)
 # Check out Padre::Task::PPI and its subclasses instead!
@@ -144,9 +145,14 @@ sub set_highlighter {
 
 sub guess_filename {
 	my $self = shift;
-	my $text = $self->text_get;
+
+	# Don't attempt a content-based guess if the file already has a name.
+	if ( $self->filename ) {
+		return $self->SUPER::guess_filename;
+	}
 
 	# Is this a script?
+	my $text = $self->text_get;
 	if ( $text =~ /^\#\![^\n]*\bperl\b/s ) {
 
 		# It's impossible to predict the name of a script in
@@ -209,8 +215,26 @@ sub get_command {
 		: $self->filename;
 
 	# Run with console Perl to prevent unexpected results under wperl
-	# TODO: get preferred Perl from configuration
-	my $perl = Padre::Perl::cperl();
+	# The configuration values is cheaper to get compared to cperl(),
+	# try it first.
+	my $perl = $config->run_perl_cmd;
+
+	# Warn if the Perl interpreter is not executable:
+	if ( defined($perl) and ( $perl ne '' ) and ( !-x $perl ) ) {
+		my $ret = Wx::MessageBox(
+			Wx::gettext(
+				sprintf( '%s seems to be no executable Perl interpreter, use the system default perl instead?', $perl )
+			),
+			Wx::gettext('Run'),
+			Wx::wxYES_NO | Wx::wxCENTRE,
+			Padre->ide->wx->main,
+		);
+		$perl = Padre::Perl::cperl()
+			if $ret == Wx::wxYES;
+
+	} else {
+		$perl = Padre::Perl::cperl();
+	}
 
 	# Set default arguments
 	my %run_args = (
@@ -240,7 +264,7 @@ sub pre_process {
 
 	if ( Padre->ide->config->editor_beginner ) {
 		require Padre::Document::Perl::Beginner;
-		my $b = Padre::Document::Perl::Beginner->new;
+		my $b = Padre::Document::Perl::Beginner->new( document => $self );
 		if ( $b->check( $self->text_get ) ) {
 			return 1;
 		} else {
@@ -326,15 +350,19 @@ sub beginner_check {
 	# TODO: Make this cool
 	# It isn't, because it should show _all_ warnings instead of one and
 	# it should at least go to the line it's complaining about.
+	# Ticket #534
 
-	my $Beginner = Padre::Document::Perl::Beginner->new();
+	my $Beginner = Padre::Document::Perl::Beginner->new(
+		document => $self,
+		editor   => $self->editor
+	);
 
 	$Beginner->check( $self->text_get );
 
 	my $error = $Beginner->error;
 
 	if ($error) {
-		Padre->ide->wx->main->error( sprintf( Wx::gettext("Error:\n%s"), $error ) );
+		Padre->ide->wx->main->error( Wx::gettext("Error:\n") . $error );
 	} else {
 		Padre->ide->wx->main->message( Wx::gettext('No errors found.') );
 	}
@@ -417,7 +445,9 @@ sub _get_current_symbol {
 	$cursor_col = length($line_content) - 1 if $cursor_col >= length($line_content);
 	my $col = $cursor_col;
 
-	# find start of symbol TODO: This could be more robust, no?
+	# find start of symbol
+	# TODO: This could be more robust, no?
+	# Ticket #639
 	while (1) {
 		if ( $col <= 0 or substr( $line_content, $col, 1 ) =~ /^[^#\w:\']$/ ) {
 			last;
@@ -525,6 +555,123 @@ sub introduce_temporary_variable {
 	return ();
 }
 
+sub extract_subroutine {
+	my ( $self, $newname ) = @_;
+
+	my $editor = $self->editor;
+	my $code   = $editor->GetSelectedText();
+
+	my $sub_comment = <<EOC;
+# 
+# New subroutine extracted.
+#
+EOC
+
+	# we want to get a list of the subroutines to pick where to place
+	# the new sub
+	my @functions = $self->get_functions;
+
+	#print "printing the functions: " . join( "\n", @functions );
+
+	# Show a list of functions
+	require Padre::Wx::Dialog::RefactorSelectFunction;
+	my $dialog = Padre::Wx::Dialog::RefactorSelectFunction->new( $editor->main, \@functions );
+	$dialog->show();
+	if ( $dialog->{cancelled} ) {
+		return ();
+	}
+
+	# testing for now hard set:
+	#my $subname = 'testing2';
+	# check if canceled:
+
+	my $subname = $dialog->get_function_name;
+
+	# get the new code, replace the selection
+	require Devel::Refactor;
+	my $refactory = Devel::Refactor->new;
+	my ( $new_sub_call, $new_code ) = $refactory->extract_subroutine( $newname, $code, 1 );
+
+	# make the change to the selected text
+	$editor->BeginUndoAction(); # do the edit atomically
+	$editor->ReplaceSelection($new_sub_call);
+
+	# with the change made
+	# locate the function:
+	my ( $start, $end ) = Padre::Util::get_matches(
+		$editor->GetText,
+		$self->get_function_regex($subname),
+		$editor->GetSelection,  # Provides two params
+	);
+	unless ( defined $start ) {
+
+		# This needs to now rollback the
+		# the changes made with the editor
+		$editor->Undo();
+		$editor->EndUndoAction();
+
+		# Couldn't find it
+		# should be dialog
+		#print "Couldn't find the sub: $subname\n";
+		return;
+	}
+
+	# now instert the text into the right location
+	my $data = Wx::TextDataObject->new;
+	$data->SetText( $sub_comment . $new_code );
+	my $length = $data->GetTextLength;
+
+	$editor->InsertText( $start, $data->GetText );
+	$editor->EndUndoAction();
+
+	return ();
+
+}
+
+# This sub handles a cached C-Tags - Parser object which is much faster
+# than recreating it on every autocomplete
+
+sub _perltags_parser {
+	my $self = shift;
+
+	require Parse::ExuberantCTags;
+
+	my $perltags_file = $self->{_perltags_file};
+
+	# Temporary until this is configurable:
+	if ( !defined($perltags_file) ) {
+		$self->{_perltags_file} = File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' );
+		$perltags_file = $self->{_perltags_file};
+	}
+
+	# If we don't have a file (none specified in config, for example), return undef
+	# as the object and noone will try to use it
+	return undef if !defined($perltags_file);
+
+	my $parser;
+
+	# Use the cached parser if
+	#  - there is one
+	#  - the last check is younger than 5 seconds (don't check the file again)
+	#    or the file's mtime matches our cached mtime
+	if (    defined( $self->{_perltags_parser} )
+		and defined( $self->{_perltags_parser_time} )
+		and (  ( $self->{_perltags_parser_last} > ( time - 5 ) )
+			or ( $self->{_perltags_parser_time} == ( stat($perltags_file) )[9] ) )
+		)
+	{
+		$parser = $self->{_perltags_parser};
+		$self->{_perltags_parser_last} = time;
+	} else {
+		$parser                        = Parse::ExuberantCTags->new($perltags_file);
+		$self->{_perltags_parser}      = $parser;
+		$self->{_perltags_parser_time} = ( stat($perltags_file) )[9];
+		$self->{_perltags_parser_last} = time;
+	}
+
+	return $parser;
+}
+
 sub autocomplete {
 	my $self = shift;
 
@@ -550,13 +697,15 @@ sub autocomplete {
 	# i) hack Perl::Tags to be better (including inheritance)
 	# j) add inheritance support
 	# k) figure out how to do method auto-comp. on objects
-	require Parse::ExuberantCTags;
 
 	# check for variables
+
+	# (Ticket #676)
+
 	if ( $prefix =~ /([\$\@\%\*])(\w+(?:::\w+)*)$/ ) {
 		my $prefix = $2;
 		my $type   = $1;
-		my $parser = Parse::ExuberantCTags->new( File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' ) );
+		my $parser = $self->_perltags_parser;
 		if ( defined $parser ) {
 			my $tag = $parser->findTag( $prefix, partial => 1 );
 			my @words;
@@ -612,7 +761,7 @@ sub autocomplete {
 		my $class  = $1;
 		my $prefix = $2;
 		$prefix = '' if not defined $prefix;
-		my $parser = Parse::ExuberantCTags->new( File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' ) );
+		my $parser = $self->_perltags_parser;
 		if ( defined $parser ) {
 			my $tag = ( $prefix eq '' ) ? $parser->firstTag() : $parser->findTag( $prefix, partial => 1 );
 			my @words;
@@ -637,7 +786,8 @@ sub autocomplete {
 	# check for packages
 	elsif ( $prefix =~ /(?![\$\@\%\*])(\w+(?:::\w+)*)/ ) {
 		my $prefix = $1;
-		my $parser = Parse::ExuberantCTags->new( File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' ) );
+		my $parser = $self->_perltags_parser;
+
 		if ( defined $parser ) {
 			my $tag = $parser->findTag( $prefix, partial => 1 );
 			my @words;
@@ -716,6 +866,7 @@ sub event_on_char {
 	my ( $self, $editor, $event ) = @_;
 
 	my $config = Padre->ide->config;
+	my $main   = Padre->ide->wx->main;
 
 	$editor->Freeze;
 
@@ -727,7 +878,12 @@ sub event_on_char {
 
 	my $key = $event->GetUnicodeKey;
 
-	if ( Padre->ide->config->autocomplete_brackets ) {
+	my $pos   = $editor->GetCurrentPos;
+	my $line  = $editor->LineFromPosition($pos);
+	my $first = $editor->PositionFromLine($line);
+	my $last  = $editor->PositionFromLine( $line + 1 ) - 1;
+
+	if ( $config->autocomplete_brackets ) {
 		my %table = (
 			34  => 34,  # " "
 			39  => 39,  # ' '
@@ -736,7 +892,6 @@ sub event_on_char {
 			91  => 93,  # [ ]
 			123 => 125, # { }
 		);
-		my $pos = $editor->GetCurrentPos;
 		if ( $table{$key} ) {
 			if ($selection_exists) {
 				my $start = $editor->GetSelectionStart;
@@ -759,7 +914,56 @@ sub event_on_char {
 		}
 	}
 
+	# This only matches if all conditions are met:
+	#  - config option enabled
+	#  - none of the following keys pressed: a-z, A-Z, 0-9, _
+	#  - cursor position is at end of line
+	if ($config->autocomplete_method
+		and (  ( $key < 48 )
+			or ( ( $key > 57 ) and ( $key < 65 ) )
+			or ( ( $key > 90 ) and ( $key < 95 ) )
+			or ( $key == 96 )
+			or ( $key > 122 ) )
+		and ( $pos == $last )
+		)
+	{
+
+		# from beginning to current position
+		my $prefix = $editor->GetTextRange( 0, $pos );
+
+		# methods can't live outside packages, so ignore them
+		if ( $prefix =~ /package / ) {
+			my $linetext = $editor->GetTextRange( $first, $last );
+
+			# we only match "sub foo" at the beginning of a line
+			# but no inline subs (eval, anonymus, etc.)
+			# The end-of-subname match is included in the first if
+			# which match the last key pressed (which is not part of
+			# $linetext at this moment:
+			if ( $linetext =~ /^sub[\s\t]+\w+$/ ) {
+
+				# Add the default skeleton of a method,
+				# the \t should be replaced by
+				# (space * current_indent_width)
+				$editor->AddText( ' {'
+						. $self->newline . "\t"
+						. 'my $self = shift;'
+						. $self->newline . "\t"
+						. $self->newline . '}'
+						. $self->newline
+						. $self->newline );
+
+				# Ready for typing in the new method:
+				$editor->GotoPos( $last + 23 );
+
+			}
+		}
+	}
+
 	$editor->Thaw;
+
+	$main->on_autocompletion if $config->autocomplete_always;
+
 	return;
 }
 
@@ -775,11 +979,19 @@ sub event_on_right_down {
 	my $pos;
 	if ( $event->isa("Wx::MouseEvent") ) {
 		my $point = $event->GetPosition();
-		$pos = $editor->PositionFromPoint($point);
-	} else {
+		if ( $point != Wx::wxDefaultPosition ) {
+
+			# Then it is really a mouse event...
+			# On Windows, context menu is faked
+			# as a Mouse event
+			$pos = $editor->PositionFromPoint($point);
+		}
+	}
+
+	unless ($pos) {
 
 		# Fall back to the cursor position
-		$editor->GetCurrentPos();
+		$pos = $editor->GetCurrentPos();
 	}
 
 	my $introduced_separator = 0;

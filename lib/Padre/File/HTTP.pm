@@ -6,7 +6,7 @@ use warnings;
 
 use Padre::File;
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Padre::File';
 
 sub new {
@@ -19,9 +19,10 @@ sub new {
 		return;
 	}
 
-	my $self = bless { Filename => $_[0], UA => LWP::UserAgent->new() }, $class;
+	my $self = bless { filename => $_[0], UA => LWP::UserAgent->new() }, $class;
 	$self->{protocol} = 'http'; # Should not be overridden
 	$self->{UA}->timeout(60);   # TODO: Make this configurable
+	$self->{UA}->env_proxy;
 	return $self;
 }
 
@@ -29,7 +30,7 @@ sub _request {
 
 	my $self   = shift;
 	my $method = shift || 'GET';
-	my $URL    = shift || $self->{Filename};
+	my $URL    = shift || $self->{filename};
 
 	my $HTTP_Req = HTTP::Request->new( $method, $URL );
 
@@ -48,6 +49,10 @@ sub _request {
 			return;
 		}
 	}
+}
+
+sub can_run {
+	return 0;
 }
 
 sub size {
@@ -89,7 +94,7 @@ sub basename {
 	my $self = shift;
 
 	# Cut the protocol and hostname part or fail if this is no expected syntax:
-	$self->{Filename} =~ /https?\:\/\/.+?\/(.+)/i or return 'index.html';
+	$self->{filename} =~ /https?\:\/\/.+?\/(.+)/i or return 'index.html';
 	my $basename = $1;
 
 	# Cut any arguments and anchor-parts
@@ -106,7 +111,7 @@ sub dirname {
 	my $self = shift;
 
 	# Cut the protocol and hostname part or fail if this is no expected syntax:
-	$self->{Filename} =~ /^(https?\:\/\/.+?\/)[^\/\#\?]+?([\#\?].*)?$/i or return $self->{Filename};
+	$self->{filename} =~ /^(https?\:\/\/.+?\/)[^\/\#\?]+?([\#\?].*)?$/i or return $self->{filename};
 	return $1;
 }
 
@@ -123,7 +128,7 @@ sub read {
 #	my $encode  = shift || ''; # undef encode = default, but undef will trigger a warning
 #
 #	my $fh;
-#	if ( !open $fh, ">$encode", $self->{Filename} ) {
+#	if ( !open $fh, ">$encode", $self->{filename} ) {
 #		$self->{error} = $!;
 #		return 0;
 #	}

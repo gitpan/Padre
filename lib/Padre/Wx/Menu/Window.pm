@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.47';
+our $VERSION = '0.48';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -25,18 +25,6 @@ sub new {
 	# Add additional properties
 	$self->{main} = $main;
 	$self->{alt}  = [];
-
-	# Split Window
-	$self->{window_split_window} = $self->add_menu_item(
-		$self,
-		name       => 'window.split_window',
-		label      => Wx::gettext('&Split window'),
-		menu_event => sub {
-			Padre::Wx::Main::on_split_window(@_);
-		},
-	);
-
-	$self->AppendSeparator;
 
 	# File Navigation
 	$self->{window_next_file} = $self->add_menu_item(
@@ -89,10 +77,11 @@ sub new {
 		$self,
 		name       => 'window.goto_functions_window',
 		label      => Wx::gettext('GoTo Functions Window'),
+		shortcut   => 'Alt-N',
 		menu_event => sub {
 			$_[0]->refresh_functions( $_[0]->current );
 			$_[0]->show_functions(1);
-			$_[0]->functions->SetFocus;
+			$_[0]->functions->focus_on_search;
 		},
 	);
 
@@ -187,7 +176,6 @@ sub refresh {
 			$self->Destroy( delete $self->{separator} );
 		}
 	}
-	$self->{window_split_window}->Enable($pages);
 	$self->{window_next_file}->Enable($pages);
 	$self->{window_previous_file}->Enable($pages);
 	$self->{window_last_visited_file}->Enable($pages);
