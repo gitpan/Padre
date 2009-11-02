@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 my %Registered_Modules;
 
@@ -61,7 +61,7 @@ sub REGISTER { # RegExp,Module
 
 }
 
-=pot
+=pod
 
 =head1 METHODS
 

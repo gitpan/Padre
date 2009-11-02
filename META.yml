@@ -91,6 +91,8 @@ requires:
   IO::Scalar: 2.110
   IO::Socket: 1.30
   IO::String: 1.08
+  IPC::Open2: 0
+  IPC::Open3: 0
   List::MoreUtils: 0.22
   List::Util: 1.18
   Module::CoreList: 0
@@ -131,4 +133,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.48
+version: 0.49

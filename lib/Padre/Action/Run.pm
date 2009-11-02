@@ -17,7 +17,7 @@ use warnings;
 use Padre::Action ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 #####################################################################
 
@@ -33,22 +33,31 @@ sub new {
 
 	# Script Execution
 	Padre::Action->new(
-		name       => 'run.run_document',
-		label      => Wx::gettext('Run Script'),
-		comment    => Wx::gettext( 'Runs the current document and ' . 'shows its output in the output panel.' ),
-		shortcut   => 'F5',
-		menu_event => sub {
+		name         => 'run.run_document',
+		need_editor  => 1,
+		need_runable => 1,
+		label        => Wx::gettext('Run Script'),
+		comment      => Wx::gettext('Runs the current document and shows its output in the output panel.'),
+		shortcut     => 'F5',
+		need_editor  => 1,
+		need_file    => 1,
+		need_runable => 1,
+		menu_event   => sub {
 			$_[0]->run_document;
 			$_[0]->refresh_toolbar( $_[0]->current );
 		},
 	);
 
 	Padre::Action->new(
-		name       => 'run.run_document_debug',
-		label      => Wx::gettext('Run Script (debug info)'),
-		comment    => Wx::gettext( 'Run the current document but include ' . 'debug info in the output.' ),
-		shortcut   => 'Shift-F5',
-		menu_event => sub {
+		name         => 'run.run_document_debug',
+		need_editor  => 1,
+		need_runable => 1,
+		need_file    => 1,
+		label        => Wx::gettext('Run Script (debug info)'),
+		comment      => Wx::gettext( 'Run the current document but include ' . 'debug info in the output.' ),
+		shortcut     => 'Shift-F5',
+		need_editor  => 1,
+		menu_event   => sub {
 			$_[0]->run_document(1); # Enable debug info
 		},
 	);
@@ -62,29 +71,57 @@ sub new {
 			$_[0]->on_run_command;
 		},
 	);
+	Padre::Action->new(
+		name        => 'run.run_tdd_tests',
+		need_file   => 1,
+		need_editor => 1,
+		label       => Wx::gettext('Build + run all Tests'),
+		comment     => Wx::gettext('Builds the current project, then run all tests.'),
+		shortcut    => 'Ctrl-Shift-F5',
+		menu_event  => sub {
+			$_[0]->on_run_tdd_tests;
+		},
+	);
 
 	Padre::Action->new(
-		name    => 'run.run_tests',
-		label   => Wx::gettext('Run Tests'),
-		comment => Wx::gettext(
-			'Run all tests for the current project or ' . 'document and show the results in the output panel.'
+		name        => 'run.run_tests',
+		need_editor => 1,
+		need_file   => 1,
+		label       => Wx::gettext('Run Tests'),
+		comment     => Wx::gettext(
+			'Run all tests for the current project or document and show the results in ' . 'the output panel.'
 		),
-		menu_event => sub {
+		need_editor => 1,
+		menu_event  => sub {
 			$_[0]->on_run_tests;
 		},
 	);
 
 	Padre::Action->new(
-		name       => 'run.run_this_test',
-		label      => Wx::gettext('Run This Test'),
-		comment    => Wx::gettext('Run the current test if the current document is a test.'),
-		menu_event => sub {
+		name         => 'run.run_this_test',
+		need_editor  => 1,
+		need_runable => 1,
+		need_file    => 1,
+		need         => sub {
+			my %objects = @_;
+			return 0 if !defined( $objects{document} );
+			return 0 if !defined( $objects{document}->{file} );
+			return $objects{document}->{file}->{filename} =~ /\.t$/;
+		},
+		label       => Wx::gettext('Run This Test'),
+		comment     => Wx::gettext('Run the current test if the current document is a test.'),
+		need_editor => 1,
+		menu_event  => sub {
 			$_[0]->on_run_this_test;
 		},
 	);
 
 	Padre::Action->new(
-		name       => 'run.stop',
+		name => 'run.stop',
+		need => sub {
+			my %objects = @_;
+			return $main->{command} ? 1 : 0;
+		},
 		label      => Wx::gettext('Stop execution'),
 		comment    => Wx::gettext('Stop a running task.'),
 		shortcut   => 'F6',

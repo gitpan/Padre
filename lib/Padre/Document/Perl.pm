@@ -6,18 +6,14 @@ use warnings;
 use Carp   ();
 use Encode ();
 use Params::Util '_INSTANCE';
-use YAML::Tiny      ();
-use Padre::Document ();
-use Padre::Util     ();
-use Padre::Perl     ();
-use Padre::Document::Perl::Beginner;
+use YAML::Tiny                      ();
+use Padre::Document                 ();
+use Padre::Util                     ();
+use Padre::Perl                     ();
+use Padre::Document::Perl::Beginner ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::Document';
-
-
-
-
 
 #####################################################################
 # Padre::Document::Perl Methods
@@ -555,42 +551,106 @@ sub introduce_temporary_variable {
 	return ();
 }
 
+# this method takes the new subroutine name
+# and extracts the name and sets a call to it
+# Uses Devel::Refactor to get the code and create the new subroutine code.
+# Uses PPIx::EditorTools when no functions are in the script
+# Otherwise locates the entry point after a user has
+# provided a function name to insert the new code before.
 sub extract_subroutine {
 	my ( $self, $newname ) = @_;
 
 	my $editor = $self->editor;
-	my $code   = $editor->GetSelectedText();
 
+	# get the selected code
+	my $code = $editor->GetSelectedText();
+
+	#print "startlocation: " . join(", ", @$start_position) . "\n";
+	# this could be configurable
+	my $now         = localtime;
 	my $sub_comment = <<EOC;
 # 
-# New subroutine extracted.
+# New subroutine "$newname" extracted - $now.
 #
 EOC
+
+	# get the new code
+	require Devel::Refactor;
+	my $refactory = Devel::Refactor->new;
+	my ( $new_sub_call, $new_code ) = $refactory->extract_subroutine( $newname, $code, 1 );
+	my $data = Wx::TextDataObject->new;
+	$data->SetText( $sub_comment . $new_code . "\n\n" );
 
 	# we want to get a list of the subroutines to pick where to place
 	# the new sub
 	my @functions = $self->get_functions;
 
-	#print "printing the functions: " . join( "\n", @functions );
+	# need to check there are functions already defined
+	if ( scalar(@functions) == 0 ) {
+
+		# get the current position of the selected text as we need it for PPI
+		my $start_position = $self->character_position_to_ppi_location( $editor->GetSelectionStart );
+		my $end_position   = $self->character_position_to_ppi_location( $editor->GetSelectionEnd - 1 );
+
+		# use PPI to find the right place to put the new subroutine
+		require PPI::Document;
+		my $text    = $editor->GetText;
+		my $ppi_doc = PPI::Document->new( \$text );
+
+		# /usr/local/share/perl/5.10.0/PPIx/EditorTools/IntroduceTemporaryVariable.pm
+		# we have no subroutines to put before, so we
+		# really just need to make sure we aren't in a block of any sort
+		# and then stick the new subroutine in above where we are.
+		# being above the selected text also means we won't
+		# lose the location when the change is made to the document
+		#require PPI::Dumper;
+		#my $dumper = PPI::Dumper->new( $ppi_doc );
+		#$dumper->print;
+		require PPIx::EditorTools;
+		my $token     = PPIx::EditorTools::find_token_at_location( $ppi_doc, $start_position );
+		my $statement = $token->statement();
+		my $parent    = $statement;
+
+		#print "The statement is: " . $statement->statement() . "\n";
+		my $last_location; # use this to get the last point before the PPI::Document
+		while ( !$parent->isa('PPI::Document') ) {
+
+			#print "parent currently: " . ref($parent) . "\n";
+			#print "location: " . join(', ', @{$parent->location} ) . "\n";
+
+			$last_location = $parent->location;
+			$parent        = $parent->parent;
+		}
+
+		#print "location: " . join(', ', @{$parent->location} ) . "\n";
+		#print "last location: " . join(', ' ,@$last_location) . "\n";
+
+		my $insert_start_location = $self->ppi_location_to_character_position($last_location);
+
+		#print "Document start location is: $doc_start_location\n";
+
+		# make the change to the selected text
+		$editor->BeginUndoAction(); # do the edit atomically
+		$editor->ReplaceSelection($new_sub_call);
+		$editor->InsertText( $insert_start_location, $data->GetText );
+		$editor->EndUndoAction();
+
+		return;
+	}
 
 	# Show a list of functions
 	require Padre::Wx::Dialog::RefactorSelectFunction;
 	my $dialog = Padre::Wx::Dialog::RefactorSelectFunction->new( $editor->main, \@functions );
 	$dialog->show();
 	if ( $dialog->{cancelled} ) {
+
+		#$dialog->Destroy();
 		return ();
 	}
 
-	# testing for now hard set:
-	#my $subname = 'testing2';
-	# check if canceled:
-
 	my $subname = $dialog->get_function_name;
 
-	# get the new code, replace the selection
-	require Devel::Refactor;
-	my $refactory = Devel::Refactor->new;
-	my ( $new_sub_call, $new_code ) = $refactory->extract_subroutine( $newname, $code, 1 );
+	#$dialog->Destroy();
 
 	# make the change to the selected text
 	$editor->BeginUndoAction(); # do the edit atomically
@@ -616,11 +676,7 @@ EOC
 		return;
 	}
 
-	# now instert the text into the right location
-	my $data = Wx::TextDataObject->new;
-	$data->SetText( $sub_comment . $new_code );
-	my $length = $data->GetTextLength;
-
+	# now insert the text into the right location
 	$editor->InsertText( $start, $data->GetText );
 	$editor->EndUndoAction();
 
@@ -673,7 +729,8 @@ sub _perltags_parser {
 }
 
 sub autocomplete {
-	my $self = shift;
+	my $self  = shift;
+	my $event = shift;
 
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
@@ -682,6 +739,18 @@ sub autocomplete {
 
 	# line from beginning to current position
 	my $prefix = $editor->GetTextRange( $first, $pos );
+	my $suffix = $editor->GetTextRange( $pos,   $pos + 15 );
+	$suffix = $1 if $suffix =~ /^(\w*)/; # Cut away any non-word chars
+
+	# The second parameter may be a reference to the current event or the next
+	# char which will be added to the editor:
+	my $nextchar;
+	if ( defined($event) and ( ref($event) eq 'Wx::KeyEvent' ) ) {
+		my $key = $event->GetUnicodeKey;
+		$nextchar = chr($key);
+	} elsif ( defined($event) and ( !ref($event) ) ) {
+		$nextchar = $event;
+	}
 
 	# WARNING: This is totally not done, but Gabor made me commit it.
 	# TODO:
@@ -697,10 +766,9 @@ sub autocomplete {
 	# i) hack Perl::Tags to be better (including inheritance)
 	# j) add inheritance support
 	# k) figure out how to do method auto-comp. on objects
+	# (Ticket #676)
 
 	# check for variables
-
-	# (Ticket #676)
 
 	if ( $prefix =~ /([\$\@\%\*])(\w+(?:::\w+)*)$/ ) {
 		my $prefix = $2;
@@ -832,7 +900,36 @@ sub autocomplete {
 		@words = @words[ 0 .. 19 ];
 	}
 
-	return ( length($prefix), @words );
+	# Suggesting the current word as the only solution doesn't help
+	# anything, but your need to close the suggestions window before
+	# you may press ENTER/RETURN.
+	if ( ( $#words == 0 ) and ( $prefix eq $words[0] ) ) {
+		return;
+	}
+
+	# While typing within a word, the rest of the word shouldn't be
+	# inserted.
+	if ( defined($suffix) ) {
+		for ( 0 .. $#words ) {
+			$words[$_] =~ s/\Q$suffix\E$//;
+		}
+	}
+
+	# This is the final result if there is no char which hasn't been
+	# saved to the editor buffer until now
+	return ( length($prefix), @words ) if !defined($nextchar);
+
+	# Finally cut out all words which do not match the next char
+	# which will be inserted into the editor (by the current event)
+	my @final_words;
+	for (@words) {
+
+		# Accept everything which has prefix + next char + at least one other char
+		next if !/^\Q$prefix$nextchar\E./;
+		push @final_words, $_;
+	}
+
+	return ( length($prefix), @final_words );
 }
 
 sub newline_keep_column {
@@ -870,6 +967,16 @@ sub event_on_char {
 
 	$editor->Freeze;
 
+	$self->autocomplete_matching_char(
+		$editor, $event,
+		34  => 34,  # " "
+		39  => 39,  # ' '
+		40  => 41,  # ( )
+		60  => 62,  # < >
+		91  => 93,  # [ ]
+		123 => 125, # { }
+	);
+
 	my $selection_exists = 0;
 	my $text             = $editor->GetSelectedText;
 	if ( defined($text) && length($text) > 0 ) {
@@ -882,37 +989,6 @@ sub event_on_char {
 	my $line  = $editor->LineFromPosition($pos);
 	my $first = $editor->PositionFromLine($line);
 	my $last  = $editor->PositionFromLine( $line + 1 ) - 1;
-
-	if ( $config->autocomplete_brackets ) {
-		my %table = (
-			34  => 34,  # " "
-			39  => 39,  # ' '
-			40  => 41,  # ( )
-			60  => 62,  # < >
-			91  => 93,  # [ ]
-			123 => 125, # { }
-		);
-		if ( $table{$key} ) {
-			if ($selection_exists) {
-				my $start = $editor->GetSelectionStart;
-				my $end   = $editor->GetSelectionEnd;
-				$editor->GotoPos($end);
-				$editor->AddText( chr( $table{$key} ) );
-				$editor->GotoPos($start);
-			} else {
-				my $nextChar;
-				if ( $editor->GetTextLength > $pos ) {
-					$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
-				}
-				unless ( defined($nextChar) && ord($nextChar) == $table{$key}
-					and ( !$config->autocomplete_multiclosebracket ) )
-				{
-					$editor->AddText( chr( $table{$key} ) );
-					$editor->CharLeft;
-				}
-			}
-		}
-	}
 
 	# This only matches if all conditions are met:
 	#  - config option enabled
@@ -962,7 +1038,11 @@ sub event_on_char {
 
 	$editor->Thaw;
 
-	$main->on_autocompletion if $config->autocomplete_always;
+	# Auto complete only when the user selected 'always'
+	# and no ALT key is pressed
+	if ( $config->autocomplete_always && ( not $event->AltDown ) ) {
+		$main->on_autocompletion($event);
+	}
 
 	return;
 }
@@ -1128,6 +1208,21 @@ sub get_help_provider {
 sub get_quick_fix_provider {
 	require Padre::QuickFixProvider::Perl;
 	return Padre::QuickFixProvider::Perl->new;
+}
+
+sub autoclean {
+	my $self = shift;
+
+	my $editor = $self->editor;
+	my $text   = $editor->GetText;
+
+	$text =~ s/[\s\t]+([\r\n]*?)$/$1/mg;
+	$text .= "\n" if $text !~ /\n$/;
+
+	$editor->SetText($text);
+
+	return 1;
+
 }
 
 1;

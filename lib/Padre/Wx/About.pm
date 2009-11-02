@@ -12,7 +12,7 @@ use Padre::Wx::Icon         ();
 use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -82,15 +82,13 @@ sub new {
 
 	# Hide the dialog when the user presses the ESCape key or clicks Close button
 	# Please see ticket:573
-	$self->{sizer}->Add(
-		Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('&Close') ),
-		0,
-		Wx::wxALIGN_CENTER,
-		0
-	);
+	my $button = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('&Close') );
+	$self->{sizer}->Add( $button, 0, Wx::wxALIGN_CENTER, 0 );
 	$self->{sizer}->AddSpacer(0);
-
 	$self->SetSizer( $self->{sizer} );
+
+	# The close button is focused in case the user presses an ENTER
+	$button->SetFocus;
 
 	return $self;
 }
@@ -109,7 +107,8 @@ sub _content_about {
     </strong>
     <p>Created by Gábor Szabó</p>
     <p>Copyright 2008 - 2009 The Padre Development Team</p>
-    <p>Splash image courtesy of Jerry Charlotte</p>
+    <p>"Blue butterfly on a green leaf" splash image is based on work by 
+    Jerry Charlotte (blackbutterfly)</p>
     <p>
     <center>
         <img src="$splash">
@@ -148,6 +147,8 @@ sub _content_developers {
             Claudio Ramirez<br>
             <br>
             Fayland Lam<br>
+            <br>
+            Gabriel Vieira<br>
             <br>
             Gábor Szabó - גאבור סבו <br>
             <br>
@@ -249,6 +250,7 @@ sub _content_translators {
             <br>
             <b>Portuguese (Brazil)</b><br>
             Breno G. de Oliveira<br>
+            Gabriel Vieira<br>
             <br>
             <b>Spanish</b><br>
             Paco Alguacil<br>

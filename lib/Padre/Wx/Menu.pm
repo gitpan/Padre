@@ -13,7 +13,7 @@ use Class::Adapter::Builder
 	NEW      => 'Wx::Menu',
 	AUTOLOAD => 'PUBLIC';
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 use Class::XSAccessor getters => {
 	wx => 'OBJECT',
@@ -67,7 +67,11 @@ sub add_menu_action {
 	my $menu        = shift;
 	my $action_name = shift;
 
-	my $actions  = Padre->ide->actions;
+	my $actions = Padre->ide->actions;
+	if ( !defined( $actions->{$action_name} ) ) {
+		warn 'Action "' . $action_name . '" could not be found!';
+		return 0;
+	}
 	my $action   = $actions->{$action_name};
 	my $name     = $action->name;
 	my $shortcut = $action->shortcut;
@@ -77,6 +81,9 @@ sub add_menu_action {
 		$action->id,
 		$action->label_menu,
 	);
+	$item->Check( $action->{checked_default} )
+		if $method eq 'AppendCheckItem';
+
 	Wx::Event::EVT_MENU(
 		$self->{main},
 		$item,

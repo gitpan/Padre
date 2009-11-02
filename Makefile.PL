@@ -8,15 +8,35 @@ use lib 'privinc';
 use inc::Module::Install 0.91;
 use POSIX qw(locale_h);
 
+# workaround for the fact that Module::Install loads the modules
+# into memory and when Test::NoWarnings is loaded it will hide
+# the warnings generated from that point.
+# removed in r2208, added again in r9001
+eval {
+	require Test::NoWarnings;
+	$SIG{__WARN__} = 'DEFAULT';
+};
+
 BEGIN {
 	if ( author_context and not eval("use Locale::Msgfmt 0.14; 1;") ) {
 		die("Install Locale::Msgfmt version 0.14 or higher to build from SVN");
 	}
 }
 
+
 # Configure-time dependencies MUST be done first
 configure_requires 'ExtUtils::MakeMaker' => '6.52';
 
+# the above line does not seem to force an upgrade
+# the below code might work but not tested
+#eval "use ExtUtils::MakeMaker ()"; # avoid importing prompt() and other subs
+#if ($@) {
+#	print STDERR "Warning: prerequisite ExtUtils::MakeMaker 6.52 not found.\n";
+#	exit 0;
+#} elsif ($ExtUtils::MakeMaker::VERSION <= 6.52) {
+#	print STDERR "Warning: prerequisite ExtUtils::MakeMaker 6.52 not found. We have $ExtUtils::MakeMaker::VERSION.\n";
+#	exit 0;
+#}
 
 
 
@@ -70,6 +90,8 @@ requires 'HTML::Parser'          => '3.58';
 requires 'IO::Scalar'      => '2.110';
 requires 'IO::Socket'      => '1.30';
 requires 'IO::String'      => '1.08';
+requires 'IPC::Open2'      => 0;
+requires 'IPC::Open3'      => 0;
 requires 'List::Util'      => '1.18';
 requires 'List::MoreUtils' => '0.22';
 requires 'Module::Refresh' => '0.13';
@@ -158,7 +180,15 @@ keywords(
 );
 
 install_script 'script/padre';
-install_script 'script/padre.exe' if win32;
+if (win32) {
+
+	# Install Padre's Launcher
+	system $^X , qw[-MExtUtils::Command -e mkpath --], qw[ blib/bin ];
+	system $^X , qw[-MExtUtils::Command -e cp --],     qw[ bin/padre.exe blib/bin/padre.exe ];
+
+	# Install XP manifest to get a themed Padre
+	system $^X , qw[-MExtUtils::Command -e cp --], qw[ bin/wperl.exe.manifest blib/bin/wperl.exe.manifest ];
+}
 install_share_with_mofiles;
 
 

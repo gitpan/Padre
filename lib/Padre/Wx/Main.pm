@@ -22,44 +22,45 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use Cwd                       ();
-use Carp                      ();
-use File::Spec                ();
-use File::HomeDir             ();
-use File::Basename            ();
-use File::Temp                ();
-use List::Util                ();
-use Scalar::Util              ();
-use Params::Util              ();
-use Padre::Action             ();
-use Padre::Constant           ();
-use Padre::Util               ();
-use Padre::Perl               ();
-use Padre::Locale             ();
-use Padre::Current            ();
-use Padre::Document           ();
-use Padre::DB                 ();
-use Padre::Wx                 ();
-use Padre::Wx::Icon           ();
-use Padre::Wx::Left           ();
-use Padre::Wx::Right          ();
-use Padre::Wx::Bottom         ();
-use Padre::Wx::Editor         ();
-use Padre::Wx::Output         ();
-use Padre::Wx::Syntax         ();
-use Padre::Wx::Menubar        ();
-use Padre::Wx::ToolBar        ();
-use Padre::Wx::Notebook       ();
-use Padre::Wx::StatusBar      ();
-use Padre::Wx::ErrorList      ();
-use Padre::Wx::AuiManager     ();
-use Padre::Wx::FunctionList   ();
-use Padre::Wx::FileDropTarget ();
-use Padre::Wx::Dialog::Text   ();
-use Padre::Wx::Progress       ();
+use Cwd                           ();
+use Carp                          ();
+use File::Spec                    ();
+use File::HomeDir                 ();
+use File::Basename                ();
+use File::Temp                    ();
+use List::Util                    ();
+use Scalar::Util                  ();
+use Params::Util                  ();
+use Padre::Action                 ();
+use Padre::Constant               ();
+use Padre::Util                   ();
+use Padre::Perl                   ();
+use Padre::Locale                 ();
+use Padre::Current                ();
+use Padre::Document               ();
+use Padre::DB                     ();
+use Padre::Wx                     ();
+use Padre::Wx::Icon               ();
+use Padre::Wx::Left               ();
+use Padre::Wx::Right              ();
+use Padre::Wx::Bottom             ();
+use Padre::Wx::Editor             ();
+use Padre::Wx::Output             ();
+use Padre::Wx::Syntax             ();
+use Padre::Wx::Menubar            ();
+use Padre::Wx::ToolBar            ();
+use Padre::Wx::Notebook           ();
+use Padre::Wx::StatusBar          ();
+use Padre::Wx::ErrorList          ();
+use Padre::Wx::AuiManager         ();
+use Padre::Wx::FunctionList       ();
+use Padre::Wx::FileDropTarget     ();
+use Padre::Wx::Dialog::Text       ();
+use Padre::Wx::Dialog::FilterTool ();
+use Padre::Wx::Progress           ();
+use IPC::Open3                    ('open3');
 
-
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -155,7 +156,7 @@ sub new {
 	$self->{marker} = {};
 
 	# Create the actions
-	Padre::Action::create;
+	Padre::Action::create($self);
 
 	# Create the menu bar
 	$self->{menu} = Padre::Wx::Menubar->new($self);
@@ -321,19 +322,21 @@ use Class::XSAccessor predicates => {
 	getters => {
 
 	# GUI Elements
-	title     => 'title',
-	config    => 'config',
-	ide       => 'ide',
-	aui       => 'aui',
-	menu      => 'menu',
-	notebook  => 'notebook',
-	left      => 'left',
-	right     => 'right',
-	functions => 'functions',
-	bottom    => 'bottom',
-	output    => 'output',
-	syntax    => 'syntax',
-	errorlist => 'errorlist',
+	title               => 'title',
+	config              => 'config',
+	ide                 => 'ide',
+	aui                 => 'aui',
+	menu                => 'menu',
+	notebook            => 'notebook',
+	left                => 'left',
+	right               => 'right',
+	functions           => 'functions',
+	bottom              => 'bottom',
+	output              => 'output',
+	syntax              => 'syntax',
+	errorlist           => 'errorlist',
+	infomessage         => 'infomessage',
+	infomessage_timeout => 'infomessage_timeout',
 
 	# Operating Data
 	cwd        => 'cwd',
@@ -1022,6 +1025,12 @@ sub refresh_cursorpos {
 	$self->GetStatusBar->update_pos( $_[0] or $self->current );
 }
 
+sub refresh_rdstatus {
+	my $self = shift;
+	return if $self->no_refresh;
+	$self->GetStatusBar->is_read_only( $_[0] or $self->current );
+}
+
 =pod
 
 =head3 refresh_functions
@@ -1544,7 +1553,40 @@ sub on_run_command {
 	return;
 }
 
-=pod
+=pod 
+
+=head3 on_run_tdd_tests
+
+   $main->on_run_tdd_tests;
+   
+Callback method, to build and then call on_run_tests
+
+=cut 
+
+sub on_run_tdd_tests {
+	my $self     = shift;
+	my $document = $self->current->document;
+	unless ($document) {
+		return $self->error( Wx::gettext("No document open") );
+	}
+
+	# Find the project
+	my $project_dir = $document->project_dir;
+	unless ($project_dir) {
+		return $self->error( Wx::gettext("Could not find project root") );
+
+
+	}
+
+	my $dir = Cwd::cwd;
+	chdir $project_dir;
+	$self->run_command('perl Build test') if ( -e 'Build' );
+
+	$self->run_command('make test') if ( -e 'Makefile' ); # this should do dmake, nmake so on
+	chdir $dir;
+}
+
+=pod 
 
 =head3 on_run_tests
 
@@ -1663,7 +1705,6 @@ sub run_command {
 	my $self = shift;
 	my $cmd  = shift;
 
-	# experimental
 	# when this mode is used the Run menu options are not turned off
 	# and the Run/Stop is not turned on as we currently cannot control
 	# the external execution.
@@ -1696,6 +1737,20 @@ sub run_command {
 	# set up the ProcessStream bindings.
 	unless ($Wx::Perl::ProcessStream::VERSION) {
 		require Wx::Perl::ProcessStream;
+		if ( $Wx::Perl::ProcessStream::VERSION < .20 ) {
+			$self->error(
+				sprintf(
+					Wx::gettext(
+						      'Wx::Perl::ProcessStream is version %s'
+							. ' which is known to cause problems. Get at least 0.20 by typing'
+							. "\ncpan Wx::Perl::ProcessStream"
+					),
+					$Wx::Perl::ProcessStream::VERSION
+				)
+			);
+			return 1;
+		}
+
 		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDOUT(
 			$self,
 			sub {
@@ -1732,12 +1787,10 @@ sub run_command {
 	}
 
 	# Start the command
-	$self->{command} = Wx::Perl::ProcessStream::Process->new( $cmd, 'MyName1', $self );
-	$self->{command}->Run;
+	my $process = Wx::Perl::ProcessStream::Process->new( $cmd, "Run $cmd", $self );
+	$self->{command} = $process->Run;
 
-	# TODO: It appears that Wx::Perl::ProcessStream::Process's Run()
-	# does not honour the docs, as we don't get to this cleanup code
-	# even if we try to run a program that doesn't exist.
+	# Check if we started the process or not
 	unless ( $self->{command} ) {
 
 		# Failed to start the command. Clean up.
@@ -1916,7 +1969,9 @@ C<$session> (a C<Padre::DB::Session> object). No return value.
 =cut
 
 sub open_session {
-	my ( $self, $session ) = @_;
+	my ( $self, $session, $autosave ) = @_;
+
+	$autosave ||= 0; # Initilize if it isn't
 
 	# get list of files in the session
 	my @files = $session->files;
@@ -1960,7 +2015,8 @@ sub open_session {
 	$progress->update( $#files + 1, Wx::gettext('Restore focus...') );
 	$self->on_nth_pane($focus) if defined $focus;
 
-	$self->ide->{session} = $session->{id};
+	$self->ide->{session}          = $session->{id};
+	$self->ide->{session_autosave} = $autosave;
 
 	# now we can redraw
 	$self->Thaw;
@@ -1993,6 +2049,41 @@ sub save_session {
 	}
 	Padre::DB->commit;
 }
+
+sub save_current_session {
+	my $self = shift;
+
+	my ($session) = Padre::DB::Session->select(
+		'where id = ?',
+		$self->{ide}->{session}
+	);
+
+	# TODO: Understand and rewrite this if to match the logical context of this method
+	if ( defined $session ) {
+
+		# session exist, remove all files associated to it
+		Padre::DB::SessionFile->delete(
+			'where session = ?',
+			$session->id
+		);
+	} else {
+
+		# session did not exist, create a new one
+		$session = Padre::DB::Session->new(
+			name        => 'New session ' . localtime(time),
+			description => 'Auto-created session',
+			last_update => time,
+		);
+		$session->insert;
+	}
+
+	# capture session and save it
+	my @session = $self->capture_session;
+	$self->save_session( $session, @session );
+
+}
+
+
 
 sub update_directory {
 	my $self = shift;
@@ -2027,6 +2118,38 @@ sub message {
 	my $message = shift;
 	my $title   = shift || Wx::gettext('Message');
 	Wx::MessageBox( $message, $title, Wx::wxOK | Wx::wxCENTRE, $self );
+	return;
+}
+
+=pod
+
+=head3 info
+
+    $main->info( $msg );
+
+Print a message on the status bar or within a dialog box depending on the
+users preferences setting.
+The dialog has only a OK button and there is no return value.
+
+=cut
+
+sub info {
+	my $self    = shift;
+	my $message = shift;
+
+	my $ide    = $self->ide;
+	my $config = $ide->config;
+
+	if ( $config->info_on_statusbar ) {
+		$message =~ s/[\r\n]+/ /g;
+		$self->{infomessage}         = $message;
+		$self->{infomessage_timeout} = time + 10;
+		$self->refresh_status;
+	} else {
+		my $title = shift || Wx::gettext('Message');
+		Wx::MessageBox( $message, $title, Wx::wxOK | Wx::wxCENTRE, $self );
+	}
+
 	return;
 }
 
@@ -2308,9 +2431,10 @@ document type.
 =cut
 
 sub on_autocompletion {
-	my $self = shift;
+	my $self     = shift;
+	my $event    = shift;
 	my $document = $self->current->document or return;
-	my ( $length, @words ) = $document->autocomplete;
+	my ( $length, @words ) = $document->autocomplete($event);
 	if ( $length =~ /\D/ ) {
 		Wx::MessageBox(
 			$length, Wx::gettext("Autocompletion error"), Wx::wxOK,
@@ -2320,6 +2444,18 @@ sub on_autocompletion {
 		my $editor = $document->editor;
 		$editor->AutoCompSetSeparator( ord ' ' );
 		$editor->AutoCompShow( $length, join " ", @words );
+
+		# Cancel the auto completion list when Padre loses focus
+		Wx::Event::EVT_KILL_FOCUS(
+			$editor,
+			sub {
+				my ( $self, $event ) = @_;
+				unless ( $event->GetWindow ) {
+					$editor->AutoCompCancel;
+				}
+			}
+		);
+
 	}
 	return;
 }
@@ -2834,6 +2970,21 @@ sub on_open_all_recent_files {
 
 =pod
 
+=head3 on_filter_tool
+
+    $main->on_filter_tool;
+
+Prompt user for a command to filter the selection/document.
+
+=cut
+
+sub on_filter_tool {
+	require Padre::Wx::Dialog::FilterTool;
+	my $self   = shift;
+	my $filter = Padre::Wx::Dialog::FilterTool->new($self);
+	$filter->show;
+}
+
 =head3 on_open_url
 
     $main->on_open_url;
@@ -2853,6 +3004,9 @@ sub on_open_url {
 		return;
 	}
 	$self->setup_editor($url);
+
+	$self->ide->{session_autosave} and $self->save_current_session;
+
 }
 
 =pod
@@ -2925,16 +3079,16 @@ sub open_file_dialog {
 	$self->{cwd} = $dialog->GetDirectory;
 
 	my @files;
-	for (@filenames) {
+	for my $filename (@filenames) {
 
-		if (/[\*\?]/) {
+		if ( $filename =~ /[\*\?]/ ) {
 
 			# Windows usually handles this at the dialog level, but Gnome doesn't,
 			# so this should never appear on Windows:
 			my $ret = Wx::MessageBox(
 				sprintf(
 					Wx::gettext('Filename %s contains * or ? which are special chars on most computers. Skip?'),
-					$_
+					$filename
 				),
 				Wx::gettext("Open Warning"),
 				Wx::wxYES_NO | Wx::wxCENTRE,
@@ -2944,7 +3098,7 @@ sub open_file_dialog {
 			next if $ret == Wx::wxYES;
 		}
 
-		my $FN = File::Spec->catfile( $self->cwd, $_ );
+		my $FN = File::Spec->catfile( $self->cwd, $filename );
 
 		if ( !-e $FN ) {
 
@@ -2968,6 +3122,8 @@ sub open_file_dialog {
 	}
 	$self->setup_editors(@files) if $#files > -1;
 
+	$self->ide->{session_autosave} and $self->save_current_session;
+
 	return;
 }
 
@@ -2978,19 +3134,62 @@ sub on_open_example {
 
 =pod
 
-=head3 on_reload_file
+=head3 reload_all
 
-    $main->on_reload_file;
+    my $success = $main->reload_all();
 
-Try to reload current file from disk. Display an error if something went wrong.
-No return value.
+Reload all open files from disk.
 
 =cut
 
-sub on_reload_file {
-	my $self     = shift;
-	my $document = $self->current->document or return;
-	my $editor   = $document->editor;
+sub reload_all {
+	my $self  = shift;
+	my $skip  = shift;
+	my $guard = $self->freezer;
+
+	my @pages = $self->pageids;
+
+	my $progress = Padre::Wx::Progress->new(
+		$self, Wx::gettext('Reload all files'), $#pages,
+		lazy => 1
+	);
+
+	foreach my $no ( 0 .. $#pages ) {
+		$progress->update( $no, ( $no + 1 ) . '/' . scalar(@pages) );
+		$self->reload_file( $pages[$no] ) or return 0;
+	}
+
+	$self->refresh;
+
+	return 1;
+}
+
+=head3 reload_file
+
+    $main->reload_file;
+
+Try to reload a file from disk. Display an error if something went wrong.
+
+
+Returns 1 on success and 0 in case of and error.
+
+=cut
+
+sub reload_file {
+	my $self = shift;
+	my $page = shift;
+
+	my $editor;
+	my $document;
+
+	if ( defined($page) ) {
+		my $notebook = $self->notebook;
+		$editor   = $notebook->GetPage($page) or return 0;
+		$document = $editor->{Document}       or return 0;
+	} else {
+		$document = $self->current->document or return 0;
+		$editor = $document->editor;
+	}
 
 	$document->store_cursor_position;
 	if ( $document->reload ) {
@@ -3004,7 +3203,38 @@ sub on_reload_file {
 			)
 		);
 	}
-	return;
+	return 1;
+}
+
+=head3 on_reload_file
+
+    $main->on_reload_file;
+
+Try to reload current file from disk. Display an error if something went wrong.
+No return value.
+
+=cut
+
+sub on_reload_file {
+	my $self = shift;
+
+	return $self->reload_file;
+}
+
+
+=head3 on_reload_all
+
+    $main->on_reload_all;
+
+Reload all currently opened files from disk.
+No return value.
+
+=cut
+
+sub on_reload_all {
+	my $self = shift;
+
+	return $self->reload_all;
 }
 
 =pod
@@ -3222,6 +3452,10 @@ sub on_close {
 	}
 	$self->close;
 	$self->refresh;
+
+	$self->ide->{session_autosave} and $self->save_current_session;
+	$self->update_last_session;
+
 }
 
 =pod
@@ -3304,6 +3538,8 @@ sub close_all {
 	my $self  = shift;
 	my $skip  = shift;
 	my $guard = $self->freezer;
+
+	$self->ide->{session_autosave} and $self->save_current_session;
 
 	# Remove current session ID from IDE object
 	# Do this before closing as the session shouldn't be affected by a close-all
@@ -4182,6 +4418,8 @@ sub on_stc_update_ui {
 	#	$self->refresh_status($current);
 	$self->refresh_cursorpos($current);
 
+	$self->refresh_rdstatus($current);
+
 	# $self->refresh_functions;
 	# $self->refresh_syntaxcheck;
 
@@ -4824,8 +5062,10 @@ sub set_title {
 		$variable_data{'d'} = $document->file->dirname;
 
 		$variable_data{'F'} = $document->file->{filename};
-		my $project_dir = quotemeta $document->project_dir;
-		$variable_data{'F'} =~ s/^$project_dir//;
+		if ( defined( $document->project_dir ) ) {
+			my $project_dir = quotemeta $document->project_dir;
+			$variable_data{'F'} =~ s/^$project_dir//;
+		}
 	}
 
 	# Fill in the session, if any
@@ -4889,6 +5129,82 @@ sub new_document_from_string {
 	return 1;
 
 }
+
+sub filter_tool {
+	my $self = shift;
+	my $cmd  = shift;
+
+	return 0 if !defined($cmd);
+	return 0 if $cmd eq '';
+
+	my $text = $self->current->text;
+
+	if ( defined($text) and ( $text ne '' ) ) {
+
+		# Process a selection
+
+		my $newtext = $self->_filter_tool_run( $cmd, \$text );
+
+		if ( defined($newtext) and ( $newtext ne '' ) ) {
+
+			my $editor = $self->current->editor;
+			$editor->ReplaceSelection($newtext);
+		}
+
+	} else {
+
+		# No selection, process whole document
+
+		my $document = $self->current->document;
+		my $text     = $document->text_get;
+
+		my $newtext = $self->_filter_tool_run( $cmd, \$text );
+
+		if ( defined($newtext) and ( $newtext ne '' ) ) {
+			$document->text_set($newtext);
+		}
+	}
+
+	return 1;
+}
+
+sub _filter_tool_run {
+	my $self = shift;
+	my $cmd  = shift;
+	my $text = shift; # reference to advoid copiing the content again
+
+	my $filter_in;
+	my $filter_out;
+	my $filter_err;
+
+	if ( !open3( $filter_in, $filter_out, $filter_err, $cmd ) ) {
+		$self->error( sprintf( Wx::gettext("Error running filter tool:\n%s"), $! ) );
+		return;
+	}
+
+	print $filter_in ${$text};
+	CORE::close $filter_in; # Send EOF to tool
+	my $newtext = join( '', <$filter_out> );
+
+	if ( defined($filter_err) ) {
+
+		# The error channel may not exist
+
+		my $errtext = join( '', <$filter_err> );
+
+		if ( defined($errtext) and ( $errtext ne '' ) ) {
+			$self->error( sprintf( Wx::gettext( "Error returned by filter tool:\n%s", $errtext ) ) );
+
+			# We may also have a result, so don't return here
+		}
+	}
+
+	return $newtext;
+}
+
+
+
+
 1;
 
 =pod

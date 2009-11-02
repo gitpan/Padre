@@ -9,7 +9,7 @@ use File::Basename  ();
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::File';
 
 sub _reformat_filename {
@@ -171,6 +171,11 @@ sub basename {
 sub dirname {
 	my $self = shift;
 	return File::Basename::dirname( $self->{filename} );
+}
+
+sub readonly {
+	my $self = shift;
+	return 1 if ( !-w $self->{filename} );
 }
 
 1;

@@ -1,4 +1,6 @@
 Artistic
+bin/padre.exe
+bin/wperl.exe.manifest
 Changes
 COPYING
 eg/hello.pasm
@@ -37,8 +39,12 @@ inc/Module/Install/With.pm
 inc/Module/Install/WriteAll.pm
 lib/Padre.pm
 lib/Padre/Action.pm
+lib/Padre/Action/Help.pm
+lib/Padre/Action/Perl.pm
+lib/Padre/Action/Plugins.pm
 lib/Padre/Action/Refactor.pm
 lib/Padre/Action/Run.pm
+lib/Padre/Action/Search.pm
 lib/Padre/Autosave.pm
 lib/Padre/Config.pm
 lib/Padre/Config/Host.pm
@@ -138,6 +144,7 @@ lib/Padre/Wx/CPAN/Listview.pm
 lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
 lib/Padre/Wx/Dialog/Encode.pm
+lib/Padre/Wx/Dialog/FilterTool.pm
 lib/Padre/Wx/Dialog/Find.pm
 lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
@@ -207,8 +214,6 @@ padre.yml
 privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
-script/padre.exe
-script/padre.ico
 share/doc/perlopref.pod
 share/examples/absolute_beginner/01_hello_world.pl
 share/examples/absolute_beginner/02_time.pl
@@ -267,6 +272,7 @@ share/icons/padre/16x16/status/padre-plugin-error.png
 share/icons/padre/16x16/status/padre-plugin-incompatible.png
 share/icons/padre/16x16/status/padre-plugin.png
 share/icons/padre/16x16/status/padre-syntax-error.png
+share/icons/padre/16x16/status/padre-syntax-ok.png
 share/icons/padre/16x16/status/padre-syntax-warning.png
 share/icons/padre/16x16/status/padre-tasks-load.png
 share/icons/padre/16x16/status/padre-tasks-running.png
@@ -328,6 +334,7 @@ t/10-copyright.t
 t/11-badcode.t
 t/12.pragmas.t
 t/13-eol.t
+t/14-warnings.t
 t/50-docbrowser.t
 t/60-db.t
 t/70-document.t

@@ -8,7 +8,7 @@ use Padre::Constant            ();
 use Padre::Util::Win32         ();
 use Padre::Task::SyntaxChecker ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::Task::SyntaxChecker';
 
 use version;
@@ -63,7 +63,7 @@ sub _check_syntax {
 
 		# Create a temporary file with the Perl text
 		require File::Temp;
-		my $file = File::Temp->new( UNLINK => 0 );
+		my $file = File::Temp->new( UNLINK => 1 );
 		binmode( $file, ":utf8" );
 		$file->print( $self->{text} );
 		$file->close;
@@ -80,7 +80,7 @@ sub _check_syntax {
 		}
 
 		# Open a temporary file for standard error redirection
-		my $err = File::Temp->new( UNLINK => 0 );
+		my $err = File::Temp->new( UNLINK => 1 );
 		$err->close;
 
 		# Redirect perl's output to temporary file

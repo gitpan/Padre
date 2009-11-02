@@ -6,7 +6,7 @@ use warnings;
 
 use Padre::File;
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::File';
 
 sub new {
@@ -119,6 +119,10 @@ sub read {
 	my $self = shift;
 	return scalar( $self->_request() );
 
+}
+
+sub readonly {
+	return 1;
 }
 
 # TODO: Maybe use WebDAV to enable writing

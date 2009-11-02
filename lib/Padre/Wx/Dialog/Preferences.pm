@@ -10,8 +10,10 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::Wx::Dialog';
+
+our %PANELS;
 
 =pod
 
@@ -219,6 +221,13 @@ sub _behaviour_panel {
 			],
 			[]
 		],
+		[   [   'Wx::CheckBox',
+				'save_autoclean',
+				( $config->save_autoclean ? 1 : 0 ),
+				Wx::gettext("Clean up file content on saving (for supported document types)")
+			],
+			[]
+		],
 		[   [   'Wx::CheckBox', 'editor_fold_pod', ( $config->editor_fold_pod ? 1 : 0 ),
 				Wx::gettext('Auto-fold POD markup when code folding enabled')
 			],
@@ -282,6 +291,13 @@ sub _behaviour_panel {
 				'autocomplete_method',
 				( $config->autocomplete_method ? 1 : 0 ),
 				Wx::gettext("Autocomplete new methods in packages")
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox',
+				'window_list_shorten_path',
+				( $config->window_list_shorten_path ? 1 : 0 ),
+				Wx::gettext("Shorten the common path in window list?")
 			],
 			[]
 		],
@@ -352,6 +368,11 @@ sub _appearance_panel {
 		],
 		[   [   'Wx::CheckBox', 'main_output_ansi', ( $config->main_output_ansi ? 1 : 0 ),
 				Wx::gettext('Colored text in output window (ANSI)')
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox', 'info_on_statusbar', ( $config->info_on_statusbar ? 1 : 0 ),
+				Wx::gettext('Show low-priority info messages on statusbar (not in a popup)')
 			],
 			[]
 		],
@@ -481,8 +502,10 @@ sub main {
     return 0;
   }
 }
-__END__
 END_TEXT
+
+	# Including this in the << block would kill the function parsing
+	$dummy_text .= "__END__\n";
 
 	$editor->SetText($dummy_text);
 	$editor->SetWrapMode(Wx::wxSTC_WRAP_WORD);
@@ -750,6 +773,25 @@ sub dialog {
 	#$tb->AddPage( $plugin_manager, Wx::gettext('Plugin Manager') );
 	#$self->_add_plugins($tb);
 
+	# Add panels
+	# The panels are ahown in alphabetical order based on the Wx::gettext results
+
+	# TODO: Convert the internal panels to use this
+
+	for my $module ( sort { Wx::gettext( $PANELS{$a} ) cmp Wx::gettext( $PANELS{$b} ); } ( keys(%PANELS) ) ) {
+
+		# A plugin or panel should not crash Padre on error
+		eval {
+			eval 'require ' . $module . ';';
+			warn $@ if $@;
+			my $preferences_page = $module->new();
+			my $panel            = $preferences_page->panel($tb);
+			$tb->AddPage( $panel, Wx::gettext( $PANELS{$module} ) );
+		};
+		next unless $@;
+		warn 'Error while adding preference panel ' . $module . ': ' . $@;
+	}
+
 	$dialog_sizer->Add( $tb, 10, Wx::wxGROW | Wx::wxALL, 5 );
 
 	$dialog_sizer->Add(
@@ -921,6 +963,10 @@ sub run {
 		$data->{editor_wordwrap} ? 1 : 0
 	);
 	$config->set(
+		'save_autoclean',
+		$data->{save_autoclean} ? 1 : 0
+	);
+	$config->set(
 		'editor_fold_pod',
 		$data->{editor_fold_pod} ? 1 : 0
 	);
@@ -951,6 +997,10 @@ sub run {
 	$config->set(
 		'main_output_ansi',
 		$data->{main_output_ansi} ? 1 : 0
+	);
+	$config->set(
+		'info_on_statusbar',
+		$data->{info_on_statusbar} ? 1 : 0
 	);
 	$config->set(
 		'window_title',
@@ -1031,16 +1081,20 @@ sub run {
 		'autocomplete_method',
 		$data->{autocomplete_method} ? 1 : 0
 	);
+	$config->set(
+		'window_list_shorten_path',
+		$data->{window_list_shorten_path} ? 1 : 0
+	);
 
 
 	# Don't save options which are not shown as this may result in
 	# clearing them:
 	if ( $config->func_config ) {
 
-		for (@Func_List) {
+		for my $func (@Func_List) {
 			$config->set(
-				'func_' . $_->[0],
-				$data->{ 'func_' . $_->[0] } ? 1 : 0
+				'func_' . $func->[0],
+				$data->{ 'func_' . $func->[0] } ? 1 : 0
 			);
 		}
 
@@ -1074,6 +1128,11 @@ sub run {
 		'editor_currentline_color',
 		$editor_currentline_color
 	);
+
+	for my $module ( keys(%PANELS) ) {
+		my $preferences_page = $module->new();
+		$preferences_page->save();
+	}
 
 	$config->write;
 	return 1;

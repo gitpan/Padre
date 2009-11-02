@@ -6,13 +6,17 @@ use warnings;
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
 };
 
 =pod
+
+=head1 NAME
+
+Padre::Wx::Dialog::OpenURL - a dialog for opening URLs
 
 =head2 new
 

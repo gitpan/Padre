@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -69,6 +69,8 @@ sub _on_butsave_clicked {
 
 	my $main    = $self->GetParent;
 	my $session = $self->_current_session;
+
+	# TODO: This must be switched to use the main methods:
 
 	if ( defined $session ) {
 

@@ -12,7 +12,7 @@ use Encode       ();
 use Params::Util ();
 use Padre::Wx    ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Wx::TextCtrl';
 
 sub new {
@@ -35,6 +35,7 @@ sub new {
 	# Do custom startup stuff here
 	$self->clear;
 	$self->set_font;
+	$self->{main} = $main;
 
 	# see #351: output should be blank by default at startup.
 	#$self->AppendText( Wx::gettext('No output') );
@@ -75,6 +76,21 @@ sub setup_bindings {
 	}
 
 	require Wx::Perl::ProcessStream;
+
+	if ( $Wx::Perl::ProcessStream::VERSION < .20 ) {
+		$self->{main}->error(
+			sprintf(
+				Wx::gettext(
+					      'Wx::Perl::ProcessStream is version %s'
+						. ' which is known to cause problems. Get at least 0.20 by typing'
+						. "\ncpan Wx::Perl::ProcessStream"
+				),
+				$Wx::Perl::ProcessStream::VERSION
+			)
+		);
+		return 1;
+	}
+
 	Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDOUT(
 		$self,
 		sub {

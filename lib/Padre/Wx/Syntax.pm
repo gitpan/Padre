@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -23,9 +23,10 @@ sub new {
 		Wx::wxLC_REPORT | Wx::wxLC_SINGLE_SEL
 	);
 
-	my $list = Wx::ImageList->new( 14, 7 );
+	my $list = Wx::ImageList->new( 16, 16 );
 	$list->Add( Padre::Wx::Icon::icon('status/padre-syntax-error') );
 	$list->Add( Padre::Wx::Icon::icon('status/padre-syntax-warning') );
+	$list->Add( Padre::Wx::Icon::icon('status/padre-syntax-ok') );
 	$self->AssignImageList( $list, Wx::wxIMAGE_LIST_SMALL );
 
 	$self->InsertColumn( $_, _get_title($_) ) for 0 .. 2;

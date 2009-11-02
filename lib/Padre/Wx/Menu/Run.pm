@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -48,6 +48,11 @@ sub new {
 	$self->{run_tests} = $self->add_menu_action(
 		$self,
 		'run.run_tests',
+	);
+
+	$self->{run_tdd_tests} = $self->add_menu_action(
+		$self,
+		'run.run_tdd_tests',
 	);
 
 	$self->{run_this_test} = $self->add_menu_action(
@@ -91,6 +96,11 @@ sub refresh {
 	);
 	$self->{run_this_test}->Enable(
 		  $document && defined( $document->filename ) && $document->filename =~ /\.t$/
+		? $self->{run_command}->IsEnabled
+		: 0
+	);
+	$self->{run_tdd_tests}->Enable(
+		  $document && defined( $document->filename )
 		? $self->{run_command}->IsEnabled
 		: 0
 	);

@@ -23,7 +23,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -61,6 +61,9 @@ use Class::XSAccessor::Array getters => {
 # create a new setting, with %params used to feed the new object.
 #
 sub setting {
+
+	# Allow this sub to be called as a method or function
+	shift if ref( $_[0] ) eq __PACKAGE__;
 
 	# Validate the setting
 	my $object = Padre::Config::Setting->new(@_);
@@ -329,6 +332,42 @@ setting(
 	# Hide it by default so Padre looks "more Mac'ish"
 	default => Padre::Constant::MAC ? 0 : 1,
 );
+setting(
+	name  => 'main_toolbar_items',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HUMAN,
+
+	# This lifes here until a better place is found:
+	# This is a list of toolbar items, seperated by ;
+	# The following items are supported:
+	#   action:icon
+	#     Insert the action with the named icon
+	#   action(argument,argument):icon
+	#     Insert an action which requires one or more arguments
+	#   |
+	#     Insert a seperator
+	default => 'file.new:actions/document-new;'
+		. 'file.open:actions/document-open;'
+		. 'file.save:actions/document-save;'
+		. 'file.save_as:actions/document-save-as;'
+		. 'file.save_all:actions/stock_data-save;'
+		. 'file.close:actions/x-document-close;' . '|;'
+		. 'file.open_example:stock/generic/stock_example;' . '|;'
+		. 'edit.undo:actions/edit-undo;'
+		. 'edit.redo:actions/edit-redo;' . '|;'
+		. 'edit.cut:actions/edit-cut;'
+		. 'edit.copy:actions/edit-copy;'
+		. 'edit.paste:actions/edit-paste;'
+		. 'edit.select_all:actions/edit-select-all;' . '|;'
+		. 'search.find:actions/edit-find;'
+		. 'search.replace:actions/edit-find-replace;' . '|;'
+		. 'edit.comment_toggle:actions/toggle-comments;' . '|;'
+		. 'file.doc_stat:actions/document-properties;' . '|;'
+		. 'search.open_resource:places/folder-saved-search;'
+		. 'search.quick_menu_access:status/info;' . '|;'
+		. 'run.run_document:actions/player_play;'
+		. 'run.stop:actions/stop;',
+);
 
 # Directory Tree Settings
 setting(
@@ -394,6 +433,12 @@ setting(
 );
 setting(
 	name    => 'editor_fold_pod',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
+	name    => 'save_autoclean',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
@@ -537,6 +582,13 @@ setting(
 	# may be outdated sometimes in the future, reading it fresh on
 	# every run makes us more future-compatible
 	default => '',
+);
+
+setting(
+	name    => 'info_on_statusbar',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
 );
 
 # Move of stacktrace to run menu: will be removed (run_stacktrace)
@@ -683,6 +735,13 @@ setting(
 	default => 1,
 );
 
+# Window menu list shorten common path
+setting(
+	name    => 'window_list_shorten_path',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
 
 
 #####################################################################
@@ -913,6 +972,8 @@ editing. Examples of those settings are whether to use tabs or spaces, etc.
 
 Those settings are accessed with C<Padre::Config::Project>.
 
+=back
+
 =head1 ADDING CONFIGURATION OPTIONS
 
 Add a "setting()" - call to the correct section of this file.
@@ -921,8 +982,6 @@ The setting() call initially creates the option and defines some
 metadata like the type of the option, it's living place and the
 default value which should be used until the user configures
 a own value.
-
-=back
 
 =head1 COPYRIGHT & LICENSE
 

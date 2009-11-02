@@ -9,13 +9,16 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
 # Padre::Wx::Menu Methods
 
 sub new {
+
+	# TODO: Convert this to Padre::Action::File
+
 	my $class = shift;
 	my $main  = shift;
 
@@ -123,11 +126,12 @@ sub new {
 
 	$self->{close} = $self->add_menu_item(
 		$self,
-		name       => 'file.close',
-		id         => Wx::wxID_CLOSE,
-		label      => Wx::gettext('&Close'),
-		shortcut   => 'Ctrl-W',
-		menu_event => sub {
+		name        => 'file.close',
+		id          => Wx::wxID_CLOSE,
+		need_editor => 1,
+		label       => Wx::gettext('&Close'),
+		shortcut    => 'Ctrl-W',
+		menu_event  => sub {
 			$_[0]->on_close;
 		},
 	);
@@ -143,9 +147,10 @@ sub new {
 
 	$self->{close_current_project} = $self->add_menu_item(
 		$file_close,
-		name       => 'file.close_current_project',
-		label      => Wx::gettext('Close This Project'),
-		menu_event => sub {
+		name        => 'file.close_current_project',
+		need_editor => 1,
+		label       => Wx::gettext('Close This Project'),
+		menu_event  => sub {
 			my $doc = $_[0]->current->document;
 			return if not $doc;
 			my $dir = $doc->project_dir;
@@ -163,9 +168,10 @@ sub new {
 
 	$self->{close_other_projects} = $self->add_menu_item(
 		$file_close,
-		name       => 'file.close_other_projects',
-		label      => Wx::gettext('Close Other Projects'),
-		menu_event => sub {
+		name        => 'file.close_other_projects',
+		need_editor => 1,
+		label       => Wx::gettext('Close Other Projects'),
+		menu_event  => sub {
 			my $doc = $_[0]->current->document;
 			return if not $doc;
 			my $dir = $doc->project_dir;
@@ -185,28 +191,42 @@ sub new {
 
 	$self->{close_all} = $self->add_menu_item(
 		$file_close,
-		name       => 'file.close_all',
-		label      => Wx::gettext('Close All Files'),
-		menu_event => sub {
+		name        => 'file.close_all',
+		need_editor => 1,
+		label       => Wx::gettext('Close All Files'),
+		menu_event  => sub {
 			$_[0]->close_all;
 		},
 	);
 
 	$self->{close_all_but_current} = $self->add_menu_item(
 		$file_close,
-		name       => 'file.close_all_but_current',
-		label      => Wx::gettext('Close All Other Files'),
-		menu_event => sub {
+		name        => 'file.close_all_but_current',
+		need_editor => 1,
+		label       => Wx::gettext('Close All Other Files'),
+		menu_event  => sub {
 			$_[0]->close_all( $_[0]->notebook->GetSelection );
 		},
 	);
 
 	$self->{reload_file} = $self->add_menu_item(
 		$self,
-		name       => 'file.reload_file',
-		label      => Wx::gettext('Reload File'),
-		menu_event => sub {
+		name        => 'file.reload_file',
+		need_editor => 1,
+		label       => Wx::gettext('Reload File'),
+		menu_event  => sub {
 			$_[0]->on_reload_file;
+		},
+	);
+
+	$self->{reload_all} = $self->add_menu_item(
+		$self,
+		name        => 'file.reload_all',
+		need_editor => 1,
+		label       => Wx::gettext('Reload all files'),
+		comment     => Wx::gettext('Reload all files currently open'),
+		menu_event  => sub {
+			$_[0]->on_reload_all;
 		},
 	);
 
@@ -215,31 +235,35 @@ sub new {
 	# Save files
 	$self->{save} = $self->add_menu_item(
 		$self,
-		name       => 'file.save',
-		id         => Wx::wxID_SAVE,
-		label      => Wx::gettext('&Save'),
-		shortcut   => 'Ctrl-S',
-		menu_event => sub {
+		name          => 'file.save',
+		id            => Wx::wxID_SAVE,
+		need_editor   => 1,
+		need_modified => 1,
+		label         => Wx::gettext('&Save'),
+		shortcut      => 'Ctrl-S',
+		menu_event    => sub {
 			$_[0]->on_save;
 		},
 	);
 
 	$self->{save_as} = $self->add_menu_item(
 		$self,
-		name       => 'file.save_as',
-		id         => Wx::wxID_SAVEAS,
-		label      => Wx::gettext('Save &As'),
-		shortcut   => 'F12',
-		menu_event => sub {
+		name        => 'file.save_as',
+		id          => Wx::wxID_SAVEAS,
+		need_editor => 1,
+		label       => Wx::gettext('Save &As'),
+		shortcut    => 'F12',
+		menu_event  => sub {
 			$_[0]->on_save_as;
 		},
 	);
 
 	$self->{save_all} = $self->add_menu_item(
 		$self,
-		name       => 'file.save_all',
-		label      => Wx::gettext('Save All'),
-		menu_event => sub {
+		name        => 'file.save_all',
+		need_editor => 1,
+		label       => Wx::gettext('Save All'),
+		menu_event  => sub {
 			$_[0]->on_save_all;
 		},
 	);
@@ -288,9 +312,12 @@ sub new {
 	# Print files
 	$self->{print} = $self->add_menu_item(
 		$self,
-		name       => 'file.print',
+		name => 'file.print',
+
+		# TODO: As long as the ID is here, the shortcut won't work on Ubuntu.
 		id         => Wx::wxID_PRINT,
 		label      => Wx::gettext('&Print'),
+		shortcut   => 'Ctrl-P',
 		menu_event => sub {
 			require Wx::Print;
 			require Padre::Wx::Printout;
@@ -372,6 +399,7 @@ sub refresh {
 	$self->{close_all}->Enable($doc);
 	$self->{close_all_but_current}->Enable($doc);
 	$self->{reload_file}->Enable($doc);
+	$self->{reload_all}->Enable($doc);
 	$self->{save}->Enable($doc);
 	$self->{save_as}->Enable($doc);
 	$self->{save_all}->Enable($doc);

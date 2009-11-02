@@ -24,7 +24,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 
 #####################################################################
 # Methods
@@ -48,7 +48,7 @@ sub new {
 		label      => Wx::gettext('Lexically Rename Variable'),
 		menu_event => sub {
 			my $doc = $_[0]->current->document;
-			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+			return unless $doc->can('lexical_variable_replacement');
 			require Padre::Wx::History::TextEntryDialog;
 			my $dialog = Padre::Wx::History::TextEntryDialog->new(
 				$_[0],
@@ -73,6 +73,7 @@ sub new {
 		),
 		menu_event => sub {
 			my $doc = $_[0]->current->document;
+			return unless $doc->can('extract_subroutine');
 
 			#my $editor = $doc->editor;
 			#my $code   = $editor->GetSelectedText();
@@ -97,7 +98,7 @@ sub new {
 		label      => Wx::gettext('Introduce Temporary Variable'),
 		menu_event => sub {
 			my $doc = $_[0]->current->document;
-			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+			return unless $doc->can('introduce_temporary_variable');
 			require Padre::Wx::History::TextEntryDialog;
 			my $dialog = Padre::Wx::History::TextEntryDialog->new(
 				$_[0],

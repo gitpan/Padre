@@ -51,7 +51,7 @@ use Class::XSAccessor accessors => {
 	_task_width  => '_task_width',  # Current width of task field
 };
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::StatusBar
@@ -64,6 +64,7 @@ use constant {
 	MIMETYPE    => 3,
 	NEWLINE     => 4,
 	POSTRING    => 5,
+	RDONLY      => 6,
 };
 
 #####################################################################
@@ -92,6 +93,8 @@ sub new {
 		Wx::wxST_SIZEGRIP | Wx::wxFULL_REPAINT_ON_RESIZE
 	);
 
+	$self->{main} = $main;
+
 	# create the static bitmap that will hold the task load status
 	my $sbmp = Wx::StaticBitmap->new( $self, -1, Wx::wxNullBitmap );
 	$self->_task_sbmp($sbmp);
@@ -105,7 +108,7 @@ sub new {
 	);
 
 	# Set up the fields
-	$self->SetFieldsCount(6);
+	$self->SetFieldsCount(7);
 
 	#$self->SetStatusWidths( -1, 0, 100, 100, 50, 100 );
 
@@ -135,6 +138,7 @@ sub clear {
 	$self->SetStatusText( "", MIMETYPE );
 	$self->SetStatusText( "", NEWLINE );
 	$self->SetStatusText( "", POSTRING );
+	$self->SetStatusText( "", RDONLY );
 	return;
 }
 
@@ -156,6 +160,7 @@ sub refresh {
 	my $editor = $current->editor or return $self->clear;
 
 	# Prepare the various strings that form the status bar
+	my $main     = $self->{main};
 	my $notebook = $current->notebook;
 	my $document = $current->document;
 	my $newline  = $document->get_newline_type || Padre::Constant::NEWLINE;
@@ -187,16 +192,25 @@ sub refresh {
 	my $format   = '%' . length( $lines + 1 ) . 's,%-3s %3s%%';
 	my $length   = length( $lines + 1 ) + 8;
 	my $postring = sprintf( $format, ( $line + 1 ), $char, $percent );
+	my $rdstatus = $self->is_read_only;
 
 	# update task load status
 	$self->update_task_status;
 
 	# Write the new values into the status bar and update sizes
-	$self->SetStatusText( "$modified $filename", FILENAME );
-	$self->SetStatusText( $highlighter,          HIGHLIGHTER );
-	$self->SetStatusText( $mime_type_name,       MIMETYPE );
-	$self->SetStatusText( $newline,              NEWLINE );
-	$self->SetStatusText( $postring,             POSTRING );
+	if (    defined( $main->{infomessage} )
+		and ( $main->{infomessage} ne '' )
+		and ( $main->{infomessage_timeout} > time ) )
+	{
+		$self->SetStatusText( $main->{infomessage}, FILENAME );
+	} else {
+		$self->SetStatusText( "$modified $filename", FILENAME );
+	}
+	$self->SetStatusText( $highlighter,    HIGHLIGHTER );
+	$self->SetStatusText( $mime_type_name, MIMETYPE );
+	$self->SetStatusText( $newline,        NEWLINE );
+	$self->SetStatusText( $postring,       POSTRING );
+	$self->SetStatusText( $rdstatus,       RDONLY );
 	$self->SetStatusWidths(
 		-1,
 		$self->_task_width,
@@ -204,6 +218,7 @@ sub refresh {
 		( length($mime_type_name) + 2 ) * $width,
 		( length($newline) + 2 ) * $width,
 		( $length + 2 ) * $width,
+		length($rdstatus) * $width,
 	);
 
 	# move the static bitmap holding the task load status
@@ -373,6 +388,14 @@ sub _move_bitmap {
 	);
 	$sbmp->Refresh;
 }
+
+sub is_read_only {
+	my ($self) = @_;
+	my $file = $self->current->document->file || '';
+	my $is_rdonly = $file->readonly if $file;
+	$is_rdonly ? return Wx::gettext('Read Only') : return ':)';
+}
+
 
 1;
 

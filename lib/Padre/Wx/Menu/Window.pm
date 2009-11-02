@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.48';
+our $VERSION = '0.49';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -144,66 +144,74 @@ sub refresh {
 	my $items    = $self->GetMenuItemCount;
 	my $notebook = $current->notebook;
 	my $pages    = $notebook->GetPageCount;
+	my $main     = $self->{main};
+
+	# Destroy previous window list so we can add it again
+	$self->Destroy( pop @$alt ) while @$alt;
+	$self->Destroy( delete $self->{separator} ) if $self->{separator};
 
 	# Add or remove menu entries as needed
 	if ($pages) {
-		if ( $items == $default ) {
-			$self->{separator} = $self->AppendSeparator;
-			$items++;
-		}
-		my $need = $pages - $items + $default + 1;
-		my $main = $self->{main};
-		if ( $need > 0 ) {
-			foreach my $i ( 1 .. $need ) {
+		my $config_shorten_path = $main->ide->config->window_list_shorten_path;
+		my $prefix_length       = 0;
+		if ($config_shorten_path) {
 
-				# The temporary label 'tmp' is necessary (i.e. must be ne '')
-				# in order not to get a wx assertion failure in debug mode
-				my $menu_entry = $self->Append( -1, 'tmp' );
-				push @$alt, $menu_entry;
-				Wx::Event::EVT_MENU(
-					$main, $menu_entry,
-					sub { $main->on_nth_pane( $pages - $need + $i - 1 ) }
-				);
-			}
-		} elsif ( $need < 0 ) {
-			foreach ( 1 .. -$need ) {
-				$self->Destroy( pop @$alt );
-			}
+			# This only works when there isnt any unsaved tabs
+			$prefix_length = length get_common_prefix( $pages, $notebook );
 		}
-	} else {
-		if ( $items > $default ) {
-			$self->Destroy( pop @$alt ) while @$alt;
-			$self->Destroy( delete $self->{separator} );
+
+		# Create a list of notebook labels.
+		# A label can be a project (relative/full) path
+		# or unsaved pane label (e.g. Unsaved [0-9]+)
+		my %windows = ();
+		foreach my $tab_index ( 0 .. $pages - 1 ) {
+			my $doc = $notebook->GetPage($tab_index)->{Document} or return;
+			my $label = $doc->filename || $notebook->GetPageText($tab_index);
+			$label =~ s/^\s+//;
+			if ( $prefix_length < length $label ) {
+				$label = substr( $label, $prefix_length );
+			}
+			$windows{$label} = {
+				pane_index => $tab_index,
+				project    => Padre::Util::get_project_dir( $doc->filename ) || '',
+			};
+		}
+
+		# A separator is needed here for awesomeness
+		$self->{separator} = $self->AppendSeparator if $pages;
+
+		# Now let us sort by project path and then by label
+		my @sorted_by_project_then_label =
+			sort { $windows{$a}{project} cmp $windows{$a}{project} || $a cmp $b } keys %windows;
+
+		# Add sorted notebook labels and attach event handlers to them
+		foreach my $label (@sorted_by_project_then_label) {
+			my $menu_entry = $self->Append( -1, $label );
+			push @$alt, $menu_entry;
+			Wx::Event::EVT_MENU(
+				$main, $menu_entry,
+				sub { $main->on_nth_pane( $windows{$label}{pane_index} ) }
+			);
 		}
 	}
+
+	# toggle window operations based on number of pages
 	$self->{window_next_file}->Enable($pages);
 	$self->{window_previous_file}->Enable($pages);
 	$self->{window_last_visited_file}->Enable($pages);
 	$self->{window_right_click}->Enable($pages);
 
-	# Update the labels to match the notebooks
-	my $config_shorten_path = 1; # TODO should be configurable ?
-	my $prefix_length       = 0;
-	if ($config_shorten_path) {
-		$prefix_length = length get_common_prefix( $#$alt, $notebook );
-	}
-	foreach my $i ( 0 .. $#$alt ) {
-		my $doc = $notebook->GetPage($i)->{Document} or return;
-		my $label = $doc->filename || $notebook->GetPageText($i);
-		$label =~ s/^\s+//;
-		if ( $prefix_length < length $label ) {
-			$label = substr( $label, $prefix_length );
-		}
-		$alt->[$i]->SetText($label);
-	}
-
 	return 1;
 }
 
+#
+# Get the common prefix of notebooks
+# Please note that an Unsaved file causes this return undef
+#
 sub get_common_prefix {
 	my ( $count, $notebook ) = @_;
 	my @prefix = ();
-	foreach my $i ( 0 .. $count ) {
+	foreach my $i ( 0 .. $count - 1 ) {
 		my $doc = $notebook->GetPage($i)->{Document} or return;
 		my $label = $doc->filename || $notebook->GetPageText($i);
 		my @label = File::Spec->splitdir($label);
