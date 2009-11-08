@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Locale   ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -397,6 +397,11 @@ sub new {
 
 	foreach my $name ( sort { $language{$a} cmp $language{$b} } keys %language ) {
 		my $label = $language{$name};
+
+		# Calculate the tag name before we apply any humour :/
+		my $tag = "view.view_as_" . lc $label;
+		$tag =~ s/\s/_/g;
+
 		if ( $label eq 'English (United Kingdom)' ) {
 
 			# NOTE: A dose of fun in a mostly boring application.
@@ -408,8 +413,7 @@ sub new {
 			# speakers, non-English localisations do NOT show this.
 			$label = "English (New Britstralian)";
 		}
-		my $tag = "view.view_as_" . lc $label;
-		$tag =~ s/\s/_/g;
+
 		my $radio = $self->add_radio_menu_item(
 			$self->{language},
 			name       => $tag,
@@ -445,6 +449,12 @@ sub new {
 	);
 
 	return $self;
+}
+
+sub title {
+	my $self = shift;
+
+	return Wx::gettext('&View');
 }
 
 sub refresh {

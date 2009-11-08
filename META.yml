@@ -82,6 +82,7 @@ requires:
   File::ShareDir: 1.00
   File::Spec: 3.2701
   File::Spec::Functions: 3.2701
+  File::Temp: 0
   File::Which: 1.08
   FindBin: 0
   Format::Human::Bytes: 0
@@ -133,4 +134,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.49
+version: 0.50

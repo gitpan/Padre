@@ -34,7 +34,7 @@ use List::Util     ();
 use POSIX          ();
 use Padre::Constant();
 
-our $VERSION   = '0.49';
+our $VERSION   = '0.50';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = qw{ newline_type get_matches _T };
 
@@ -135,7 +135,7 @@ sub get_matches {
 	$text = Encode::encode( 'utf-8', $text );
 
 	my @matches;
-	while ( $text =~ /($regex)/g ) {
+	while ( $text =~ /$regex/mg ) {
 		my $e = pos($text);
 		my $s = $e - length($1);
 		push @matches, [ $s, $e ];

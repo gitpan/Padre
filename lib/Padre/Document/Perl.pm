@@ -11,8 +11,9 @@ use Padre::Document                 ();
 use Padre::Util                     ();
 use Padre::Perl                     ();
 use Padre::Document::Perl::Beginner ();
+use File::Find::Rule                ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Document';
 
 #####################################################################
@@ -188,14 +189,40 @@ sub get_functions {
 	$text =~ s/(\n)\n*__(?:DATA|END)__\b.*\z/$1/s;
 	$text =~ s/\n\n=\w+.+?\n\n=cut\b.+?\n+/\n\n/sg;
 
-	return $text =~ m/\n\s*sub\s+(\w+(?:::\w+)*)/g;
+	# Removes double \
+	$text =~ s/\\{2}//sg;
+
+	# Removes substitution functions
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)s(\W)(?:.*?)(?<!\\)\1(?:.*?)(?<!\\)\1\w*\s*(?<!;)?//g;
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)s\{(?:.*?)(?<!\\)\}\{(?:.*?)(?<!\\)\}\w*\s*(?<!;)?//sg;
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)s\((?:.*?)(?<!\\)\)\((?:.*?)(?<!\\)\)\w*\s*(?<!;)?//sg;
+
+	# Removes translate functions
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)tr(\W)(?:.*?)(?<!\\)\1(?:.*?)(?<!\\)\1\w*\s*//sg;
+
+	# Removes matches functions
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)m(\W)(?:.*?)(?<!\\)\1\w*\s*//sg;
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)m\{(?:.*?)(?<!\\)\}\w*\s*//sg;
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)m\((?:.*?)(?<!\\)\)\w*\s*//sg;
+	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)\/(?:.*?)(?<!\\)\/\w*\s*//sg;
+
+	# Remove quoted strings, attributions and comparations
+	$text =~ s/(?:[\$\@\%]\w+\s*=+\s*|\w+\s*)?(?<![\w\\])(["']).*?(?<!\\)\1//sg;
+
+	# Removes everything after # in each line
+	$text =~ s/#.*$//mg;
+
+	#	return $text =~ m/\n\s*sub\s+(\w+(?:::\w+)*)/g;
+	#	return $text =~ m/(?:(?:^[^#]*?)sub\s+(\w+(?:::\w+)*))+?/mg;
+	return $text =~ m/(?:^|[};])\s*sub\s+(\w+(?:::\w+)*)/mg;
 }
 
 sub get_function_regex {
 
 	# This emulates qr/(?<=^|[\012\015])sub\s$name\b/ but without
 	# triggering a "Variable length lookbehind not implemented" error.
-	return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
+	#return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
+	return qr/(?:^|[^#\s])\s*(sub\s+$_[1])\b/;
 }
 
 sub get_command {
@@ -500,8 +527,124 @@ sub find_variable_declaration {
 	return ();
 }
 
+sub find_method_declaration {
+	my ($self) = @_;
+
+	my ( $location, $token ) = _get_current_symbol( $self->editor );
+	unless ( defined $location ) {
+		Wx::MessageBox(
+			Wx::gettext("Current cursor does not seem to point at a method"),
+			Wx::gettext("Check cancelled"),
+			Wx::wxOK,
+			Padre->ide->wx->main
+		);
+		return ();
+	}
+	if ( $token =~ /^\w+$/ ) {
+
+		# check if there is -> before or (  after or shall we look it up in the list of existing methods?
+		# search for sub someting in
+		#    current file
+		#    all the files in the project directory (if in project)
+		# cache the list of methods found
+	}
+
+	#	Wx::MessageBox(
+	#		Wx::gettext("Current '$token' $location"),
+	#		Wx::gettext("Check cancelled"),
+	#		Wx::wxOK,
+	#		Padre->ide->wx->main
+	#	);
+	my ( $found, $filename ) = $self->_find_method($token);
+	if ( not $found ) {
+		Wx::MessageBox(
+			Wx::gettext("Current '$token' not found"),
+			Wx::gettext("Check cancelled"),
+			Wx::wxOK,
+			Padre->ide->wx->main
+		);
+		return;
+	}
+	if ( not $filename ) {
+
+		#print "No filename\n";
+		# goto $line in current file
+		$self->goto_sub($token);
+	} else {
+		my $main = Padre->ide->wx->main;
+
+		# open or switch to file
+		my $id = $main->find_editor_of_file($filename);
+		if ( not defined $id ) {
+			$id = $main->setup_editor($filename);
+		}
+
+		#print "Filename '$filename' id '$id'\n";
+		# goto $line in that file
+		return if not defined $id;
+
+		#print "ID $id\n";
+		my $editor = $main->notebook->GetPage($id);
+		$editor->{Document}->goto_sub($token);
+	}
 
 
+	return ();
+}
+
+sub _find_method {
+	my ( $self, $name ) = @_;
+
+	# TODO: unify with code in Padre::Wx::FunctionList
+	# TODO: lots of improvement needed here
+	if ( not $self->{_methods_}{$name} ) {
+		my $filename = $self->filename;
+		$self->{_methods_}{$_} = $filename for $self->get_functions;
+		my $project_dir = Padre::Util::get_project_dir($filename);
+		if ($project_dir) {
+			my @files = File::Find::Rule->file->name('*.pm')->in( File::Spec->catfile( $project_dir, 'lib' ) );
+			foreach my $f (@files) {
+				if ( open my $fh, '<', $f ) {
+					my $lines = do { local $/ = undef; <$fh> };
+					my @subs = $lines =~ /sub\s+(\w+)/g;
+
+					#use Data::Dumper;
+					#print Dumper \@subs;
+					$self->{_methods_}{$_} = $f for @subs;
+				}
+			}
+
+		}
+	}
+
+	#use Data::Dumper;
+	#print Dumper $self->{_methods_};
+
+	if ( $self->{_methods_}{$name} ) {
+		return 1, $self->{_methods_}{$name};
+	}
+	return;
+
+}
+
+# TODO temp function given a name of a subroutine and move the cursor
+# to its develaration, need to be improved ~ szabgab
+sub goto_sub {
+	my ( $self, $name ) = @_;
+	my $text = $self->text_get;
+	my @lines = split /\n/, $text;
+
+	#print "Name '$name'\n";
+	for my $i ( 0 .. @lines - 1 ) {
+
+		#print "L: $lines[$i]\n";
+		if ( $lines[$i] =~ /sub \s+ $name\b/x ) {
+			$self->editor->goto_line_centerize($i);
+			return 1;
+		}
+	}
+	return;
+}
 
 
 #####################################################################
@@ -1120,6 +1263,22 @@ sub event_on_right_down {
 		);
 	} # end if it's a variable
 
+	# TODO connect this to the action of menu item in the Perl menu!
+	if ( defined $location and $token =~ /^\w+$/ ) {
+		my $find = $menu->Append( -1, Wx::gettext("Find Method Declaration") );
+		Wx::Event::EVT_MENU(
+			$editor, $find,
+			sub {
+				my $editor = shift;
+				my $doc    = $self; # FIXME if Padre::Wx::Editor had a method to access its Document...
+				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
+				$doc->find_method_declaration;
+			},
+		);
+
+	}
+
+
 	my $select_start = $editor->GetSelectionStart;
 	my $select_end   = $editor->GetSelectionEnd;
 	if ( $select_start != $select_end ) { # if something's selected
@@ -1224,6 +1383,14 @@ sub autoclean {
 	return 1;
 
 }
+
+sub menu {
+	my $self = shift;
+
+	return [ 'menu.Perl', 'menu.Refactor' ];
+}
+
+
 
 1;
 

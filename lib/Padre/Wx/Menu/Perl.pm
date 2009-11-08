@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -51,6 +51,12 @@ sub new {
 		'perl.find_variable',
 	);
 
+	$self->{find_method} = $self->add_menu_action(
+		$self,
+		'perl.find_method',
+	);
+
+
 	$self->AppendSeparator;
 
 	$self->add_menu_action(
@@ -85,6 +91,12 @@ sub new {
 	);
 
 	return $self;
+}
+
+sub title {
+	my $self = shift;
+
+	return Wx::gettext('&Perl');
 }
 
 sub refresh {

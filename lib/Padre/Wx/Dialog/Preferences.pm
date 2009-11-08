@@ -10,10 +10,10 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Wx::Dialog';
 
-our %PANELS;
+our %PANELS = ( 'Padre::Wx::Dialog::Preferences::File' => 'Local/Remote file access' );
 
 =pod
 
@@ -785,7 +785,7 @@ sub dialog {
 			eval 'require ' . $module . ';';
 			warn $@ if $@;
 			my $preferences_page = $module->new();
-			my $panel            = $preferences_page->panel($tb);
+			my $panel = $preferences_page->panel( $tb, $self );
 			$tb->AddPage( $panel, Wx::gettext( $PANELS{$module} ) );
 		};
 		next unless $@;
@@ -916,6 +916,7 @@ sub run {
 		\@perldiag_locales,
 		\@default_line_ending_localized,
 	);
+	$self->{dialog}->Centre;
 	my $ret = $self->{dialog}->ShowModal;
 
 	if ( $ret eq Wx::wxID_CANCEL ) {
@@ -1131,7 +1132,7 @@ sub run {
 
 	for my $module ( keys(%PANELS) ) {
 		my $preferences_page = $module->new();
-		$preferences_page->save();
+		$preferences_page->save($data);
 	}
 
 	$config->write;

@@ -22,7 +22,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Locale ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Wx::Menu';
 
 sub new {
@@ -67,6 +67,16 @@ sub new {
 			my $doc = $_[0]->current->document;
 			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
 			$doc->find_variable_declaration;
+		},
+	);
+
+	Padre::Action->new(
+		name       => 'perl.find_method',
+		label      => Wx::gettext('Find Method Declaration'),
+		menu_event => sub {
+			my $doc = $_[0]->current->document;
+			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+			$doc->find_method_declaration;
 		},
 	);
 

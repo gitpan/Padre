@@ -23,7 +23,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -369,12 +369,37 @@ setting(
 		. 'run.stop:actions/stop;',
 );
 
+setting(
+	name  => 'main_menubar_items',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HUMAN,
+
+	# This lifes here until a better place is found:
+	# This is a list of menubar items, seperated by ;
+	# The following items are supported:
+	#   menu.MenuName
+	#     Insert the (sub-)menu MenuName
+	#   some.other_action
+	#     Insert an action
+	#   |
+	#     Insert a seperator
+	default => 'menu.File;'
+		. 'menu.Edit;'
+		. 'menu.Search;'
+		. 'menu.View;'
+		. 'menu._document;'
+		. 'menu.Run;'
+		. 'menu.Plugins;'
+		. 'menu.Window;'
+		. 'menu.Help',
+);
+
 # Directory Tree Settings
 setting(
 	name    => 'default_projects_directory',
 	type    => Padre::Constant::PATH,
 	store   => Padre::Constant::HOST,
-	default => File::HomeDir->my_documents,
+	default => File::HomeDir->my_documents || '',
 );
 
 # Editor Settings
@@ -743,6 +768,122 @@ setting(
 	default => 1,
 );
 
+# Beginner error checks configuration
+setting(
+	name    => 'begerror_split',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_warning',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_map',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_DB',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_chomp',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_map2',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_perl6',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_ifsetvar',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_pipeopen',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_pipe2open',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_regexq',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_elseif',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+setting(
+	name    => 'begerror_close',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HOST,
+	default => 1,
+);
+
+# Padre::File options
+
+#   ::HTTP
+setting(
+	name    => 'file_http_timeout',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 30,
+);
+
+#   ::FTP
+setting(
+	name    => 'file_ftp_timeout',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 30,
+);
+
+setting(
+	name    => 'file_ftp_passive',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
 
 #####################################################################
 # Constructor and Accessors

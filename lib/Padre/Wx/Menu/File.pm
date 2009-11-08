@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -389,6 +389,14 @@ sub new {
 
 	return $self;
 }
+
+sub title {
+	my $self = shift;
+
+	return Wx::gettext('&File');
+}
+
+
 
 sub refresh {
 	my $self    = shift;

@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -643,6 +643,17 @@ sub new {
 
 	$self->AppendSeparator;
 
+	$self->add_menu_item(
+		$self,
+		name       => 'edit.regex',
+		label      => Wx::gettext('Regex editor'),
+		menu_event => sub {
+			Padre::Wx::Main::open_regex_editor(@_);
+		},
+	);
+
+	$self->AppendSeparator;
+
 	$self->{show_as_number} = Wx::Menu->new;
 	$self->Append(
 		-1,
@@ -683,6 +694,12 @@ sub new {
 	);
 
 	return $self;
+}
+
+sub title {
+	my $self = shift;
+
+	return Wx::gettext('&Edit');
 }
 
 sub refresh {

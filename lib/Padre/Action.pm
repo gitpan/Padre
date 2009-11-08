@@ -11,8 +11,9 @@ use Padre::Action::Plugins  ();
 use Padre::Action::Refactor ();
 use Padre::Action::Run      ();
 use Padre::Action::Search   ();
+use Padre::Action::Window   ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 
 # Generate faster accessors
 use Class::XSAccessor getters => {
@@ -41,7 +42,7 @@ sub create {
 	Padre::Action::Refactor->new($main);
 	Padre::Action::Run->new($main);
 	Padre::Action::Search->new($main);
-
+	Padre::Action::Window->new($main);
 
 	# This is made for usage by the developers to create a complete
 	# list of all actions used in Padre. It outputs some warnings
@@ -69,6 +70,12 @@ sub new {
 
 	if ( ( !defined( $self->{name} ) ) or ( $self->{name} eq '' ) ) {
 		warn join( ',', caller ) . " tried to create an action without name";
+		return;
+	}
+
+	# The menu prefix is dedicated to menus and must not be used by actions
+	if ( $self->{name} =~ /^menu\./ ) {
+		warn join( ',', caller ) . ' tried to create an action with name prefix menu';
 		return;
 	}
 

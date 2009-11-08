@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 
 #
 # Constructor.
@@ -33,7 +33,7 @@ sub help_init {
 # Renders the help topic content into XHTML
 #
 sub help_render {
-	warn "helpi_render, You need to override this to do something useful with help search";
+	warn "help_render, You need to override this to do something useful with help search";
 }
 
 #

@@ -11,7 +11,7 @@ use Padre::Constant ();
 use Padre::Current '_CURRENT';
 use Padre::Locale ();
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 
 
 
@@ -37,7 +37,7 @@ sub new {
 		label      => Wx::gettext('Help'),
 		comment    => Wx::gettext('Show the Padre help'),
 		menu_event => sub {
-			$_[0]->help();
+			$_[0]->help('Padre');
 		},
 	);
 	Padre::Action->new(
@@ -51,8 +51,7 @@ sub new {
 				$_[0]->errorlist->on_menu_help_context_help;
 			} else {
 
-				# TODO This feels wrong, the help menu code shouldn't
-				# populate the main window hash.
+				#Show help for selected text
 				$_[0]->help( $_[0]->current->text );
 				return;
 			}
@@ -75,7 +74,7 @@ sub new {
 		name        => 'help.current',
 		need_editor => 1,
 		label       => Wx::gettext('Current Document'),
-		comment     => Wx::gettext('Show the POD (Perdoc) version of the current document'),
+		comment     => Wx::gettext('Show the POD (Perldoc) version of the current document'),
 		menu_event  => sub {
 			$_[0]->help( $_[0]->current->document );
 		},

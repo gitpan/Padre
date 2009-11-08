@@ -60,7 +60,7 @@ use Padre::Wx::Dialog::FilterTool ();
 use Padre::Wx::Progress           ();
 use IPC::Open3                    ('open3');
 
-our $VERSION = '0.49';
+our $VERSION = '0.50';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -1159,6 +1159,9 @@ sub relocale {
 	# actions and shortcuts
 	my %actions = ();
 	$self->ide->actions( \%actions );
+
+	# Create the actions (again)
+	Padre::Action::create($self);
 
 	# The menu doesn't support relocale, replace it
 	delete $self->{menu};
@@ -2812,6 +2815,9 @@ sub setup_editor {
 
 	$self->update_last_session unless $skip_update_session;
 
+	# Refresh the menu (to include or remove document dependent menu items)
+	$self->menu->refresh;
+
 	return $id;
 }
 
@@ -3788,6 +3794,28 @@ sub zoom {
 		$page->SetZoom($zoom);
 	}
 }
+
+
+=pod
+
+=head3 open_regex_editor
+
+    $main->open_regex_editor;
+
+Open Padre's regex editor. No return value.
+
+=cut
+
+sub open_regex_editor {
+	my $self = shift;
+
+	require Padre::Wx::Dialog::RegexEditor;
+	my $regex = Padre::Wx::Dialog::RegexEditor->new($self);
+	$regex->show();
+
+	return;
+}
+
 
 =pod
 
@@ -4994,7 +5022,6 @@ sub help {
 			$self->{help},
 			sub { $self->on_help_close( $_[1] ) },
 		);
-		$self->{help}->help('Padre');
 	}
 	$self->{help}->SetFocus;
 	$self->{help}->Show(1);

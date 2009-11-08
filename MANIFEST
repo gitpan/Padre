@@ -45,6 +45,7 @@ lib/Padre/Action/Plugins.pm
 lib/Padre/Action/Refactor.pm
 lib/Padre/Action/Run.pm
 lib/Padre/Action/Search.pm
+lib/Padre/Action/Window.pm
 lib/Padre/Autosave.pm
 lib/Padre/Config.pm
 lib/Padre/Config/Host.pm
@@ -78,6 +79,7 @@ lib/Padre/Document/Perl/Lexer.pm
 lib/Padre/Document/Perl/PPILexer.pm
 lib/Padre/Document/POD.pm
 lib/Padre/File.pm
+lib/Padre/File/FTP.pm
 lib/Padre/File/HTTP.pm
 lib/Padre/File/Local.pm
 lib/Padre/HelpProvider.pm
@@ -154,8 +156,10 @@ lib/Padre/Wx/Dialog/OpenURL.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
+lib/Padre/Wx/Dialog/Preferences/File.pm
 lib/Padre/Wx/Dialog/QuickMenuAccess.pm
 lib/Padre/Wx/Dialog/RefactorSelectFunction.pm
+lib/Padre/Wx/Dialog/RegexEditor.pm
 lib/Padre/Wx/Dialog/Replace.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/SessionManager.pm
@@ -214,7 +218,10 @@ padre.yml
 privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
-share/doc/perlopref.pod
+share/doc/perlopref/Artistic
+share/doc/perlopref/Copying
+share/doc/perlopref/perlopref.pod
+share/doc/perlopref/README
 share/examples/absolute_beginner/01_hello_world.pl
 share/examples/absolute_beginner/02_time.pl
 share/examples/absolute_beginner/03_good_morning.pl
@@ -332,9 +339,10 @@ t/07-log.t
 t/08-style.t
 t/10-copyright.t
 t/11-badcode.t
-t/12.pragmas.t
+t/12-pragmas.t
 t/13-eol.t
 t/14-warnings.t
+t/15-locale.t
 t/50-docbrowser.t
 t/60-db.t
 t/70-document.t
@@ -351,6 +359,7 @@ t/86-service.t
 t/91-vi.t
 t/92-padre-file.t
 t/93-padre-filename-win.t
+t/99-perl-func-list.t
 t/collection/Config-Tiny/Changes
 t/collection/Config-Tiny/lib/Config/Tiny.pm
 t/collection/Config-Tiny/Makefile.PL
