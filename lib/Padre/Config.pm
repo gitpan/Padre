@@ -23,7 +23,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -85,7 +85,7 @@ sub $object->{name} {
 END_PERL
 
 	# Compile the accessor
-	eval $code; ## no critic
+	eval $code;
 	if ($@) {
 		Carp::croak("Failed to compile setting $object->{name}");
 	}
@@ -225,7 +225,7 @@ setting(
 
 		# The toolbar can't dynamically switch between
 		# tearable and non-tearable so rebuild it.
-		# TODO: Review this assumption
+		# TO DO: Review this assumption
 
 		# (Ticket #668)
 
@@ -547,6 +547,12 @@ setting(
 	default => 1,
 );
 setting(
+	name    => 'find_nomatch',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
 	name    => 'find_quick',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -564,6 +570,8 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 2,
 );
+
+# Autocomplete settings (global and Perl-specific)
 setting(
 	name    => 'autocomplete_multiclosebracket',
 	type    => Padre::Constant::BOOLEAN,
@@ -581,6 +589,24 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+);
+setting(
+	name    => 'perl_autocomplete_max_suggestions',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 20,
+);
+setting(
+	name    => 'perl_autocomplete_min_chars',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+setting(
+	name    => 'perl_autocomplete_min_suggestion_len',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 3,
 );
 
 # Behaviour Tuning
@@ -610,6 +636,23 @@ setting(
 );
 
 setting(
+	name  => 'perl_tags_file',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HOST,
+
+	# Don't save a default to allow future updates
+	default => '',
+);
+
+setting(
+	name    => 'xs_calltips_perlapi_version',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::PROJECT,
+	default => 'newest',
+	project => 1,
+);
+
+setting(
 	name    => 'info_on_statusbar',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -631,7 +674,7 @@ setting(
 );
 
 # By default use background threads unless profiling
-# TODO - Make the default actually change
+# TO DO - Make the default actually change
 
 # (Ticket # 669)
 setting(
@@ -692,20 +735,6 @@ setting(
 	type    => Padre::Constant::POSINT,
 	store   => Padre::Constant::HOST,
 	default => 400,
-);
-
-# Logging
-setting(
-	name    => 'logging',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HOST,
-	default => 0,
-);
-setting(
-	name    => 'logging_trace',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HOST,
-	default => 0,
 );
 
 # Run Parameters
@@ -885,6 +914,8 @@ setting(
 	default => 1,
 );
 
+
+
 #####################################################################
 # Constructor and Accessors
 
@@ -1042,7 +1073,7 @@ sub apply {
 #
 # return true if $scalar is an integer.
 #
-sub _INTEGER ($) {
+sub _INTEGER {
 	return defined $_[0] && !ref $_[0] && $_[0] =~ m/^(?:0|-?[1-9]\d*)$/;
 }
 
@@ -1069,22 +1100,25 @@ the functions for loading and saving the configuration.
 
 The Padre configuration lives in two places:
 
- - A user-editable text file usually called config.yml
+=over
 
- - A SQlite - database which shouldn't be edited by the
-   user.
+=item a user-editable text file usually called F<config.yml>
+
+=item an SQLite database which shouldn't be edited by the user
+
+=back
 
 =head2 Generic usage
 
-Every setting is accessed by a method named after it, which is a mutator.
-ie, it can be used both as a getter and a setter, depending on the number
+Every setting is accessed by a mutator named after it,
+i.e. it can be used both as a getter and a setter depending on the number
 of arguments passed to it.
 
 =head2 Different types of settings
 
 Padre needs to store different settings. Those preferences are stored in
 different places depending on their impact. But C<Padre::Config> allows to
-access them with a unified api (a mutator). Only their declaration differ
+access them with a unified API (a mutator). Only their declaration differs
 in the module.
 
 Here are the various types of settings that C<Padre::Config> can manage:
@@ -1094,7 +1128,7 @@ Here are the various types of settings that C<Padre::Config> can manage:
 =item * User settings
 
 Those settings are general settings that relates to user preferences. They range
-from general user interface look&feel (whether to show the line numbers, etc.)
+from general user interface I<look & feel> (whether to show the line numbers, etc.)
 to editor preferences (tab width, etc.) and other personal settings.
 
 Those settings are stored in a YAML file, and accessed with C<Padre::Config::Human>.

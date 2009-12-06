@@ -8,7 +8,7 @@ Padre::Wx::Role::MainChild - Convenience methods for children of the main window
 
 =head1 DESCRIPTION
 
-This psuedo-role implements the fairly common method pattern for Wx elements that
+This pseudo-role implements the fairly common method pattern for Wx elements that
 are children of L<Padre::Wx::Main>.
 
 =head1 METHODS
@@ -21,13 +21,13 @@ use warnings;
 use Params::Util qw{_INSTANCE};
 use Padre::Current ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # The four most common things we need are implemented directly
 
 =pod
 
-=head2 ide
+=head2 C<ide>
 
     my $ide = $object->ide;
 
@@ -45,7 +45,7 @@ sub ide {
 
 =pod
 
-=head2 config
+=head2 C<config>
 
     my $config = $object->config;
 
@@ -64,7 +64,7 @@ sub config {
 
 =pod
 
-=head2 main
+=head2 C<main>
 
     my $main = $object->main;
 
@@ -82,11 +82,11 @@ sub main {
 
 =pod
 
-=head2 aui
+=head2 C<aui>
 
     my $aui = $object->aui;
 
-Convenient access to the AUI Manager
+Convenient access to the C<AUI> Manager.
 
 =cut
 

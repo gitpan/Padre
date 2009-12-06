@@ -11,12 +11,12 @@ Padre::Transform::Perl::UpdateCopyright - Demonstration Padre::Transform class
   my $transform = Padre::Transform::Perl::UpdateCopyright->new(
       name => 'Adam Kennedy'
   );
-  
+
   $transform->apply( Padre::Current->document );
 
 =head1 DESCRIPTION
 
-B<Padre::Transform::Perl::UpdateCopyright> provides a demonstration of a
+C<Padre::Transform::Perl::UpdateCopyright> provides a demonstration of a
 typical L<Padre::Transform> class.
 
 This class implements a document transform that will take the name of an
@@ -34,7 +34,7 @@ use Params::Util qw{ _STRING };
 use Padre::Current         ();
 use Padre::Transform::Perl ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Transform::Perl';
 
 #####################################################################
@@ -103,7 +103,7 @@ sub document {
 			return 1;
 		}
 	);
-	return undef unless defined $elements;
+	return   unless defined $elements;
 	return 0 unless $elements;
 
 	# Try to transform any elements

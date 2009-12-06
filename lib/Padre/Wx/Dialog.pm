@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Wx::Perl::Dialog ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::Perl::Dialog';
 
 sub create_widget {
@@ -166,8 +166,8 @@ sub get_widget_value {
 		&& $self->{_widgets_}->{$name}->isa('Wx::Control') )
 	{
 		my $w = $self->{_widgets_}->{$name};
-		return undef if $w->isa('Wx::Button');
-		return undef if $w->isa('Wx::StaticText');
+		return if $w->isa('Wx::Button');
+		return if $w->isa('Wx::StaticText');
 
 		if ( $w->isa('Wx::DirPickerCtrl') ) {
 			return $w->GetPath;

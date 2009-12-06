@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 #
 # Constructor.
@@ -106,7 +106,7 @@ __END__
 
 =head1 NAME
 
-Padre::QuickFixProvider::Perl::StrictWarnings - Check for strict and warnings pragmatas
+Padre::QuickFixProvider::Perl::StrictWarnings - Check for strict and warnings pragmas
 
 =head1 DESCRIPTION
 

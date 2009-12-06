@@ -11,15 +11,15 @@ Padre::Search - The Padre Search API
   # Create the search object
   my $search = Padre::Search->new(
       find_term => 'foo',
-  );  
-  
+  );
+
   # Execute the search on the current editor
   $search->search_next(Padre::Current->editor);
 
 =head2 DESCRIPTION
 
 This is the Padre Search API. It allows the creation of abstract objects
-object that can independantly search and/or replace in an editor object.
+object that can independently search and/or replace in an editor object.
 
 =head2 METHODS
 
@@ -32,7 +32,7 @@ use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 use Class::XSAccessor getters => {
 	find_term    => 'find_term',
@@ -78,7 +78,7 @@ sub new {
 
 	# Compile the regex
 	$self->{search_regex} = eval { $self->find_case ? qr/$term/m : qr/$term/mi };
-	return undef if $@;
+	return if $@;
 
 	return $self;
 }
@@ -267,8 +267,8 @@ sub editor_replace {
 				$editor->SetSelection( $start, $start );
 			} else {
 
-				# TODO: There might be unicode bugs in this.
-				# TODO: Someone that understands needs to check.
+				# TO DO: There might be unicode bugs in this.
+				# TO DO: Someone that understands needs to check.
 				$start = $start + length( $self->replace_term );
 				$editor->SetSelection( $start, $start );
 			}
@@ -295,7 +295,7 @@ sub editor_replace_all {
 
 	# Replace all matches as a single undo
 	if (@matches) {
-		my $replace = $self->replace_text;
+		my $replace = $self->replace_term;
 		$editor->BeginUndoAction;
 		foreach my $match ( reverse @matches ) {
 			$editor->SetTargetStart( $match->[0] );
@@ -386,6 +386,24 @@ sub matches {
 	}
 
 	return ( @$pair, @matches );
+}
+
+sub match_lines {
+	my ( $self, $selected_text, $regex ) = @_;
+
+	# Searches run in unicode
+	my $text = Encode::encode( 'utf-8', $selected_text );
+	my @lines = split( /\n/, $text );
+
+	my @matches;
+	foreach my $lineNumber ( 0 .. ( scalar(@lines) - 1 ) ) {
+
+		if ( $lines[$lineNumber] =~ /$regex/ ) {
+			push( @matches, ( { lineNumber => ( $lineNumber + 1 ), line => $lines[$lineNumber] } ) );
+		}
+	}
+	return @matches;
+
 }
 
 1;

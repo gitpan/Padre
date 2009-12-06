@@ -45,11 +45,12 @@ use Padre::Constant ();
 use Padre::Util     ('_T');
 use Padre::Config   ();
 use Padre::Wx       ();
+use Padre::Debug;
 
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => File::Spec->rel2abs( Padre::Util::sharedir('locale') );
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -394,6 +395,16 @@ BEGIN {
 			supported => 1,
 		},
 
+		'tr-tr' => {
+			gettext   => _T('Turkish'),
+			utf8text  => 'Türkçe',
+			iso639    => 'tr',
+			iso3166   => 'TR',
+			wxid      => Wx::wxLANGUAGE_TURKISH,
+			fallback  => ['en-us'],
+			supported => 0,
+		},
+
 		'zh' => {
 			gettext   => _T('Chinese'),
 			utf8text  => 'Chinese',
@@ -430,7 +441,7 @@ BEGIN {
 		# a language is not supported by various older standards.
 		'x-klingon' => {
 			gettext   => _T('Klingon'),
-			utf8text  => 'Klingon',    # TODO Fix this at some point
+			utf8text  => 'Klingon',    # TO DO Fix this at some point
 			iso639    => undef,
 			iso3166   => undef,
 			wxid      => undef,
@@ -564,7 +575,7 @@ sub encoding_system_default {
 		return;
 	}
 
-	Padre::Util::debug("Encoding system default: ($encoding)");
+	TRACE("Encoding system default: ($encoding)") if DEBUG;
 
 	return $encoding;
 }
@@ -572,7 +583,7 @@ sub encoding_system_default {
 sub encoding_from_string {
 	my $content = shift;
 
-	# FIXME
+	# FIX ME
 	# This is a just heuristic approach. Maybe there is a better way. :)
 	# Japanese and Chinese have to be tested. Only Korean is tested.
 	#
@@ -602,7 +613,7 @@ sub encoding_from_string {
 		$guess = '';                 # to avoid warnings
 	}
 
-	Padre::Util::debug("Encoding guess: ($guess)");
+	TRACE("Encoding guess: ($guess)") if DEBUG;
 
 	# Wow, nice!
 	if ( ref($guess) and ref($guess) =~ m/^Encode::/ ) {
@@ -631,7 +642,7 @@ sub encoding_from_string {
 		$encoding = 'utf-8';
 	}
 
-	Padre::Util::debug("Encoding selected: ($encoding)");
+	TRACE("Encoding selected: ($encoding)") if DEBUG;
 
 	return $encoding;
 }

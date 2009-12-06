@@ -13,6 +13,7 @@ eval {
 if ($@) {
 	plan skip_all => 'Win32::GuiTest is required for this test';
 }
+plan( skip_all => 'test is currently broken' );
 
 use t::lib::Padre;
 require t::lib::Padre::Win32;
@@ -106,7 +107,9 @@ sleep 1;
 sub slurp {
 	if ( open( my $fh, '<', $save_to ) ) {
 		local $/;
-		return <$fh>;
+		my $rv = <$fh>;
+		close $fh;
+		return $rv;
 	} else {
 		warn("Could not open file $save_to  $!");
 		return;

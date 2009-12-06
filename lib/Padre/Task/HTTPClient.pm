@@ -6,7 +6,7 @@ use warnings;
 
 # Use all modules which may provide services for us:
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 =pod
 
@@ -16,14 +16,14 @@ Padre::Task::HTTPClient - HTTP client for Padre
 
 =head1 DESCRIPTION
 
-Padre::Task::HTTPClient provies a common API for HTTP access to Padre.
+C<Padre::Task::HTTPClient> provides a common API for HTTP access to Padre.
 
 As we don't want a specific HTTP client module dependency to a
 network-independent application like Padre, this module searches
 for installed HTTP client modules and uses one of them.
 
 If none of the "child" modules could be loaded (no HTTP support at all
-on this computer), it fails and returns nothing (scalar undef).
+on this computer), it fails and returns nothing (scalar C<undef>).
 
 =head1 METHODS
 
@@ -31,9 +31,9 @@ on this computer), it fails and returns nothing (scalar undef).
 
   my $http = Padre::Task::HTTPClient->new();
 
-The C<new> constructor lets you create a new B<Padre::Task::HTTPClient> object.
+The C<new> constructor lets you create a new C<Padre::Task::HTTPClient> object.
 
-Returns a new B<Padre::Task::HTTPClient> or dies on error.
+Returns a new C<Padre::Task::HTTPClient> or dies on error.
 
 =cut
 
@@ -54,7 +54,10 @@ sub new {
 	# Each module will be tested and the first working one should return
 	# a object, all others should return nothing (undef)
 	for ('LWP') {
-		require 'Padre/Task/HTTPClient/' . $_ . '.pm';
+
+		#		require 'Padre/Task/HTTPClient/' . $_ . '.pm';
+		eval 'require Padre::Task::HTTPClient::' . $_;
+		next if $@;
 		$self = "Padre::Task::HTTPClient::$_"->new(%args);
 		next unless defined($self);
 		return $self;

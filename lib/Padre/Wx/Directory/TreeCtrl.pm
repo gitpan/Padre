@@ -4,15 +4,14 @@ use 5.008;
 use strict;
 use warnings;
 use File::Copy;
-use File::Spec     ();
-use File::Basename ();
-use Params::Util qw{_INSTANCE};
+use File::Spec      ();
+use File::Basename  ();
 use Padre::Current  ();
 use Padre::Util     ();
 use Padre::Wx       ();
 use Padre::Constant ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::TreeCtrl';
 
 # Creates a new Directory Browser object
@@ -319,10 +318,20 @@ sub _updated_dir {
 	my $dir    = shift;
 	my $cached = $self->{CACHED}->{$dir};
 
+	my $file = $self->parent->{file};
+	my $mtime;
+
+	if ( defined($file) ) {
+		$file->browse_mtime($dir);
+	} else {
+		$mtime = ( stat($dir) )[10];
+	}
+
 	if (   not defined $cached
 		or !$cached->{Data}
 		or !$cached->{Change}
-		or ( stat $dir )[10] != $cached->{Change}
+		or !defined($mtime)
+		or $mtime != $cached->{Change}
 		or $self->search->{just_used}->{$dir} )
 	{
 		return 1;
@@ -414,10 +423,11 @@ sub _rename_or_move {
 		my $separator = File::Spec->catfile( '', '' );
 
 		# Moves all cached data of the node and above it to the new path
-		map {
-			$cached->{ $new_file . ( defined $1 ? $1 : '' ) } = $cached->{$_}, delete $cached->{$_}
-				if $_ =~ /^$old_file($separator.+?)?$/
-		} keys %$cached;
+		foreach ( keys %$cached ) {
+			next unless /^$old_file($separator.+?)?$/;
+			$cached->{ $new_file . ( defined $1 ? $1 : '' ) } = $cached->{$_};
+			delete $cached->{$_};
+		}
 
 		$self->{select_item} = 1;
 
@@ -815,7 +825,7 @@ sub _on_tree_item_menu {
 			$self, $pod,
 			sub {
 
-				# TODO Fix this wasting of objects (cf. Padre::Wx::Menu::Help)
+				# TO DO Fix this wasting of objects (cf. Padre::Wx::Menu::Help)
 				require Padre::Wx::DocBrowser;
 				my $help = Padre::Wx::DocBrowser->new;
 				$help->help( $node_data->{name} );
@@ -836,7 +846,7 @@ sub _on_tree_item_menu {
 		$applies_to_node = $self->GetParent($node);
 	}
 
-	my $cached = \%{ $self->{CACHED}->{$applies_to_path} } if defined($applies_to_path);
+	my $cached = defined($applies_to_path) ? \%{ $self->{CACHED}->{$applies_to_path} } : undef;
 	my $show = $cached->{ShowHidden};
 	$hiddenFiles->Check($show);
 	Wx::Event::EVT_MENU(

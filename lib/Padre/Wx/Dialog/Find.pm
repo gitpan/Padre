@@ -24,8 +24,9 @@ use Padre::DB                    ();
 use Padre::Wx                    ();
 use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
+use Padre::Wx::FindResult        ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -138,17 +139,17 @@ sub new {
 	);
 	$self->{button_find}->SetDefault;
 
-	# The "Count All" button
-	$self->{button_count} = Wx::Button->new(
+	# The "Find All" button
+	$self->{findall_button} = Wx::Button->new(
 		$self,
 		-1,
-		Wx::gettext("&Count All"),
+		Wx::gettext("Find &All"),
 	);
 	Wx::Event::EVT_BUTTON(
 		$self,
-		$self->{button_count},
+		$self->{findall_button},
 		sub {
-			$_[0]->count_button;
+			$_[0]->findall_button;
 		},
 	);
 
@@ -219,9 +220,9 @@ sub new {
 
 	# Sizer for the buttons
 	my $bottom = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$bottom->Add( $self->{button_find},   0, Wx::wxGROW | Wx::wxLEFT,  5 );
-	$bottom->Add( $self->{button_count},  0, Wx::wxGROW,               5 );
-	$bottom->Add( $self->{button_cancel}, 0, Wx::wxGROW | Wx::wxRIGHT, 5 );
+	$bottom->Add( $self->{button_find},    0, Wx::wxGROW | Wx::wxLEFT,  5 );
+	$bottom->Add( $self->{findall_button}, 0, Wx::wxGROW,               5 );
+	$bottom->Add( $self->{button_cancel},  0, Wx::wxGROW | Wx::wxRIGHT, 5 );
 
 	# Fill the sizer for the overall dialog
 	my $sizer = Wx::FlexGridSizer->new( 1, 1, 0, 0 );
@@ -250,10 +251,10 @@ sub new {
   $self->find
 
 Grab currently selected text, if any, and place it in find combo box.
-Bring up the dialog or perform search for strings' next occurence
+Bring up the dialog or perform search for string's next occurrence
 if dialog is already displayed.
 
-TODO: if selection is more than one line then consider it as the limit
+TO DO: if selection is more than one line then consider it as the limit
 of the search and not as the string to be used.
 
 =cut
@@ -262,10 +263,10 @@ sub find {
 	my $self = shift;
 	my $text = $self->current->text;
 
-	# No search if no file is open (TODO ??)
+	# No search if no file is open (TO DO ??)
 	return unless $self->current->editor;
 
-	# TODO: if selection is more than one lines then consider it as the
+	# TO DO: if selection is more than one lines then consider it as the
 	# limit of the search and not as the string to be used.
 	$text = '' if $text =~ /\n/;
 
@@ -311,6 +312,11 @@ sub find_button {
 	my $search = $self->as_search;
 	unless ($search) {
 		$main->error("Not a valid search");
+
+		# Move the focus back to the search text
+		# so they can tweak their search.
+		$self->{find_text}->SetFocus;
+
 		return;
 	}
 
@@ -320,8 +326,16 @@ sub find_button {
 	# If we're only searching once, we won't need the dialog any more
 	if ( $self->{find_first}->GetValue ) {
 		$self->Hide;
-	} elsif ( !$Result ) {
-		$main->message( Wx::gettext('No matches found'), Wx::gettext('Search') );
+	} elsif ( not $Result ) {
+		$DB::single = 1;
+		$main->error(
+			Wx::gettext('No matches found'),
+			Wx::gettext('Search')
+		);
+
+		# Move the focus back to the search text
+		# so they can tweak their search.
+		$self->{find_text}->SetFocus;
 	}
 
 	return;
@@ -358,33 +372,36 @@ sub cancel_button {
 
 =head2 count_button
 
-  $self->count_button
+  $self->findall_button
 
-Count and announce the number of matches in the document.
+Find all lines with matching text and display in a list.
 
 =cut
 
-sub count_button {
+sub findall_button {
 	my $self   = shift;
 	my $main   = $self->main;
 	my $config = $self->save;
 
 	# Generate the search object
 	my $search = $self->as_search;
+
 	unless ($search) {
 		$main->error( Wx::gettext("Not a valid search") );
 		return;
 	}
 
-	# Find the number of matches
+
+
 	my $editor = $self->current->editor or return;
-	my $matches = $search->editor_count_all($editor);
-	$main->message(
-		sprintf(
-			Wx::gettext("Found %d matching occurrences"),
-			$matches,
-		)
+	my @matches = $search->match_lines(
+		$editor->GetTextRange( 0, $editor->GetLength ),
+		$search->search_regex,
+		$editor->GetSelection
 	);
+
+	Padre::Wx::FindResult->new( $main, \@matches, $editor );
+	$self->Hide;
 }
 
 

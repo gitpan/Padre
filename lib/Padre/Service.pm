@@ -11,9 +11,10 @@ use threads::shared;
 use Padre::Wx     ();
 use Padre::Task   ();
 use Thread::Queue ();
-our @ISA = 'Padre::Task';
+use Padre::Debug;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
+our @ISA     = 'Padre::Task';
 
 =pod
 
@@ -32,48 +33,49 @@ Padre::Service - persistent Padre::Task API
   );
   $service->schedule;
   $service->
-  
-  
+
+
   # Later
   $service->shutdown; # Your show_my_dialog will be called...,eventually
 
 =head1 DESCRIPTION
 
-Padre::Service extends L<Padre::Task> to provide a means to launch and 
+Padre::Service extends L<Padre::Task> to provide a means to launch and
 control a long running background service, without blocking the editor.
 
 =head2 EXTENDING
 
-To extend this class, inherit it and implement C<service_loop> and preferabbly
-C<hangup>
+To extend this class, inherit it and implement C<service_loop> and preferably
+C<hangup>.
 
 C<service_loop> should not block forever. If there is no work for the service to do
-then return immediately, allowing the C<<Task->run>> loop to continue.
+then return immediately, allowing the C<< Task->run >> loop to continue.
 
   package Padre::Service::HTTPD
   use base qw( Padre::Service );
-  
+
   sub prepare { # Build a dummy httpd.conf from $self , "BREAK" if error }
-  
+
   sub service_start { # Launch httpd binary goodness, IPC::Run3 maybe? }
-  
+
   sub service_shutdown { # Clean shutdown httpd binary }
-  
+
   sub service_loop { # ->select($timeout) on your IPC handles }
-  
+
   sub hangup { ->service_shutdown ?!?}
-  
+
   sub terminate { # Stop everything, brutally }
-  
+
 =head1 METHODS
 
 =head2 run
 
 Overrides C<Padre::Task::run> providing a non-blocking loop around the
-TaskManager to Service shared queue.
-C<run> will call ->hangup or ->terminate on your service if instructed
+C<TaskManager> to C<Service> shared queue.
+
+C<run> will call C<hangup> or C<terminate> on your service if instructed
 by the main thread, otherwise C<service_loop> is called in void context
-with no arguments B<IN A TIGHT LOOP>.
+with no arguments B<in a tight loop>.
 
 =cut
 
@@ -89,7 +91,7 @@ with no arguments B<IN A TIGHT LOOP>.
 
 		my ($self) = @_;
 		my $queue = $self->queue;
-		Padre::Util::debug("Running queue $queue");
+		TRACE("Running queue $queue") if DEBUG;
 		my $tid   = threads->tid;
 		my $event = $self->event;
 
@@ -107,7 +109,7 @@ with no arguments B<IN A TIGHT LOOP>.
 			next unless $queue->pending;
 
 			my $command = $queue->dequeue;
-			Padre::Util::debug("Service dequeued input");
+			TRACE("Service dequeued input") if DEBUG;
 
 			# Respond to HANGUP TERMINATE and PING -
 			if ( ref($command) ) {
@@ -116,7 +118,7 @@ with no arguments B<IN A TIGHT LOOP>.
 
 			# Or possibly a signal from the main thread
 			else {
-				Padre::Util::debug("Caught command signal '$command'");
+				TRACE("Caught command signal '$command'") if DEBUG;
 				if ( $command eq 'HANGUP' ) {
 					$self->hangup( \$running );
 				} elsif ( $command eq 'TERMINATE' ) {
@@ -124,7 +126,7 @@ with no arguments B<IN A TIGHT LOOP>.
 				} elsif ( $command eq 'PING' ) {
 					$self->post_event( $event, "ALIVE" );
 				} else {
-					Padre::Util::debug("Service does not recognise '$command' signal");
+					TRACE("Service does not recognise '$command' signal") if DEBUG;
 				}
 			}
 		}
@@ -139,7 +141,7 @@ with no arguments B<IN A TIGHT LOOP>.
 =head2 start
 
 consider start the background_thread analog of C<prepare> and will be called
-in the service thread immediatly prior to the service loop starting.
+in the service thread immediately prior to the service loop starting.
 
 
 =cut
@@ -158,9 +160,9 @@ sub hangup {
 
 =head2 terminate
 
-Called on your service when TaskManager believes your service is hung or not
+Called on your service when C<TaskManager> believes your service is hung or not
 responding to a C<<->hangup>. Your service is obliged to B<IMMEDIATELY> stop
-everything and to hell with the consequences. 
+everything and to hell with the consequences.
 
 =cut
 
@@ -205,7 +207,7 @@ second before returning control to the loop.
 
 Accessor for this service's instance event, in the running service
 data may be posted to this event and the Wx subscribers will be notified
- 
+
 =cut
 
 {
@@ -225,7 +227,7 @@ data may be posted to this event and the Wx subscribers will be notified
 	sub prepare {
 		my $self = shift;
 		my $queue : shared;
-		$queue           = new Thread::Queue;
+		$queue           = Thread::Queue->new;
 		$Queues{"$self"} = $queue;
 		$self->{_refid}  = "$self";
 		$self->SUPER::prepare(@_);
@@ -234,10 +236,10 @@ data may be posted to this event and the Wx subscribers will be notified
 =head2 queue
 
 accessor for the shared queue the service thread is polling for input.
-Calling C<enqueue> on reference sends data to the service thread. Storable
-serialization rules apply. See also L<"event"> for receiving data from 
+Calling C<enqueue> on reference sends data to the service thread. L<Storable>
+serialization rules apply. See also L<"event"> for receiving data from
 the service thread
- 
+
 =cut
 
 	sub queue {
@@ -304,14 +306,14 @@ the service thread
 
 sub shutdown {
 	my $self = shift;
-	Padre::Util::debug("shutdown - $self");
+	TRACE("shutdown - $self") if DEBUG;
 	my $queue = $self->queue;
 	$queue->enqueue('HANGUP');
 }
 
 sub cleanup {
 	my $self = shift;
-	Padre::Util::debug("cleanup - $self");
+	TRACE("cleanup - $self") if DEBUG;
 }
 
 =head2 tell
@@ -319,7 +321,7 @@ sub cleanup {
 Accepts a reference as it's argument, this is serialized and sent to
 the service thread
 
-=cut  
+=cut
 
 ## MAIN
 sub tell {
@@ -330,7 +332,7 @@ sub tell {
 
 =head1 COPYRIGHT
 
-Copyright 2009 The Padre develoment team as listed in Padre.pm
+Copyright 2009 The Padre development team as listed in Padre.pm
 
 This program is free software; you can redistribute it and/or
 modify it under the same terms as Perl 5 itself.

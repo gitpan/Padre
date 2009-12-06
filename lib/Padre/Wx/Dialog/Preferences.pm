@@ -10,10 +10,13 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Dialog';
 
-our %PANELS = ( 'Padre::Wx::Dialog::Preferences::File' => 'Local/Remote file access' );
+our %PANELS = (
+	'Padre::Wx::Dialog::Preferences::File'             => 'Local/Remote file access',
+	'Padre::Wx::Dialog::Preferences::PerlAutoComplete' => 'Perl autocomplete'
+);
 
 =pod
 
@@ -58,9 +61,14 @@ sub _external_tools_panel {
 	my ( $self, $treebook ) = @_;
 
 	my $config = Padre->ide->config;
-	my $table  = [
+
+	# TODO: Really needs a "browse" button.
+	my $table = [
 		[   [ 'Wx::StaticText', undef,                Wx::gettext('Diff tool:') ],
 			[ 'Wx::TextCtrl',   'external_diff_tool', $config->external_diff_tool ]
+		],
+		[   [ 'Wx::StaticText', undef,            Wx::gettext('Perl ctags file:') ],
+			[ 'Wx::TextCtrl',   'perl_tags_file', $config->perl_tags_file ]
 		],
 	];
 
@@ -112,7 +120,7 @@ sub _mime_type_panel {
 
 	$self->update_highlighters;
 	$self->update_description;
-	$self->get_widget('description')->Wrap(200); # TODO should be based on the width of the page !
+	$self->get_widget('description')->Wrap(200); # TO DO should be based on the width of the page !
 	return $panel;
 }
 
@@ -277,20 +285,6 @@ sub _behaviour_panel {
 				'editor_smart_highlight_enable',
 				( $config->editor_smart_highlight_enable ? 1 : 0 ),
 				Wx::gettext("Enable Smart highlighting while typing")
-			],
-			[]
-		],
-		[   [   'Wx::CheckBox',
-				'autocomplete_always',
-				( $config->autocomplete_always ? 1 : 0 ),
-				Wx::gettext("Autocomplete always while typing")
-			],
-			[]
-		],
-		[   [   'Wx::CheckBox',
-				'autocomplete_method',
-				( $config->autocomplete_method ? 1 : 0 ),
-				Wx::gettext("Autocomplete new methods in packages")
 			],
 			[]
 		],
@@ -770,13 +764,13 @@ sub dialog {
 	$tb->AddPage( $external_tools, Wx::gettext('External Tools') );
 
 	#my $plugin_manager = $self->_pluginmanager_panel($tb);
-	#$tb->AddPage( $plugin_manager, Wx::gettext('Plugin Manager') );
+	#$tb->AddPage( $plugin_manager, Wx::gettext('Plug-in Manager') );
 	#$self->_add_plugins($tb);
 
 	# Add panels
 	# The panels are ahown in alphabetical order based on the Wx::gettext results
 
-	# TODO: Convert the internal panels to use this
+	# TO DO: Convert the internal panels to use this
 
 	for my $module ( sort { Wx::gettext( $PANELS{$a} ) cmp Wx::gettext( $PANELS{$b} ); } ( keys(%PANELS) ) ) {
 
@@ -1055,6 +1049,10 @@ sub run {
 		$data->{run_use_external_window}
 	);
 	$config->set(
+		'perl_tags_file',
+		$data->{perl_tags_file}
+	);
+	$config->set(
 		'external_diff_tool',
 		$data->{external_diff_tool}
 	);
@@ -1073,14 +1071,6 @@ sub run {
 	$config->set(
 		'editor_smart_highlight_enable',
 		$data->{editor_smart_highlight_enable} ? 1 : 0
-	);
-	$config->set(
-		'autocomplete_always',
-		$data->{autocomplete_always} ? 1 : 0
-	);
-	$config->set(
-		'autocomplete_method',
-		$data->{autocomplete_method} ? 1 : 0
 	);
 	$config->set(
 		'window_list_shorten_path',

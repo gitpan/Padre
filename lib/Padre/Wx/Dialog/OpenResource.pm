@@ -8,7 +8,7 @@ use Padre::DB       ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -366,7 +366,7 @@ sub _setup_events {
 #
 # Restarts search
 #
-sub _restart_search() {
+sub _restart_search {
 	my $self = shift;
 	$self->_search();
 	$self->_update_matches_list_box;
@@ -410,7 +410,7 @@ sub _show_recent_while_idle {
 #
 # Shows the recently opened resources
 #
-sub _show_recently_opened_resources() {
+sub _show_recently_opened_resources {
 	my $self = shift;
 
 	# Fetch them from Padre's RecentlyUsed database table
@@ -433,7 +433,7 @@ sub _show_recently_opened_resources() {
 #
 # Search for files and cache result
 #
-sub _search() {
+sub _search {
 	my $self = shift;
 
 	$self->_status_text->ChangeValue( Wx::gettext("Reading items. Please wait...") );
@@ -453,7 +453,7 @@ sub _search() {
 #
 # Update matches list box from matched files list
 #
-sub _update_matches_list_box() {
+sub _update_matches_list_box {
 	my $self = shift;
 
 	return if not $self->_matched_files;
@@ -501,15 +501,15 @@ Padre::Wx::Dialog::OpenResource - Ecliptic's Open Resource dialog
 
 =head1 DESCRIPTION
 
-=head2 Open Resource (Shortcut: Ctrl + Shift + R)
+=head2 Open Resource (Shortcut: C<Ctrl+Shift+R>)
 
-This opens a nice dialog that allows you to find any file that exists 
-in the current document or working directory. You can use ? to replace 
-a single character or * to replace an entire string. The matched files list 
-are sorted alphabetically and you can select one or more files to be opened in 
-Padre when you press the OK button.
+This opens a nice dialog that allows you to find any file that exists
+in the current document or working directory. You can use C<?> to replace
+a single character or C<*> to replace an entire string. The matched files list
+are sorted alphabetically and you can select one or more files to be opened in
+Padre when you press the B<OK> button.
 
-You can simply ignore CVS, .svn and .git folders using a simple checkbox 
+You can simply ignore F<CVS>, F<.svn> and F<.git> folders using a simple check-box
 (enhancement over Eclipse).
 
 =head1 AUTHOR

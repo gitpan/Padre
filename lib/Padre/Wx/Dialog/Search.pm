@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 ######################################################################
 # Constructor
@@ -147,7 +147,7 @@ sub _create_panel {
 		Wx::wxBORDER_NONE
 	);
 
-	#$self->{previous}->SetLabel("Next"); # TODO: should be better but does not work
+	#$self->{previous}->SetLabel("Next"); # TO DO: should be better but does not work
 	Wx::Event::EVT_BUTTON( $main, $self->{previous}, sub { $self->search('previous') } );
 	$self->{previous_text} = Wx::Button->new(
 		$self->{panel}, -1,

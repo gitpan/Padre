@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -21,7 +21,7 @@ our @ISA     = 'Padre::Wx::Menu';
 
 sub new {
 
-	# TODO: Convert this to Padre::Action::Edit
+	# TO DO: Convert this to Padre::Action::Edit
 
 	my $class = shift;
 	my $main  = shift;

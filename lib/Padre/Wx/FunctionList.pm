@@ -7,7 +7,7 @@ use Params::Util qw{ _STRING };
 use Padre::Wx ();
 use Padre::Current ('_CURRENT');
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::Panel';
 
 #####################################################################
@@ -218,10 +218,9 @@ sub refresh {
 	} elsif ( $config->main_functions_order eq 'alphabetical_private_last' ) {
 
 		# ~ comes after \w
-		@methods = map { tr/~/_/; $_ } ## no critic
-			sort
-			map { tr/_/~/; $_ }        ## no critic
-			@methods;
+		tr/_/~/ foreach @methods;
+		@methods = sort @methods;
+		tr/~/_/ foreach @methods;
 	} else {
 
 		# Alphabetical (aka 'abc')

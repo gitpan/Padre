@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 #
 # Constructor.
@@ -53,9 +53,9 @@ sub apply {
 					my $Build_PL    = File::Spec->catfile( $project_dir, 'Build.PL' );
 					my $Makefile_PL = File::Spec->catfile( $project_dir, 'Makefile.PL' );
 					if ( -f $Build_PL ) {
-						open FILE, $Build_PL;
-						my $content = do { local $/ = <FILE> };
-						close FILE;
+						open my $FILE, '<', $Build_PL;
+						my $content = do { local $/ = <$FILE> };
+						close $FILE;
 						if ( $content !~ /^\s*requires\s+["']$module["']/ ) {
 							push @items, {
 								text     => "Add missing requires '$module' to Build.PL",
@@ -66,9 +66,9 @@ sub apply {
 						}
 
 					} elsif ( -f $Makefile_PL ) {
-						open FILE, $Makefile_PL;
-						my $content = do { local $/ = <FILE> };
-						close FILE;
+						open my $FILE, '<', $Makefile_PL;
+						my $content = do { local $/ = <$FILE> };
+						close $FILE;
 						if ( $content !~ /^\s*requires\s+["']$module["']/ ) {
 							push @items, {
 								text     => "Add missing requires '$module' to Makefile.PL",

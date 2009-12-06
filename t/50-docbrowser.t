@@ -1,14 +1,18 @@
 #!/usr/bin/perl
 
 use strict;
+use warnings;
 use Test::More;
+use Padre::Constant;
 
 BEGIN {
-	unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
+
+	require Win32 if Padre::Constant::WIN32;
+	unless ( $ENV{DISPLAY} or Padre::Constant::WIN32 ) {
 		plan skip_all => 'Needs DISPLAY';
 		exit 0;
 	}
-	unless ($<) {
+	if ( Padre::Constant::WIN32 ? Win32::IsAdminUser() : !$< ) {
 		plan skip_all => 'Cannot run as root';
 		exit 0;
 	}

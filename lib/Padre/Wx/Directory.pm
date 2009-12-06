@@ -7,7 +7,7 @@ use Padre::Wx                        ();
 use Padre::Wx::Directory::TreeCtrl   ();
 use Padre::Wx::Directory::SearchCtrl ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::Panel';
 
 use Class::XSAccessor getters => {
@@ -70,7 +70,12 @@ sub current {
 
 # Returns the window label
 sub gettext_label {
-	Wx::gettext('Directory');
+	my $self = shift;
+	if (defined($self->mode) and ( $self->mode eq 'tree' )) {
+		return Wx::gettext('Project');
+	} else {
+		return Wx::gettext('Directory');
+	}
 }
 
 # Updates the gui, so each compoment can update itself
@@ -89,10 +94,17 @@ sub refresh {
 
 	# Finds project base
 	my $doc = $current->document;
-	my $dir =
-		  $doc
-		? $doc->project_dir
-		: $self->main->config->default_projects_directory;
+	my $dir;
+
+	# Disabled for release
+	#	if ( defined($doc) ) {
+	#		$dir = $doc->project_dir;
+	#		$self->{file} = $doc->{file};
+	#	} else {
+	$dir = $self->main->config->default_projects_directory;
+
+	#		delete $self->{file};
+	#	}
 
 	return unless $dir;
 
@@ -116,6 +128,9 @@ sub refresh {
 	# Sets the last project to the current one
 	$self->previous_dir( $self->{projects}->{$dir}->{dir} );
 	$self->previous_dir_original($dir);
+
+	# Update the panel label
+	$self->panel->refresh;
 
 	return 1;
 }

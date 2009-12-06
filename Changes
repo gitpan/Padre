@@ -1,9 +1,52 @@
 Changes for Perl Application Development and Refactoring Environment
 
+0.52 To Be Released
+
+
+0.51 2009.12.04
+    - Find all option showing all matches in bottom tab (CODE4PAY)
+    - Improved FTP error handling (SEWI)
+    - Open URLs from command line (SEWI)
+    - Configurable location of the 'perltags' file for autocompletion (SEWI)
+    - Fixed ticket #419: find variable declaration does not work at the end of
+      a variable (PATRICKAS)
+    - Fixed ticket #654: Lexical Rename of Variable - Can't highlight the
+      whole variable (PATRICKAS)
+    - Improved "Find Method Declaration" based on perltags (SMUELLER)
+    - Basic XS-Document support as needed for the full monty in a plugin (SMUELLER)
+    - XS (perlapi) calltips based on the perlapi of 5.10.1 
+      by default. Can be configured to show the perlapi of any release of
+      perl back to 5.6.0 if Padre::Plugin::XS is installed. (SMUELLER)
+    - Padre::Action::Queue for auto-processing of Padre actions (SEWI)
+    - Perl autocompletion is much more configurable now (SEWI)
+    - Indentation auto-detection now skips POD for ::Perl documents (SMUELLER)
+    - Find in Files now has a checkbox that shows files that do not match (GARU)
+    - Tests which are not needed for end-user installation now in xt (ADAMK)
+    - Added a test for actions (SEWI)
+    - Re-enabled the beginner error check tests (SEWI)
+    - Added missing File::Slurp dependency exposed by DMG installer (ADAMK)
+    - Better focus transitions during search/replace, which should make
+      them easier to work with quickly (ADAMK)
+    - Rolled back function list improvements that were causing regressions (ADAMK)
+    - Added project sub-path intuition when saving new files (ADAMK)
+    - Fixed a number of search/replace related bugs (ADAMK)
+    - Fixed ticket #421: crash: no documents, F3/F4 (AZAWAWI)
+    - Fixed ticket #678: VACUUM the configuration database at shutdown 
+      to keep it small and fast (AZAWAWI)
+    - Fixed ticket #714: [Windows] Have a script to make binary. (AZAWAWI)
+    - Styles now allow configuring of the selected text (ADAMK)
+    - Upgraded tracing to new Padre::Debug that compiles out when not
+      being used. (ADAMK)
+    - Make Capture::Tiny a test prereq in order to eliminate a strange 
+      test failure (SZABGAB).  
+    - Added an initial simplistic mime-type + detector for Template Toolkit (ADAMK)
+    - Change Directory label to Project to hint to the user that Padre does
+      actually understand the concept of a project, it's just subtle (ADAMK)
+
 0.50 2009.11.08
     - Fixed #686 DocBrowser launching Padre help (BRAMBLE)
     - Add initial version of a regex editor. (SZABGAB)
-    - Fixed ticket:728 "Changing locale crashes Padre" (AZAWAWI)
+    - Fixed ticket #728: Changing locale crashes Padre (AZAWAWI)
     - Menubar is now configurable but still lacks a dialog for this (SEWI)
     - Beginner error checks are now configurable (turn each single one on
       or off) (SEWI)
@@ -449,7 +492,7 @@ Changes for Perl Application Development and Refactoring Environment
     - Fix Ctrl-TAB and Ctrl-Shift-TAB. (SZABGAB)
     - List the available perldiag translations and allow the user to change. (SZABGAB)
     - Fix a few missed cases of the API change. (SZABGAB)
-    - Some sharedir improvement. (TSEE)
+    - Some sharedir improvement. (SMUELLER)
     - List of available perldiag translations. (SZABGAB)
     - Add prompt method to be used by plugins as well. (SZABGAB)
 

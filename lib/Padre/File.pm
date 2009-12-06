@@ -4,9 +4,14 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
-my %Registered_Modules;
+# a list of registered protocol handlers. Structure:
+# regexp => [handler1, handler2, ...]
+# Note that ONLY THE FIRST handler is used! This is meant to allow
+# for plugins to enable and disable handlers with falling back to
+# the previously instantiated handlers.
+our %RegisteredModules;
 
 =pod
 
@@ -16,92 +21,137 @@ Padre::File - Common API for file functions
 
 =head1 DESCRIPTION
 
-Padre::File provies a common API for file access within Padre.
+C<Padre::File> provides a common API for file access within Padre.
 It covers all the differences with non-local files by mapping every function
 call to the currently used transport stream.
 
-=head1 FUNCTIONS
+=head1 METHODS
 
-=head2 REGISTER
+=head2 RegisterProtocol
 
-  Padre::File::REGISTER($RegExp,$Module);
+  Padre::File->RegisterProtocol($RegExp, $Module);
 
-This function is NOT a OO-method, it may not be called on a Padre::File object!
+Class method, may not be called on an object.
 
-A plugin could call C<Padre::File::REGISTER> to register a new protocol to
-Padre::File and enable Padre to use URLs handled by this module.
+A plug-in could call C<Padre::File->RegisterProtocol> to register a new protocol to
+C<Padre::File> and enable Padre to use URLs handled by this module.
 
 Example:
-	Padre::File::REGISTER('^nfs\:\/\/','Padre::Plugin::NFS');
 
-Every file/URL opened through Padre::File which starts with nfs:// is now
-handled through Padre::Plugin::NFS.
-Padre::File->new() will respect this and call Padre::Plugin::NFS->new() to
+  Padre::File->RegisterProtocol('^nfs\:\/\/','Padre::Plugin::NFS');
+
+Every file/URL opened through C<Padre::File> which starts with C<nfs://> is now
+handled through C<Padre::Plugin::NFS>.
+C<< Padre::File->new() >> will respect this and call C<< Padre::Plugin::NFS->new() >> to
 handle such URLs.
 
 Returns true on success or false on error.
 
-REGISTERed protocols may override the internal protocols.
+Registered protocols may override the internal protocols.
 
 =cut
 
-sub REGISTER { # RegExp,Module
+sub RegisterProtocol {
+	shift if defined $_[0] and $_[0] eq __PACKAGE__;
+	my $regexp = shift;
+	my $module = shift;
 
-	my $RegExp = shift;
-	my $Module = shift;
+	return () if not defined $regexp or $regexp eq '';
+	return () if not defined $module or $module eq '';
+	$regexp = "$regexp";
 
-	return 0 if !defined $RegExp;
-	return 0 if $RegExp eq '';
-	return 0 if !defined $Module;
-	return 0 if $Module eq '';
+	# no double insertion
+	return ()
+		if exists $RegisteredModules{$regexp}
+			and grep { $_ eq $module } @{ $RegisteredModules{$regexp} };
 
-	$Registered_Modules{$RegExp} = $Module;
+	unshift @{ $RegisteredModules{$regexp} }, $module;
 
 	return 1;
-
 }
+
+
+=head2 DropProtocol
+
+Drops a previously registered protocol handler. First argument must
+be the same regular expression (matching a protocol from an URI)
+that was used to register the protocol handler in the first place using
+C<RegisterProtocol>. Similarly, the second argument must be the name of
+the class (module) that the handler was registered for. That means
+if you registered your protocol with
+
+  Padre::File->RegisterProtocol(qr/^sftp:\/\//, 'Padre::File::MySFTP');
+
+then you need to drop it with
+
+  Padre::File->DropProtocol(qr/^sftp:\/\//, 'Padre::File::MySFTP');
+
+Returns true if a handler was removed and the empty list if no
+handler was found for the given regular expression.
+
+=cut
+
+sub DropProtocol {
+	shift if defined $_[0] and $_[0] eq __PACKAGE__;
+	my $regexp = shift;
+	my $module = shift;
+
+	return () if not defined $regexp or $regexp eq '';
+	return () if not defined $module or $module eq '';
+	$regexp = "$regexp";
+
+	return () if not exists $RegisteredModules{$regexp};
+
+	my $modules  = $RegisteredModules{$regexp};
+	my $n_before = @$modules;
+	@$modules = grep { $_ ne $module } @$modules; # drop this module only
+
+	delete $RegisteredModules{$regexp} if @$modules == 0;
+
+	return $n_before != @$modules;
+}
+
 
 =pod
 
-=head1 METHODS
-
-=head2 new
+=head2 C<new>
 
   my $file = Padre::File->new($File_or_URL);
 
-The C<new> constructor lets you create a new B<Padre::File> object.
+The C<new> constructor lets you create a new C<Padre::File> object.
 
 Only one parameter is accepted at the moment: The name of the file which should
 be used. As soon as there are HTTP, FTP, SSH and other modules, also URLs
 should be accepted.
 
 If you know the protocol (which should be true every time you build the URL
-by source), it's better to call Padre::File::Protocol->new($URL) directly
+by source), it's better to call C<< Padre::File::Protocol->new($URL) >> directly
 (replacing Protocol by the protocol which should be used, of course).
 
-The module for the selected protocol should fill ->{filename} property. This
+The module for the selected protocol should fill C<< ->{filename} >> property. This
 should be used for all further references to the file as it will contain the
-filename in universal correct format (for example correct the C:\ eq C:/ problem
-on windows).
+file name in universal correct format (for example correct the C<C:\ eq C:/> problem
+on Windows).
 
-Returns a new B<Padre::File> or dies on error.
+Returns a new C<Padre::File> or dies on error.
 
 =cut
 
-sub new { # URL
-
+sub new {
 	my $class = shift;
 	my $URL   = $_[0];
 
-	return if ( !defined($URL) ) or ( $URL eq '' );
+	return if not defined($URL) or $URL eq '';
 
 	my $self;
 
-	for ( keys(%Registered_Modules) ) {
+	for ( keys(%RegisteredModules) ) {
 		next if $URL !~ /$_/;
-		require $_;
-		$self = $Registered_Modules{$_}->new($URL);
-		return $self;
+		my $module = $RegisteredModules{$_}->[0];
+		if ( eval "require $module; 1;" ) {
+			$self = $module->new($URL);
+			return $self;
+		}
 	}
 
 	if ( $URL =~ /^file\:(.+)$/i ) {
@@ -125,27 +175,24 @@ sub new { # URL
 
 }
 
-=head2 atime
+=head2 C<atime>
 
   $file->atime;
 
 Returns the last-access time of the file.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub atime {
-	return;
-}
+sub atime { }
 
-=head2 basename
+=head2 C<basename>
 
   $file->basename;
 
-Returns the plain filename without path if a path/filename structure
+Returns the plain file name without path if a path/file name structure
 exists for this module.
 
 =cut
@@ -158,111 +205,269 @@ sub basename {
 	return $self->{filename};
 }
 
-=head2 blksize
+=head2 C<blksize>
+
+  $file->blksize;
+
+Returns the block size of the file system where the file resides.
+
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
+
+=cut
+
+sub blksize { }
+
+=head2 C<blocks>
 
   $file->blocks;
 
-Returns the block size of the filesystem where the file resides
+Returns the number of blocks used by the file.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub blksize {
-	return;
+sub blocks { }
+
+=head2 C<browse_mtime>
+
+  $file->browse_mtime($path_and_filename);
+
+Returns the modification time of the given file on the remote server.
+
+Leave out the protocol and server name for remote protocols, for example
+
+  my $file = Padre::File->new('http://perlide.org/current/foo.html');
+  $file->browse_mtime('/archive/bar.html');
+
+This returns the mtime of http://perlide.org/archive/bar.html
+
+The default uses one Padre::File clone per request which is a reasonable
+fallback but very inefficient! Please add browse_ - methods to the
+subclass module whenever possible.
+
+=cut
+
+sub browse_mtime {
+	my $self     = shift;
+	my $filename = shift;
+
+	my $file = $self->clone_file($filename);
+	return $file->mtime;
 }
 
-=head2 blocks
+=pod
 
-  $file->blocks;
+=head2 C<browse_url_join>
 
-Returns the number of blockes used by the file.
+  $file->browse_url_join($server, $path, $basename);
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+Merges a servername, pathname and a filename to a complete url.
+
+A "path" in this function is meant to be the local path on the server,
+not the Padre path (which includes the servername).
+
+You may think of
+  /tmp + padre.$$                       => /tmp/padre.$$
+  C:\\temp + padre.$$                   => C:\\temp\\padre.$$
+
+...but also remember
+  http://perlide.org + about.html       => http://perlide.org/about.html
+
+Datapoint created a file syntax...
+  common + program/text                 => program/text:common
+This could happen once someone adds a Padre::File::DBCFS for using
+a DB/C FS fileserver. "program" is the filename, "text" the extension
+and "common" is what we call a directory.
+
+The most common seems to be a / as the directory seperator char, so
+we'll use this as the default.
+
+This method should care about merging double / to one if this should
+be done on this filesystem (even if the default doesn't care).
 
 =cut
 
-# Fallback if the module has no such function:
-sub blocks {
-	return;
+# Note: Don't use File::Spec->catfile here as it may mix up http or
+#       other pathnames. This is a default and should be overriden
+#       by each Padre::File::* - module!
+sub browse_url_join {
+	my $self     = shift;
+	my $server   = shift;
+	my $path     = shift;
+	my $basename = shift;
+
+	return $self->{protocol} . '://' . $server . '/' . $path . '/' . $basename if defined($basename);
+	return $self->{protocol} . '://' . $server . '/' . $path;
 }
 
-=head2 can_run
+=pod
 
-  $file->can_run;
+=head2 C<can_clone>
 
-Returns 1 if the protocol allows execution of files or 0 if it doesn't.
+  $file->can_clone;
 
-This is usually not possible for non-local files (which return 1),
-because there is no way to reproduce a save environment for running
-a HTTP or FTP based file (they return 0).
+Returns true if the protocol allows re-using of connections for new
+files (usually from the same project).
+
+Local files don't use connections at all, HTTP uses one-request-
+connections, cloning has no benefit for them. FTP and SSH use
+connections to a remote server and we should work to get no more
+than one connection per server.
 
 =cut
 
-# Fallback if the module has no such function:
-sub can_run {
+sub can_clone {
 
-	# If the module does not state that it could do "run",
-	# we return a safe default of 0.
+	# Cloning needs to be supported by the protocol, the safer
+	# option is false here.
 	return 0;
 }
 
-=head2 ctime
+=pod
+
+=head2 C<can_run>
+
+  $file->can_run;
+
+Returns true if the protocol allows execution of files or the empty
+list if it doesn't.
+
+This is usually not possible for non-local files (which return true),
+because there is no way to reproduce a save environment for running
+a HTTP or FTP based file (they return false).
+
+=cut
+
+sub can_run {
+
+	# If the module does not state that it could do "run",
+	# we return a safe default of false.
+	return 0;
+}
+
+=pod
+
+=head2 C<clone>
+
+  my $clone = $file->clone($File_or_URL);
+
+The C<clone> constructor lets you create a new C<Padre::File> object reusing
+an existing connection.
+
+Takes the same arguments as the C<new> method.
+
+If the protocol doesn't know about (server) connections/sessions, returns a
+brand new Padre::File object.
+
+NOTICE: If you request a clone which is located on another server, you'll
+        get a Padre::File object using the original connection to the
+        original server and the original authentication data but the new
+        path and filename!
+
+Returns a new C<Padre::File> or dies on error.
+
+=cut
+
+sub clone {
+	my $self = shift;
+
+	my $class = ref($self);
+
+	return $class->new(@_);
+}
+
+=pod
+
+=head2 C<clone_file>
+
+  my $clone = $file->clone_file($filename_with_path);
+  my $clone = $file->clone_file($path,$filename);
+
+The C<clone> constructor lets you create a new C<Padre::File> object reusing
+an existing connection.
+
+Takes one or two arguments:
+ - either the complete path + filename of an URL
+ - or the path and filename as seperate arguments
+
+If the protocol doesn't know about (server) connections/sessions, returns a
+brand new Padre::File object.
+
+Returns a new C<Padre::File> or dies on error.
+
+=cut
+
+sub clone_file {
+	my $self     = shift;
+	my $path     = shift;
+	my $filename = shift;
+
+	return $self->clone( $self->browse_url_join( $self->servername, $path, $filename ) );
+}
+
+=head2 C<ctime>
 
   $file->ctime;
 
 Returns the last-change time of the inode (not the file!).
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub ctime {
-	return;
-}
+sub ctime { }
 
-=head2 dev
+=head2 C<dev>
 
   $file->dev;
 
-Returns the device number of the filesystem where the file resides.
+Returns the device number of the file system where the file resides.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub dev {
-	return;
-}
+sub dev { }
 
-=head2 dirname
+=head2 C<dirname>
 
   $file->dirname;
 
-Returns the plain path without filename if a path/filename structure
+Returns the plain path without file name if a path/file name structure
 exists for this module.
+
+Returns the empty list on failure or undefined behaviour for the
+given protocol.
 
 =cut
 
-# Fallback if the module has no such function:
-sub dirname {
-	return;
+sub dirname { }
+
+=head2 C<error>
+
+  $file->error;
+
+Returns the last error message (like $! for system calls).
+
+=cut
+
+sub error {
+	my $self = shift;
+	return $self->{error};
 }
 
-=head2 exists
+=head2 C<exists>
 
   $file->exists;
 
 Returns true if the file exists.
 Returns false if the file doesn't exist.
-Returns undef if unsure (network problem, not implemented).
+Returns the empty list if unsure (network problem, not implemented).
 
 =cut
 
@@ -277,14 +482,14 @@ sub exists {
 	return;
 }
 
-=head2 filename
+=head2 C<filename>
 
   $file->filename;
 
-Returns the the filename including path handled by this object
+Returns the the file name including path handled by this object.
 
-Please remember that Padre::File is able to open many URL types. This
-"filename" may also be a URL. Please use the ->basename and ->dirname
+Please remember that C<Padre::File> is able to open many URL types. This
+file name may also be a URL. Please use the C<basename> and C<dirname>
 methods to split it (assuming that a path exists in the current
 protocol).
 
@@ -296,44 +501,38 @@ sub filename {
 	return $self->{filename};
 }
 
-=head2 gid
+=head2 C<gid>
 
   $file->gid;
 
-Returns the GID of the file group.
+Returns the real group ID of the file group.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub gid {
-	return;
-}
+sub gid { }
 
-=head2 inode
+=head2 C<inode>
 
   $file->inode;
 
 Returns the inode number of the file.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub inode {
-	return;
-}
+sub inode { }
 
-=head2 mime
+=head2 C<mime>
 
   $file->mime;
   $file->mime('text/plain');
 
-Returns or sets the mime type of the file.
+Returns or sets the MIME type of the file.
 
 =cut
 
@@ -344,25 +543,25 @@ sub mime {
 	return $self->{MIME};
 }
 
-=head2 mode
+=head2 C<mode>
 
   $file->mode;
 
-Returns the file mode (type and rights).
+Returns the file mode (type and rights). See also: L<perlfunc/stat>.
+To get the Unixy file I<permissions> as the usual octal I<number>
+(as opposed to a I<string>) use:
 
-TODO: Add a description what exactly is returned.
+  use Fcntl ':mode';
+  my $perms_octal = S_IMODE($file->mode);
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub mode {
-	return;
-}
+sub mode { }
 
-=head2 mtime
+=head2 C<mtime>
 
   $file->mtime;
 
@@ -370,80 +569,82 @@ Returns the last-modification (change) time of the file.
 
 =cut
 
-# Fallback if the module has no such function:
-sub mtime {
-	return;
-}
+sub mtime { }
 
-=head2 nlink
+=head2 C<nlink>
 
   $file->nlink;
 
-Returns the number of hard links to the file
+Returns the number of hard links to the file.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub nlink {
-	return;
-}
+sub nlink { }
 
-=head2 rdev
+=head2 C<rdev>
 
   $file->rdev;
 
 Returns the device identifier.
 
-This is usually not possible for non-local files, in these cases, undef
-is returned.
+This is usually not possible for non-local files, in these cases,
+the empty list is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub rdev {
-	return;
-}
+sub rdev { }
 
-=head2 read
+=head2 C<read>
 
   $file->read;
 
 Reads the file contents and returns them.
 
-Returns undef on error. The error message could be retrieved using the
-->error method.
+Returns the empty list on error. The error message can be retrieved using the
+C<error> method.
 
 =cut
 
-sub error {
+=head2 C<servername>
+
+  $file->servername;
+
+Returns the server name for this module - if the protocol knows about a
+server, local files don't.
+
+WARNING: The Padre "path" includes the servername in a protocol dependent
+         syntax!
+
+=cut
+
+sub servername {
 	my $self = shift;
-	return $self->{error};
+	return '';
 }
 
-=head2 size
+
+=head2 C<size>
 
   $file->size;
 
-Returns the file size in bytes.
+Returns the file size in bytes or the empty list if the
+method was not implemented by the C<Padre::File> subclass.
 
 =cut
 
-# Fallback if the module has no such function:
-sub size {
-	return;
-}
+sub size { }
 
-=head2 stat
+=head2 C<stat>
 
   $file->stat;
 
 This emulates a stat call and returns the same values:
 
 
-  0 dev      device number of filesystem
+  0 dev      device number of file system
   1 ino      inode number
   2 mode     file mode  (type and permissions)
   3 nlink    number of (hard) links to the file
@@ -459,15 +660,27 @@ This emulates a stat call and returns the same values:
 
 A module should fill as many items as possible, but if you're thinking
 about using this method, always remember
-  1. Usually, you need only one or two of the items, request them
-     directly.
-  2. Besides from local files, most of the values will not be
-     accessable (resulting in undef values)
-  3. On most protocols these values must be requested one-by-one
-     which is very very expensive
+
+=over
+
+=item 1.
+
+Usually, you need only one or two of the items, request them directly.
+
+=item 2.
+
+Besides from local files, most of the values will not be accessible (resulting
+in empty lists/false returned).
+
+=item 3.
+
+On most protocols these values must be requested one-by-one, which is very
+expensive.
+
+=back
 
 Please always consider using the function for the value you really need
-instead of using ->stat!
+instead of using C<stat>!
 
 =cut
 
@@ -493,39 +706,34 @@ sub stat {
 
 }
 
-=head2 uid
+=head2 C<uid>
 
   $file->uid;
 
-Returns the UID of the file owner.
+Returns the real user ID of the file owner.
 
-This is usually not possible for non-local files, in these cases, undef
+This is usually not possible for non-local files, in these cases, the empty list
 is returned.
 
 =cut
 
-# Fallback if the module has no such function:
-sub uid {
-	return;
-}
+sub uid { }
 
-=head2 write
+=head2 C<write>
 
   $file->write($Content);
   $file->write($Content,$Coding);
 
-Writes the given $Content to the file, if a encoding is given and the
-protocol allows the usage of encodings, it is respected.
+Writes the given C<$Content> to the file, if a encoding is given and the
+protocol allows encoding, it is respected.
 
 Returns 1 on success.
 Returns 0 on failure.
-Returns undef if the function is not avaible on the protocol.
+Returns the empty list if the function is not available on the protocol.
 
 =cut
 
-sub write {
-	return;
-}
+sub write { }
 
 1;
 

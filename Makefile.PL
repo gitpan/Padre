@@ -50,31 +50,30 @@ name 'Padre';
 license 'perl';
 author 'Gabor Szabo';
 all_from 'lib/Padre.pm';
-requires 'perl'                     => '5.008005';
-requires 'App::Ack'                 => '1.86';
-requires 'Carp'                     => 0;
-requires 'Class::Adapter'           => '1.05';
-requires 'Class::Unload'            => '0.03';
-requires 'Class::XSAccessor'        => '1.02';
-requires 'Class::XSAccessor::Array' => '1.02';
-requires 'Cwd'                      => '3.2701';
-requires 'Data::Dumper'             => 0;
-requires 'DBD::SQLite'              => '1.10';
-requires 'DBI'                      => '1.58';
-requires 'Devel::Dumpvar'           => '0.04';
-requires 'Devel::Refactor'          => '0.05';
-requires 'Digest::MD5'              => 0;
-requires 'Encode'                   => '2.26';
-requires 'File::Basename'           => 0;
-requires 'File::Glob'               => 0;
-requires 'File::Glob::Windows'      => '0.1.3' if win32;
-requires 'File::Copy::Recursive'    => '0.37';
-requires 'File::Find::Rule'         => '0.30';
-requires 'File::HomeDir'            => '0.84';
-requires 'File::Next'               => '1.06';          # Force-bump ack dep
-requires 'File::Path'               => 0;
-requires 'File::Remove'             => '1.42';
-requires 'File::ShareDir'           => '1.00';
+requires 'perl'                  => '5.008005';
+requires 'App::Ack'              => '1.86';
+requires 'Carp'                  => 0;
+requires 'Class::Adapter'        => '1.05';
+requires 'Class::Unload'         => '0.03';
+requires 'Class::XSAccessor'     => '1.05';
+requires 'Cwd'                   => '3.2701';
+requires 'Data::Dumper'          => 0;
+requires 'DBD::SQLite'           => '1.10';
+requires 'DBI'                   => '1.58';
+requires 'Devel::Dumpvar'        => '0.04';
+requires 'Devel::Refactor'       => '0.05';
+requires 'Digest::MD5'           => 0;
+requires 'Encode'                => '2.26';
+requires 'File::Basename'        => 0;
+requires 'File::Glob'            => 0;
+requires 'File::Glob::Windows'   => '0.1.3' if win32;
+requires 'File::Copy::Recursive' => '0.37';
+requires 'File::Find::Rule'      => '0.30';
+requires 'File::HomeDir'         => '0.84';
+requires 'File::Next'            => '1.06';          # Force-bump ack dep
+requires 'File::Path'            => 0;
+requires 'File::Remove'          => '1.42';
+requires 'File::ShareDir'        => '1.00';
 
 #requires      'File::ShareDir::PAR'      => '0.04';
 requires 'File::Spec'            => '3.2701';
@@ -120,7 +119,7 @@ requires 'Storable'                => '2.15';
 requires 'Term::ReadLine'          => 0;
 requires 'Text::Balanced'          => 0;
 requires 'Text::Diff'              => '0.35';
-requires 'Text::FindIndent'        => '0.03';
+requires 'Text::FindIndent'        => '0.05';
 requires 'Thread::Queue'           => '2.11';
 requires 'threads'                 => '1.71';
 requires 'threads::shared'         => '1.26';
@@ -133,6 +132,7 @@ requires 'YAML::Tiny'              => '1.32';
 requires 'ExtUtils::Manifest'      => '1.56';
 requires 'Pod::Functions'          => 0;
 requires 'Module::CoreList'        => 0;
+test_requires 'Capture::Tiny'      => '0.06';
 test_requires 'Test::More'         => '0.88';
 test_requires 'Test::Script'       => '1.05';
 test_requires 'Test::Exception'    => '0.27';
@@ -140,9 +140,16 @@ test_requires 'Test::NoWarnings'   => '0.084';
 
 my $locale = setlocale(LC_CTYPE);
 print "Found locale    $locale\n";
+
+# What tests should we run?
+my @TESTS = 't/*.t';
 if ( win32 and $locale =~ /^English/ ) {
-	tests 't/*.t t/win32/*.t';
+	push @TESTS, 't/win32/*.t';
 }
+if ( author_context or $ENV{AUTOMATED_TESTING} or $ENV{RELEASE_TESTING} ) {
+	push @TESTS, 'xt/*.t';
+}
+tests join ' ', @TESTS;
 
 no_index 'directory' => qw{ t xt eg share inc privinc };
 homepage 'http://padre.perlide.org/';
@@ -183,12 +190,26 @@ keywords(
 install_script 'script/padre';
 if (win32) {
 
-	# Install Padre's Launcher
-	system $^X , qw[-MExtUtils::Command -e mkpath --], qw[ blib/bin ];
-	system $^X , qw[-MExtUtils::Command -e cp --],     qw[ bin/padre.exe blib/bin/padre.exe ];
+	#--------------- Build Padre.exe --------------
+	print "Building padre.exe\n";
 
-	# Install XP manifest to get a themed Padre
+	# Create the blib/bin folder
+	system $^X , qw[-MExtUtils::Command -e mkpath --], qw[ blib/bin ];
+
+	# Step 1: Make sure we do not have old files
+	unlink "padre-rc.o" if -f "padre-rc.o";
+	unlink "padre.exe"  if -f "blib/bin/padre.exe";
+
+	# Step 2: Build Padre's win32 resource using windres
+	system qw[cd bin && windres padre-rc.rc padre-rc.o];
+
+	# Step 3: Build padre.exe using gcc
+	system "cd bin && gcc -Wall -Os -mwin32 -mwindows -Wl,-s padre.c padre-rc.o -o ../blib/bin/padre.exe";
+
+	# Step 4: Install XP manifest to get a themed Padre
 	system $^X , qw[-MExtUtils::Command -e cp --], qw[ bin/wperl.exe.manifest blib/bin/wperl.exe.manifest ];
+
+	#--------------- End of Padre.exe's Build --------------
 }
 install_share_with_mofiles;
 

@@ -6,8 +6,8 @@ package Padre::Action::Perl;
 
 =head1 NAME
 
-Padre::Action::Perl is a outsourced module. It creates Actions for
-developing Perl files.
+Padre::Action::Perl - outsourced module, creates Actions for
+developing Perl files
 
 =cut
 
@@ -22,7 +22,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Locale ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Menu';
 
 sub new {
@@ -40,9 +40,10 @@ sub new {
 
 	# Perl-Specific Searches
 	Padre::Action->new(
-		name       => 'perl.beginner_check',
-		label      => Wx::gettext('Check for common (beginner) errors'),
-		menu_event => sub {
+		name        => 'perl.beginner_check',
+		need_editor => 1,
+		label       => Wx::gettext('Check for common (beginner) errors'),
+		menu_event  => sub {
 			my $doc = $_[0]->current->document;
 			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
 			$doc->beginner_check;
@@ -50,8 +51,9 @@ sub new {
 	);
 
 	Padre::Action->new(
-		name       => 'perl.find_brace',
-		label      => Wx::gettext('Find Unmatched Brace'),
+		name        => 'perl.find_brace',
+		need_editor => 1,
+		label       => Wx::gettext('Find Unmatched Brace'),
 		comment    => Wx::gettext('Searches the source code for brackets with lack a matching (opening/closing) part.'),
 		menu_event => sub {
 			my $doc = $_[0]->current->document;
@@ -61,9 +63,10 @@ sub new {
 	);
 
 	Padre::Action->new(
-		name       => 'perl.find_variable',
-		label      => Wx::gettext('Find Variable Declaration'),
-		menu_event => sub {
+		name        => 'perl.find_variable',
+		need_editor => 1,
+		label       => Wx::gettext('Find Variable Declaration'),
+		menu_event  => sub {
 			my $doc = $_[0]->current->document;
 			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
 			$doc->find_variable_declaration;
@@ -71,9 +74,10 @@ sub new {
 	);
 
 	Padre::Action->new(
-		name       => 'perl.find_method',
-		label      => Wx::gettext('Find Method Declaration'),
-		menu_event => sub {
+		name        => 'perl.find_method',
+		need_editor => 1,
+		label       => Wx::gettext('Find Method Declaration'),
+		menu_event  => sub {
 			my $doc = $_[0]->current->document;
 			return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
 			$doc->find_method_declaration;
@@ -81,25 +85,40 @@ sub new {
 	);
 
 	Padre::Action->new(
-		name       => 'perl.vertically_align_selected',
-		label      => Wx::gettext('Vertically Align Selected'),
-		comment    => Wx::gettext('Align a selection of text to the same left column.'),
-		menu_event => sub {
+		name        => 'perl.vertically_align_selected',
+		need_editor => 1,
+		label       => Wx::gettext('Vertically Align Selected'),
+		comment     => Wx::gettext('Align a selection of text to the same left column.'),
+		menu_event  => sub {
 			my $editor = $_[0]->current->editor or return;
 			$editor->vertically_align;
 		},
 	);
 
 	Padre::Action->new(
-		name    => 'perl.newline_keep_column',
-		label   => Wx::gettext('Newline same column'),
-		comment => Wx::gettext(
+		name        => 'perl.newline_keep_column',
+		need_editor => 1,
+		label       => Wx::gettext('Newline same column'),
+		comment     => Wx::gettext(
 			'Like pressing ENTER somewhere on a line but use the current position as ident for the new line.'),
 		shortcut   => 'Ctrl-Enter',
 		menu_event => sub {
 			my $document = $_[0]->current->document or return;
 			return unless _INSTANCE( $document, 'Padre::Document::Perl' );
 			$document->newline_keep_column;
+		},
+	);
+
+	Padre::Action->new(
+		name        => 'perl.create_tagsfile',
+		need_editor => 1,
+		label       => Wx::gettext('Create project tagsfile'),
+		comment =>
+			Wx::gettext('Creates a perltags - file for the current project supporting find_method and autocomplete.'),
+		menu_event => sub {
+			my $document = $_[0]->current->document or return;
+			return unless _INSTANCE( $document, 'Padre::Document::Perl' );
+			$document->project_create_tagsfile;
 		},
 	);
 
@@ -120,6 +139,7 @@ sub new {
 	Padre::Action->new(
 		menu_method => 'AppendCheckItem',
 		name        => 'perl.autocomplete_brackets',
+		need_editor => 1,
 		label       => Wx::gettext('Automatic bracket completion'),
 		menu_event  => sub {
 

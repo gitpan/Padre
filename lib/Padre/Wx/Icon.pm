@@ -22,7 +22,7 @@ use Padre::Util ();
 use Padre::Wx   ();
 use Params::Util qw( _HASH );
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -49,7 +49,7 @@ our $DEFAULT_ICON_NAME = 'status/padre-fallback-icon';
 our $DEFAULT_ICON;
 
 # Convenience access to the official Padre icon
-sub PADRE () {
+sub PADRE {
 	return icon('logo');
 }
 
@@ -70,7 +70,7 @@ sub icon {
 
 # For now, assume the people using this are competent
 # and don't bother to check params.
-# TODO: Clearly this assumption can't last...
+# TO DO: Clearly this assumption can't last...
 sub find {
 	my $name  = shift;
 	my $prefs = shift;

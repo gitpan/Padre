@@ -21,6 +21,7 @@ plain:
   0: 00007f
  current_line_foreground: 000000
  currentline: FFFF04
+ selection_background: 0080ff
  colors:
   wxSTC_STYLE_DEFAULT:
   wxSTC_STYLE_LINENUMBER:
@@ -77,6 +78,8 @@ perl:
   wxSTC_PL_COMMENTLINE:
    foreground: 008800
   wxSTC_PL_POD:
+   foreground: 000000
+  wxSTC_PL_POD_VERB:
    foreground: 000000
   wxSTC_PL_NUMBER:
    foreground: ff0000
@@ -139,7 +142,6 @@ perl:
   wxSTC_PL_STRING_QW:
    foreground: 000000
 # missing:
-#define SCE_PL_POD_VERB 31
 #define SCE_PL_SUB_PROTOTYPE 40
 #define SCE_PL_FORMAT_IDENT 41
 #define SCE_PL_FORMAT 42

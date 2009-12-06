@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -54,6 +54,11 @@ sub new {
 	$self->{find_method} = $self->add_menu_action(
 		$self,
 		'perl.find_method',
+	);
+
+	$self->{create_tagsfile} = $self->add_menu_action(
+		$self,
+		'perl.create_tagsfile',
 	);
 
 
@@ -121,6 +126,9 @@ sub refresh {
 
 	return;
 }
+
+
+
 
 1;
 

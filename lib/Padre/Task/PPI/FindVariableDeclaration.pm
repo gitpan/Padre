@@ -3,18 +3,18 @@ package Padre::Task::PPI::FindVariableDeclaration;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx ();
+use Padre::Wx                                  ();
+use Padre::Task::PPI                           ();
+use PPIx::EditorTools::FindVariableDeclaration ();
 
-our $VERSION = '0.50';
-
-use base 'Padre::Task::PPI';
-use PPIx::EditorTools::FindVariableDeclaration;
+our $VERSION = '0.51';
+our @ISA     = 'Padre::Task::PPI';
 
 =pod
 
 =head1 NAME
 
-Padre::Task::PPI::FindVariableDeclaration - Finds where a variable was declared using PPI
+Padre::Task::PPI::FindVariableDeclaration - Finds where a variable was declared using L<PPI>
 
 =head1 SYNOPSIS
 
@@ -23,7 +23,7 @@ Padre::Task::PPI::FindVariableDeclaration - Finds where a variable was declared 
           document => $document_obj,
           location => [$line, $column], # ppi-style location is okay, too
   );
-  
+
   $declfinder->schedule();
 
 =head1 DESCRIPTION

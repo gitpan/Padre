@@ -3,13 +3,12 @@ package Padre::File::Local;
 use 5.008;
 use strict;
 use warnings;
-
-use Padre::File;
 use File::Basename  ();
 use File::Spec      ();
 use Padre::Constant ();
+use Padre::File     ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::File';
 
 sub _reformat_filename {
@@ -48,6 +47,12 @@ sub new {
 	$self->_reformat_filename;
 
 	return $self;
+}
+
+sub can_clone {
+
+	# Local files don't have connections, no need to clone objects
+	return 0;
 }
 
 sub can_run {
@@ -135,16 +140,18 @@ sub read {
 	# The return value should be the file content, so returning
 	# undef is better than nothing (in this situation) if there
 	# is no filename
-	return undef if !defined( $self->{filename} );
+	return if not defined $self->{filename};
 
-	my $fh;
-	if ( !open $fh, '<', $self->{filename} ) {
-		$self->{error} = $!;
-		return;
+	if ( open my $fh, '<', $self->{filename} ) {
+		binmode($fh);
+		local $/ = undef;
+		my $buffer = <$fh>;
+		close $fh;
+		return $buffer;
 	}
-	binmode($fh);
-	local $/ = undef;
-	return <$fh>;
+
+	$self->{error} = $!;
+	return;
 }
 
 sub write {
@@ -152,15 +159,14 @@ sub write {
 	my $content = shift;
 	my $encode  = shift || ''; # undef encode = default, but undef will trigger a warning
 
-	my $fh;
-	if ( !open $fh, ">$encode", $self->{filename} ) {
-		$self->{error} = $!;
-		return 0;
+	if ( open my $fh, ">$encode", $self->{filename} ) {
+		print {$fh} $content;
+		close $fh;
+		return 1;
 	}
-	print {$fh} $content;
-	close $fh;
 
-	return 1;
+	$self->{error} = $!;
+	return ();
 }
 
 sub basename {
@@ -176,6 +182,15 @@ sub dirname {
 sub readonly {
 	my $self = shift;
 	return 1 if ( !-w $self->{filename} );
+}
+
+sub browse_url_join {
+	my $self     = shift;
+	my $server   = shift;
+	my $path     = shift;
+	my $filename = shift;
+
+	return File::Spec->catfile( $server, $path, $filename );
 }
 
 1;

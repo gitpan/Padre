@@ -6,10 +6,10 @@ package Padre::Wx::AuiManager;
 use 5.008;
 use strict;
 use warnings;
-use Params::Util qw{_INSTANCE};
 use Padre::Wx ();
+use Padre::Debug;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Due to an overly simplistic implementation at the C level,
 # Wx::AuiManager is only a SCALAR reference and cannot be
@@ -54,7 +54,7 @@ sub relocale {
 
 	# Update the pane captions
 	foreach my $name ( sort keys %{ $self->{caption} } ) {
-		Padre::Util::debug("relocale $name");
+		TRACE("relocale $name") if DEBUG;
 		my $pane = $self->GetPane($name) or next;
 		$pane->Caption( Wx::gettext( $self->{caption}->{$name} ) );
 	}

@@ -9,8 +9,9 @@ use Padre::Util               ();
 use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
+use Padre::Debug;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -28,6 +29,7 @@ our %mode = (
 # mapping for mime-type to the style name in the share/styles/default.yml file
 our %MIME_STYLE = (
 	'application/x-perl' => 'perl',
+	'text/x-perlxs'      => 'xs',   # should be in the plugin...
 	'text/x-patch'       => 'diff',
 	'text/x-makefile'    => 'make',
 	'text/x-yaml'        => 'yaml',
@@ -49,7 +51,7 @@ sub new {
 	my $self   = $class->SUPER::new($notebook);
 	my $config = $self->main->ide->config;
 
-	# TODO: Make this suck less
+	# TO DO: Make this suck less
 	$data = data( $config->editor_style );
 
 	# Set the code margins a little larger than the default.
@@ -143,7 +145,7 @@ sub error { # Error Message
 sub padre_setup {
 	my $self = shift;
 
-	Padre::Util::debug("before setting the lexer");
+	TRACE("before setting the lexer") if DEBUG;
 	$self->SetLexer( $self->{Document}->lexer );
 
 	# the next line will change the ESC key to cut the current selection
@@ -267,38 +269,61 @@ sub padre_setup_style {
 }
 
 sub setup_style_from_config {
-	my ( $self, $name ) = @_;
+	my $self   = shift;
+	my $name   = shift;
+	my $style  = $data->{$name};
+	my $colors = $style->{colors};
 
-	foreach my $k ( keys %{ $data->{$name}->{colors} } ) {
-		my $f = 'Wx::' . $k;
-		if ( $k =~ /^PADRE_/ ) {
-			$f = 'Padre::Constant::' . $k;
-		}
-		no strict "refs"; ## no critic
-		my $v = eval { $f->() };
-		if ($@) {
-			warn "invalid key '$k'\n";
-			next;
+	# The selection background (if applicable)
+	# (The Scintilla official selection background colour is cc0000)
+	if ( $style->{selection_background} ) {
+		$self->SetSelBackground( 1, _color( $style->{selection_background} ) );
+	}
+	if ( $style->{selection_foreground} ) {
+		$self->SetSelForeground( 1, _color( $style->{selection_foreground} ) );
+	}
+
+	# Set the styles
+	foreach my $k ( keys %$colors ) {
+		my $v;
+
+		# allow for plain numbers
+		if ( $k =~ /^\d+$/ ) {
+			$v = $k;
 		}
 
-		my $colors = $data->{$name}->{colors}->{$k};
-		if ( exists $colors->{foreground} ) {
-			$self->StyleSetForeground( $f->(), _color( $colors->{foreground} ) );
+		# but normally, we have Wx:: or PADRE_ constants
+		else {
+			my $f = 'Wx::' . $k;
+			if ( $k =~ /^PADRE_/ ) {
+				$f = 'Padre::Constant::' . $k;
+			}
+			no strict "refs";
+			$v = eval { $f->() };
+			if ($@) {
+				warn "invalid key '$k'\n";
+				next;
+			}
 		}
-		if ( exists $colors->{background} ) {
-			$self->StyleSetBackground( $f->(), _color( $colors->{background} ) );
+
+		my $color = $data->{$name}->{colors}->{$k};
+		if ( exists $color->{foreground} ) {
+			$self->StyleSetForeground( $v, _color( $color->{foreground} ) );
 		}
-		if ( exists $colors->{bold} ) {
-			$self->StyleSetBold( $f->(), $colors->{bold} );
+		if ( exists $color->{background} ) {
+			$self->StyleSetBackground( $v, _color( $color->{background} ) );
 		}
-		if ( exists $colors->{italics} ) {
-			$self->StyleSetItalic( $f->(), $colors->{italic} );
+		if ( exists $color->{bold} ) {
+			$self->StyleSetBold( $v, $color->{bold} );
 		}
-		if ( exists $colors->{eolfilled} ) {
-			$self->StyleSetEOLFilled( $f->(), $colors->{eolfilled} );
+		if ( exists $color->{italics} ) {
+			$self->StyleSetItalic( $v, $color->{italic} );
 		}
-		if ( exists $colors->{underlined} ) {
-			$self->StyleSetUnderline( $f->(), $colors->{underline} );
+		if ( exists $color->{eolfilled} ) {
+			$self->StyleSetEOLFilled( $v, $color->{eolfilled} );
+		}
+		if ( exists $color->{underlined} ) {
+			$self->StyleSetUnderline( $v, $color->{underline} );
 		}
 	}
 }
@@ -417,7 +442,7 @@ sub show_folding {
 					my $line_clicked  = $editor->LineFromPosition( $event->GetPosition() );
 					my $level_clicked = $editor->GetFoldLevel($line_clicked);
 
-					# TODO check this (cf. ~/contrib/samples/stc/edit.cpp from wxWidgets)
+					# TO DO check this (cf. ~/contrib/samples/stc/edit.cpp from wxWidgets)
 					#if ( $level_clicked && wxSTC_FOLDLEVELHEADERFLAG) > 0) {
 					$editor->ToggleFold($line_clicked);
 
@@ -502,7 +527,7 @@ sub show_calltip {
 # 3) while doing all this, respect the current (sadly global) indentation settings
 # For auto-de-indentation (i.e. closing brace), we remove one level of indentation
 # instead.
-# FIXME/TODO: needs some refactoring
+# FIX ME/TO DO: needs some refactoring
 sub autoindent {
 	my ( $self, $mode ) = @_;
 
@@ -618,7 +643,7 @@ sub _auto_deindent {
 	# this is if the line matches "blahblahSomeText}".
 	elsif ( $config->editor_autoindent eq 'deep' and $content =~ /\}\s*$/ ) {
 
-		# TODO: What should happen in this case?
+		# TO DO: What should happen in this case?
 	}
 
 	return;
@@ -677,7 +702,7 @@ sub on_focus {
 	my ( $self, $event ) = @_;
 	my $doc = Padre::Current->document;
 
-	Padre::Util::debug( "Focus received file: " . ( $doc->filename || '' ) );
+	TRACE( "Focus received file: " . ( $doc->filename || '' ) ) if DEBUG;
 
 	my $main = $self->main;
 
@@ -686,13 +711,13 @@ sub on_focus {
 
 	$main->update_directory;
 
-	# TODO
+	# TO DO
 	# this is called even if the mouse is moved away from padre and back again
 	# we should restrict some of the updates to cases when we switch from one file to
 	# another
 
 	if ( $self->needs_manual_colorize ) {
-		Padre::Util::debug("needs_manual_colorize");
+		TRACE("needs_manual_colorize") if DEBUG;
 		my $lexer = $self->GetLexer;
 		if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 			$doc->colorize;
@@ -702,7 +727,7 @@ sub on_focus {
 		}
 		$self->needs_manual_colorize(0);
 	} else {
-		Padre::Util::debug("no need to colorize");
+		TRACE("no need to colorize") if DEBUG;
 	}
 
 	$event->Skip(1); # so the cursor will show up
@@ -818,7 +843,7 @@ sub on_left_up {
 sub on_middle_up {
 	my ( $self, $event ) = @_;
 
-	# TODO: Sometimes there are unexpected effects when using the middle button.
+	# TO DO: Sometimes there are unexpected effects when using the middle button.
 	# It seems that another event is doing something but not within this module.
 	# Please look at ticket #390 for details!
 
@@ -1004,7 +1029,7 @@ sub on_right_down {
 	if ( $event->isa('Wx::MouseEvent') ) {
 		$self->PopupMenu( $menu, $event->GetX, $event->GetY );
 	} else { #Wx::CommandEvent
-		$self->PopupMenu( $menu, 50, 50 ); # TODO better location
+		$self->PopupMenu( $menu, 50, 50 ); # TO DO better location
 	}
 }
 
@@ -1399,6 +1424,7 @@ sub insert_from_file {
 		binmode($fh);
 		local $/ = undef;
 		$text = <$fh>;
+		close $fh;
 	} else {
 		return;
 	}

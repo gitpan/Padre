@@ -10,7 +10,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -54,8 +54,8 @@ sub new {
 		'search.quick_find',
 	);
 
-	# We should be able to remove F4 and shift-F4 and hook this functionality
-	# to F3 and shift-F3 Incremental find (#60)
+	# We should be able to remove F4 and Shift+F4 and hook this functionality
+	# to F3 and Shift+F3 Incremental find (#60)
 	$self->{quick_find_next} = $self->add_menu_action(
 		$self,
 		'search.quick_find_next',

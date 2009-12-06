@@ -12,8 +12,9 @@ use Padre::Action::Refactor ();
 use Padre::Action::Run      ();
 use Padre::Action::Search   ();
 use Padre::Action::Window   ();
+use Padre::Action::Internal ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Generate faster accessors
 use Class::XSAccessor getters => {
@@ -43,6 +44,7 @@ sub create {
 	Padre::Action::Run->new($main);
 	Padre::Action::Search->new($main);
 	Padre::Action::Window->new($main);
+	Padre::Action::Internal->new($main);
 
 	# This is made for usage by the developers to create a complete
 	# list of all actions used in Padre. It outputs some warnings
@@ -56,6 +58,7 @@ sub create {
 		print $action_export_fh Data::Dumper::Dumper( Padre->ide->actions );
 		close $action_export_fh;
 	}
+
 }
 
 
@@ -87,6 +90,8 @@ sub new {
 		$self->{menu_event} =
 			eval ' return sub { ' . "Padre->ide->actions->{'" . $self->{name} . "'}->_event(\@_);" . '};';
 	}
+
+	$self->{queue_event} ||= $self->{menu_event};
 
 	my $name     = $self->{name};
 	my $shortcut = $self->{shortcut};
@@ -169,7 +174,7 @@ sub _event {
 		&{ $self->{event} }(@args);
 	} elsif ( ref( $self->{event} ) eq 'ARRAY' ) {
 		for my $item ( @{ $self->{event} } ) {
-			next if ref($item) ne 'CODE'; # TODO: Catch error and source (Ticket #666)
+			next if ref($item) ne 'CODE'; # TO DO: Catch error and source (Ticket #666)
 			&{$item}(@args);
 		}
 	} else {
@@ -190,12 +195,12 @@ Padre::Action - Padre Action Object
 
 =head1 SYNOPSIS
 
-  my $action = Padre::Action->new( 
-    name       => 'file.save', 
-    label      => 'Save', 
+  my $action = Padre::Action->new(
+    name       => 'file.save',
+    label      => 'Save',
     comment    => 'Saves the current file to disk',
-    icon       => '...', 
-    shortcut   => 'CTRL-S', 
+    icon       => '...',
+    shortcut   => 'CTRL-S',
     menu_event => sub { },
   );
 
@@ -210,7 +215,7 @@ To be documented...
 =head1 KEYS
 
 Each module is constructed using a number of keys. While only the name is
-technicalls required there are few reasons for actions which lack a label or
+technically required there are few reasons for actions which lack a label or
 menu_event.
 
 The keys are listed here in the order they usually appear.
@@ -229,12 +234,12 @@ Both group and action should only contain \w+ chars.
 
 Text which is shown in menus and allows the user to see what this action does.
 
-Remember to use Wx::gettext to make this translateable.
+Remember to use L<Wx::gettext> to make this translatable.
 
 =head2 need_editor
 
 This action should only be enabled/shown if there is a open editor window with
-a (maybe unsafed) document in it.
+a (potentially unsaved) document in it.
 
 The action may be called anyway even if there is no editor (all documents
 closed), but it shouldn't.
@@ -243,11 +248,11 @@ Set to a value of 1 to use it.
 
 =head2 need_file
 
-This action should only be enabled/shown if the current document has a filename
+This action should only be enabled/shown if the current document has a file name
 (meaning there is a copy on disk which may be older than the in-memory
 document).
 
-The action may be called anyway even if there is no filename for the current
+The action may be called anyway even if there is no file name for the current
 document, but it shouldn't.
 
 Set to a value of 1 to use it.
@@ -281,6 +286,7 @@ whatever_is_checked_by_the_code. (For example, UNDO can't be used if there
 was no change which could be undone.)
 
 The CODE receives a list of objects which should help with the decision:
+
 	config		contains the current configuration object
 	editor		the current editor object
 	document	the current document object
@@ -302,9 +308,9 @@ time.
 =head2 comment
 
 A comment (longer than label) which could be used in lists. It should contain
-a short decription of what this action does.
+a short description of what this action does.
 
-Remember to use Wx::gettext to make this translateable.
+Remember to use L<Wx::gettext> to make this translatable.
 
 =head2 icon
 
@@ -324,7 +330,7 @@ or an ARRAY reference of CODE references which are executed in order.
 
 =head2 new
 
-A default contructor for action objects.
+A default constructor for action objects.
 
 =head1 COPYRIGHT & LICENSE
 

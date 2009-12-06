@@ -3,6 +3,7 @@ abstract: 'Perl Application Development and Refactoring Environment'
 author:
   - 'Gabor Szabo'
 build_requires:
+  Capture::Tiny: 0.06
   ExtUtils::MakeMaker: 6.42
   Locale::Msgfmt: 0.14
   Test::Exception: 0.27
@@ -60,8 +61,7 @@ requires:
   Carp: 0
   Class::Adapter: 1.05
   Class::Unload: 0.03
-  Class::XSAccessor: 1.02
-  Class::XSAccessor::Array: 1.02
+  Class::XSAccessor: 1.05
   Cwd: 3.2701
   DBD::SQLite: 1.10
   DBI: 1.58
@@ -118,7 +118,7 @@ requires:
   Term::ReadLine: 0
   Text::Balanced: 0
   Text::Diff: 0.35
-  Text::FindIndent: 0.03
+  Text::FindIndent: 0.05
   Thread::Queue: 2.11
   URI: 0
   Wx: 0.91
@@ -134,4 +134,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.50
+version: 0.51

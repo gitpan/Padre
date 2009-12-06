@@ -1,14 +1,8 @@
 #!/usr/bin/perl
 
 use strict;
-
-BEGIN {
-	$|  = 1;
-	$^W = 1;
-
-}
-
-use constant CONFIG_OPTIONS => 98;
+use warnings;
+use constant CONFIG_OPTIONS => 102;
 
 # Move of Debug to Run Menu
 use Test::More tests => CONFIG_OPTIONS * 2 + 17;
@@ -24,9 +18,9 @@ use Padre::Config   ();
 
 # Create the empty config file
 my $empty = Padre::Constant::CONFIG_HUMAN;
-open( FILE, '>', $empty ) or die "Failed to open $empty";
-print FILE "--- {}\n";
-close(FILE);
+open( my $FILE, '>', $empty ) or die "Failed to open $empty";
+print $FILE "--- {}\n";
+close($FILE);
 
 # Load the config
 my $config = Padre::Config->read;

@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -18,7 +18,7 @@ our @ISA     = 'Padre::Plugin';
 # Padre::Plugin Methods
 
 sub padre_interfaces {
-	'Padre::Plugin' => 0.43, 'Padre::Wx::Main' => 0.43,;
+	( 'Padre::Plugin' => 0.43, 'Padre::Wx::Main' => 0.43 );
 }
 
 sub plugin_name {
@@ -68,24 +68,6 @@ sub menu_plugins_simple {
 
 		'---' => undef,
 
-		# TODO
-		# Should be checkbox but I am too lazy to turn the whole
-		# menu_plugins_simple into a menu_plugins
-		Wx::gettext('Enable logging') => sub {
-			$self->set_logging(1);
-		},
-		Wx::gettext('Disable logging') => sub {
-			$self->set_logging(0);
-		},
-		Wx::gettext('Enable trace when logging') => sub {
-			$self->set_trace(1);
-		},
-		Wx::gettext('Disable trace') => sub {
-			$self->set_trace(0);
-		},
-
-		'---' => undef,
-
 		Wx::gettext('Load All Padre Modules')    => 'load_everything',
 		Wx::gettext('Simulate Crash')            => 'simulate_crash',
 		Wx::gettext('Simulate Crashing Bg Task') => 'simulate_task_crash',
@@ -114,32 +96,6 @@ sub menu_plugins_simple {
 
 #####################################################################
 # Plugin Methods
-
-sub set_logging {
-	my $self    = shift;
-	my $on      = shift;
-	my $current = $self->current;
-
-	$current->config->set( logging => $on );
-	Padre::Util::set_logging($on);
-	Padre::Util::debug("After setting debugging to '$on'");
-	$current->main->refresh;
-
-	return;
-}
-
-sub set_trace {
-	my $self    = shift;
-	my $on      = shift;
-	my $current = $self->current;
-
-	$current->config->set( logging_trace => $on );
-	Padre::Util::set_trace($on);
-	Padre::Util::debug("After setting trace to '$on'");
-	$current->main->refresh;
-
-	return;
-}
 
 sub dump_expression {
 	my $self = shift;
@@ -272,7 +228,7 @@ sub _dump_eval {
 	my $code = shift;
 
 	# Evecute the code and handle errors
-	my @rv = eval $code; ## no critic
+	my @rv = eval $code;
 	if ($@) {
 		$self->current->main->error( sprintf( Wx::gettext("Error: %s"), $@ ) );
 		return;
@@ -325,19 +281,19 @@ Dumps the %INC hash to Output
 
 =head2 wxWidgets 2.8.10 Reference
 
-=head2 STC reference
+=head2 C<STC> reference
 
-Documentation for wxStyledTextCtrl, a control that wraps the Scintilla editor component.
+Documentation for C<wxStyledTextCtrl>, a control that wraps the Scintilla editor component.
 
-=head2 wxPerl Live Support
+=head2 C<wxPerl> Live Support
 
-Connects to #wxperl on irc.perl.org, where people can answer queries on wxPerl problems/usage.
+Connects to C<#wxperl> on C<irc.perl.org>, where people can answer queries on wxPerl problems/usage.
 
 =head2 About
 
 =head1 AUTHOR
 
-Gabor Szabo
+Gábor Szabó
 
 =head1 LICENSE
 

@@ -3,24 +3,32 @@ package Padre::Document::Perl;
 use 5.008;
 use strict;
 use warnings;
-use Carp   ();
-use Encode ();
-use Params::Util '_INSTANCE';
+use Carp                            ();
+use Encode                          ();
+use File::Spec                      ();
+use File::Temp                      ();
+use File::Find::Rule                ();
+use Params::Util                    ('_INSTANCE');
 use YAML::Tiny                      ();
-use Padre::Document                 ();
 use Padre::Util                     ();
 use Padre::Perl                     ();
+use Padre::Document                 ();
+use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
-use File::Find::Rule                ();
+use Padre::Debug;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Document';
+
+
+
+
 
 #####################################################################
 # Padre::Document::Perl Methods
 
 # Ticket #637:
-# TODO watch out! These PPI methods may be VERY expensive!
+# TO DO watch out! These PPI methods may be VERY expensive!
 # (Ballpark: Around 1 Gigahertz-second of *BLOCKING* CPU per 1000 lines)
 # Check out Padre::Task::PPI and its subclasses instead!
 sub ppi_get {
@@ -90,7 +98,7 @@ sub ppi_location_to_character_position {
 
 # Convert an absolute document offset to
 # a ppi-style location [$line, $col, $apparent_col]
-# FIXME: Doesn't handle $apparent_col right
+# FIX ME: Doesn't handle $apparent_col right
 sub character_position_to_ppi_location {
 	my $self     = shift;
 	my $position = shift;
@@ -124,12 +132,13 @@ sub set_highlighter {
 		$length = $editor->GetTextLength;
 	}
 
-	Padre::Util::debug( "Setting highlighter for Perl 5 code. length: $length" . ( $limit ? " limit is $limit" : '' ) );
+	TRACE( "Setting highlighter for Perl 5 code. length: $length" . ( $limit ? " limit is $limit" : '' ) ) if DEBUG;
 
 	if ( defined $limit and $length > $limit ) {
-		Padre::Util::debug("Forcing STC highlighting");
+		TRACE("Forcing STC highlighting") if DEBUG;
 		$module = 'stc';
 	}
+
 	return $self->SUPER::set_highlighter($module);
 }
 
@@ -171,6 +180,42 @@ sub guess_filename {
 	return undef;
 }
 
+sub guess_subpath {
+	my $self = shift;
+
+	# Don't attempt a content-based guess if the file already has a name.
+	if ( $self->filename ) {
+		return $self->SUPER::guess_subpath;
+	}
+
+	# Is this a script?
+	my $text = $self->text_get;
+	if ( $text =~ /^\#\![^\n]*\bperl\b/s ) {
+
+		# Is this a test?
+		if ( $text =~ /use Test::/ ) {
+			return 't';
+		} else {
+			return 'script';
+		}
+	}
+
+	# Is this a module?
+	if ( $text =~ /\bpackage\s*([\w\:]+)/s ) {
+
+		# Take all but the last section of the package name,
+		# and use that as the file.
+		my $name = $1;
+		my @dirs = split /::/, $name;
+		pop @dirs;
+
+		return ( 'lib', @dirs );
+	}
+
+	# Otherwise, no idea
+	return;
+}
+
 my $keywords;
 
 sub keywords {
@@ -182,48 +227,36 @@ sub keywords {
 
 sub get_functions {
 	my $self = shift;
-	my $text = $self->text_get;
 
 	# Filter out POD
-	$text =~ s/(?:\015{1,2}\012|\015|\012)/\n/sg;
-	$text =~ s/(\n)\n*__(?:DATA|END)__\b.*\z/$1/s;
-	$text =~ s/\n\n=\w+.+?\n\n=cut\b.+?\n+/\n\n/sg;
-
-	# Removes double \
-	$text =~ s/\\{2}//sg;
-
-	# Removes substitution functions
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)s(\W)(?:.*?)(?<!\\)\1(?:.*?)(?<!\\)\1\w*\s*(?<!;)?//g;
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)s\{(?:.*?)(?<!\\)\}\{(?:.*?)(?<!\\)\}\w*\s*(?<!;)?//sg;
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)s\((?:.*?)(?<!\\)\)\((?:.*?)(?<!\\)\)\w*\s*(?<!;)?//sg;
-
-	# Removes translate functions
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)tr(\W)(?:.*?)(?<!\\)\1(?:.*?)(?<!\\)\1\w*\s*//sg;
-
-	# Removes matches functions
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)m(\W)(?:.*?)(?<!\\)\1\w*\s*//sg;
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)m\{(?:.*?)(?<!\\)\}\w*\s*//sg;
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)m\((?:.*?)(?<!\\)\)\w*\s*//sg;
-	$text =~ s/(?:[\$\@\%]\w+\s*[!=]~\s*)?(?<!\w)\/(?:.*?)(?<!\\)\/\w*\s*//sg;
-
-	# Remove quoted strings, attributions and comparations
-	$text =~ s/(?:[\$\@\%]\w+\s*=+\s*|\w+\s*)?(?<![\w\\])(["']).*?(?<!\\)\1//sg;
-
-	# Removes everything after # in each line
-	$text =~ s/#.*$//mg;
-
-	#	return $text =~ m/\n\s*sub\s+(\w+(?:::\w+)*)/g;
-	#	return $text =~ m/(?:(?:^[^#]*?)sub\s+(\w+(?:::\w+)*))+?/mg;
-	return $text =~ m/(?:^|[};])\s*sub\s+(\w+(?:::\w+)*)/mg;
+	return grep { defined $_ } $self->text_get =~ m/
+		(?:
+		\n*__(?:DATA|END)__\b.*
+		|
+		\n\n=\w+.+?\n\n=cut\b.+?\n+
+		|
+		(?:^|\n)\s*sub\s+(\w+(?:::\w+)*)
+		)
+	/sgx;
 }
 
 sub get_function_regex {
 
 	# This emulates qr/(?<=^|[\012\015])sub\s$name\b/ but without
 	# triggering a "Variable length lookbehind not implemented" error.
-	#return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
-	return qr/(?:^|[^#\s])\s*(sub\s+$_[1])\b/;
+	return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
 }
+
+=pod
+
+=head2 get_command
+
+Returns the full command (interpreter, filename (maybe temporary) and arguments
+for both of them) for running the current document.
+
+Accepts one optional argument: a debug flag.
+
+=cut
 
 sub get_command {
 	my $self  = shift;
@@ -366,11 +399,23 @@ sub _check_syntax_internals {
 	}
 }
 
+=pod
+
+=head2 beginner_check
+
+Run the beginer error checks on the current document.
+
+Shows a popup message for the first error.
+
+Always returns 1 (true).
+
+=cut
+
 # Run the checks for common beginner errors
 sub beginner_check {
 	my $self = shift;
 
-	# TODO: Make this cool
+	# TO DO: Make this cool
 	# It isn't, because it should show _all_ warnings instead of one and
 	# it should at least go to the line it's complaining about.
 	# Ticket #534
@@ -469,12 +514,12 @@ sub _get_current_symbol {
 	my $col = $cursor_col;
 
 	# find start of symbol
-	# TODO: This could be more robust, no?
+	# TO DO: This could be more robust, no?
 	# Ticket #639
+	# if we are at the end of a symbol (maybe we need better detection?), start counting on the previous letter. this should resolve #419 and #654
+	$col-- if $col and substr( $line_content, $col - 1, 2 ) =~ /^\w\W$/;
 	while (1) {
-		if ( $col <= 0 or substr( $line_content, $col, 1 ) =~ /^[^#\w:\']$/ ) {
-			last;
-		}
+		last if $col <= 0 or substr( $line_content, $col, 1 ) =~ /^[^#\w:\']$/;
 		$col--;
 	}
 
@@ -555,10 +600,20 @@ sub find_method_declaration {
 	#		Wx::wxOK,
 	#		Padre->ide->wx->main
 	#	);
-	my ( $found, $filename ) = $self->_find_method($token);
+
+	# Try to extract class methods' class name
+	my $editor       = $self->editor;
+	my $line         = $location->[0] - 1;
+	my $col          = $location->[1] - 1;
+	my $line_start   = $editor->PositionFromLine($line);
+	my $token_end    = $line_start + $col + 1 + length($token);
+	my $line_content = $editor->GetTextRange( $line_start, $token_end );
+	my ($class) = $line_content =~ /(?:^|[^\w:\$])(\w+(?:::\w+)*)\s*->\s*\Q$token\E$/;
+
+	my ( $found, $filename ) = $self->_find_method( $token, $class );
 	if ( not $found ) {
 		Wx::MessageBox(
-			Wx::gettext("Current '$token' not found"),
+			sprintf( Wx::gettext("Current '%s' not found"), $token ),
 			Wx::gettext("Check cancelled"),
 			Wx::wxOK,
 			Padre->ide->wx->main
@@ -592,11 +647,39 @@ sub find_method_declaration {
 	return ();
 }
 
+# Arguments: A method name, optionally a class name
+# Returns: Success-Bit, Filename
 sub _find_method {
-	my ( $self, $name ) = @_;
+	my ( $self, $name, $class ) = @_;
 
-	# TODO: unify with code in Padre::Wx::FunctionList
-	# TODO: lots of improvement needed here
+	# Use tags parser if it's configured, return a match
+	my $parser = $self->perltags_parser;
+	if ( defined($parser) ) {
+		my $tag = $parser->findTag($name);
+
+		# Try to match tag AND class first
+		if ( defined $class ) {
+			while (1) {
+				last if not defined $tag;
+				next
+					if not defined $tag->{extension}{class}
+						or not $tag->{extension}{class} eq $class;
+				last;
+			} continue {
+				$tag = $parser->findNextTag();
+			}
+
+			# fall back to the first method name match (bad idea?)
+			$tag = $parser->findTag($name)
+				if not defined $tag;
+		}
+
+		return ( 1, $tag->{file} ) if defined $tag;
+	}
+
+	# Fallback: Search for methods in source
+	# TO DO: unify with code in Padre::Wx::FunctionList
+	# TO DO: lots of improvement needed here
 	if ( not $self->{_methods_}{$name} ) {
 		my $filename = $self->filename;
 		$self->{_methods_}{$_} = $filename for $self->get_functions;
@@ -606,6 +689,7 @@ sub _find_method {
 			foreach my $f (@files) {
 				if ( open my $fh, '<', $f ) {
 					my $lines = do { local $/ = undef; <$fh> };
+					close $fh;
 					my @subs = $lines =~ /sub\s+(\w+)/g;
 
 					#use Data::Dumper;
@@ -621,13 +705,12 @@ sub _find_method {
 	#print Dumper $self->{_methods_};
 
 	if ( $self->{_methods_}{$name} ) {
-		return 1, $self->{_methods_}{$name};
+		return ( 1, $self->{_methods_}{$name} );
 	}
 	return;
-
 }
 
-# TODO temp function given a name of a subroutine and move the cursor
+# TO DO temp function given a name of a subroutine and move the cursor
 # to its develaration, need to be improved ~ szabgab
 sub goto_sub {
 	my ( $self, $name ) = @_;
@@ -712,7 +795,7 @@ sub extract_subroutine {
 	# this could be configurable
 	my $now         = localtime;
 	my $sub_comment = <<EOC;
-# 
+#
 # New subroutine "$newname" extracted - $now.
 #
 EOC
@@ -829,23 +912,75 @@ EOC
 
 # This sub handles a cached C-Tags - Parser object which is much faster
 # than recreating it on every autocomplete
-
-sub _perltags_parser {
+sub perltags_parser {
 	my $self = shift;
 
 	require Parse::ExuberantCTags;
-
+	my $config        = Padre->ide->config;
 	my $perltags_file = $self->{_perltags_file};
 
-	# Temporary until this is configurable:
-	if ( !defined($perltags_file) ) {
-		$self->{_perltags_file} = File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' );
+	# Use the configured file (if any) or the old default, reset on config change
+	if (   not defined $perltags_file
+		or not defined $self->{_perltags_config}
+		or $self->{_perltags_config} ne $config->perl_tags_file )
+	{
+
+		for my $candidate (
+			$self->project_tagsfile, $config->perl_tags_file,
+			File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' )
+			)
+		{
+
+			# project_tagsfile and config value may be undef
+			next if !defined($candidate);
+
+			# config value may be defined but empty
+			next if $candidate eq '';
+
+			# Check if the tagsfile exists using Padre::File
+			# to allow "ftp://my.server/~myself/perltags" in config
+			# and remote projects
+			my $tagsfile = Padre::File->new($candidate);
+			next if !defined($tagsfile);
+
+			next if !$tagsfile->exists;
+
+			# For non-local perltags-files, copy the file to a local tempfile,
+			# otherwise the parser won't work or will be very slow.
+			if ( $tagsfile->{protocol} ne 'local' ) {
+
+				# Create temporary local file
+				$self->{_perltags_temp} = File::Temp->new( UNLINK => 1 );
+
+				# Flush tagsfile content to temporary file
+				my $FH = $self->{_perltags_temp};
+				$FH->autoflush(1);
+				print $FH $tagsfile->read;
+
+				# File should not be closed - it may get deleted on close!
+
+				# Use the local temporary file as tagsfile
+				$self->{_perltags_file} = $self->{_perltags_temp}->filename;
+			} else {
+				$self->{_perltags_file} = $candidate;
+			}
+
+			# Use first existing file
+			last;
+		}
+
+		# Remember current value for later checks
+		$self->{_perltags_config} = $config->perl_tags_file;
+
 		$perltags_file = $self->{_perltags_file};
+
+		# Reset timer for new file
+		delete $self->{_perltags_parser_time};
 	}
 
 	# If we don't have a file (none specified in config, for example), return undef
 	# as the object and noone will try to use it
-	return undef if !defined($perltags_file);
+	return if not defined $perltags_file;
 
 	my $parser;
 
@@ -853,10 +988,10 @@ sub _perltags_parser {
 	#  - there is one
 	#  - the last check is younger than 5 seconds (don't check the file again)
 	#    or the file's mtime matches our cached mtime
-	if (    defined( $self->{_perltags_parser} )
-		and defined( $self->{_perltags_parser_time} )
-		and (  ( $self->{_perltags_parser_last} > ( time - 5 ) )
-			or ( $self->{_perltags_parser_time} == ( stat($perltags_file) )[9] ) )
+	if (    defined $self->{_perltags_parser}
+		and defined $self->{_perltags_parser_time}
+		and (  $self->{_perltags_parser_last} > time - 5
+			or $self->{_perltags_parser_time} == ( stat $perltags_file )[9] )
 		)
 	{
 		$parser = $self->{_perltags_parser};
@@ -864,25 +999,59 @@ sub _perltags_parser {
 	} else {
 		$parser                        = Parse::ExuberantCTags->new($perltags_file);
 		$self->{_perltags_parser}      = $parser;
-		$self->{_perltags_parser_time} = ( stat($perltags_file) )[9];
+		$self->{_perltags_parser_time} = ( stat $perltags_file )[9];
 		$self->{_perltags_parser_last} = time;
 	}
 
 	return $parser;
 }
 
+=pod
+
+=head2 autocomplete
+
+This method is called on two events:
+ - Manually using the autocomplete-action (via menu, toolbar, hotkey)
+ - on every char typed by the user if the "autocomplete-always" config option
+   is active
+
+Arguments:
+ - The event object (optional)
+
+Returns the prefix length and an array of suggestions. prefix_length is the
+number of chars left to the cursor position which need to be replaced if
+a suggestion is accepted.
+
+WARNING: This method runs very often (on each keypress), keep it as efficient
+         and fast as possible!
+
+=cut
+
 sub autocomplete {
 	my $self  = shift;
 	my $event = shift;
+
+	my $config    = Padre->ide->config;
+	my $min_chars = $config->perl_autocomplete_min_chars;
 
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
 	my $line   = $editor->LineFromPosition($pos);
 	my $first  = $editor->PositionFromLine($line);
 
+	# This function is called very often, return asap
+	return if ( $pos - $first ) < ( $min_chars - 1 );
+
 	# line from beginning to current position
 	my $prefix = $editor->GetTextRange( $first, $pos );
-	my $suffix = $editor->GetTextRange( $pos,   $pos + 15 );
+
+	# Remove any ident from the beginning of the prefix
+	$prefix =~ s/^[\r\t]+//;
+
+	# One char may be added by the current event
+	return if length($prefix) < ( $min_chars - 1 );
+
+	my $suffix = $editor->GetTextRange( $pos, $pos + 15 );
 	$suffix = $1 if $suffix =~ /^(\w*)/; # Cut away any non-word chars
 
 	# The second parameter may be a reference to the current event or the next
@@ -896,7 +1065,7 @@ sub autocomplete {
 	}
 
 	# WARNING: This is totally not done, but Gabor made me commit it.
-	# TODO:
+	# TO DO:
 	# a) complete this list
 	# b) make the path configurable
 	# c) make the whole thing optional and/or pluggable
@@ -916,20 +1085,20 @@ sub autocomplete {
 	if ( $prefix =~ /([\$\@\%\*])(\w+(?:::\w+)*)$/ ) {
 		my $prefix = $2;
 		my $type   = $1;
-		my $parser = $self->_perltags_parser;
+		my $parser = $self->perltags_parser;
 		if ( defined $parser ) {
 			my $tag = $parser->findTag( $prefix, partial => 1 );
 			my @words;
 			my %seen;
 			while ( defined($tag) ) {
 
-				# TODO check file scope?
+				# TO DO check file scope?
 				if ( !defined( $tag->{kind} ) ) {
 
 					# This happens with some tagfiles which have no kind
 				} elsif ( $tag->{kind} eq 'v' ) {
 
-					# TODO potentially don't skip depending on circumstances.
+					# TO DO potentially don't skip depending on circumstances.
 					if ( not $seen{ $tag->{name} }++ ) {
 						push @words, $tag->{name};
 					}
@@ -972,12 +1141,12 @@ sub autocomplete {
 		my $class  = $1;
 		my $prefix = $2;
 		$prefix = '' if not defined $prefix;
-		my $parser = $self->_perltags_parser;
+		my $parser = $self->perltags_parser;
 		if ( defined $parser ) {
 			my $tag = ( $prefix eq '' ) ? $parser->firstTag() : $parser->findTag( $prefix, partial => 1 );
 			my @words;
 
-			# TODO: INHERITANCE!
+			# TO DO: INHERITANCE!
 			while ( defined($tag) ) {
 				if ( !defined( $tag->{kind} ) ) {
 
@@ -997,7 +1166,7 @@ sub autocomplete {
 	# check for packages
 	elsif ( $prefix =~ /(?![\$\@\%\*])(\w+(?:::\w+)*)/ ) {
 		my $prefix = $1;
-		my $parser = $self->_perltags_parser;
+		my $parser = $self->perltags_parser;
 
 		if ( defined $parser ) {
 			my $tag = $parser->findTag( $prefix, partial => 1 );
@@ -1005,13 +1174,13 @@ sub autocomplete {
 			my %seen;
 			while ( defined($tag) ) {
 
-				# TODO check file scope?
+				# TO DO check file scope?
 				if ( !defined( $tag->{kind} ) ) {
 
 					# This happens with some tagfiles which have no kind
 				} elsif ( $tag->{kind} eq 'p' ) {
 
-					# TODO potentially don't skip depending on circumstances.
+					# TO DO potentially don't skip depending on circumstances.
 					if ( not $seen{ $tag->{name} }++ ) {
 						push @words, $tag->{name};
 					}
@@ -1023,6 +1192,13 @@ sub autocomplete {
 	}
 
 	$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
+
+	if ( defined($nextchar) ) {
+		return if ( length($prefix) + 1 ) < $min_chars;
+	} else {
+		return if length($prefix) < $min_chars;
+	}
+
 	my $last      = $editor->GetLength();
 	my $text      = $editor->GetTextRange( 0, $last );
 	my $pre_text  = $editor->GetTextRange( 0, $first + length($prefix) );
@@ -1039,8 +1215,9 @@ sub autocomplete {
 	push @words, grep { !$seen{$_}++ } reverse( $pre_text =~ /$regex/g );
 	push @words, grep { !$seen{$_}++ } ( $post_text =~ /$regex/g );
 
-	if ( @words > 20 ) {
-		@words = @words[ 0 .. 19 ];
+	my $max_length = $config->perl_autocomplete_max_suggestions;
+	if ( @words > $max_length ) {
+		@words = @words[ 0 .. ( $max_length - 1 ) ];
 	}
 
 	# Suggesting the current word as the only solution doesn't help
@@ -1060,15 +1237,24 @@ sub autocomplete {
 
 	# This is the final result if there is no char which hasn't been
 	# saved to the editor buffer until now
-	return ( length($prefix), @words ) if !defined($nextchar);
+	#	return ( length($prefix), @words ) if !defined($nextchar);
+
+	my $min_length = $config->perl_autocomplete_min_suggestion_len;
 
 	# Finally cut out all words which do not match the next char
 	# which will be inserted into the editor (by the current event)
+	# and remove all which are too short
 	my @final_words;
 	for (@words) {
 
+		# Filter out everything which is too short
+		next if length($_) < $min_length;
+
 		# Accept everything which has prefix + next char + at least one other char
-		next if !/^\Q$prefix$nextchar\E./;
+		# (check only if any char is pending)
+		next if defined($nextchar) and ( !/^\Q$prefix$nextchar\E./ );
+
+		# All checks passed, add to the final list
 		push @final_words, $_;
 	}
 
@@ -1093,7 +1279,7 @@ sub newline_keep_column {
 	#	my $col2 = $pos - $first;
 	#	$editor->AddText( ' ' x ( $col - $col2 ) );
 
-	# TODO: Remove the part made by auto-ident before addtext:
+	# TO DO: Remove the part made by auto-ident before addtext:
 	$text =~ s/[^\s\t\r\n]/ /g;
 	$editor->AddText($text);
 
@@ -1101,6 +1287,26 @@ sub newline_keep_column {
 
 	return 1;
 }
+
+=pod
+
+=head2 event_on_char
+
+This event fires once for every char which should be added to the editor window.
+
+Typing this line fired it about 41 times!
+
+Arguments: Current editor object, current event object
+
+Returns nothing useful.
+
+Notice: The char being typed has not been inserted into the editor at the run
+        time of this method. It could be read using $event->GetUnicodeKey
+
+WARNING: This method runs very often (on each keypress), keep it as efficient
+         and fast as possible!
+
+=cut
 
 sub event_on_char {
 	my ( $self, $editor, $event ) = @_;
@@ -1131,8 +1337,14 @@ sub event_on_char {
 	my $pos   = $editor->GetCurrentPos;
 	my $line  = $editor->LineFromPosition($pos);
 	my $first = $editor->PositionFromLine($line);
-	my $last  = $editor->PositionFromLine( $line + 1 ) - 1;
 
+	# removed the - 1 at the end
+	#my $last = $editor->PositionFromLine( $line + 1 );
+
+	my $last = $editor->GetLineEndPosition($line);
+
+	#print "pos,line,first,last: $pos,$line,$first,$last\n";
+	#print "$pos == $last\n";
 	# This only matches if all conditions are met:
 	#  - config option enabled
 	#  - none of the following keys pressed: a-z, A-Z, 0-9, _
@@ -1150,9 +1362,14 @@ sub event_on_char {
 		# from beginning to current position
 		my $prefix = $editor->GetTextRange( 0, $pos );
 
+
+
 		# methods can't live outside packages, so ignore them
+		my $linetext = $editor->GetTextRange( $first, $last );
+
+		#print "Text:\n'$linetext'\n";
 		if ( $prefix =~ /package / ) {
-			my $linetext = $editor->GetTextRange( $first, $last );
+
 
 			# we only match "sub foo" at the beginning of a line
 			# but no inline subs (eval, anonymus, etc.)
@@ -1169,13 +1386,47 @@ sub event_on_char {
 						. 'my $self = shift;'
 						. $self->newline . "\t"
 						. $self->newline . '}'
-						. $self->newline
 						. $self->newline );
 
 				# Ready for typing in the new method:
 				$editor->GotoPos( $last + 23 );
 
 			}
+		} elsif ( $linetext =~ /^sub[\s\t]+(\w+)$/ ) {
+			my $subName = $1;
+
+			#$self->_do_end_check($editor, $line, $pos);
+			# Add the default skeleton of a subroutine,
+			# the \t should be replaced by
+			# (space * current_indent_width)
+
+			$editor->AddText( ' {' . $self->newline . "\t" . $self->newline . '}' );
+
+			# $line is where it starts
+			my $starting_line = $line - 1;
+			if ( $starting_line < 0 ) {
+				$starting_line = 0;
+			}
+
+			#print "starting_line: $starting_line\n";
+			$editor->GotoPos( $editor->PositionFromLine($starting_line) );
+			$editor->AddText( $self->_pod($subName) );
+
+			# $editor->GetLineEndPosition($editor->PositionFromLine(
+			my $end_line = $starting_line + 10;
+			$editor->GotoLine($end_line);
+
+			#print "end_line: $end_line\n";
+			my $line_end_pos = $editor->GetLineEndPosition($end_line);
+
+			#print "Line_end_pos: " . $line_end_pos . "\n";
+			my $last_pos = $editor->GetLineEndPosition($end_line);
+
+			#print "Last pos: $last_pos\n";
+			# Ready for typing in the new method:
+
+			$editor->GotoPos($last_pos);
+
 		}
 	}
 
@@ -1189,6 +1440,13 @@ sub event_on_char {
 
 	return;
 }
+
+sub _pod {
+	my ( $self, $method ) = @_;
+	my $pod = "\n=pod\n\n=head2 $method\n\n\tTODO: Document $method\n\n=cut\n";
+	return $pod;
+}
+
 
 # Our opportunity to implement a context-sensitive right-click menu
 # This would be a lot more powerful if we used PPI, but since that would
@@ -1223,7 +1481,6 @@ sub event_on_right_down {
 
 	# Append variable specific menu items if it's a variable
 	if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
-
 		$menu->AppendSeparator if not $introduced_separator++;
 
 		my $findDecl = $menu->Append( -1, Wx::gettext("Find Variable Declaration") );
@@ -1232,7 +1489,7 @@ sub event_on_right_down {
 			$findDecl,
 			sub {
 				my $editor = shift;
-				my $doc    = $self; # FIXME if Padre::Wx::Editor had a method to access its Document...
+				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
 				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				$doc->find_variable_declaration;
 			},
@@ -1243,9 +1500,9 @@ sub event_on_right_down {
 			$editor, $lexRepl,
 			sub {
 
-				# FIXME near duplication of the code in Padre::Wx::Menu::Perl
+				# FIX ME near duplication of the code in Padre::Wx::Menu::Perl
 				my $editor = shift;
-				my $doc    = $self; # FIXME if Padre::Wx::Editor had a method to access its Document...
+				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
 				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				require Padre::Wx::History::TextEntryDialog;
 				my $dialog = Padre::Wx::History::TextEntryDialog->new(
@@ -1263,14 +1520,14 @@ sub event_on_right_down {
 		);
 	} # end if it's a variable
 
-	# TODO connect this to the action of menu item in the Perl menu!
+	# TO DO connect this to the action of menu item in the Perl menu!
 	if ( defined $location and $token =~ /^\w+$/ ) {
 		my $find = $menu->Append( -1, Wx::gettext("Find Method Declaration") );
 		Wx::Event::EVT_MENU(
 			$editor, $find,
 			sub {
 				my $editor = shift;
-				my $doc    = $self; # FIXME if Padre::Wx::Editor had a method to access its Document...
+				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
 				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				$doc->find_method_declaration;
 			},
@@ -1290,7 +1547,7 @@ sub event_on_right_down {
 			$intro_temp,
 			sub {
 
-				# FIXME near duplication of the code in Padre::Wx::Menu::Perl
+				# FIX ME near duplication of the code in Padre::Wx::Menu::Perl
 				my $editor = shift;
 				my $doc    = $self;
 				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
@@ -1333,7 +1590,7 @@ sub event_on_left_up {
 		# Does it look like a variable?
 		if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
 
-			# FIXME editor document accessor?
+			# FIX ME editor document accessor?
 			$editor->{Document}->find_variable_declaration();
 		}
 
@@ -1390,6 +1647,81 @@ sub menu {
 	return [ 'menu.Perl', 'menu.Refactor' ];
 }
 
+=pod
+
+=head2 project_tagsfile
+
+No arguments.
+
+Returns the full path and filename of the (perl))tagsfile for the current
+document.
+
+=cut
+
+sub project_tagsfile {
+	my $self = shift;
+
+	my $project_dir = $self->project_dir;
+
+	return if !defined($project_dir);
+
+	return File::Spec->catfile( $project_dir, 'perltags' );
+}
+
+=pod
+
+=head2 project_create_tagsfile
+
+Creates a tagsfile for the project of the current document. Includes all Perl
+source files within the project excluding blib.
+
+=cut
+
+sub project_create_tagsfile {
+	my $self = shift;
+
+	# First try is using the perl-tags command, next version should so this
+	# internal using Padre::File and should skip at least the "blip" dir.
+
+	#	print STDERR join(' ','perl-tags','-o',$self->project_tagsfile,$self->project_dir)."\n";
+	system 'perl-tags', '-o', $self->project_tagsfile, $self->project_dir;
+
+}
+
+sub find_help_topic {
+	my $self = shift;
+
+	my $editor = $self->editor;
+	my $pos    = $editor->GetCurrentPos;
+	
+	require PPI;
+	my $text = $editor->GetText;
+	my $doc  = PPI::Document->new( \$text );
+
+	# Find token under the cursor!
+	my $line       = $editor->LineFromPosition($pos);
+	my $line_start = $editor->PositionFromLine($line);
+	my $line_end   = $editor->GetLineEndPosition($line);
+	my $col        = $pos - $line_start;
+
+	require Padre::PPI;
+	my $token = Padre::PPI::find_token_at_location(
+		$doc, [ $line + 1, $col + 1 ],
+	);
+
+	if ($token) {
+		#print $token->class . "\n";
+		if ( $token->isa('PPI::Token::Symbol') ) {
+			if ( $token->content =~ /^[\$\@\%].+?$/ ) {
+				return 'perldata';
+			}
+		} elsif ( $token->isa('PPI::Token::Operator') ) {
+			return $token->content;
+		}
+	}
+
+	return;
+}
 
 
 1;

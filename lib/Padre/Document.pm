@@ -11,7 +11,7 @@ Padre::Document - Padre Document API
 The B<Padre::Document> class provides a base class, default implementation
 and API documentation for document type support in L<Padre>.
 
-As an API, it allows L<Padre> developers and plugin authors to implement
+As an API, it allows L<Padre> developers and plug-in authors to implement
 extended support for various document types in Padre, while ensuring that
 a naive default document implementation exists that allows Padre to provide
 basic support (syntax highlighting mainly) for many document types without
@@ -31,91 +31,90 @@ Each supported mime has a mapping to a Scintilla lexer (for syntax
 highlighting), and an optional mapping to the class that provides enhanced
 support for that document type.
 
-Plugins that implement support for a document type provide a
-C<registered_documents> method that the PluginManager will call as needed.
+Plug-ins that implement support for a document type provide a
+C<registered_documents> method that the plug-in manager will call as needed.
 
-Plugin authors should B<not> load the document classes in advance, they
+Plug-in authors should B<not> load the document classes in advance, they
 will be automatically loaded by Padre as needed.
 
 Padre does B<not> currently support opening non-text files.
 
-=head2 File to MIME-type mapping
+=head2 File to MIME type mapping
 
-Padre has a built-in hash mapping the file exetensions to mime-types.
+Padre has a built-in hash mapping the file extensions to MIME types.
 In certain cases (.t, .pl, .pm) Padre also looks in the content of the
 file to determine if the file is Perl 5 or Perl 6.
 
-mime-types are mapped to lexers that provide the syntax highlighting.
+MIME types are mapped to lexers that provide the syntax highlighting.
 
-mime-types are also mapped to modules that implement 
+MIME types are also mapped to modules that implement
 special features needed by that kind of a file type.
 
 Plug-ins can add further mappings.
 
-=head3 Plan
+=head2 Plan
 
-Padre has a built-in mapping of file extension to either 
-a single mime-type or function name. In order to determine
-the actual mime-type Padre checks this hash. If the key
-is a subroutine it is called and it should return the 
-mime-type of the file.
+Padre has a built-in mapping of file extension to either
+a single MIME type or function name. In order to determine
+the actual MIME type Padre checks this hash. If the key
+is a subroutine it is called and it should return the
+MIME type of the file.
 
-The user has a way in the GUI to add more file extensions 
-and map them to existing mime-types or funtions. It is probably
-better to have a commonly used name along with the mime-type
-in that GUI instead of the mime-type only.
+The user has a way in the GUI to add more file extensions
+and map them to existing MIME types or functions. It is probably
+better to have a commonly used name along with the MIME type
+in that GUI instead of the MIME type only.
 
-I wonder if we should allow the users (and or plugin authors) to
+I wonder if we should allow the users (and or plug-in authors) to
 change the functions or to add new functions that will map
-file content to mime-type or if we should just tell them to 
+file content to MIME type or if we should just tell them to
 patch Padre. What if they need it for some internal project?
 
-A plugin is able to add new supported mime-types. Padre should
-either check for collisions if a plugin already wants to provide
-an already suported mime-type or should allow multiple support
+A plug-in is able to add new supported MIME types. Padre should
+either check for collisions if a plug-in already wants to provide
+an already supported MIME type or should allow multiple support
 modules with a way to select the current one. (Again I think we
-probably don't need this. People can just come and add the 
-mime-types to Padre core.) (not yet implemented)
+probably don't need this. People can just come and add the
+MIME types to Padre core.) (not yet implemented)
 
-A plugin can register zero or more modules that implement 
-special features needed by certain mime-types. Every mime-type
+A plug-in can register zero or more modules that implement
+special features needed by certain MIME types. Every MIME type
 can have only one module that implements its features. Padre is
-checking if a mime-type already has a registered module and
+checking if a MIME type already has a registered module and
 does not let to replace it.
 (Special features such as commenting out a few lines at once,
-autocompletion or refactoring tools).
+auto-completion or refactoring tools).
 
-Padre should check if the given mime-type is one that is
-in the supported mime-type list. (TODO)
+Padre should check if the given MIME type is one that is
+in the supported MIME type list. (TO DO)
 
+Each MIME type is mapped to one or more lexers that provide
+the syntax highlighting. Every MIME type has to be mapped to at least
+one lexer but it can be mapped to several lexers as well.
+The user is able to select the lexer for each MIME type.
+(For this each lexer should have a reasonable name too.) (TO DO)
 
-Each mime-type is mapped to one or more lexers that provide 
-the syntax highlighting. Every mime-type has to be mapped to at least 
-one lexer but it can be mapped to several lexers as well. 
-The user is able to select the lexer for each mime-type.
-(For this each lexer should have a reasonable name too.) (TODO)
+Every plug-in should be able to add a list of lexers to the existing
+MIME types regardless if the plug-in also provides the class that
+implements the features of that MIME type. By default Padre
+supports the built-in syntax highlighting of Scintilla.
+Perl 5 currently has two L<PPI> based syntax highlighter,
+Perl 6 can use the STD.pm or Rakudo/PGE for syntax highlighting but
+there are two plug-ins – Parrot and Kate – that can provide syntax
+highlighting to a wide range of MIME types.
 
-Every plugin should be able to add a list of lexers to the existing 
-mime-types regardless if the plugin also provides the class that 
-implements the features of that mime-type. By default Padre
-suppors the built-in syntax highlighting of Scintialla but. 
-Perl 5 currently has two PPI based syntax highlighter,
-Perl 6 can use the STD.pm or Rakudo/PGE for syntax highlighting but 
-there are two plugins Parrot and Kate that can provide synax 
-highlighting to a wide range of mime-types.
+C<provided_highlighters()> returns a list of arrays like this:
 
- provided_highlighters()  returns a lits of arrays like this:
     ['Module with a colorize function' => 'Human readable Name' => 'Long description']
 
- highlighting_mime_types() returns a hash where the keys are module
- names listed in the provided_highlighters the values are array references to mime-types
-     'Module::A' => [ mime-type-1, mime-type-2]
+C<highlighting_mime_types()> returns a hash where the keys are module
+names listed in C<provided_highlighters>, the values are array references to MIME types:
 
-    
+    'Module::A' => [ mime-type-1, mime-type-2]
 
-The user can change the mime-type mapping of individual 
+The user can change the MIME type mapping of individual
 files and Padre should remember this choice and allow the
-user to change it to another specific mime-type
+user to change it to another specific MIME type
 or to set it to "Default by extension".
 
 =head1 METHODS
@@ -134,8 +133,9 @@ use Padre::Wx        ();
 use Padre            ();
 use Padre::MimeTypes ();
 use Padre::File      ();
+use Padre::Debug;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 
 
@@ -147,7 +147,7 @@ our $VERSION = '0.50';
 # NOTE: This is probably a bad place to store this
 my $unsaved_number = 0;
 
-# TODO generate this from the the MIME_TYPES in the Padre::MimeTypes class?
+# TO DO generate this from the the MIME_TYPES in the Padre::MimeTypes class?
 sub menu_view_mimes {
 	return (
 		'00Plain Text' => 'text/plain',
@@ -175,7 +175,7 @@ sub menu_view_mimes {
 
 use Class::XSAccessor getters => {
 	editor           => 'editor',
-	filename         => 'filename',    # TODO is this read_only or what?
+	filename         => 'filename',    # TO DO is this read_only or what?
 	file             => 'file',        # Padre::File - object
 	get_mimetype     => 'mimetype',
 	get_newline_type => 'newline_type',
@@ -194,15 +194,14 @@ use Class::XSAccessor getters => {
 
 =pod
 
-=head2 new
+=head2 C<new>
 
   my $doc = Padre::Document->new(
       filename => $file,
   );
 
-$file is optional and if given it will be loaded in the document
-
-mime-type is defined by the guess_mimetype function
+C<$file> is optional and if given it will be loaded in the document.
+MIME type is defined by the C<guess_mimetype> function.
 
 =cut
 
@@ -216,6 +215,16 @@ sub new {
 	# Use document->{file}->filename instead!
 	if ( $self->{filename} ) {
 		$self->{file} = Padre::File->new( $self->{filename} );
+
+		if ( !defined( $self->{file} ) ) {
+			$self->error( Wx::gettext('Error while opening file: no file object') );
+			return;
+		}
+
+		if ( defined( $self->{file}->{error} ) ) {
+			$self->error( $self->{file}->{error} );
+			return;
+		}
 
 		# The Padre::File - module knows how to format the filename to the right
 		# syntax to correct (for example) .//file.pl to ./file.pl)
@@ -268,7 +277,7 @@ sub rebless {
 	# do for a first implementation.
 	my $mime_type = $self->get_mimetype or return;
 	my $class = Padre::MimeTypes->get_mime_class($mime_type) || __PACKAGE__;
-	Padre::Util::debug("Reblessing to mimetype: '$class'");
+	TRACE("Reblessing to mimetype: '$class'") if DEBUG;
 	if ($class) {
 		unless ( $class->VERSION ) {
 			eval "require $class;";
@@ -314,13 +323,13 @@ sub colourize {
 sub colorize {
 	my $self = shift;
 
-	Padre::Util::debug("colorize called");
+	TRACE("colorize called") if DEBUG;
 
 	my $module = $self->get_highlighter;
-	Padre::Util::debug("module: '$module'");
+	TRACE("module: '$module'") if DEBUG;
 	if ( $module eq 'stc' ) {
 
-		#TODO sometime this happens when I open Padre with several file
+		#TO DO sometime this happens when I open Padre with several file
 		# I think this can be somehow related to the quick (or slow ?) switching of
 		# what is the current document while the code is still running.
 		# for now I hide the warnings as this would just frighten people and the
@@ -340,7 +349,7 @@ sub colorize {
 		}
 	}
 	if ( $module->can('colorize') ) {
-		Padre::Util::debug("Call '$module->colorize(@_)'");
+		TRACE("Call '$module->colorize(@_)'") if DEBUG;
 		$module->colorize(@_);
 	} else {
 		warn("Module $module does not have a colorize method\n");
@@ -365,7 +374,7 @@ sub dirname {
 }
 
 # For ts without a newline type
-# TODO: get it from config
+# TO DO: get it from config
 sub _get_default_newline_type {
 
 	# Very ugly hack to make the test script work
@@ -378,7 +387,7 @@ sub _get_default_newline_type {
 
 =pod
 
-=head3 error
+=head2 C<error>
 
     $document->error( $msg );
 
@@ -387,7 +396,7 @@ button. No return value.
 
 =cut
 
-# TODO: A globally used error/message box function may be better instead
+# TO DO: A globally used error/message box function may be better instead
 #       of replicating the same function in many files:
 sub error {
 	Padre->ide->wx->main->message( $_[1], Wx::gettext('Error') );
@@ -461,42 +470,45 @@ sub time_on_file {
 sub checksum_on_file {
 	warn join( ',', caller ) . ' called Document::checksum_on_file which is out-of-service.';
 	return 1;
-
-	my $self = shift;
-
-	my $filename = $self->{file}->filename;
-	return undef unless defined $filename;
-
-	require Digest::MD5;
-
-	open my $FH, $filename or return;
-	binmode($FH);
-	return Digest::MD5->new->addfile(*$FH)->hexdigest;
 }
+
+# Part of the above checksum_on_file sub
+# Commented out to keep Perl::Critic happy
+#my $self = shift;
+#
+#my $filename = $self->{file}->filename;
+#return unless defined $filename;
+#
+#require Digest::MD5;
+#
+#open my $FH, '<', $filename or return;
+#binmode($FH);
+#return Digest::MD5->new->addfile(*$FH)->hexdigest;
 
 =pod
 
-=head2 load_file
+=head2 C<load_file>
 
  $doc->load_file;
- 
+
 Loads the current file.
 
 Sets the B<Encoding> bit using L<Encode::Guess> and tries to figure
-out what kind of newlines are in the file. Defaults to utf-8 if
+out what kind of newlines are in the file. Defaults to C<utf-8> if it
 could not figure out the encoding.
 
-Returns true on success false on failure. Sets $doc->errstr;
+Returns true on success false on failure. Sets C<< $doc->errstr >>.
 
 =cut
 
 sub load_file {
 	my ($self) = @_;
-
 	my $file = $self->file;
 
-	Padre::Util::debug(
-		"Loading file '" . ( defined( $file->{file}->{filename} ) and $file->{file}->{filename} ) . "'" );
+	if (DEBUG) {
+		my $name = $file->{file}->{filename} || '';
+		TRACE("Loading file '$name'");
+	}
 
 	# check if file exists
 	if ( !$file->exists ) {
@@ -545,7 +557,7 @@ sub newline_type {
 }
 
 # Get the newline char(s) for this document.
-# TODO: This solution is really terrible - it should be {newline} or at least a caching of the value
+# TO DO: This solution is really terrible - it should be {newline} or at least a caching of the value
 #       because of speed issues:
 sub newline {
 	my $self = shift;
@@ -559,7 +571,7 @@ sub newline {
 
 =pod
 
-=head2 autocomplete_matching_char
+=head2 C<autocomplete_matching_char>
 
 The first argument needs to be a reference to the editor this method should
 work on.
@@ -573,12 +585,12 @@ set between key and value. Both key and value are expected to be ASCII codes.
 
 Usually used for brackets and text signs like:
 
-	$self->autocomplete_matching_char(
-			$editor,
-			$event,
-			39  => 39,  # ' '
-			40  => 41,  # ( )
-		);
+  $self->autocomplete_matching_char(
+      $editor,
+      $event,
+      39  => 39,  # ' '
+      40  => 41,  # ( )
+  );
 
 Returns 1 if something was added or 0 otherwise (if anybody cares about this).
 
@@ -661,8 +673,6 @@ sub autoclean {
 	return 1;
 }
 
-
-
 sub save_file {
 	my ($self) = @_;
 	$self->set_errstr('');
@@ -724,13 +734,13 @@ sub save_file {
 
 =pod
 
-=head2 reload
+=head2 C<reload>
 
 Reload the current file discarding changes in the editor.
 
-Returns true on success false on failure. Error message will be in $doc->errstr;
+Returns true on success false on failure. Error message will be in C<< $doc->errstr >>.
 
-TODO: In the future it should backup the changes in case the user regrets the action.
+TO DO: In the future it should backup the changes in case the user regrets the action.
 
 =cut
 
@@ -748,9 +758,9 @@ sub store_in_tempfile {
 
 	$self->create_tempfile unless $self->tempfile;
 
-	open FH, ">", $self->tempfile;
-	print FH $self->text_get;
-	close FH;
+	open my $FH, ">", $self->tempfile;
+	print $FH $self->text_get;
+	close $FH;
 
 	return $self->tempfile;
 }
@@ -809,7 +819,7 @@ sub text_with_one_nl {
 #
 sub store_cursor_position {
 	my $self     = shift;
-	my $filename = $self->{file}->filename if defined( $self->{file} );
+	my $filename = defined( $self->{file} ) ? $self->{file}->filename : undef;
 	my $editor   = $self->editor;
 	return unless $filename && $editor;
 	my $pos = $editor->GetCurrentPos;
@@ -824,7 +834,7 @@ sub store_cursor_position {
 #
 sub restore_cursor_position {
 	my $self     = shift;
-	my $filename = $self->{file}->filename if defined( $self->{file} );
+	my $filename = defined( $self->{file} ) ? $self->{file}->filename : undef;
 	my $editor   = $self->editor;
 	return unless $filename && $editor;
 	my $pos = Padre::DB::LastPositionInFile->get_last_pos($filename);
@@ -855,7 +865,7 @@ sub lexer {
 	return Wx::wxSTC_LEX_CONTAINER if $highlighter ne 'stc';
 	return Wx::wxSTC_LEX_AUTOMATIC unless defined Padre::MimeTypes->get_lexer( $self->get_mimetype );
 
-	Padre::Util::debug( 'STC Lexer will be based on mime type "' . $self->get_mimetype . '"' );
+	TRACE( 'STC Lexer will be based on mime type "' . $self->get_mimetype . '"' ) if DEBUG;
 	return Padre::MimeTypes->get_lexer( $self->get_mimetype );
 }
 
@@ -876,13 +886,13 @@ sub get_title {
 sub remove_color {
 	my ($self) = @_;
 
-	Padre::Util::debug("remove_color called (@_)");
+	TRACE("remove_color called (@_)") if DEBUG;
 
 	my $editor = $self->editor;
 
-	Padre::Util::debug("editor '$editor'");
+	TRACE("editor '$editor'") if DEBUG;
 
-	# TODO this is strange, do we really need to do it with all?
+	# TO DO this is strange, do we really need to do it with all?
 	for my $i ( 0 .. 31 ) {
 		$editor->StartStyling( 0, $i );
 		$editor->SetStyling( $editor->GetLength, 0 );
@@ -891,17 +901,17 @@ sub remove_color {
 	return;
 }
 
-# TODO: experimental
+# TO DO: experimental
 sub get_indentation_style {
 	my $self   = shift;
 	my $config = Padre->ide->config;
 
-	# TODO: (document >) project > config
+	# TO DO: (document >) project > config
 
 	my $style;
 	if ( $config->editor_indent_auto ) {
 
-		# TODO: This should be cached? What's with newish documents then?
+		# TO DO: This should be cached? What's with newish documents then?
 		$style = $self->guess_indentation_style;
 	} else {
 		$style = {
@@ -914,7 +924,7 @@ sub get_indentation_style {
 	return $style;
 }
 
-=head2 set_indentation_style
+=head2 C<set_indentation_style>
 
 Given a hash reference with the keys C<use_tabs>,
 C<tabwidth>, and C<indentwidth>, set the document's editor's
@@ -942,7 +952,7 @@ sub set_indentation_style {
 	return ();
 }
 
-=head2 event_on_char
+=head2 C<event_on_char>
 
 NOT IMPLEMENTED IN THE BASE CLASS
 
@@ -951,33 +961,33 @@ to the current document. This enables document classes to aid the user
 in the editing process in various ways, e.g. by auto-pairing of brackets
 or by suggesting usable method names when method-call syntax is detected.
 
-Parameters retrieved are the objects for the document, the editor, and the 
+Parameters retrieved are the objects for the document, the editor, and the
 wxWidgets event.
 
 Returns nothing.
 
 Cf. C<Padre::Document::Perl> for an example.
 
-=head2 event_on_right_down
+=head2 C<event_on_right_down>
 
 NOT IMPLEMENTED IN THE BASE CLASS
 
-This method - if implemented - is called when a user right-clicks in an 
-editor to open a context menu and after the standard context menu was 
+This method - if implemented - is called when a user right-clicks in an
+editor to open a context menu and after the standard context menu was
 created and populated in the C<Padre::Wx::Editor> class.
-By manipulating the menu document classes may provide the user with 
+By manipulating the menu document classes may provide the user with
 additional options.
 
-Parameters retrieved are the objects for the document, the editor, the 
+Parameters retrieved are the objects for the document, the editor, the
 context menu (C<Wx::Menu>) and the event.
 
 Returns nothing.
 
-=head2 event_on_left_up
+=head2 C<event_on_left_up>
 
 NOT IMPLEMENTED IN THE BASE CLASS
 
-This method - if implemented - is called when a user left-clicks in an 
+This method - if implemented - is called when a user left-clicks in an
 editor. This can be used to implement context-sensitive actions if
 the user presses modifier keys while clicking.
 
@@ -1025,7 +1035,7 @@ sub project_find {
 	# Search upwards from the file to find the project root
 	my ( $v, $d, $f ) = File::Spec->splitpath( $self->{file}->filename );
 	my @d = File::Spec->splitdir($d);
-	pop @d if $d[-1] eq '';
+	pop @d if defined( $d[-1] ) and ( $d[-1] eq '' );
 	my $dirs = List::Util::first {
 		-f File::Spec->catpath( $v, $_, 'Makefile.PL' )
 			or -f File::Spec->catpath( $v, $_, 'Build.PL' )
@@ -1062,7 +1072,7 @@ sub guess_mimetype {
 	);
 }
 
-=head2 guess_indentation_style
+=head2 C<guess_indentation_style>
 
 Automatically infer the indentation style of the document using
 L<Text::FindIndent>.
@@ -1077,7 +1087,10 @@ sub guess_indentation_style {
 	my $self = shift;
 
 	require Text::FindIndent;
-	my $indentation = Text::FindIndent->parse( $self->text_get );
+	my $indentation = Text::FindIndent->parse(
+		$self->text_get,
+		skip_pod => $self->isa('Padre::Document::Perl'),
+	);
 
 	my $style;
 	if ( $indentation =~ /^t\d+/ ) { # we only do ONE tab
@@ -1112,7 +1125,7 @@ sub guess_indentation_style {
 	return $style;
 }
 
-=head2 guess_filename
+=head2 C<guess_filename>
 
   my $name = $document->guess_filename
 
@@ -1125,7 +1138,7 @@ name of the file should be based purely on the content of the file.
 In the base implementation, this returns C<undef> to indicate that the
 method cannot make a reasonable guess at the name of the file.
 
-Your mime-type specific document subclass should implement any file name
+Your MIME type specific document subclass should implement any file name
 detection as it sees fit, returning the file name as a string.
 
 =cut
@@ -1142,8 +1155,38 @@ sub guess_filename {
 	return undef;
 }
 
+=head2 C<guess_subpath>
+
+  my $subpath = $document->guess_subpath;
+
+When called on a new unsaved file, this method attempts to guess what the
+subpath of the file should be inside of the current project, based purely
+on the content of the file.
+
+In the base implementation, this returns a null list to indicate that the
+method cannot make a reasonable guess at the name of the file.
+
+Your MIME type specific document subclass should implement any file name
+detection as it sees fit, returning the project-rooted subpath as a list
+of directory names.
+
+These directory names do not need to exist, they only represent intent.
+
+=cut
+
+sub guess_subpath {
+	my $self = shift;
+
+	# IF the file already has an existing name, guess that
+	my $filename = $self->filename;
+
+	$DB::single = 1;
+
+	1;
+}
+
 # Abstract methods, each subclass should implement it
-# TODO: Clearly this isn't ACTUALLY abstract (since they exist)
+# TO DO: Clearly this isn't ACTUALLY abstract (since they exist)
 
 sub keywords {
 	return {};
@@ -1187,7 +1230,7 @@ sub stats {
 	}
 
 	# avoid slow calculation on large files
-	# TODO or improve them ?
+	# TO DO or improve them ?
 	if ( length($code) < 100_000 ) {
 		$words++               while ( $code =~ /\b\w+\b/g );
 		$chars_without_space++ while ( $code =~ /\S/g );
@@ -1196,8 +1239,7 @@ sub stats {
 		$chars_without_space = Wx::gettext("Skipped for large files");
 	}
 
-	my $filename = $self->{file}->filename
-		if defined( $self->{file} );
+	my $filename = defined( $self->{file} ) ? $self->{file}->filename : undef;
 
 	# not set when first time to save
 	# allow the upgread of ascii to utf-8
@@ -1213,7 +1255,7 @@ sub stats {
 
 =pod
 
-=head2 check_syntax
+=head2 C<check_syntax>
 
 NOT IMPLEMENTED IN THE BASE CLASS
 
@@ -1223,41 +1265,41 @@ By default, this method will only check the syntax if
 the document has changed since the last check. Specify
 the C<force =E<gt> 1> parameter to override this.
 
-An implementation in a derived class needs to return an arrayref of
+An implementation in a derived class needs to return an array reference of
 syntax problems.
 
-Each entry in the array has to be an anonymous hash with the 
+Each entry in the array has to be an anonymous hash with the
 following keys:
 
 =over 4
 
-=item * line
+=item * C<line>
 
 The line where the problem resides
 
-=item * msg
+=item * C<msg>
 
 A short description of the problem
 
-=item * severity
+=item * C<severity>
 
 A flag indicating the problem class: Either 'B<W>' (warning) or 'B<E>' (error)
 
-=item * desc
+=item * C<desc>
 
-A longer description with more information on the error (currently 
+A longer description with more information on the error (currently
 not used but intended to be)
 
 =back
 
-Returns an empty arrayref if no problems can be found.
+Returns an empty array reference if no problems can be found.
 
-Returns B<undef> if nothing has changed since the last invocation.
+Returns C<undef> if nothing has changed since the last invocation.
 
-Must return the problem list even if nothing has changed when a 
-param is present which evaluates to B<true>.
+Must return the problem list even if nothing has changed when a
+parameter is present which evaluates to B<true>.
 
-=head2 check_syntax_in_background
+=head2 C<check_syntax_in_background>
 
 NOT IMPLEMENTED IN THE BASE CLASS
 
@@ -1296,7 +1338,7 @@ the C<force =E<gt> 1> parameter to override this.
 # order for padre not to crash if user wants to un/comment lines with
 # a document type that did not define those methods.
 #
-# TODO Remove this base method, and compensate by disabling the menu entries
+# TO DO Remove this base method, and compensate by disabling the menu entries
 # if the document class does not define this method.
 sub comment_lines_str { }
 

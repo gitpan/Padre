@@ -11,7 +11,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 
 
@@ -48,7 +48,7 @@ sub new {
 		comment     => Wx::gettext('Repeat the last find to find the next match'),
 		shortcut    => 'F3',
 		menu_event  => sub {
-			my $editor = $_[0]->current->editor;
+			my $editor = $_[0]->current->editor or return;
 
 			# Handle the obvious case with nothing selected
 			my ( $position1, $position2 ) = $editor->GetSelection;
@@ -109,8 +109,8 @@ sub new {
 		checked_default => $main->config->find_quick,
 	);
 
-	# We should be able to remove F4 and shift-F4 and hook this functionality
-	# to F3 and shift-F3 Incremental find (#60)
+	# We should be able to remove F4 and Shift+F4 and hook this functionality
+	# to F3 and Shift+F3 Incremental find (#60)
 	Padre::Action->new(
 		name        => 'search.quick_find_next',
 		need_editor => 1,

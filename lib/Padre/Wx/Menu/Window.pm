@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -53,11 +53,6 @@ sub new {
 	$self->{window_goto_functions_window} = $self->add_menu_action(
 		$self,
 		'window.goto_functions_window',
-	);
-
-	$self->{window_goto_outline_window} = $self->add_menu_action(
-		$self,
-		'window.goto_outline_window',
 	);
 
 	$self->{window_goto_outline_window} = $self->add_menu_action(

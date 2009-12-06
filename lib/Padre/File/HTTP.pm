@@ -6,32 +6,40 @@ use warnings;
 
 use Padre::File;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::File';
 
 sub new {
 	my $class = shift;
 
-	my $config = Padre->ide->config;
-
 	# Don't add a new overall-dependency to Padre:
 	eval { require LWP::UserAgent; };
 	if ($@) {
 
-		# TODO: This should be an error popup to the user, not a shell window warning
+		# TO DO: This should be an error popup to the user, not a shell window warning
 		warn 'LWP::UserAgent is not installed, Padre::File::HTTP currently depends on it.';
 		return;
 	}
 
 	my $self = bless { filename => $_[0], UA => LWP::UserAgent->new() }, $class;
+
+	# Using the config is optional, tests and other usages should run without
+	my $config = eval { return Padre->ide->config; };
+	if ( defined($config) ) {
+		$self->{_timeout} = $config->file_http_timeout;
+	} else {
+
+		# Use defaults if we have no config
+		$self->{_timeout} = 30;
+	}
+
 	$self->{protocol} = 'http'; # Should not be overridden
-	$self->{UA}->timeout( $config->file_http_timeout );
+	$self->{UA}->timeout( $self->{_timeout} );
 	$self->{UA}->env_proxy;
 	return $self;
 }
 
 sub _request {
-
 	my $self   = shift;
 	my $method = shift || 'GET';
 	my $URL    = shift || $self->{filename};
@@ -48,7 +56,7 @@ sub _request {
 		}
 	} else {
 		if (wantarray) {
-			return undef, $Result;
+			return ( undef, $Result );
 		} else {
 			return;
 		}
@@ -56,7 +64,7 @@ sub _request {
 }
 
 sub can_run {
-	return 0;
+	return ();
 }
 
 sub size {
@@ -91,7 +99,7 @@ sub exists {
 	my $self = shift;
 	my ( $Content, $Result ) = $self->_request('HEAD');
 	return 1 if $Result->code == 200;
-	return 0;
+	return ();
 }
 
 sub basename {
@@ -119,17 +127,24 @@ sub dirname {
 	return $1;
 }
 
+sub servername {
+	my $self = shift;
+
+	# Cut the protocol and hostname part or fail if this is no expected syntax:
+	$self->{filename} =~ /^https?\:\/\/(.+?)\/[^\/\#\?]+?([\#\?].*)?$/i or return undef;
+	return $1;
+}
+
 sub read {
 	my $self = shift;
 	return scalar( $self->_request() );
-
 }
 
 sub readonly {
 	return 1;
 }
 
-# TODO: Maybe use WebDAV to enable writing
+# TO DO: Maybe use WebDAV to enable writing
 #sub write {
 #	my $self    = shift;
 #	my $content = shift;
@@ -138,7 +153,7 @@ sub readonly {
 #	my $fh;
 #	if ( !open $fh, ">$encode", $self->{filename} ) {
 #		$self->{error} = $!;
-#		return 0;
+#		return();
 #	}
 #	print {$fh} $content;
 #	close $fh;

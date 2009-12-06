@@ -4,7 +4,7 @@ use 5.008005;
 use strict;
 use warnings;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 # Load just enough modules to get Wx bootstrapped far enough
 # to show the splash screen;
@@ -21,7 +21,7 @@ my $SPLASH = undef;
 #
 # Load the splash screen here, before we get bogged
 # down running the database migration scripts.
-# TODO
+# TO DO
 # This means we'll splash even if we run the single
 # instance server, but that's better than before.
 # We need it to be even less whacked.

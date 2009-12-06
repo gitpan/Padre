@@ -3,18 +3,18 @@ package Padre::Task::PPI::IntroduceTemporaryVariable;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx ();
+use Padre::Wx                                     ();
+use Padre::Task::PPI                              ();
+use PPIx::EditorTools::IntroduceTemporaryVariable ();
 
-our $VERSION = '0.50';
-
-use base 'Padre::Task::PPI';
-use PPIx::EditorTools::IntroduceTemporaryVariable;
+our $VERSION = '0.51';
+our @ISA     = 'Padre::Task::PPI';
 
 =pod
 
 =head1 NAME
 
-Padre::Task::PPI::IntroduceTemporaryVariable - Introduces a temporary variable using PPI
+Padre::Task::PPI::IntroduceTemporaryVariable - Introduces a temporary variable using L<PPI>
 
 =head1 SYNOPSIS
 
@@ -24,7 +24,7 @@ Padre::Task::PPI::IntroduceTemporaryVariable - Introduces a temporary variable u
           end_location   => [$line, $column], # or ppi-style location
           varname        => '$foo',
   );
-  
+
   $tempvarmaker->schedule();
 
 =head1 DESCRIPTION
@@ -33,8 +33,8 @@ Given a region of code within a statement, replaces that code with a temporary v
 Declares and initializes the temporary variable right above the statement that included the selected
 expression.
 
-Usually, you simply set C<start_position> to what C<<$editor->GetSelectionStart()>> returns
-and C<end_position> to C<<$editor->GetSelectionEnd() - 1>>.
+Usually, you simply set C<start_position> to what C<< $editor->GetSelectionStart() >> returns
+and C<end_position> to C<< $editor->GetSelectionEnd() - 1 >>.
 
 =cut
 
@@ -83,7 +83,7 @@ sub process_ppi {
 		return;
 	}
 
-	# TODO: passing this back and forth is probably hyper-inefficient, but such is life.
+	# TO DO: passing this back and forth is probably hyper-inefficient, but such is life.
 	$self->{updated_document_string} = $munged->code;
 	$self->{location}                = $munged->element->location;
 	return ();
@@ -94,7 +94,7 @@ sub finish {
 	if ( defined $self->{updated_document_string} ) {
 
 		# GUI update
-		# TODO: What if the document changed? Bad luck for now.
+		# TO DO: What if the document changed? Bad luck for now.
 		$self->{main_thread_only}->{document}->editor->SetText( $self->{updated_document_string} );
 		$self->{main_thread_only}->{document}->ppi_select( $self->{location} );
 	} else {

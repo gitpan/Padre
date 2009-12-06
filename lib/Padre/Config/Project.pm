@@ -8,14 +8,14 @@ use warnings;
 use YAML::Tiny ();
 use Params::Util qw{_HASH0};
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 ######################################################################
 # Constructor
 
 use Class::XSAccessor constructor => 'new';
 
-# TODO Write constructor that checks the config?
+# TO DO Write constructor that checks the config?
 
 sub read {
 	my $class = shift;

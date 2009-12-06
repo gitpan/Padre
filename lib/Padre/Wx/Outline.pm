@@ -3,11 +3,12 @@ package Padre::Wx::Outline;
 use 5.008;
 use strict;
 use warnings;
-use Params::Util qw{_INSTANCE};
+use Params::Util   ();
 use Padre::Wx      ();
 use Padre::Current ();
+use Padre::Debug;
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor accessors => {
@@ -70,10 +71,10 @@ sub clear {
 sub start {
 	my $self = shift; @_ = (); # Feeble attempt to kill Scalars Leaked ($self is leaking)
 
-	# TODO: GUI on-start initialisation here
+	# TO DO: GUI on-start initialisation here
 
 	# Set up or reinitialise the timer
-	if ( _INSTANCE( $self->{timer}, 'Wx::Timer' ) ) {
+	if ( Params::Util::_INSTANCE( $self->{timer}, 'Wx::Timer' ) ) {
 		$self->{timer}->Stop if $self->{timer}->IsRunning;
 	} else {
 		$self->{timer} = Wx::Timer->new(
@@ -97,16 +98,16 @@ sub start {
 sub stop {
 	my $self = shift;
 
-	Padre::Util::debug("stopping Outline");
+	TRACE("stopping Outline") if DEBUG;
 
 	# Stop the timer
-	if ( _INSTANCE( $self->{timer}, 'Wx::Timer' ) ) {
+	if ( Params::Util::_INSTANCE( $self->{timer}, 'Wx::Timer' ) ) {
 		$self->{timer}->Stop if $self->{timer}->IsRunning;
 	}
 
 	$self->clear;
 
-	# TODO: GUI on-stop cleanup here
+	# TO DO: GUI on-stop cleanup here
 
 	return ();
 }

@@ -10,7 +10,7 @@ use File::Spec        ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 sub get_layout {
 
@@ -110,7 +110,7 @@ sub ok_clicked {
 
 	my $main = Padre->ide->wx->main;
 
-	# TODO improve input validation !
+	# TO DO improve input validation !
 	my @fields = qw(_module_name_ _author_name_ _email_ _builder_choice_ _license_choice_);
 	foreach my $f (@fields) {
 		if ( not $data->{$f} ) {
@@ -133,7 +133,7 @@ sub ok_clicked {
 	chdir $data->{_directory_};
 	eval {
 		require Module::Starter::App;
-		@ARGV = (
+		local @ARGV = (
 			'--module',  $data->{_module_name_},
 			'--author',  $data->{_author_name_},
 			'--email',   $data->{_email_},
@@ -141,7 +141,6 @@ sub ok_clicked {
 			'--license', $data->{_license_choice_},
 		);
 		Module::Starter::App->run;
-		@ARGV = ();
 	};
 	chdir $pwd;
 

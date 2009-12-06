@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -117,10 +117,24 @@ sub _create {
 sub _create_controls {
 	my $self = shift;
 
+	my $topic_label = Wx::StaticText->new(
+		$self, -1,
+		Wx::gettext('Select the help &topic')
+	);
+	my @topics         = ('perl 5');
+	my $topic_selector = Wx::Choice->new(
+		$self, -1,
+		Wx::wxDefaultPosition,
+		Wx::wxDefaultSize,
+		\@topics,
+	);
+
+	#Wx::Event::EVT_CHOICE($self, $topic_selector, \&select_topic);
+
 	# search textbox
 	my $search_label = Wx::StaticText->new(
 		$self, -1,
-		Wx::gettext('&Type a help topic to read:')
+		Wx::gettext('Type a help &keyword to read:')
 	);
 	$self->_search_text( Wx::TextCtrl->new( $self, -1, '' ) );
 
@@ -158,6 +172,8 @@ sub _create_controls {
 
 	my $vbox = Wx::BoxSizer->new(Wx::wxVERTICAL);
 
+	$vbox->Add( $topic_label,        0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $topic_selector,     0, Wx::wxALL | Wx::wxEXPAND,     2 );
 	$vbox->Add( $search_label,       0, Wx::wxALL | Wx::wxEXPAND,     2 );
 	$vbox->Add( $self->_search_text, 0, Wx::wxALL | Wx::wxEXPAND,     2 );
 	$vbox->Add( $matches_label,      0, Wx::wxALL | Wx::wxEXPAND,     2 );
@@ -272,8 +288,7 @@ sub _search {
 	}
 	return if not $self->_help_provider;
 	eval {
-		my @targets_index = @{ $self->_help_provider->help_list };
-		$self->_index( \@targets_index );
+		$self->_index( $self->_help_provider->help_list );
 	};
 	if ($@) {
 		warn "Error while calling help_list: $@\n";
@@ -288,53 +303,26 @@ sub _search {
 sub find_help_topic {
 	my $self = shift;
 
-	my $topic = '';
 	my $doc   = Padre::Current->document;
-	if ($doc) {
+	return '' if not $doc;
+	
+	my $topic;
+	if ($doc->can('find_help_topic')) {
+		$topic = $doc->find_help_topic;
+	}
+
+	#fallback
+	unless ($topic) {
 		my $editor = $doc->editor;
 		my $pos    = $editor->GetCurrentPos;
-		if ( $doc->isa('Padre::Document::Perl') ) {
-			require PPI;
-			my $text = $editor->GetText;
-			my $doc  = PPI::Document->new( \$text );
 
-			# Find token under the cursor!
-			my $line       = $editor->LineFromPosition($pos);
-			my $line_start = $editor->PositionFromLine($line);
-			my $line_end   = $editor->GetLineEndPosition($line);
-			my $col        = $pos - $line_start;
-
-			require Padre::PPI;
-			my $token = Padre::PPI::find_token_at_location(
-				$doc, [ $line + 1, $col + 1 ],
+		# The selected/under the cursor word is a help topic
+		$topic = $editor->GetSelectedText;
+		if ( not $topic ) {
+			$topic = $editor->GetTextRange(
+				$editor->WordStartPosition( $pos, 1 ),
+				$editor->WordEndPosition( $pos, 1 )
 			);
-
-			if ($token) {
-				print $token->class . "\n";
-				if ( $token->isa('PPI::Token::Symbol') ) {
-					if ( $token->content =~ /^[\$\@\%].+?$/ ) {
-						$topic = 'perldata';
-					}
-				} elsif ( $token->isa('PPI::Token::Operator') ) {
-					$topic = $token->content;
-				}
-			}
-
-		}
-
-
-		unless ($topic) {
-
-			#fallback
-
-			# The selected/under the cursor word is a help topic
-			$topic = $editor->GetSelectedText;
-			if ( not $topic ) {
-				$topic = $editor->GetTextRange(
-					$editor->WordStartPosition( $pos, 1 ),
-					$editor->WordEndPosition( $pos, 1 )
-				);
-			}
 		}
 	}
 
@@ -409,10 +397,12 @@ Padre::Wx::Dialog::HelpSearch - Padre Shiny Help Search Dialog
 
 =head1 DESCRIPTION
 
-This opens a dialog where you can search for help topics... 
+This opens a dialog where you can search for help topics...
 
-Note: This used to be Perl 6 Help Dialog (in Padre::Plugin::Perl6) and but it
-has been moved to Padre core
+Note: This used to be Perl 6 Help Dialog (in C<Padre::Plugin::Perl6>) and but it
+has been moved to Padre core.
+
+In order to setup a help system see L<Padre::HelpProvider>.
 
 =head1 AUTHOR
 

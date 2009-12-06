@@ -4,7 +4,7 @@ package Padre::Wx::Ack;
 
 =head1 NAME
 
-Padre::Wx::Ack - Find in files, using Ack
+Padre::Wx::Ack - Find in files, using L<Ack>
 
 =head1 DESCRIPTION
 
@@ -21,7 +21,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use File::Basename    ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 
 my $iter;
 my %opts;
@@ -38,7 +38,7 @@ sub load {
 
 	# try to load app::ack - we don't require $minver in the eval to
 	# provide a meaningful error message if needed.
-	eval "use App::Ack"; ## no critic
+	eval "use App::Ack";
 	if ($@) {
 		return "$error (module not installed)";
 	}
@@ -123,6 +123,12 @@ sub get_layout {
 				$config->find_nohidden,
 			],
 		],
+		[   [   'Wx::CheckBox',
+				'files_without_match',
+				Wx::gettext("Show only files that don't match"),
+				$config->find_nomatch,
+			],
+		],
 
 	);
 
@@ -195,7 +201,7 @@ sub find_clicked {
 
 	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
 
-	# TODO kill the thread before closing the application
+	# TO DO kill the thread before closing the application
 
 	# prepare \%opts
 	%opts = ();
@@ -226,6 +232,11 @@ sub find_clicked {
 	# case_insensitive
 	$opts{i} = $search->{case_insensitive} if $search->{case_insensitive};
 
+	# find only files that do not match
+	if ( $search->{files_without_match} ) {
+		$opts{l} = $opts{v} = 1;
+	}
+
 	my $what = App::Ack::get_starting_points( [ $search->{dir} ], \%opts );
 	$iter = App::Ack::get_iterator( $what, \%opts );
 	App::Ack::filetype_setup();
@@ -252,6 +263,7 @@ sub _get_data_from {
 	my $file_types            = $data->{_file_types_};
 	my $case_insensitive      = $data->{case_insensitive};
 	my $ignore_hidden_subdirs = $data->{ignore_hidden_subdirs};
+	my $files_without_match   = $data->{files_without_match};
 
 	$dialog->Destroy;
 
@@ -274,6 +286,7 @@ sub _get_data_from {
 
 	$config->set( find_case => $case_insensitive ? 0 : 1 );
 	$config->set( find_nohidden => $ignore_hidden_subdirs );
+	$config->set( find_nomatch  => $files_without_match );
 
 	return {
 		term                  => $term,
@@ -281,6 +294,7 @@ sub _get_data_from {
 		file_types            => $file_types,
 		case_insensitive      => $case_insensitive,
 		ignore_hidden_subdirs => $ignore_hidden_subdirs,
+		files_without_match   => $files_without_match,
 	};
 }
 
@@ -338,7 +352,16 @@ sub on_ack_result_selected {
 	my $text = $event->GetItem->GetText;
 	return if not defined $text;
 
-	my ( $file, $line ) = ( $text =~ /^(.*?)\((\d+)\)\:/ );
+	my ( $file, $line );
+
+	# TODO: those appear to be very fragile regexps
+	# specially with i18n of the message
+	if ( $opts{l} ) {
+		($file) = ( $text =~ /'.+'[^']+'(.+)'$/ );
+		$line = 1 if $file;
+	} else {
+		( $file, $line ) = ( $text =~ /^(.*?)\((\d+)\)\:/ );
+	}
 	return unless $line;
 
 	my $main = Padre->ide->wx->main;
@@ -373,20 +396,41 @@ sub on_ack_thread {
 		cnt_matches => 0,
 	);
 
-	App::Ack::print_matches( $iter, \%opts );
+	if ( $opts{l} ) {
+		App::Ack::print_files_with_matches( $iter, \%opts );
 
-	# summary
-	_send_text( '-' x 39 . "\n" ) if ( $stats{cnt_files} );
-	_send_text("Found $stats{cnt_files} files and $stats{cnt_matches} matches\n");
+		# summary
+		_send_text( '-' x 39 . "\n" ) if ( $stats{cnt_files} );
+		_send_text( Wx::gettext( sprintf( "Found %d files\n", $stats{cnt_files} ) ) );
+	} else {
+		App::Ack::print_matches( $iter, \%opts );
+
+		# summary
+		_send_text( '-' x 39 . "\n" ) if ( $stats{cnt_files} );
+		_send_text(
+			Wx::gettext(
+				sprintf(
+					"Found %d files and %d matches\n",
+					$stats{cnt_files},
+					$stats{cnt_matches},
+				)
+			)
+		);
+	}
+
 }
 
 sub print_results {
 	my ($text) = @_;
 
 	#print "$text\n";
+	# TODO: for some reason App::Ack::print_files_with_matches()
+	# is returning empty 1-length text. Any way to fix this will be
+	# greatly appreciated (and we'll be able to remove the line below)
+	return unless defined $text and $text !~ m{^\s*$}o;
 
 	# the first is filename, the second is line number, the third is matched line text
-	# while 'Binary file', there is ONLY filename
+	# while 'Binary file' and the 'files without matches' mode, there is ONLY filename
 	$stats{printed_lines}++;
 
 	# don't print filename again if it's just printed
@@ -395,16 +439,37 @@ sub print_results {
 		and $stats{last_matched_filename}
 		and $stats{last_matched_filename} eq $text );
 	if ( $stats{printed_lines} % 3 == 1 ) {
-		if ( $text =~ /^Binary file/ ) {
+		if ( $text =~ /^Binary file/ or $opts{l} ) {
 			$stats{printed_lines} = $stats{printed_lines} + 2;
 		}
 
 		$stats{last_matched_filename} = $text;
 		$stats{cnt_files}++;
 
-		# chop last ':', add \n after $filename
-		chop($text);
-		$text = "Found '$opts{regex}' in '$text':\n";
+		# list only file names
+		if ( $opts{l} ) {
+			$text = Wx::gettext(
+				sprintf(
+					"'%s' missing in file '%s'\n",
+					$opts{regex},
+					$text,
+				)
+			);
+		}
+
+		# list file names and context
+		else {
+
+			# chop last ':', add \n after $filename
+			chop($text);
+			$text = Wx::gettext(
+				sprintf(
+					"Found '%s' in '%s':\n",
+					$opts{regex},
+					$text,
+				)
+			);
+		}
 
 		# new line between different files
 		_send_text( '-' x 39 . "\n" );

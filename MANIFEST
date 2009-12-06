@@ -1,5 +1,9 @@
 Artistic
-bin/padre.exe
+bin/padre-rc.h
+bin/padre-rc.rc
+bin/padre.c
+bin/padre.ico
+bin/README
 bin/wperl.exe.manifest
 Changes
 COPYING
@@ -40,8 +44,10 @@ inc/Module/Install/WriteAll.pm
 lib/Padre.pm
 lib/Padre/Action.pm
 lib/Padre/Action/Help.pm
+lib/Padre/Action/Internal.pm
 lib/Padre/Action/Perl.pm
 lib/Padre/Action/Plugins.pm
+lib/Padre/Action/Queue.pm
 lib/Padre/Action/Refactor.pm
 lib/Padre/Action/Run.pm
 lib/Padre/Action/Search.pm
@@ -69,9 +75,11 @@ lib/Padre/DB/Session.pm
 lib/Padre/DB/SessionFile.pm
 lib/Padre/DB/Snippets.pod
 lib/Padre/DB/SyntaxHighlight.pm
+lib/Padre/Debug.pm
 lib/Padre/DocBrowser.pm
 lib/Padre/DocBrowser/document.pm
 lib/Padre/DocBrowser/POD.pm
+lib/Padre/DocBrowser/PseudoPerldoc.pm
 lib/Padre/Document.pm
 lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl/Beginner.pm
@@ -85,7 +93,8 @@ lib/Padre/File/Local.pm
 lib/Padre/HelpProvider.pm
 lib/Padre/HelpProvider/Perl.pm
 lib/Padre/Locale.pm
-lib/Padre/Log.pm
+lib/Padre/Lock.pm
+lib/Padre/Locker.pm
 lib/Padre/Manual.pod
 lib/Padre/Manual/Hacking.pod
 lib/Padre/MimeTypes.pm
@@ -157,6 +166,7 @@ lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
 lib/Padre/Wx/Dialog/Preferences/File.pm
+lib/Padre/Wx/Dialog/Preferences/PerlAutoComplete.pm
 lib/Padre/Wx/Dialog/QuickMenuAccess.pm
 lib/Padre/Wx/Dialog/RefactorSelectFunction.pm
 lib/Padre/Wx/Dialog/RegexEditor.pm
@@ -167,6 +177,7 @@ lib/Padre/Wx/Dialog/SessionSave.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/SpecialValues.pm
 lib/Padre/Wx/Dialog/Text.pm
+lib/Padre/Wx/Dialog/Warning.pm
 lib/Padre/Wx/Directory.pm
 lib/Padre/Wx/Directory/OpenInFileBrowserAction.pm
 lib/Padre/Wx/Directory/SearchCtrl.pm
@@ -175,6 +186,7 @@ lib/Padre/Wx/DocBrowser.pm
 lib/Padre/Wx/Editor.pm
 lib/Padre/Wx/ErrorList.pm
 lib/Padre/Wx/FileDropTarget.pm
+lib/Padre/Wx/FindResult.pm
 lib/Padre/Wx/FunctionList.pm
 lib/Padre/Wx/History/ComboBox.pm
 lib/Padre/Wx/History/TextEntryDialog.pm
@@ -286,6 +298,7 @@ share/icons/padre/16x16/status/padre-tasks-running.png
 share/icons/padre/64x64/logo.png
 share/icons/padre/README.txt
 share/languages/perl5/perl5.yml
+share/languages/perl5/perlapi_current.yml
 share/locale/ar.po
 share/locale/cz.po
 share/locale/de.po
@@ -310,6 +323,7 @@ share/padre-splash.bmp
 share/ppm/README.txt
 share/README.txt
 share/styles/default.yml
+share/styles/evening.yml
 share/styles/night.yml
 share/styles/notepad.yml
 share/styles/ultraedit.yml
@@ -335,12 +349,7 @@ t/03-wx.t
 t/04-config.t
 t/05-project.t
 t/06-utils.t
-t/07-log.t
 t/08-style.t
-t/10-copyright.t
-t/11-badcode.t
-t/12-pragmas.t
-t/13-eol.t
 t/14-warnings.t
 t/15-locale.t
 t/50-docbrowser.t
@@ -348,7 +357,6 @@ t/60-db.t
 t/70-document.t
 t/71-perl.t
 t/72-dialog-html.t
-t/75-perl-beginner.t
 t/80-newline.t
 t/81-search.t
 t/82-plugin-manager.t
@@ -359,7 +367,8 @@ t/86-service.t
 t/91-vi.t
 t/92-padre-file.t
 t/93-padre-filename-win.t
-t/99-perl-func-list.t
+t/94-padre-file-remote.t
+t/author_tests/pod-coverage.t
 t/collection/Config-Tiny/Changes
 t/collection/Config-Tiny/lib/Config/Tiny.pm
 t/collection/Config-Tiny/Makefile.PL
@@ -391,6 +400,7 @@ t/files/missing_brace_1.pl
 t/files/missing_semicolon.pl
 t/files/no_strict.pl
 t/files/one_char.pl
+t/files/perl_functions.pl
 t/files/plugins/Padre/Plugin/A.pm
 t/files/plugins/Padre/Plugin/B.pm
 t/files/plugins/Padre/Plugin/C.pm
@@ -405,9 +415,17 @@ t/win32/002-menu.t
 t/win32/010-file-new.t
 t/win32/011-file-open.t
 t/win32/012-file-open-selection.t
-xt/95_critic.t
-xt/97_meta.t
-xt/98_pod.t
-xt/99_pmv.t
-xt/critic.ini
+xt/01-copyright.t
+xt/02-eol.t
+xt/11-pragmas.t
+xt/12-badcode.t
+xt/13-perl-beginner.t
+xt/20-actions.t
+xt/critic-core.ini
+xt/critic-core.t
+xt/critic-util.ini
+xt/critic-util.t
 xt/files/lexical_replace_stress_test.pl
+xt/meta.t
+xt/pmv.t
+xt/pod.t

@@ -4,17 +4,17 @@ package Padre::Wx::HtmlWindow;
 
 =head1 NAME
 
-Padre::Wx::HtmlWindow - Padre-enhanced version of Wx::HtmlWindow
+Padre::Wx::HtmlWindow - Padre-enhanced version of L<Wx::HtmlWindow>
 
 =head1 DESCRIPTION
 
-L<Padre::Wx::HtmlWindow> provides a Padre-specific sub-class of
-Wx::HtmlWindow that adds some additional features, primarily
-default support for POD2HTML functionality.
+C<Padre::Wx::HtmlWindow> provides a Padre-specific subclass of
+L<Wx::HtmlWindow> that adds some additional features, primarily
+default support for L<pod2html> functionality.
 
 =head1 METHODS
 
-L<Padre::Wx::HtmlWindow> implements all the methods described in
+C<Padre::Wx::HtmlWindow> implements all the methods described in
 the documentation for L<Wx::HtmlWindow>, and adds some additional
 methods.
 
@@ -26,8 +26,12 @@ use warnings;
 use Padre::Wx ();
 use Wx::Html  ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Wx::HtmlWindow';
+
+
+
+
 
 #####################################################################
 # Loader Methods
@@ -51,11 +55,10 @@ sub load_file {
 	my $file = shift;
 	my $pod;
 	SCOPE: {
-		local */;
-		local *FILE;
-		open( FILE, '<', $file ) or die "Failed to open file";
-		$pod = <FILE>;
-		close(FILE) or die "Failed to close file";
+		local $/ = undef;
+		open( my $fh, '<', $file ) or die "Failed to open file";
+		$pod = <$fh>;
+		close($fh) or die "Failed to close file";
 	}
 	return $self->load_pod($pod);
 }
@@ -83,6 +86,8 @@ sub load_pod {
 
 1;
 
+__END__
+
 =pod
 
 =head1 SUPPORT
@@ -104,3 +109,8 @@ The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
+
+# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.

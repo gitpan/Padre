@@ -9,7 +9,7 @@ BEGIN {
 		plan skip_all => 'Needs DISPLAY';
 		exit 0;
 	}
-	plan( tests => 24 );
+	plan( tests => 27 );
 }
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
@@ -64,7 +64,9 @@ SCOPE: {
 	my $text = do {
 		local $/ = undef;
 		open my $fh, '<', $infile or die $!;
-		<$fh>;
+		my $rv = <$fh>;
+		close $fh;
+		$rv;
 	};
 	my $doc = PPI::Document->new( \$text );
 	isa_ok( $doc, "PPI::Document" );
@@ -106,7 +108,13 @@ SCOPE: {
 # and ...find_token_at_location
 SCOPE: {
 	my $infile = catfile( $files, 'find_variable_declaration_2.pm' );
-	my $text = do { local $/ = undef; open my $fh, '<', $infile or die $!; <$fh> };
+	my $text = do {
+		local $/ = undef;
+		open my $fh, '<', $infile or die $!;
+		my $rv = <$fh>;
+		close $fh;
+		$rv;
+	};
 
 	my $doc = PPI::Document->new( \$text );
 	isa_ok( $doc, "PPI::Document" );
@@ -185,6 +193,59 @@ SCOPE: {
 		}
 	);
 }
+
+# Regression test for get_functions
+SCOPE: {
+	my $editor = t::lib::Padre::Editor->new;
+	my $file   = catfile( $files, 'perl_functions.pl' );
+	my $doc    = Padre::Document->new(
+		filename => $file,
+	);
+	$doc->set_editor($editor);
+	$editor->configure_editor($doc);
+
+	my @functions = $doc->get_functions;
+	is_deeply(
+		\@functions,
+		[   qw{
+				guess_indentation_style
+				guess_filename
+				keywords
+				two_lines
+				three_lines
+				}
+		],
+		'Found expected Perl functions',
+	);
+}
+
+# Tests for content intuition
+SCOPE: {
+	my $editor = t::lib::Padre::Editor->new;
+	my $doc    = Padre::Document::Perl->new;
+	$doc->set_editor($editor);
+	$editor->configure_editor($doc);
+	$doc->text_set(<<'END_PERL');
+package Foo::Bar::Baz;
+
+1;
+END_PERL
+
+	# Check the filename
+	my $filename = $doc->guess_filename;
+	is( $filename, 'Baz.pm', '->guess_filename ok' );
+
+	# Check the subpath
+	my @subpath = $doc->guess_subpath;
+	is_deeply( \@subpath, [qw{ lib Foo Bar }], '->guess_subpath' );
+}
+
+
+
+
+
+######################################################################
+# Support Functions
 
 sub find_var_simple {
 	my $doc     = shift;

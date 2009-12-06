@@ -3,13 +3,12 @@ package Wx::Perl::Dialog::Frame;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec ();
-use Wx::Perl::Dialog;
-use Wx::STC ();
+use File::Spec       ();
+use Wx::Perl::Dialog ();
+use Wx::STC          ();
 
-use base 'Wx::Frame';
-
-our $VERSION = '0.50';
+our $VERSION = '0.51';
+our @ISA     = 'Wx::Frame';
 
 sub new {
 	my ($class) = @_;
@@ -22,7 +21,7 @@ sub new {
 		Wx::wxDefaultSize,
 	);
 
-	#    Wx::Event:EVT_ACTIVATE($self, \&on_activate);
+	# Wx::Event:EVT_ACTIVATE($self, \&on_activate);
 	Wx::Event::EVT_CLOSE(
 		$self,
 		sub {

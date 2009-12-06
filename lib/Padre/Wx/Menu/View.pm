@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Locale   ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -321,6 +321,7 @@ sub new {
 	);
 	my %styles = (
 		default   => Wx::gettext('Padre'),
+		evening   => Wx::gettext('Evening'),
 		night     => Wx::gettext('Night'),
 		ultraedit => Wx::gettext('Ultraedit'),
 		notepad   => Wx::gettext('Notepad++'),
@@ -347,7 +348,7 @@ sub new {
 	my @private =
 		map { substr( File::Basename::basename($_), 0, -4 ) } File::Glob::glob( File::Spec->catdir( $dir, '*.yml' ) );
 	if (@private) {
-		$self->AppendSeparator;
+		$self->{style}->AppendSeparator;
 		foreach my $name (@private) {
 			my $label = $name;
 			my $tag   = "view.view_as_" . lc $label;
@@ -367,7 +368,7 @@ sub new {
 	}
 
 	# Language Support
-	# TODO: God this is horrible, there has to be a better way
+	# TO DO: God this is horrible, there has to be a better way
 	my $default  = Padre::Locale::system_rfc4646() || 'x-unknown';
 	my $current  = Padre::Locale::rfc4646();
 	my %language = Padre::Locale::menu_view_languages();

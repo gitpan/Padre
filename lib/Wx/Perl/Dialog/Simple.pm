@@ -6,12 +6,12 @@ package Wx::Perl::Dialog::Simple;
 
 Wx::Perl::Dialog::Simple - a set of simple dialogs (a partial Zenity clone in wxPerl)
 
-=head1 SYNOPIS
+=head1 SYNOPSIS
 
 As a module:
 
   use Wx::Perl::Dialog::Simple;
-  
+
   my $name = entry(title => "What is your name?");
   message(text => "How are you $name today?\n");
 
@@ -48,12 +48,12 @@ use Cwd        ();
 use Exporter   ();
 use File::Spec ();
 
-our $VERSION = '0.50';
+our $VERSION = '0.51';
 our @ISA     = 'Exporter';
 
-$| = 1;
-
-our @EXPORT = qw(
+# I'd change this, but I suspect it's rather breaky
+our @EXPORT = ## no critic (ProhibitAutomaticExportation)
+	qw(
 	entry
 	password
 	file_selector
@@ -314,7 +314,7 @@ See L<http://padre.perlide.org/>
 
 =head1 COPYRIGHT
 
-Copyright 2008 Gabor Szabo. L<http://www.szabgab.com/>
+Copyright 2008 Gábor Szabó. L<http://www.szabgab.com/>
 
 =head1 LICENSE
 
@@ -329,7 +329,7 @@ that's your problem.
 
 =head1 CREDITS and THANKS
 
-To Mattia Barbon for providing WxPerl.
+To Mattia Barbon for providing wxPerl.
 
 The idea was taken from the Zenity project.
 
