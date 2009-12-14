@@ -1,9 +1,31 @@
 Changes for Perl Application Development and Refactoring Environment
 
-0.52 To Be Released
+0.53 To Be Released
 
+0.52 2009.12.14
+    - Add a plugin hook on change of current editor tab (SEWI)
+    - Show the svn revision of Padre's start time at the title bar&about dialog,
+      not the current one (SEWI)
+    - Fixed: Padre command line arguments work again when using dev.pl (SEWI)
+    - Fixed: Menu options get disabled/enabled as needed again, this also
+      fixed ticket #742, #762, #764 and #771 (SEWI)
+    - Alt-Left and Alt-Right switch to the neighbor panels which Ctrl-Tab
+      uses the last-used order (SEWI)
+    - Fix: Double click on the function list jumps to the sub (again) now (SEWI)
+    - Added "Save Intution" to the File menu, to automatically save a new
+      file wherever Padre is confident it is appropriate (ADAMK)
+    - New file creation is now driven by Template Toolkit templates (using
+      Template::Tiny). This should allow even basic new file creation to be
+      somewhat adaptive to the user or project context (ADAMK)
+    - Padre speedup: Limit number of menu bar refreshs (SEWI)
+    - Fixed ticket #790: Ctrl + Caps Lock reduces font size (AZAWAWI)
+    - Re-enabled toggle status bar on win32 (AZAWAWI)
+    - Fixed ticket #750: Ctrl-Tab works again (WAXHEAD, SEWI)
+    - Fixed Padre crash in Module Tools/Install Locale/Module/CPAN config (AZAWAWI)
+    - Open Resource restarts search now when project directory or Padre's 
+      current directory changes (AZAWAWI)
 
-0.51 2009.12.04
+0.51 2009.12.06
     - Find all option showing all matches in bottom tab (CODE4PAY)
     - Improved FTP error handling (SEWI)
     - Open URLs from command line (SEWI)
@@ -24,7 +46,6 @@ Changes for Perl Application Development and Refactoring Environment
     - Tests which are not needed for end-user installation now in xt (ADAMK)
     - Added a test for actions (SEWI)
     - Re-enabled the beginner error check tests (SEWI)
-    - Added missing File::Slurp dependency exposed by DMG installer (ADAMK)
     - Better focus transitions during search/replace, which should make
       them easier to work with quickly (ADAMK)
     - Rolled back function list improvements that were causing regressions (ADAMK)

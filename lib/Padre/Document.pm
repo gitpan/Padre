@@ -135,7 +135,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Debug;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 
 
@@ -1177,12 +1177,8 @@ These directory names do not need to exist, they only represent intent.
 sub guess_subpath {
 	my $self = shift;
 
-	# IF the file already has an existing name, guess that
-	my $filename = $self->filename;
-
-	$DB::single = 1;
-
-	1;
+	# For an unknown document type, we cannot make any reasonable guess
+	return ();
 }
 
 # Abstract methods, each subclass should implement it
@@ -1385,6 +1381,28 @@ sub autocomplete {
 	}
 
 	return ( length($prefix), @words );
+}
+
+# Individual document classes should override this method.
+# It gets a string (the current selection) and it should
+# return a list of files that are possible matches to that file.
+# In Perl for example A::B  would be mapped to A/B.pm in various places on
+# the filesystem.
+sub guess_filename_to_open {
+	return;
+}
+
+# Individual document classes should override this method.
+# It needs to return the document specific help topic string.
+# In Perl this is using PPI to find the correct token
+sub find_help_topic {
+	return;
+}
+
+# Individual document classes should override this method.
+# see L<Padre::HelpProvider>
+sub get_help_provider {
+	return;
 }
 
 1;

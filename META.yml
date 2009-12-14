@@ -77,7 +77,7 @@ requires:
   File::Glob: 0
   File::HomeDir: 0.84
   File::Next: 1.06
-  File::Path: 0
+  File::Path: 2.07
   File::Remove: 1.42
   File::ShareDir: 1.00
   File::Spec: 3.2701
@@ -115,6 +115,7 @@ requires:
   Pod::Simple::XHTML: 3.04
   Probe::Perl: 0.01
   Storable: 2.15
+  Template::Tiny: 0.03
   Term::ReadLine: 0
   Text::Balanced: 0
   Text::Diff: 0.35
@@ -134,4 +135,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.51
+version: 0.52

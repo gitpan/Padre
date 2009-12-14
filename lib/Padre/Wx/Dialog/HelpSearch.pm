@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -70,7 +70,8 @@ sub _display_help_in_viewer {
 		if ( $topic && $self->_help_provider ) {
 			eval { ( $html, $location ) = $self->_help_provider->help_render($topic); };
 			if ($@) {
-				warn "Error while calling help_render: $@\n";
+				$self->_main->error( Wx::gettext("Error while calling help_render: ") . $@ );
+				return;
 			}
 		}
 	}
@@ -244,7 +245,7 @@ sub _setup_events {
 #
 # Focus on it if it shown or restart its state and show it if it is hidden.
 #
-sub showIt {
+sub show {
 	my ( $self, $topic ) = @_;
 
 	if ( not $self->IsShown ) {
@@ -257,7 +258,7 @@ sub showIt {
 		if ($doc) {
 			$self->_help_provider(undef);
 		}
-		$self->_search;
+		return if not $self->_search;
 		$self->_update_list_box;
 		$self->Show(1);
 	}
@@ -282,19 +283,24 @@ sub _search {
 		if ($doc) {
 			eval { $self->_help_provider( $doc->get_help_provider ); };
 			if ($@) {
-				warn "Error while calling get_help_provider: $@\n";
+				$self->_main->error( Wx::gettext("Error while calling get_help_provider: ") . $@ );
+				return;
+			}
+			if ( not $self->_help_provider ) {
+				$self->_main->error( Wx::gettext("Could not find a help provider for ")
+						. Padre::MimeTypes->get_mime_type_name( $doc->get_mimetype ) );
+				return;
 			}
 		}
 	}
 	return if not $self->_help_provider;
-	eval {
-		$self->_index( $self->_help_provider->help_list );
-	};
+	eval { $self->_index( $self->_help_provider->help_list ); };
 	if ($@) {
-		warn "Error while calling help_list: $@\n";
+		$self->_main->error( Wx::gettext("Error while calling help_list: ") . $@ );
+		return;
 	}
 
-	return;
+	return 1;
 }
 
 #
@@ -303,13 +309,10 @@ sub _search {
 sub find_help_topic {
 	my $self = shift;
 
-	my $doc   = Padre::Current->document;
+	my $doc = Padre::Current->document;
 	return '' if not $doc;
-	
-	my $topic;
-	if ($doc->can('find_help_topic')) {
-		$topic = $doc->find_help_topic;
-	}
+
+	my $topic = $doc->find_help_topic;
 
 	#fallback
 	unless ($topic) {

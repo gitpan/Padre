@@ -18,7 +18,7 @@ use Padre::Wx::Menu::Plugins ();
 use Padre::Wx::Menu::Window  ();
 use Padre::Wx::Menu::Help    ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 #####################################################################
 # Construction, Setup, and Accessors
@@ -89,12 +89,16 @@ sub new {
 
 	my $config = $self->main->ide->config;
 
-	Wx::Event::EVT_MENU_OPEN(
-		$main,
-		sub {
-			$self->refresh;
-		}
-	);
+	# This event seems to be outdated and slow down Padre.
+	# If there are any menu (refresh) problems, re-enable it and open a ticket for
+	# deeper checking.
+	#	Wx::Event::EVT_MENU_OPEN(
+	#		$main,
+	#		sub {
+	#			print "Menubar\n";
+	#			$self->refresh;
+	#		}
+	#	);
 
 	$self->refresh;
 
@@ -125,6 +129,14 @@ sub refresh {
 			next unless $main->current->document->can('menu');
 			next unless defined( $main->current->document->menu );
 			$item = $main->current->document->menu;
+			if ( defined( $main->current->document->{menu} ) ) {
+				$item = [$item] unless ref($item) eq 'ARRAY';
+				if ( ref( $main->current->document->{menu} ) ne 'ARRAY' ) {
+					push @{$item}, $main->current->document->{menu};
+				} else {
+					push @{$item}, @{ $main->current->document->{menu} };
+				}
+			}
 		}
 
 		if ( ref($item) eq 'ARRAY' ) {
@@ -150,11 +162,14 @@ sub refresh {
 
 			# a fast skip if there is nothing to do
 			# Note: $count (and Wx indices) start at 0, but the Count is a count
-			next
-				if $count < $self->wx->GetMenuCount
-					and defined( $self->{items}->[$count] )
-					and defined( $self->{$obj} )
-					and ( $self->{items}->[$count] eq $self->{$obj} );
+			if (    $count < $self->wx->GetMenuCount
+				and defined( $self->{items}->[$count] )
+				and defined( $self->{$obj} )
+				and ( $self->{items}->[$count] eq $self->{$obj} ) )
+			{
+				$self->{$obj}->refresh($current);
+				next;
+			}
 
 			# It seems that every submenu-object could be attached only once
 			# even if it's removed lateron, so we need to create a new object

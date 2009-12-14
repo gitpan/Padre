@@ -11,7 +11,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Debug;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -96,6 +96,12 @@ sub new {
 	}
 
 	$self->SetDropTarget( Padre::Wx::FileDropTarget->new( $self->main ) );
+
+	# Disable CTRL keypad -/+. These seem to emit wrong scan codes
+	# on some laptop keyboards. (e.g. CTRL-Caps lock is the same as CTRL -)
+	# Please see bug #790
+	$self->CmdKeyClear( Wx::wxSTC_KEY_SUBTRACT, Wx::wxSTC_SCMOD_CTRL );
+	$self->CmdKeyClear( Wx::wxSTC_KEY_ADD,      Wx::wxSTC_SCMOD_CTRL );
 
 	return $self;
 }
@@ -201,12 +207,17 @@ sub on_key_up {
 			# Otherwise delete the line
 			$self->CmdKeyExecute(Wx::wxSTC_CMD_LINEDELETE);
 		}
+		$event->Skip(0); # done processing this nothing more to do
+		return;
 	}
 
 	# Apply smart highlighting when the shift key is down
 	if ( $self->main->ide->config->editor_smart_highlight_enable && $event->ShiftDown ) {
 		$self->on_smart_highlight_begin($event);
 	}
+
+	$event->Skip(1);     # we need to keep processing this event
+
 }
 
 sub padre_setup_plain {
@@ -707,7 +718,11 @@ sub on_focus {
 	my $main = $self->main;
 
 	# to show/hide the document specific Perl menu
-	$main->refresh_menu;
+	# don't refresh on each focus event
+	$main->refresh_menu
+		if ( !defined( $main->{last_refresh_editor} ) )
+		or ( $main->{last_refresh_editor} ne $self );
+	$main->{last_refresh_editor} = $self;
 
 	$main->update_directory;
 

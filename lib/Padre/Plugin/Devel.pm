@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -99,8 +99,6 @@ sub menu_plugins_simple {
 
 sub dump_expression {
 	my $self = shift;
-
-	$DB::single = 1;
 
 	# Get the expression
 	require Padre::Wx::History::TextEntryDialog;

@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Locale   ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -102,17 +102,14 @@ sub new {
 		},
 	);
 
-	# On Windows disabling the status bar doesn't work, so don't allow it
-	unless (Padre::Constant::WXWIN32) {
-		$self->{statusbar} = $self->add_checked_menu_item(
-			$self,
-			name       => 'view.statusbar',
-			label      => Wx::gettext('Show StatusBar'),
-			menu_event => sub {
-				$_[0]->on_toggle_statusbar( $_[1] );
-			},
-		);
-	}
+	$self->{statusbar} = $self->add_checked_menu_item(
+		$self,
+		name       => 'view.statusbar',
+		label      => Wx::gettext('Show StatusBar'),
+		menu_event => sub {
+			$_[0]->on_toggle_statusbar( $_[1] );
+		},
+	);
 
 	$self->{toolbar} = $self->add_checked_menu_item(
 		$self,
@@ -238,48 +235,46 @@ sub new {
 		},
 	);
 
-	if ( $config->func_fontsize ) {
+	$self->AppendSeparator;
 
-		$self->AppendSeparator;
 
-		# Font Size
-		$self->{font_size} = Wx::Menu->new;
-		$self->Append(
-			-1,
-			Wx::gettext("Font Size"),
-			$self->{font_size}
-		);
-		$self->{font_increase} = $self->add_menu_item(
-			$self->{font_size},
-			name       => 'view.font_increase',
-			label      => Wx::gettext('Increase Font Size'),
-			shortcut   => 'Ctrl-+',
-			menu_event => sub {
-				$_[0]->zoom(+1);
-			},
-		);
+	# Font Size
+	$self->{font_size} = Wx::Menu->new;
+	$self->Append(
+		-1,
+		Wx::gettext("Font Size"),
+		$self->{font_size}
+	);
+	$self->{font_increase} = $self->add_menu_item(
+		$self->{font_size},
+		name       => 'view.font_increase',
+		label      => Wx::gettext('Increase Font Size'),
+		shortcut   => 'Ctrl-+',
+		menu_event => sub {
+			$_[0]->zoom(+1);
+		},
+	);
 
-		$self->{font_decrease} = $self->add_menu_item(
-			$self->{font_size},
-			name       => 'view.font_decrease',
-			label      => Wx::gettext('Decrease Font Size'),
-			shortcut   => 'Ctrl--',
-			menu_event => sub {
-				$_[0]->zoom(-1);
-			},
-		);
+	$self->{font_decrease} = $self->add_menu_item(
+		$self->{font_size},
+		name       => 'view.font_decrease',
+		label      => Wx::gettext('Decrease Font Size'),
+		shortcut   => 'Ctrl--',
+		menu_event => sub {
+			$_[0]->zoom(-1);
+		},
+	);
 
-		$self->{font_reset} = $self->add_menu_item(
-			$self->{font_size},
-			name       => 'view.font_reset',
-			label      => Wx::gettext('Reset Font Size'),
-			shortcut   => 'Ctrl-/',
-			menu_event => sub {
-				$_[0]->zoom( -1 * $_[0]->current->editor->GetZoom );
-			},
-		);
-
-	}
+	$self->{font_reset} = $self->add_menu_item(
+		$self->{font_size},
+		name       => 'view.font_reset',
+		label      => Wx::gettext('Reset Font Size'),
+		shortcut   => 'Ctrl-0',
+		menu_event => sub {
+			my $editor = $_[0]->current->editor or return;
+			$_[0]->zoom( -1 * $editor->GetZoom );
+		},
+	);
 
 	if ( $config->func_bookmark ) {
 
@@ -466,9 +461,7 @@ sub refresh {
 	my $doc      = $document ? 1 : 0;
 
 	# Simple check state cases from configuration
-	unless (Padre::Constant::WXWIN32) {
-		$self->{statusbar}->Check( $config->main_statusbar );
-	}
+	$self->{statusbar}->Check( $config->main_statusbar );
 
 	$self->{lines}->Check( $config->editor_linenumbers );
 	$self->{folding}->Check( $config->editor_folding );

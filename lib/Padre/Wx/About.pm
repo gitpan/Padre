@@ -11,9 +11,9 @@ use Padre::Wx::HtmlWindow   ();
 use Padre::Wx::Icon         ();
 use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
-use PPI ();
+use PPI                     ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Wx::Dialog';
 
 sub new {

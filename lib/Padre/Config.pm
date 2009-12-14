@@ -23,7 +23,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -777,12 +777,6 @@ setting(
 	default => 1,
 );
 setting(
-	name    => 'func_fontsize',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 1,
-);
-setting(
 	name    => 'func_session',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -914,7 +908,13 @@ setting(
 	default => 1,
 );
 
-
+# Non-preference settings
+setting(
+	name    => 'session_autosave',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
 
 #####################################################################
 # Constructor and Accessors

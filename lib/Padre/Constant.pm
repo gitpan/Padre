@@ -10,7 +10,11 @@ use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 
-our $VERSION = '0.51';
+#use Padre::Util   ();
+
+our $VERSION = '0.52';
+
+my $revision;
 
 # Convenience constants for the operating system
 use constant WIN32 => !!( ( $^O eq 'MSWin32' ) or ( $^O eq 'cygwin' ) );
@@ -115,6 +119,20 @@ unless ( -e CONFIG_DIR or File::Path::mkpath(CONFIG_DIR) ) {
 unless ( -e PLUGIN_LIB or File::Path::mkpath(PLUGIN_LIB) ) {
 	Carp::croak( "Cannot create plug-ins directory '" . PLUGIN_LIB . "': $!" );
 }
+
+# Get the svn revision of the currently running Padre once:
+#eval 'use constant PADRE_REVISION => Padre::Util::revision;';
+# This needs to be a pseudo constant as it requires Padre::Util which
+# requires Padre::Constant (this module).
+sub PADRE_REVISION {
+
+	# Get and keep the revision at the first call of this pseudo-constant
+	# (usually at Padre start)
+	require Padre::Util;
+	$revision ||= Padre::Util::revision();
+	return $revision;
+}
+
 
 1;
 

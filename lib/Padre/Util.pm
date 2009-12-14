@@ -34,7 +34,7 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.51';
+our $VERSION   = '0.52';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
@@ -73,6 +73,45 @@ our @EXPORT_OK = '_T';
 
 #####################################################################
 # Miscellaneous Functions
+
+=pod
+
+=head2 C<slurp>
+
+    my $content = Padre::Util::slurp( $file );
+    if ( $content ) {
+        print $$content;
+    } else {
+        # Handle errors appropriately
+    }
+
+This is a simple slurp implementation, provided as a convenience for
+internal Padre use when loading trivial unimportant files for which
+we don't need anything more robust.
+
+All file reading is done with binmode enabled, and data is returned by
+reference to avoid needless copying.
+
+Returns the content of the file as a SCALAR reference if the file exists
+and can be read.
+
+Returns false if loading of the file failed.
+
+This function is only expected to be used in situations where the file
+should almost always exist, and thus the reason why reading the file
+failed isn't really important.
+
+=cut
+
+sub slurp {
+	my $file = shift;
+	open my $fh, '<', $file or return '';
+	binmode $fh;
+	local $/ = undef;
+	my $content = <$fh>;
+	close $fh;
+	return \$content;
+}
 
 =pod
 
@@ -141,6 +180,10 @@ sub get_matches {
 	my @matches;
 	while ( $text =~ /$regex/mg ) {
 		my $e = pos($text);
+		if ( !defined($1) ) {
+			print STDERR 'WARNING (' . join( ",", map { $_ || ''; } ( caller(0) ) ) . "): $regex has no \$1 match\n";
+			next;
+		}
 		my $s = $e - length($1);
 		push @matches, [ $s, $e ];
 	}
@@ -207,26 +250,6 @@ Functionally, this function is just a direct pass-through with no effect.
 #15:41 Alias It does absolutely nothing inside the code itself
 sub _T {
 	shift;
-}
-
-=pod
-
-=head2 C<pwhich>
-
-  # Find the prove utility
-  my $prove = Padre::Util::pwhich('prove');
-
-The C<pwhich> function discovers the path to the installed Perl script
-which is in the same installation directory as the Perl user to run
-Padre itself, ignoring the regular search C<PATH>.
-
-Returns the locally-formatted path to the script, or false (null string)
-if the utility does not exist in the current Perl installation.
-
-=cut
-
-sub pwhich {
-	my $bin = 1;
 }
 
 
@@ -491,7 +514,7 @@ sub process_memory {
 	return;
 }
 
-# TO DO: A much better variant would be a constant set by svn.
+# TODO: A much better variant would be a constant set by svn.
 sub revision {
 	if ( $0 =~ /padre$/ ) {
 		my $dir = $0;

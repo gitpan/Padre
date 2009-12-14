@@ -35,6 +35,7 @@ use File::Temp                    ();
 use List::Util                    ();
 use Scalar::Util                  ();
 use Params::Util                  ();
+use Time::HiRes                   ();
 use Padre::Action                 ();
 use Padre::Constant               ();
 use Padre::Util                   ();
@@ -65,7 +66,7 @@ use Padre::Wx::Dialog::FilterTool ();
 use Padre::Wx::Progress           ();
 use Padre::Debug;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -238,7 +239,7 @@ sub new {
 	# to show it, it showed at the top) so now we always turn the status bar on
 	# at the beginning and hide it in the timer, if it was not needed
 	# TO DO: there might be better ways to fix that issue...
-	$statusbar->Show;
+	#$statusbar->Show;
 	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT, );
 	Wx::Event::EVT_TIMER(
 		$self,
@@ -402,7 +403,7 @@ sub help_search {
 		require Padre::Wx::Dialog::HelpSearch;
 		$self->{help_search} = Padre::Wx::Dialog::HelpSearch->new($self);
 	}
-	$self->{help_search}->showIt($topic);
+	$self->{help_search}->show($topic);
 }
 
 =pod
@@ -2691,6 +2692,9 @@ sub setup_editors {
 	# user to actually perceive the file has been opened.
 	$self->refresh;
 
+	my $manager = $self->{ide}->plugin_manager;
+	$manager->plugin_event('editor_changed');
+
 	return;
 }
 
@@ -2729,6 +2733,8 @@ exist, create an empty file before opening it.
 sub setup_editor {
 	my ( $self, $file, $skip_update_session ) = @_;
 	my $config = $self->config;
+
+	my $manager = $self->{ide}->plugin_manager;
 
 	TRACE( "setup_editor called for '" . ( $file || '' ) . "'" ) if DEBUG;
 
@@ -2834,6 +2840,7 @@ sub setup_editor {
 	$doc->restore_cursor_position;
 
 	$self->update_last_session unless $skip_update_session;
+	$manager->plugin_event('editor_changed') unless $skip_update_session;
 
 	# Refresh the menu (to include or remove document dependent menu items)
 	$self->menu->refresh;
@@ -2922,35 +2929,9 @@ sub on_open_selection {
 			}
 		}
 	}
-	unless (@files) { # TO DO: and if we are in a Perl environment
-		my $module = $text;
-		$module =~ s{::}{/}g;
-		$module .= ".pm";
-		my $filename = File::Spec->catfile( $self->ide->{original_cwd}, $module, );
-		if ( -e $filename ) {
-			push @files, $filename;
-		} else {
-
-			# relative to the project dir
-			my $filename = File::Spec->catfile(
-				$self->current->document->project_dir,
-				'lib', $module,
-			);
-			if ( -e $filename ) {
-				push @files, $filename;
-			}
-
-			# TO DO: it should not be our @INC but the @INC of the perl used for
-			# script execution
-			foreach my $path (@INC) {
-				my $filename = File::Spec->catfile( $path, $module );
-				if ( -e $filename ) {
-					push @files, $filename;
-
-					#last;
-				}
-			}
-		}
+	unless (@files) {
+		my $doc = $self->current->document;
+		push @files, $doc->guess_filename_to_open($text);
 	}
 
 	unless (@files) {
@@ -3284,6 +3265,38 @@ sub on_reload_all {
 
 =pod
 
+=head3 C<on_save>
+
+    my $success = $main->on_save;
+
+Try to save current document. Prompt user for a file name if document was
+new (see C<on_save_as()> above). Return true if document has been saved,
+false otherwise.
+
+=cut
+
+sub on_save {
+	my $self = shift;
+	my $document = shift || $self->current->document;
+	return unless $document;
+
+	#print $document->filename, "\n";
+
+	my $pageid = $self->find_id_of_editor( $document->editor );
+	if ( $document->is_new ) {
+
+		# move focus to document to be saved
+		$self->on_nth_pane($pageid);
+		return $self->on_save_as;
+	} elsif ( $document->is_modified ) {
+		return $self->_save_buffer($pageid);
+	}
+
+	return;
+}
+
+=pod
+
 =head3 C<on_save_as>
 
     my $was_saved = $main->on_save_as;
@@ -3392,34 +3405,100 @@ sub on_save_as {
 
 =pod
 
-=head3 C<on_save>
+=head3 C<on_save_intuition>
 
-    my $success = $main->on_save;
+    my $success = $main->on_save_intuition;
 
-Try to save current document. Prompt user for a file name if document was
-new (see C<on_save_as()> above). Return true if document has been saved,
-false otherwise.
+Try to automatically determine an appropriate file name and save it,
+based entirely on the content of the file.
+
+Only do this for new documents, otherwise behave like a regular save.
 
 =cut
 
-sub on_save {
+sub on_save_intuition {
 	my $self = shift;
-	my $document = shift || $self->current->document;
-	return unless $document;
+	my $document = $self->current->document or return;
 
-	#print $document->filename, "\n";
+	# We only use Save Intuition for new files
+	unless ( $document->is_new ) {
+		if ( $document->is_saved ) {
 
-	my $pageid = $self->find_id_of_editor( $document->editor );
-	if ( $document->is_new ) {
+			# Nothing to do
+			return;
+		} else {
 
-		# move focus to document to be saved
-		$self->on_nth_pane($pageid);
-		return $self->on_save_as;
-	} elsif ( $document->is_modified ) {
-		return $self->_save_buffer($pageid);
+			# Regular save
+			return $self->on_save(@_);
+		}
 	}
 
-	return;
+	# Empty files get done via the normal save
+	if ( $document->is_unused ) {
+		return $self->on_save_as(@_);
+	}
+
+	# We need both a guessed path and file name to do anything
+	my @subpath  = $document->guess_subpath;
+	my $filename = $document->guess_filename;
+	unless ( @subpath and defined Params::Util::_STRING($filename) ) {
+
+		# Cannot come up with a suitable guess
+		return $self->on_save_as(@_);
+	}
+
+	# Convert the guesses to full paths
+	my $dir = File::Spec->catdir( $document->project_dir, @subpath );
+	my $path = File::Spec->catfile( $dir, $filename );
+	if ( -f $path ) {
+
+		# Potential collision, error and fall back
+		$self->error( Wx::gettext('File already exists') );
+		return $self->on_save_as(@_);
+	}
+
+	# Create the directory, if needed
+	unless ( -d $dir ) {
+		my $error = [];
+		File::Path::make_path(
+			$dir,
+			{   verbose => 0,
+				error   => \$error,
+			}
+		);
+		if (@$error) {
+			$self->error( sprintf( Wx::gettext("Failed to create path '%s'"), $dir ) );
+			return $self->on_save_as(@_);
+		}
+	}
+
+	# Save the file
+	$document->_set_filename($path);
+	$document->save_file;
+	$document->set_newline_type(Padre::Constant::NEWLINE);
+
+	# Laborious copy of the above.
+	# Generalise it later
+	my $pageid = $self->notebook->GetSelection;
+	$self->_save_buffer($pageid);
+
+	$document->set_mimetype( $document->guess_mimetype );
+	$document->editor->padre_setup;
+	$document->rebless;
+	$document->colourize;
+
+	$filename = $document->{file}->filename if defined( $document->{file} );
+	if ( defined($filename) ) {
+		Padre::DB::History->create(
+			type => 'files',
+			name => $filename,
+		);
+		$self->menu->file->update_recentfiles;
+	}
+
+	$self->refresh;
+
+	return 1;
 }
 
 =pod
@@ -3600,6 +3679,8 @@ sub close_all {
 	my $skip  = shift;
 	my $guard = $self->freezer;
 
+	my $manager = $self->{ide}->plugin_manager;
+
 	$self->ide->{session_autosave} and $self->save_current_session;
 
 	# Remove current session ID from IDE object
@@ -3625,6 +3706,8 @@ sub close_all {
 
 	# Recalculate window title
 	$self->set_title;
+
+	$manager->plugin_event('editor_changed');
 
 	return 1;
 }
@@ -3678,9 +3761,15 @@ sub on_nth_pane {
 	my $id   = shift;
 	my $page = $self->notebook->GetPage($id);
 	if ($page) {
+
+		my $manager = $self->{ide}->plugin_manager;
+
 		$self->notebook->SetSelection($id);
 		$self->refresh_status( $self->current );
 		$page->{Document}->set_indentation_style(); # TO DO: encapsulation?
+
+		$manager->plugin_event('editor_changed');
+
 		return 1;
 	}
 	return;
@@ -3843,8 +3932,10 @@ positive or negative.
 =cut
 
 sub zoom {
-	my $self = shift;
-	my $zoom = $self->current->editor->GetZoom + shift;
+	my ( $self, $factor ) = @_;
+	my $page = $self->current->editor or return;
+
+	my $zoom = $page->GetZoom + $factor;
 	foreach my $page ( $self->editors ) {
 		$page->SetZoom($zoom);
 	}
@@ -4225,9 +4316,6 @@ Toggle status bar visibility. No return value.
 sub on_toggle_statusbar {
 	my $self = shift;
 
-	# Status bar always shown on Windows
-	return if Padre::Constant::WXWIN32;
-
 	# Update the configuration
 	$self->config->set(
 		'main_statusbar',
@@ -4243,6 +4331,9 @@ sub on_toggle_statusbar {
 
 	# Save configuration
 	$self->config->write;
+
+	# Refresh. This is needed to show/hide the status bar
+	$self->aui->Update;
 
 	return;
 }
@@ -4845,13 +4936,64 @@ Put focus on tab visited before the current one. No return value.
 
 sub on_last_visited_pane {
 	my ( $self, $event ) = @_;
+
 	my $history = $self->{page_history};
+
 	if ( @$history >= 2 ) {
+
+		# This works, but isn't perfect, improve if you want!
+		$self->{last_visited_pane_depth} = -1
+			if ( !defined( $self->{last_visited_pane_time} ) )
+			or $self->{last_visited_pane_time} < ( Time::HiRes::time() - 1 );
+
 		@$history[ -1, -2 ] = @$history[ -2, -1 ];
 		foreach my $i ( $self->pageids ) {
 			my $editor = $_[0]->notebook->GetPage($i);
-			if ( Scalar::Util::refaddr($editor) eq $history->[-1] ) {
+			if ( Scalar::Util::refaddr($editor) eq $history->[ $self->{last_visited_pane_depth} ] ) {
 				$self->notebook->SetSelection($i);
+
+				--$self->{last_visited_pane_depth};
+				$self->{last_visited_pane_time} = Time::HiRes::time();
+				last;
+			}
+		}
+
+		# Partial refresh
+		$self->refresh_status( $self->current );
+		$self->refresh_toolbar( $self->current );
+	}
+}
+
+=pod
+
+=head3 C<on_oldest_visited_pane>
+
+    $main->on_oldest_visited_pane;
+
+Put focus on tab visited the longest time ago. No return value.
+
+=cut
+
+sub on_oldest_visited_pane {
+	my ( $self, $event ) = @_;
+
+	my $history = $self->{page_history};
+
+	if ( @$history >= 2 ) {
+
+		# This works, but isn't perfect, improve if you want!
+		$self->{oldest_visited_pane_depth} = 0
+			if ( !defined( $self->{oldest_visited_pane_time} ) )
+			or $self->{oldest_visited_pane_time} < ( Time::HiRes::time() - 1 );
+
+		@$history[ -1, -2 ] = @$history[ -2, -1 ];
+		foreach my $i ( $self->pageids ) {
+			my $editor = $_[0]->notebook->GetPage($i);
+			if ( Scalar::Util::refaddr($editor) eq $history->[ $self->{oldest_visited_pane_depth} ] ) {
+				$self->notebook->SetSelection($i);
+
+				++$self->{last_visited_pane_depth};
+				$self->{oldest_visited_pane_time} = Time::HiRes::time();
 				last;
 			}
 		}
@@ -4874,27 +5016,30 @@ file. No return value.
 =cut
 
 sub on_new_from_template {
-	my ( $self, $extension ) = @_;
+	my $self      = shift;
+	my $extension = shift;
 
-	$self->on_new;
-
-	my $editor = $self->current->editor or return;
+	# Load the template
 	my $file = File::Spec->catfile(
 		Padre::Util::sharedir('templates'),
 		"template.$extension"
 	);
+	my $template = Padre::Util::slurp($file);
+	unless ($template) {
 
-	if ( $editor->insert_from_file($file) ) {
-		my $document = $editor->{Document};
-		$document->{original_content} = $document->text_get;
-		$document->set_mimetype( $document->guess_mimetype );
-		$document->editor->padre_setup;
-		$document->rebless;
-		$document->colourize;
-	} else {
-		$self->message( sprintf( Wx::gettext("Error loading template file '%s'"), $file ) );
+		# Rare failure, no need to translate
+		$self->error("Failed to find template '$file'");
 	}
-	return;
+
+	# Generate the full file content
+	require Template::Tiny;
+	my $output = Template::Tiny->new->process(
+		$template,
+		$self->current,
+	);
+
+	# Create the file from the content
+	return $self->new_document_from_string( $output, @_ );
 }
 
 =pod
@@ -4999,6 +5144,7 @@ sub key_up {
 	my $mod   = $event->GetModifiers || 0;
 	my $code  = $event->GetKeyCode;
 
+
 	# Remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
 	# () needed after the constants as they are functions in Perl and
 	# without constants perl will call only the first one.
@@ -5006,10 +5152,14 @@ sub key_up {
 	if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
 		                           # Ctrl-TAB  #TO DO it is already in the menu
 		if ( $code == Wx::WXK_TAB ) {
+
+			# TODO: Catch up the right action for this shortcut
 			$self->on_next_pane;
 		}
 	} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) { # Ctrl-Shift
-		                                                      # Ctrl-Shift-TAB #TO DO it is already in the menu
+		                                                      # Ctrl-Shift-TAB
+		                                                      # TODO it is already in the menu
+		                                                      # TODO: Catch up the right action for this shortcut
 		$self->on_prev_pane if $code == Wx::WXK_TAB;
 	} elsif ( $mod == Wx::wxMOD_ALT() ) {
 
@@ -5168,12 +5318,15 @@ sub set_title {
 	$self->{title} = 'Padre ' . $Padre::VERSION
 		if !defined( $self->{title} );
 
-	my $revision = Padre::Util::revision();
+	my $revision = Padre::Constant::PADRE_REVISION;
 	$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)"
 		if defined($revision);
 
 	# Push the title to the window
 	$self->SetTitle( $self->{title} );
+
+	# Push the title to the process list for better identification
+	$0 = $self->{title}; ## no critic (RequireLocalizedPunctuationVars)
 }
 
 =pod

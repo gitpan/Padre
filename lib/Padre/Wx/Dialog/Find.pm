@@ -26,7 +26,7 @@ use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
 use Padre::Wx::FindResult        ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -327,7 +327,6 @@ sub find_button {
 	if ( $self->{find_first}->GetValue ) {
 		$self->Hide;
 	} elsif ( not $Result ) {
-		$DB::single = 1;
 		$main->error(
 			Wx::gettext('No matches found'),
 			Wx::gettext('Search')

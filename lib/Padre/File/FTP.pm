@@ -7,7 +7,7 @@ use warnings;
 use Padre::File;
 use File::Temp;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::File';
 
 use Class::XSAccessor {
@@ -173,6 +173,13 @@ sub mtime {
 	$self->{_cached_mtime_time}  = time;
 
 	return $self->{_cached_mtime_value};
+}
+
+sub browse_mtime {
+	my $self     = shift;
+	my $filename = shift;
+
+	return $self->{_ftp}->mdtm($filename);
 }
 
 sub exists {

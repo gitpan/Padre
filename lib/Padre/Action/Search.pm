@@ -11,7 +11,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 
 
@@ -164,7 +164,7 @@ sub new {
 
 			#Create and show the dialog
 			my $open_resource_dialog = $_[0]->open_resource;
-			$open_resource_dialog->showIt;
+			$open_resource_dialog->show;
 		},
 	);
 

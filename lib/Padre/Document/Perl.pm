@@ -17,7 +17,7 @@ use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
 use Padre::Debug;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::Document';
 
 
@@ -244,7 +244,8 @@ sub get_function_regex {
 
 	# This emulates qr/(?<=^|[\012\015])sub\s$name\b/ but without
 	# triggering a "Variable length lookbehind not implemented" error.
-	return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
+	#	return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
+	return qr/(?:^|[^#\s])\s*(sub\s+$_[1])\b/;
 }
 
 =pod
@@ -833,7 +834,8 @@ EOC
 		#my $dumper = PPI::Dumper->new( $ppi_doc );
 		#$dumper->print;
 		require PPIx::EditorTools;
-		my $token     = PPIx::EditorTools::find_token_at_location( $ppi_doc, $start_position );
+		my $token = PPIx::EditorTools::find_token_at_location( $ppi_doc, $start_position );
+		return unless $token;
 		my $statement = $token->statement();
 		my $parent    = $statement;
 
@@ -1693,7 +1695,7 @@ sub find_help_topic {
 
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
-	
+
 	require PPI;
 	my $text = $editor->GetText;
 	my $doc  = PPI::Document->new( \$text );
@@ -1710,6 +1712,7 @@ sub find_help_topic {
 	);
 
 	if ($token) {
+
 		#print $token->class . "\n";
 		if ( $token->isa('PPI::Token::Symbol') ) {
 			if ( $token->content =~ /^[\$\@\%].+?$/ ) {
@@ -1721,6 +1724,52 @@ sub find_help_topic {
 	}
 
 	return;
+}
+
+
+sub guess_filename_to_open {
+	my ( $self, $text ) = @_;
+
+	my $module = $text;
+	$module =~ s{::}{/}g;
+	$module .= ".pm";
+	my @files;
+	my $filename = File::Spec->catfile( Padre->ide->{original_cwd}, $module, );
+	if ( -e $filename ) {
+		push @files, $filename;
+	} else {
+
+		# relative to the project lib dir
+		my $filename = File::Spec->catfile(
+			$self->project_dir,
+			'lib', $module,
+		);
+		if ( -e $filename ) {
+			push @files, $filename;
+		}
+
+		# relative to the project dir
+		my $filename2 = File::Spec->catfile(
+			$self->project_dir,
+			$module,
+		);
+		if ( -e $filename2 ) {
+			push @files, $filename2;
+		}
+
+		# TO DO: it should not be our @INC but the @INC of the perl used for
+		# script execution
+		foreach my $path (@INC) {
+			my $filename = File::Spec->catfile( $path, $module );
+			if ( -e $filename ) {
+				push @files, $filename;
+
+				#last;
+			}
+		}
+	}
+
+	return @files;
 }
 
 

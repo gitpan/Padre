@@ -7,7 +7,7 @@ use Padre::Wx                        ();
 use Padre::Wx::Directory::TreeCtrl   ();
 use Padre::Wx::Directory::SearchCtrl ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Wx::Panel';
 
 use Class::XSAccessor getters => {
@@ -71,7 +71,7 @@ sub current {
 # Returns the window label
 sub gettext_label {
 	my $self = shift;
-	if (defined($self->mode) and ( $self->mode eq 'tree' )) {
+	if ( defined( $self->mode ) and ( $self->mode eq 'tree' ) ) {
 		return Wx::gettext('Project');
 	} else {
 		return Wx::gettext('Directory');
@@ -96,15 +96,13 @@ sub refresh {
 	my $doc = $current->document;
 	my $dir;
 
-	# Disabled for release
-	#	if ( defined($doc) ) {
-	#		$dir = $doc->project_dir;
-	#		$self->{file} = $doc->{file};
-	#	} else {
-	$dir = $self->main->config->default_projects_directory;
-
-	#		delete $self->{file};
-	#	}
+	if ( defined($doc) ) {
+		$dir = $doc->project_dir;
+		$self->{file} = $doc->{file};
+	} else {
+		$dir = $self->main->config->default_projects_directory;
+		delete $self->{file};
+	}
 
 	return unless $dir;
 
@@ -165,7 +163,6 @@ sub side {
 
 # Moves the panel to the other side
 sub move {
-	$DB::single = 1;
 	my $self   = shift;
 	my $config = $self->main->config;
 	my $side   = $config->main_directory_panel;

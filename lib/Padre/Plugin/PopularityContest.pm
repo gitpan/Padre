@@ -117,8 +117,9 @@ use Config        ();
 use Scalar::Util  ();
 use Padre::Plugin ();
 use Padre::Task::HTTPClient;
+use Padre::Constant();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::Plugin';
 
 # Track the number of times actions are used
@@ -227,7 +228,7 @@ sub _generate {
 	$report{'padre.instance'} = $self->ide->{instance_id};
 
 	# Versioning information
-	my $revision = Padre::Util::revision;
+	my $revision = Padre::Constant::PADRE_REVISION;
 	if ( defined $revision ) {
 
 		# This is a developer build

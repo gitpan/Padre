@@ -9,7 +9,7 @@ use Carp            ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Wx::Dialog';
 
 
@@ -359,7 +359,6 @@ sub show_error_message {
 # according to current sort criterion.
 #
 sub _refresh_list {
-	$DB::single = $DB::single = 1;
 	my $self = shift;
 
 	# Clear image list & fill it again

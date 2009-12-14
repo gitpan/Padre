@@ -15,7 +15,7 @@ Padre::Debug - Compile-time debugging library for Padre
   
   use Padre;
   
-  # In each LP2:: class
+  # In each Padre::Foo class
   use Padre::Debug;
   
   sub method {
@@ -37,7 +37,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 sub import {
 	my $pkg = ( caller() )[0];

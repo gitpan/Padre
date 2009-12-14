@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -57,7 +57,7 @@ sub new {
 sub title {
 	my $self = shift;
 
-	return Wx::gettext('Refa&ctor');
+	return Wx::gettext('Refac&tor');
 }
 
 sub refresh {

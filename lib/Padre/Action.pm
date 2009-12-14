@@ -14,7 +14,7 @@ use Padre::Action::Search   ();
 use Padre::Action::Window   ();
 use Padre::Action::Internal ();
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 # Generate faster accessors
 use Class::XSAccessor getters => {
@@ -108,6 +108,13 @@ sub new {
 			next unless $a->shortcut eq $shortcut;
 			warn "Found a duplicate shortcut '$shortcut' with " . $a->name . " for '$name'\n";
 			last;
+		}
+
+		my $shortcuts = Padre->ide->{shortcuts};
+		if ( defined( $shortcuts->{$shortcut} ) ) {
+			warn "Found a duplicate shortcut '$shortcut' with " . $shortcuts->{$shortcut}->name . " for '$name'\n";
+		} else {
+			$shortcuts->{$shortcut} = $self;
 		}
 	}
 

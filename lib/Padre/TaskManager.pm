@@ -49,9 +49,6 @@ the first task is being scheduled.
 
 =item use_threads
 
-TO DO: This is disabled for now since we need Wx 0.89
-for stable threading.
-
 Disable for profiling runs. In the degraded, thread-less mode,
 all tasks are run in the main thread. Default: 1 (use threads)
 
@@ -68,7 +65,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 
 use Params::Util qw{_INSTANCE};
 

@@ -10,7 +10,7 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Debug;
 
-our $VERSION = '0.51';
+our $VERSION = '0.52';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -73,6 +73,10 @@ sub new {
 			$_[0]->on_new_from_template('t');
 		},
 	);
+
+	# Split by language
+	$file_new->AppendSeparator;
+
 	$self->add_menu_item(
 		$file_new,
 		name       => 'file.new_p6_script',
@@ -81,6 +85,10 @@ sub new {
 			$_[0]->on_new_from_template('p6');
 		},
 	);
+
+	# Split projects from files
+	$file_new->AppendSeparator;
+
 	$self->add_menu_item(
 		$file_new,
 		name       => 'file.new_p5_distro',
@@ -90,6 +98,8 @@ sub new {
 			Padre::Wx::Dialog::ModuleStart->start( $_[0] );
 		},
 	);
+
+	### NOTE: Add support for plugins here
 
 	# Open things
 
@@ -256,6 +266,18 @@ sub new {
 		shortcut    => 'F12',
 		menu_event  => sub {
 			$_[0]->on_save_as;
+		},
+	);
+
+	$self->{save_as} = $self->add_menu_item(
+		$self,
+		name        => 'file.save_intuition',
+		id          => -1,
+		need_editor => 1,
+		label       => Wx::gettext('Save Intuition'),
+		shortcut    => 'Ctrl-Shift-S',
+		menu_event  => sub {
+			$_[0]->on_save_intuition;
 		},
 	);
 
