@@ -7,10 +7,10 @@ use Padre::Util     ();
 use Padre::DB       ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
-use Padre::Debug;
+use Padre::Logger;
 
 # package exports and version
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::Dialog';
 
 # accessors
@@ -21,6 +21,7 @@ use Class::XSAccessor accessors => {
 	_list            => '_list',            # matching items list
 	_status_text     => '_status_text',     # status label
 	_matched_results => '_matched_results', # matched results
+	_ok_button       => '_ok_button'        # OK button
 };
 
 # -- constructor
@@ -147,6 +148,7 @@ sub _create_buttons {
 	my $butsizer = $self->CreateStdDialogButtonSizer( Wx::wxOK | Wx::wxCANCEL );
 	$sizer->Add( $butsizer, 0, Wx::wxALL | Wx::wxEXPAND | Wx::wxALIGN_CENTER, 5 );
 	Wx::Event::EVT_BUTTON( $self, Wx::wxID_OK, \&_on_ok_button_clicked );
+	$self->_ok_button( Wx::Window::FindWindowById( Wx::wxID_OK, $self ) );
 }
 
 #
@@ -175,14 +177,23 @@ sub _create_controls {
 	);
 
 	# Shows how many items are selected and information about what is selected
-	$self->_status_text( Wx::StaticText->new( $self, -1, '' ) );
+	require Padre::Wx::HtmlWindow;
+	$self->_status_text(
+		Padre::Wx::HtmlWindow->new(
+			$self,
+			-1,
+			Wx::wxDefaultPosition,
+			[ -1, 70 ],
+			Wx::wxBORDER_STATIC
+		)
+	);
 
 	$self->_sizer->AddSpacer(10);
 	$self->_sizer->Add( $search_label,       0, Wx::wxALL | Wx::wxEXPAND, 2 );
-	$self->_sizer->Add( $self->_search_text, 0, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$self->_sizer->Add( $self->_search_text, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
 	$self->_sizer->Add( $matches_label,      0, Wx::wxALL | Wx::wxEXPAND, 2 );
 	$self->_sizer->Add( $self->_list,        1, Wx::wxALL | Wx::wxEXPAND, 2 );
-	$self->_sizer->Add( $self->_status_text, 0, Wx::wxALL | Wx::wxEXPAND, 10 );
+	$self->_sizer->Add( $self->_status_text, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
 
 	$self->_setup_events;
 
@@ -231,7 +242,7 @@ sub _setup_events {
 			my $selection = $self->_list->GetSelection;
 			if ( $selection != Wx::wxNOT_FOUND ) {
 				my $action = $self->_list->GetClientData($selection);
-				$self->_status_text->SetLabel( $self->_list->GetString($selection) . " (" . $action->{name} . ")" );
+				$self->_status_text->SetPage( $self->_label( $action->{value}, $action->{name} ) );
 			}
 		}
 	);
@@ -324,7 +335,7 @@ sub _show_recently_opened_actions {
 sub _search {
 	my $self = shift;
 
-	$self->_status_text->SetLabel( Wx::gettext("Reading items. Please wait...") );
+	$self->_status_text->SetPage( Wx::gettext("Reading items. Please wait...") );
 	my @menu_actions = ();
 	my %actions      = %{ Padre::ide->actions };
 	foreach my $action_name ( keys %actions ) {
@@ -359,24 +370,43 @@ sub _update_list_box {
 	my $pos = 0;
 
 	my $first_label = undef;
-	foreach my $menu_action ( @{ $self->_matched_results } ) {
-		my $label = $menu_action->{value};
-		if ( not $first_label ) {
-			$first_label = $label . " (" . $menu_action->{name} . ")";
-		}
+	foreach my $action ( @{ $self->_matched_results } ) {
+		my $label = $action->{value};
 		if ( $label =~ /$search_expr/i ) {
-			$self->_list->Insert( $label, $pos, $menu_action );
+			if ( not $first_label ) {
+				$first_label = $self->_label( $label, $action->{name} );
+			}
+			$self->_list->Insert( $label, $pos, $action );
 			$pos++;
 		}
 	}
 	if ( $pos > 0 ) {
 		$self->_list->Select(0);
-		$self->_status_text->SetLabel($first_label);
+		$self->_status_text->SetPage($first_label);
+		$self->_list->Enable(1);
+		$self->_status_text->Enable(1);
+		$self->_ok_button->Enable(1);
 	} else {
-		$self->_status_text->SetLabel('');
+		$self->_status_text->SetPage('');
+		$self->_list->Enable(0);
+		$self->_status_text->Enable(0);
+		$self->_ok_button->Enable(0);
 	}
 
 	return;
+}
+
+#
+# Returns a formatted html string of the action label, name and comment
+#
+sub _label {
+	my ( $self, $action_label, $action_name ) = @_;
+
+	my %actions     = %{ Padre::ide->actions };
+	my $menu_action = $actions{$action_name};
+	my $comment     = ( $menu_action and defined $menu_action->{comment} ) ? $menu_action->{comment} : '';
+
+	return '<b>' . $action_label . '</b> <i>' . $action_name . '</i><br>' . $comment;
 }
 
 

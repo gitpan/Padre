@@ -8,7 +8,7 @@ use Padre::DB       ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -19,6 +19,7 @@ use Class::XSAccessor accessors => {
 	_status_text              => '_status_text',              # status label
 	_directory                => '_directory',                # searched directory
 	_matched_files            => '_matched_files',            # matched files list
+	_ok_button                => '_ok_button',                # OK button
 	_copy_button              => '_copy_button',              # copy button
 	_popup_button             => '_popup_button',             # popup button for options
 	_popup_menu               => '_popup_menu',               # options popup menu
@@ -183,6 +184,7 @@ sub _create_buttons {
 	my $butsizer = $self->CreateStdDialogButtonSizer( Wx::wxOK | Wx::wxCANCEL );
 	$sizer->Add( $butsizer, 0, Wx::wxALL | Wx::wxEXPAND | Wx::wxALIGN_CENTER, 5 );
 	Wx::Event::EVT_BUTTON( $self, Wx::wxID_OK, \&_on_ok_button_clicked );
+	$self->_ok_button( Wx::Window::FindWindowById( Wx::wxID_OK, $self ) );
 }
 
 #
@@ -317,7 +319,7 @@ sub _setup_events {
 			my @matches      = $self->_matches_list->GetSelections();
 			my $num_selected = scalar @matches;
 			if ( $num_selected == 1 ) {
-				$self->_status_text->ChangeValue( $self->_matches_list->GetClientData( $matches[0] ) );
+				$self->_status_text->ChangeValue( $self->_path( $self->_matches_list->GetClientData( $matches[0] ) ) );
 				$self->_copy_button->Enable(1);
 			} elsif ( $num_selected > 1 ) {
 				$self->_status_text->ChangeValue( $num_selected . " items selected" );
@@ -402,8 +404,22 @@ sub show {
 	if ( $self->IsShown ) {
 		$self->SetFocus;
 	} else {
-		$self->_search_text->ChangeValue('');
+		my $editor = $self->_main->current->editor;
+		if ($editor) {
+			my $selection        = $editor->GetSelectedText;
+			my $selection_length = length $selection;
+			if ( $selection_length > 0 ) {
+				$self->_search_text->ChangeValue($selection);
+				$self->_restart_search;
+			} else {
+				$self->_search_text->ChangeValue('');
+			}
+		} else {
+			$self->_search_text->ChangeValue('');
+		}
+
 		$self->_show_recent_while_idle;
+
 		$self->Show(1);
 	}
 }
@@ -439,7 +455,7 @@ sub _show_recently_opened_resources {
 	my $recently_used = Padre::DB::RecentlyUsed->select( "where type = ?", 'RESOURCE' ) || [];
 	my @recent_files = ();
 	foreach my $e (@$recently_used) {
-		push @recent_files, $e->value;
+		push @recent_files, $self->_path( $e->value );
 	}
 	@recent_files = sort { File::Basename::fileparse($a) cmp File::Basename::fileparse($b) } @recent_files;
 
@@ -499,18 +515,30 @@ sub _update_matches_list_box {
 	}
 	if ( $pos > 0 ) {
 		$self->_matches_list->Select(0);
-		$self->_status_text->ChangeValue( $self->_matches_list->GetClientData(0) );
+		$self->_status_text->ChangeValue( $self->_path( $self->_matches_list->GetClientData(0) ) );
 		$self->_status_text->Enable(1);
 		$self->_copy_button->Enable(1);
+		$self->_ok_button->Enable(1);
 	} else {
 		$self->_status_text->ChangeValue('');
 		$self->_status_text->Enable(0);
 		$self->_copy_button->Enable(0);
+		$self->_ok_button->Enable(0);
 	}
 
 	return;
 }
 
+#
+# Cleans a path on various platforms
+#
+sub _path {
+	my ( $self, $path ) = @_;
+	if (Padre::Constant::WIN32) {
+		$path =~ s/\//\\/g;
+	}
+	return $path;
+}
 
 1;
 

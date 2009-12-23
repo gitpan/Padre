@@ -1,6 +1,49 @@
 Changes for Perl Application Development and Refactoring Environment
 
-0.53 To Be Released
+0.54 To Be Released
+
+0.53 2009.12.23
+    - Add initial version of a debugger using Debug::Client (SZABGAB)
+    - Fix crashes when running refactor actions when there
+      is no document (AZAWAWI)
+    - Open resource searches now for user selections (AZAWAWI)
+    - The Open resource's OK button is disabled when the 
+      search results list is empty (AZAWAWI)
+    - Help search (F2) now supports *ALL* installed CPAN modules (AZAWAWI)
+    - Fixed "Syntax Check" focus loss bug while switching tabs quickly
+      and a syntax error is in one of them (AZAWAWI)
+    - Help search does not block when loading a long help topics
+      list (AZAWAWI)
+    - Ticket #787: Add a test for breakpoints to testsuite (SEWI)
+    - Fixed missing mime type guessing that caused new Padre documents to
+      default always to Scintilla (AZAWAWI)
+    - Landed new multi-resource locking subsystem. Many operations are now
+      prevented from refreshing the GUI multiple times. Startup, shutdown,
+      open and close multiple files, session changing all much faster (ADAMK)
+    - In Open resource, path is now cleaned from slashes on win32 (AZAWAWI)
+    - Fixed Padre crash when closing a Perl 5 script tab quickly while syntax
+      check is on (AZAWAWI)
+    - Added "No errors/warnings to $project-relative-filename" to syntax
+      checker. (AZAWAWI)
+    - Quick Menu access now displays Padre action label, name and comments
+      in an HTML window instead of a static label (AZAWAWI)
+    - Make the focus on "Find in files" work when called from Quick menu 
+      access dialog (AZAWAWI)
+    - Help Search dialog is now bigger in size and fonts. (AZAWAWI)
+    - HTML output in help search dialog for Perl variables and functions has now
+      bigger bold fonts for title (AZAWAWI)
+    - Fixed #758: Autocomplete now also works with backspace (SEWI)
+    - Ctrl-Tab behaviour is now configurable (SEWI)
+    - Rename Padre::Debug to Padre::Logger (SZABGAB)
+    - Reuse the comment field of the menu actions and show them in the toolbar (SZABGAB)
+    - Add comment field to all the menu items that did not have yet (SZABGAB)
+    - Integrated Padre::DB into the Padre::Locker API, so that we can do
+      (very basic) nested transactions (ADAMK)
+    - Audited the startup process for database operations that either weren't
+      being done in a transaction, or were doing crazy bizarre things. Startup
+      is now noticably faster (ADAMK)
+    - Added Preference setting to control autocomplete when editting a script rather than
+      a Module.  (WAXHEAD)      
 
 0.52 2009.12.14
     - Add a plugin hook on change of current editor tab (SEWI)

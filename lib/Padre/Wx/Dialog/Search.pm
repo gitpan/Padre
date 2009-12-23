@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 ######################################################################
 # Constructor
@@ -86,7 +86,7 @@ sub _find {
 		$what = quotemeta $self->{entry}->GetValue;
 	}
 
-	my $regex = $self->{case}->GetValue ? qr/$what/im : qr/$what/m;
+	my $regex = $self->{case}->GetValue ? qr/($what)/im : qr/($what)/m;
 
 	my ( $from, $to ) =
 		$self->{restart}

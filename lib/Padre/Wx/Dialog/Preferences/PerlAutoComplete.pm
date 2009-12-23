@@ -3,10 +3,9 @@ package Padre::Wx::Dialog::Preferences::PerlAutoComplete;
 use 5.008;
 use strict;
 use warnings;
-
 use Padre::Wx::Dialog::Preferences ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Padre::Wx::Dialog::Preferences';
 
 sub panel {
@@ -40,6 +39,13 @@ sub panel {
 				'autocomplete_method',
 				( $config->autocomplete_method ? 1 : 0 ),
 				Wx::gettext("Autocomplete new methods in packages")
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox',
+				'autocomplete_subroutine',
+				( $config->autocomplete_subroutine ? 1 : 0 ),
+				Wx::gettext("Autocomplete new subroutines in scripts")
 			],
 			[]
 		],
@@ -77,6 +83,10 @@ sub save {
 		'autocomplete_method',
 		$data->{autocomplete_method} ? 1 : 0
 	);
+	$config->set(
+		'autocomplete_subroutine',
+		$data->{autocomplete_subroutine} ? 1 : 0
+	);
 
 	$config->set(
 		'perl_autocomplete_max_suggestions',
@@ -95,10 +105,11 @@ sub save {
 
 }
 
-
-
 1;
+
 __END__
+
+=pod
 
 =head1 NAME
 

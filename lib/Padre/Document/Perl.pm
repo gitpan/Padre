@@ -15,9 +15,9 @@ use Padre::Perl                     ();
 use Padre::Document                 ();
 use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Padre::Document';
 
 
@@ -229,13 +229,14 @@ sub get_functions {
 	my $self = shift;
 
 	# Filter out POD
+	my $n = "\\cM?\\cJ";
 	return grep { defined $_ } $self->text_get =~ m/
 		(?:
-		\n*__(?:DATA|END)__\b.*
+		(?:$n)*__(?:DATA|END)__\b.*
 		|
-		\n\n=\w+.+?\n\n=cut\b.+?\n+
+		$n$n=\w+.*?$n$n=cut\b(?=.*?$n$n)
 		|
-		(?:^|\n)\s*sub\s+(\w+(?:::\w+)*)
+		(?:^|$n)\s*sub\s+(\w+(?:::\w+)*)
 		)
 	/sgx;
 }
@@ -245,7 +246,7 @@ sub get_function_regex {
 	# This emulates qr/(?<=^|[\012\015])sub\s$name\b/ but without
 	# triggering a "Variable length lookbehind not implemented" error.
 	#	return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
-	return qr/(?:^|[^#\s])\s*(sub\s+$_[1])\b/;
+	return qr/(?:^|[^# \t])[ \t]*(sub\s+$_[1])\b/;
 }
 
 =pod
@@ -1065,6 +1066,8 @@ sub autocomplete {
 	} elsif ( defined($event) and ( !ref($event) ) ) {
 		$nextchar = $event;
 	}
+	return if ord($nextchar) == 27;      # Close on escape
+	$nextchar = '' if ord($nextchar) < 32;
 
 	# WARNING: This is totally not done, but Gabor made me commit it.
 	# TO DO:
@@ -1351,7 +1354,7 @@ sub event_on_char {
 	#  - config option enabled
 	#  - none of the following keys pressed: a-z, A-Z, 0-9, _
 	#  - cursor position is at end of line
-	if ($config->autocomplete_method
+	if (( $config->autocomplete_method or $config->autocomplete_subroutine )
 		and (  ( $key < 48 )
 			or ( ( $key > 57 ) and ( $key < 65 ) )
 			or ( ( $key > 90 ) and ( $key < 95 ) )
@@ -1364,45 +1367,39 @@ sub event_on_char {
 		# from beginning to current position
 		my $prefix = $editor->GetTextRange( 0, $pos );
 
-
-
 		# methods can't live outside packages, so ignore them
 		my $linetext = $editor->GetTextRange( $first, $last );
 
-		#print "Text:\n'$linetext'\n";
+		# TODO: Fix picking up the space char so that
+		# 	when indenting the cursor isn't one space 'in'.
 		if ( $prefix =~ /package / ) {
-
 
 			# we only match "sub foo" at the beginning of a line
 			# but no inline subs (eval, anonymus, etc.)
 			# The end-of-subname match is included in the first if
 			# which match the last key pressed (which is not part of
 			# $linetext at this moment:
-			if ( $linetext =~ /^sub[\s\t]+\w+$/ ) {
 
-				# Add the default skeleton of a method,
-				# the \t should be replaced by
-				# (space * current_indent_width)
-				$editor->AddText( ' {'
-						. $self->newline . "\t"
-						. 'my $self = shift;'
-						. $self->newline . "\t"
-						. $self->newline . '}'
-						. $self->newline );
+			if ( $linetext =~ /^sub[\s\t]+\w+$/ ) {
+				my $indent_string = $self->get_indentation_level_string(1);
+
+				# Add the default skeleton of a method
+				my $newline            = $self->newline;
+				my $text_before_cursor = " {$newline${indent_string}my \$self = shift;$newline$indent_string";
+				my $text_after_cursor  = "$newline}$newline";
+				$editor->AddText( $text_before_cursor . $text_after_cursor );
 
 				# Ready for typing in the new method:
-				$editor->GotoPos( $last + 23 );
-
+				$editor->GotoPos( $last + length($text_before_cursor) );
 			}
-		} elsif ( $linetext =~ /^sub[\s\t]+(\w+)$/ ) {
-			my $subName = $1;
+		} elsif ( $linetext =~ /^sub[\s\t]+(\w+)$/ && $config->autocomplete_subroutine ) {
 
-			#$self->_do_end_check($editor, $line, $pos);
+			my $subName       = $1;
+			my $indent_string = $self->get_indentation_level_string(1);
+
 			# Add the default skeleton of a subroutine,
-			# the \t should be replaced by
-			# (space * current_indent_width)
-
-			$editor->AddText( ' {' . $self->newline . "\t" . $self->newline . '}' );
+			my $newline = $self->newline;
+			$editor->AddText(" {$newline$indent_string$newline}");
 
 			# $line is where it starts
 			my $starting_line = $line - 1;
@@ -1412,10 +1409,13 @@ sub event_on_char {
 
 			#print "starting_line: $starting_line\n";
 			$editor->GotoPos( $editor->PositionFromLine($starting_line) );
-			$editor->AddText( $self->_pod($subName) );
+
+			# TODO Add option for auto pod
+			#$editor->AddText( $self->_pod($subName) );
 
 			# $editor->GetLineEndPosition($editor->PositionFromLine(
-			my $end_line = $starting_line + 10;
+			# TODO For pod this was 10
+			my $end_line = $starting_line + 2;
 			$editor->GotoLine($end_line);
 
 			#print "end_line: $end_line\n";
@@ -1425,7 +1425,7 @@ sub event_on_char {
 			my $last_pos = $editor->GetLineEndPosition($end_line);
 
 			#print "Last pos: $last_pos\n";
-			# Ready for typing in the new method:
+			# Ready for typing in the new function:
 
 			$editor->GotoPos($last_pos);
 
@@ -1517,6 +1517,7 @@ sub event_on_right_down {
 				my $replacement = $dialog->GetValue;
 				$dialog->Destroy;
 				return unless defined $replacement;
+				my $lock = $editor->main->lock('BUSY');
 				$doc->lexical_variable_replacement($replacement);
 			},
 		);

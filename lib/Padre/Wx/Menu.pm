@@ -13,14 +13,13 @@ use Class::Adapter::Builder
 	NEW      => 'Wx::Menu',
 	AUTOLOAD => 'PUBLIC';
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 use Class::XSAccessor getters => {
 	wx => 'OBJECT',
 };
 
 # Default implementation of refresh
-
 sub refresh {1}
 
 # Overrides and then calls XS wx Menu::Append.
@@ -84,6 +83,12 @@ sub add_menu_action {
 	$item->Check( $action->{checked_default} )
 		if $method eq 'AppendCheckItem';
 
+	if ( $action->comment ) {
+		$item->SetHelp( $action->comment );
+	} else {
+		warn $action->label;
+	}
+
 	Wx::Event::EVT_MENU(
 		$self->{main},
 		$item,
@@ -107,6 +112,11 @@ sub _add_menu_item {
 		$action->id,
 		$action->label_menu,
 	);
+	if ( $action->comment ) {
+		$item->SetHelp( $action->comment );
+	} else {
+		warn "comment is missing from menu '$name'";
+	}
 	Wx::Event::EVT_MENU(
 		$self->{main},
 		$item,

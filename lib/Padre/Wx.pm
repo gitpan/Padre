@@ -20,7 +20,7 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Hard version lock on a new enough Wx.pm
 BEGIN {
@@ -39,9 +39,10 @@ BEGIN {
 # Defines for sidebar marker; others may be needed for breakpoint
 # icons etc.
 
-sub MarkError {1}
-sub MarkWarn  {2}
-
+sub MarkError      {1}
+sub MarkWarn       {2}
+sub MarkLocation   {3} # current location of the debugger
+sub MarkBreakpoint {4} # location of the debugger breakpoint
 
 
 

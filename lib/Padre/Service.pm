@@ -11,9 +11,9 @@ use threads::shared;
 use Padre::Wx     ();
 use Padre::Task   ();
 use Thread::Queue ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Padre::Task';
 
 =pod

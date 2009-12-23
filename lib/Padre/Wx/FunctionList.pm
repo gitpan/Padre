@@ -7,8 +7,12 @@ use Params::Util qw{ _STRING };
 use Padre::Wx ();
 use Padre::Current ('_CURRENT');
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::Panel';
+
+
+
+
 
 #####################################################################
 # Constructor
@@ -136,6 +140,10 @@ sub gettext_label {
 	Wx::gettext('Functions');
 }
 
+
+
+
+
 #####################################################################
 # Event Handlers
 
@@ -206,8 +214,6 @@ sub refresh {
 
 	if ( scalar @methods == 0 ) {
 		$functions->Clear;
-		$self->{search}->Hide;
-		$self->{functions}->Hide;
 		$self->{_methods} = [];
 		return;
 	}

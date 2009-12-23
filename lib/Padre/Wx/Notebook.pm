@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook
@@ -112,6 +112,7 @@ sub on_auinotebook_page_changed {
 		}
 	}
 	$main->refresh;
+	$main->{ide}->plugin_manager->plugin_event('editor_changed');
 }
 
 1;

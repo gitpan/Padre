@@ -6,9 +6,9 @@ use warnings;
 use Params::Util   ();
 use Padre::Wx      ();
 use Padre::Current ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor accessors => {

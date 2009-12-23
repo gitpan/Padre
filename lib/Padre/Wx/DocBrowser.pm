@@ -21,7 +21,7 @@ use Padre::DocBrowser       ();
 use Padre::Util qw( _T );
 use Wx::Perl::Dialog::Simple ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor accessors => {
@@ -81,6 +81,7 @@ sub new {
 		'Help',
 		Wx::wxDefaultPosition,
 		[ 750, 700 ],
+		Wx::wxDEFAULT_FRAME_STYLE,
 	);
 
 	$self->{provider} = Padre::DocBrowser->new;

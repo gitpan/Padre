@@ -8,7 +8,7 @@ use Padre::Task    ();
 use Padre::Current ();
 use Padre::Wx      ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Padre::Task';
 
 =pod
@@ -88,6 +88,7 @@ sub new {
 		$editor = Padre::Current->editor;
 	}
 	return () if not defined $editor;
+	$editor = Scalar::Util::refaddr($editor);
 	$self->{main_thread_only}->{on_finish} = $on_finish if $on_finish;
 	$self->{main_thread_only}->{editor} = $editor;
 	return bless $self => $class;
@@ -126,46 +127,41 @@ sub update_gui {
 	my $messages = $self->{syntax_check};
 	my $main     = Padre->ide->wx->main;
 	my $syntax   = $main->syntax;
-	my $editor   = $self->{main_thread_only}->{editor};
+
+	my $editor = Padre::Current->editor;
+	my $addr   = delete $self->{main_thread_only}->{editor};
+	if ( not $addr or not $editor or $addr ne Scalar::Util::refaddr($editor) ) {
+
+		# editor reference is not valid any more
+		return 1;
+	}
 
 	# Clear out the existing stuff
 	$syntax->clear;
 
-	require Padre::Wx;
-
 	# If there are no errors, clear the synax checker pane and return.
 	if ( ( !defined($messages) ) or ( $#{$messages} == -1 ) ) {
-		my $green = Wx::Colour->new("green");
-		$editor->MarkerDefine(
-			Padre::Wx::MarkError(),
-			Wx::wxSTC_MARK_SMALLRECT,
-			$green,
-			$green,
-		);
 		my $idx = $syntax->InsertStringImageItem( 0, '', 2 );
 		$syntax->SetItemData( $idx, 0 );
 		$syntax->SetItem( $idx, 1, Wx::gettext('Info') );
-		$syntax->SetItem( $idx, 2, Wx::gettext('No errors or warnings found.') );
+
+		# Relative-to-the-project filename
+		my $document = Padre::Current->document;
+		if ( defined( $document->file ) ) { # check that the document has been saved
+			my $filename = $document->file->{filename};
+			if ( defined( $document->project_dir ) ) {
+				my $project_dir = quotemeta $document->project_dir;
+				$filename =~ s/^$project_dir//;
+			}
+			$syntax->SetItem( $idx, 2, sprintf( Wx::gettext('No errors or warnings found in %s.'), $filename ) );
+		} else {
+			$syntax->SetItem( $idx, 2, Wx::gettext('No errors or warnings found.') );
+		}
 		return;
 	}
 
 	# Update the syntax checker pane
 	if ( scalar( @{$messages} ) > 0 ) {
-		my $red    = Wx::Colour->new("red");
-		my $orange = Wx::Colour->new("orange");
-		$editor->MarkerDefine(
-			Padre::Wx::MarkError(),
-			Wx::wxSTC_MARK_SMALLRECT,
-			$red,
-			$red,
-		);
-		$editor->MarkerDefine(
-			Padre::Wx::MarkWarn(),
-			Wx::wxSTC_MARK_SMALLRECT,
-			$orange,
-			$orange,
-		);
-
 		my $i = 0;
 		delete $editor->{synchk_calltips};
 		my $last_hint = '';
@@ -178,9 +174,9 @@ sub update_gui {
 		foreach my $hint ( sort { $a->{line} <=> $b->{line} } @{$messages} ) {
 			my $l = $hint->{line} - 1;
 			if ( $hint->{severity} eq 'W' ) {
-				$editor->MarkerAdd( $l, 2 );
+				$editor->MarkerAdd( $l, Padre::Wx::MarkWarn() );
 			} else {
-				$editor->MarkerAdd( $l, 1 );
+				$editor->MarkerAdd( $l, Padre::Wx::MarkError() );
 			}
 			my $idx = $syntax->InsertStringImageItem( $i++, $l + 1, ( $hint->{severity} eq 'W' ? 1 : 0 ) );
 			$syntax->SetItemData( $idx, 0 );
@@ -196,14 +192,6 @@ sub update_gui {
 		}
 
 		$syntax->set_column_widths($last_hint);
-
-		if ( $main->menu->view->{show_syntaxcheck}->IsChecked ) {
-
-			# Enabled "Syntax Check" tab is now shown when
-			# there is a problem without losing editor focus
-			$main->bottom->show($syntax);
-			$editor->SetFocus;
-		}
 	}
 
 	return 1;

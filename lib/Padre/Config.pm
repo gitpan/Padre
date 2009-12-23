@@ -23,7 +23,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -72,20 +72,7 @@ sub setting {
 	}
 
 	# Generate the accessor
-	my $code = <<"END_PERL";
-package Padre::Config;
-
-sub $object->{name} {
-	my \$self = shift;
-	if ( exists \$self->[$object->{store}]->{'$object->{name}'} ) {
-		return \$self->[$object->{store}]->{'$object->{name}'};
-	}
-	return \$DEFAULT{'$object->{name}'};
-}
-END_PERL
-
-	# Compile the accessor
-	eval $code;
+	eval $object->code;
 	if ($@) {
 		Carp::croak("Failed to compile setting $object->{name}");
 	}
@@ -366,7 +353,14 @@ setting(
 		. 'search.open_resource:places/folder-saved-search;'
 		. 'search.quick_menu_access:status/info;' . '|;'
 		. 'run.run_document:actions/player_play;'
-		. 'run.stop:actions/stop;',
+		. 'run.stop:actions/stop;' . '|;'
+		. 'debug.step_in:stock/code/stock_macro-stop-after-command;'
+		. 'debug.step_over:stock/code/stock_macro-stop-after-procedure;'
+		. 'debug.step_out:stock/code/stock_macro-jump-back;'
+		. 'debug.run:stock/code/stock_tools-macro;'
+		. 'debug.set_breakpoint:stock/code/stock_macro-insert-breakpoint;'
+		. 'debug.display_value:stock/code/stock_macro-watch-variable;'
+		. 'debug.quit:actions/stop;'
 );
 
 setting(
@@ -389,9 +383,17 @@ setting(
 		. 'menu.View;'
 		. 'menu._document;'
 		. 'menu.Run;'
+		. 'menu.Debug;'
 		. 'menu.Plugins;'
 		. 'menu.Window;'
 		. 'menu.Help',
+);
+
+setting(
+	name    => 'swap_ctrl_tab_alt_right',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
 );
 
 # Directory Tree Settings
@@ -591,6 +593,12 @@ setting(
 	default => 0,
 );
 setting(
+	name    => 'autocomplete_subroutine',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
 	name    => 'perl_autocomplete_max_suggestions',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
@@ -772,6 +780,12 @@ setting(
 );
 setting(
 	name    => 'func_bookmark',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+setting(
+	name    => 'func_fontsize',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,

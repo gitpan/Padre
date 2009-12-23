@@ -26,7 +26,7 @@ use Padre::Util::Win32 ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -90,6 +90,9 @@ sub new {
 	# Save the start-up dir before anyone can move us.
 	$self->{original_cwd} = Cwd::cwd();
 
+	# Set up a raw (non-Padre::Locker) transaction around the rest of the constructor.
+	Padre::DB->begin;
+
 	# Load (and sync if needed) the configuration
 	$self->{config} = Padre::Config->read;
 
@@ -109,6 +112,13 @@ sub new {
 			Type     => IO::Socket::SOCK_STREAM(),
 		);
 		if ($socket) {
+
+			# Escape the SQLite transaction before we go any further.
+			# Once we sent the single-instance server commands, it is
+			# almost certainly going to want to use the database.
+			# We need to let go of any locks we might have.
+			Padre::DB->rollback;
+
 			my $pid = '';
 			my $read = $socket->sysread( $pid, 10 );
 			if ( defined $read and $read == 10 ) {
@@ -155,6 +165,9 @@ sub new {
 	# Create the action queue
 	$self->{actionqueue} = Padre::Action::Queue->new();
 
+	# Startup completed, let go of the database
+	Padre::DB->commit;
+
 	return $self;
 }
 
@@ -183,7 +196,13 @@ sub run {
 
 	# FIX ME: RT #1 This call should be delayed until after the
 	# window was opened but my Wx skills do not exist. --Steffen
-	$self->plugin_manager->load_plugins;
+	SCOPE: {
+
+		# Lock rendering and the database while the plugins are loading
+		# to prevent them doing anything weird or slow.
+		my $lock = $self->wx->main->lock( 'DB', 'UPDATE' );
+		$self->plugin_manager->load_plugins;
+	}
 
 	# Move our current dir to the user's documents directory by default
 	if (Padre::Constant::WIN32) {

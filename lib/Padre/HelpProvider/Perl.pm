@@ -10,16 +10,26 @@ use Padre::Util            ();
 use Padre::HelpProvider    ();
 use Padre::DocBrowser::POD ();
 use Padre::Pod2HTML        ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Padre::HelpProvider';
+
+# for caching help list (for faster access)
+my ( $cached_help_list, $cached_perlopref );
 
 #
 # Initialize help
 #
 sub help_init {
 	my $self = shift;
+
+	# serve the cached copy if it is already built
+	if ($cached_help_list) {
+		$self->{help_list} = $cached_help_list;
+		$self->{perlopref} = $cached_perlopref;
+		return;
+	}
 
 	my @index = ();
 
@@ -123,9 +133,8 @@ sub help_init {
 	$Type{break} = 1;
 	push @index, keys %Type;
 
-	# Add CORE modules
-	# Note the 0 + $] to cast it to number
-	push @index, Module::CoreList->find_modules( qr//, 0 + $] );
+	# Add Installed modules
+	push @index, $self->_find_installed_modules;
 
 	# Add Perl Operators Reference
 	$self->{perlopref} = $self->_parse_perlopref;
@@ -135,6 +144,29 @@ sub help_init {
 	my %seen = ();
 	my @unique_sorted_index = sort grep { !$seen{$_}++ } @index;
 	$self->{help_list} = \@unique_sorted_index;
+
+	# Store the cached help list for faster access
+	$cached_help_list = $self->{help_list};
+	$cached_perlopref = $self->{perlopref};
+}
+
+#
+# Finds installed CPAN modules via @INC
+# This solution resides at:
+# http://stackoverflow.com/questions/115425/how-do-i-get-a-list-of-installed-cpan-modules
+#
+sub _find_installed_modules {
+	my $self = shift;
+	my %seen;
+	for my $path (@INC) {
+		for my $file ( File::Find::Rule->name('*.pm')->in($path) ) {
+			my $module = substr( $file, length($path) + 1 );
+			$module =~ s/.pm$//;
+			$module =~ s{[\\/]}{::}g;
+			$seen{$module}++;
+		}
+	}
+	return keys %seen;
 }
 
 #
@@ -215,7 +247,14 @@ sub help_render {
 		my $pod      = Padre::DocBrowser::POD->new;
 		my $doc      = $pod->resolve( $topic, $hints );
 		my $pod_html = $pod->render($doc);
-		$html = $pod_html->body if $pod_html;
+		if ($pod_html) {
+			$html = $pod_html->body;
+
+			# This is needed to make perlfunc and perlvar perldoc
+			# output a bit more consistent
+			$html =~ s/<dt>/<dt><b><font size="+2">/g;
+			$html =~ s/<\/dt>/<\/b><\/font><\/dt>/g;
+		}
 	}
 
 	return ( $html, $location || $topic );

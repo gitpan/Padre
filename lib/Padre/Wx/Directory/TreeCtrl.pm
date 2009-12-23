@@ -11,7 +11,7 @@ use Padre::Util     ();
 use Padre::Wx       ();
 use Padre::Constant ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::TreeCtrl';
 
 # Creates a new Directory Browser object
@@ -148,7 +148,7 @@ sub refresh {
 
 	# Lock the gui here to make the updates look slicker
 	# The locker holds the gui freeze until the update is done.
-	my $locker = $self->main->freezer;
+	my $lock = $self->main->lock('UPDATE');
 
 	# If the project have changed or the project root folder updates or
 	# the search is not in use anymore (was just used)

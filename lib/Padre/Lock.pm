@@ -4,31 +4,63 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 sub new {
-	my $class = shift;
-	my $self = bless {@_}, $class;
+	my $class  = shift;
+	my $locker = shift;
+	my $self   = bless [$locker], $class;
 
 	# Enable the locks
-	if ( $self->{update} ) {
-		$self->{locker}->update_enable;
+	my $db     = 0;
+	my $busy   = 0;
+	my $update = 0;
+	foreach (@_) {
+		if ( $_ eq 'BUSY' ) {
+			$locker->busy_increment;
+			$busy = 1;
+
+		} elsif ( $_ eq 'DB' ) {
+			$locker->db_increment;
+			$db = 1;
+
+		} elsif ( $_ eq 'UPDATE' ) {
+			$locker->update_increment;
+			$update = 1;
+
+		} else {
+			$locker->method_increment($_);
+			push @$self, $_;
+		}
 	}
-	if ( $self->{busy} ) {
-		$self->{locker}->busy_enable;
-	}
+
+	# We always want to unlock commit/busy/update last.
+	# NOTE: Putting DB last means that actions involving a database commit
+	#       will APPEAR to happen faster. However, this could be somewhat
+	#       disconverting to long commits, because there will be user input
+	#       lag immediately after it appears to be "complete". If this
+	#       becomes a problem, move the DB to first so actions appear to be
+	#       slower, but the UI is immediately available once updated.
+	push @$self, 'BUSY'   if $busy;
+	push @$self, 'UPDATE' if $update;
+	push @$self, 'DB'     if $db;
 
 	return $self;
 }
 
+# Disable locking on destruction
 sub DESTROY {
-
-	# Disable the locks
-	if ( $_[0]->{update} ) {
-		$_[0]->{locker}->update_disable;
-	}
-	if ( $_[0]->{busy} ) {
-		$_[0]->{locker}->busy_disable;
+	my $locker = shift @{ $_[0] };
+	foreach ( @{ $_[0] } ) {
+		if ( $_ eq 'UPDATE' ) {
+			$locker->update_decrement;
+		} elsif ( $_ eq 'DB' ) {
+			$locker->db_decrement;
+		} elsif ( $_ eq 'BUSY' ) {
+			$locker->busy_decrement;
+		} else {
+			$locker->method_decrement($_);
+		}
 	}
 }
 

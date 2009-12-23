@@ -24,7 +24,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 #####################################################################
 # Methods
@@ -47,8 +47,9 @@ sub new {
 		name        => 'perl.rename_variable',
 		need_editor => 1,
 		label       => Wx::gettext('Lexically Rename Variable'),
-		menu_event  => sub {
-			my $doc = $_[0]->current->document;
+		comment    => Wx::gettext('Prompt for a replacement variable name and replace all occurrance of this variable'),
+		menu_event => sub {
+			my $doc = $_[0]->current->document or return;
 			return unless $doc->can('lexical_variable_replacement');
 			require Padre::Wx::History::TextEntryDialog;
 			my $dialog = Padre::Wx::History::TextEntryDialog->new(
@@ -74,7 +75,7 @@ sub new {
 				. 'A call to this sub is added in the place where the selection was.'
 		),
 		menu_event => sub {
-			my $doc = $_[0]->current->document;
+			my $doc = $_[0]->current->document or return;
 			return unless $doc->can('extract_subroutine');
 
 			#my $editor = $doc->editor;
@@ -99,8 +100,9 @@ sub new {
 		name        => 'perl.introduce_temporary',
 		need_editor => 1,
 		label       => Wx::gettext('Introduce Temporary Variable'),
+		comment     => Wx::gettext('Assign the selected expression to a newly declared variable'),
 		menu_event  => sub {
-			my $doc = $_[0]->current->document;
+			my $doc = $_[0]->current->document or return;
 			return unless $doc->can('introduce_temporary_variable');
 			require Padre::Wx::History::TextEntryDialog;
 			my $dialog = Padre::Wx::History::TextEntryDialog->new(

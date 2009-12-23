@@ -17,7 +17,7 @@ use warnings;
 use Padre::Action ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 #####################################################################
 
@@ -39,9 +39,7 @@ sub new {
 		label        => Wx::gettext('Run Script'),
 		comment      => Wx::gettext('Runs the current document and shows its output in the output panel.'),
 		shortcut     => 'F5',
-		need_editor  => 1,
 		need_file    => 1,
-		need_runable => 1,
 		menu_event   => sub {
 			$_[0]->run_document;
 			$_[0]->refresh_toolbar( $_[0]->current );
@@ -56,7 +54,6 @@ sub new {
 		label        => Wx::gettext('Run Script (debug info)'),
 		comment      => Wx::gettext( 'Run the current document but include ' . 'debug info in the output.' ),
 		shortcut     => 'Shift-F5',
-		need_editor  => 1,
 		menu_event   => sub {
 			$_[0]->run_document(1); # Enable debug info
 		},
@@ -108,10 +105,9 @@ sub new {
 			return 0 if !defined( $objects{document}->{file} );
 			return $objects{document}->{file}->{filename} =~ /\.t$/;
 		},
-		label       => Wx::gettext('Run This Test'),
-		comment     => Wx::gettext('Run the current test if the current document is a test.'),
-		need_editor => 1,
-		menu_event  => sub {
+		label      => Wx::gettext('Run This Test'),
+		comment    => Wx::gettext('Run the current test if the current document is a test. (prove -bv)'),
+		menu_event => sub {
 			$_[0]->on_run_this_test;
 		},
 	);
@@ -138,6 +134,7 @@ sub new {
 			return;
 		},
 	);
+
 
 	return $self;
 }

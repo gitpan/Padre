@@ -5,9 +5,9 @@ use strict;
 use warnings;
 use Padre::Document ();
 use Padre::Util     ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 sub colorize {
 	my $self = shift;

@@ -9,7 +9,7 @@ use File::ShareDir  ();
 use Params::Util    ();
 use Padre::Constant ();
 use Padre::Current  ();
-use Padre::Debug;
+use Padre::Logger;
 
 # Need truncate
 use ORLite 1.17 ();
@@ -24,7 +24,7 @@ use ORLite::Migrate 0.01 {
 		File::ShareDir::dist_dir('Padre'),
 		'timeline',
 	),
-}; # -DEBUG;
+}; #, '-DEBUG';
 
 # Overlay classes to enhance the ORLite defaults
 use Padre::DB::Plugin             ();
@@ -35,7 +35,7 @@ use Padre::DB::LastPositionInFile ();
 use Padre::DB::Session            ();
 use Padre::DB::SessionFile        ();
 
-our $VERSION    = '0.52';
+our $VERSION    = '0.53';
 our $COMPATIBLE = '0.26';
 
 
@@ -85,7 +85,6 @@ sub vacuum {
 	Padre::DB->do("VACUUM");
 	my $diff = Padre::DB->pragma("page_size") - $page_size;
 	TRACE("Page count difference after VACUUM: $diff") if DEBUG;
-
 	return;
 }
 

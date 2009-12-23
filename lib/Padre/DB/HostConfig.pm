@@ -6,7 +6,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 sub read {
 	my %config = map { $_->name => $_->value } $_[0]->select;
@@ -16,7 +16,8 @@ sub read {
 sub write {
 	my $class = shift;
 	my $hash  = shift;
-	Padre::DB->begin;
+
+	my $transaction = Padre::Current->main->lock('DB');
 	Padre::DB::HostConfig->truncate;
 	foreach my $name ( sort keys %$hash ) {
 		Padre::DB::HostConfig->create(
@@ -24,7 +25,7 @@ sub write {
 			value => $hash->{$name},
 		);
 	}
-	Padre::DB->commit;
+
 	return 1;
 }
 

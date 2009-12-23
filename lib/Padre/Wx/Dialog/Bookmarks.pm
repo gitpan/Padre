@@ -7,7 +7,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 # TO DO - Don't store run-time data in package lexicals
@@ -136,9 +136,9 @@ sub set_bookmark {
 	$dialog->show_modal or return;
 
 	# Create (or replace an existing) bookmark
-	my $data = _get_data($dialog);
-	my $name = delete $data->{shortcut} or return;
-	Padre::DB->begin;
+	my $data        = _get_data($dialog);
+	my $name        = delete $data->{shortcut} or return;
+	my $transaction = $main->lock('DB');
 	Padre::DB::Bookmark->delete(
 		'where name = ?', $name,
 	);
@@ -147,7 +147,6 @@ sub set_bookmark {
 		file => $path,
 		line => $line,
 	);
-	Padre::DB->commit;
 
 	return;
 }

@@ -9,9 +9,9 @@ use Padre::Util               ();
 use Padre::Current            ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -29,6 +29,7 @@ our %mode = (
 # mapping for mime-type to the style name in the share/styles/default.yml file
 our %MIME_STYLE = (
 	'application/x-perl' => 'perl',
+	'application/x-psgi' => 'perl',
 	'text/x-perlxs'      => 'xs',   # should be in the plugin...
 	'text/x-patch'       => 'diff',
 	'text/x-makefile'    => 'make',
@@ -102,6 +103,35 @@ sub new {
 	# Please see bug #790
 	$self->CmdKeyClear( Wx::wxSTC_KEY_SUBTRACT, Wx::wxSTC_SCMOD_CTRL );
 	$self->CmdKeyClear( Wx::wxSTC_KEY_ADD,      Wx::wxSTC_SCMOD_CTRL );
+
+	my $green  = Wx::Colour->new("green");
+	my $red    = Wx::Colour->new("red");
+	my $orange = Wx::Colour->new("orange");
+	my $blue   = Wx::Colour->new("blue");
+	$self->MarkerDefine(
+		Padre::Wx::MarkError(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		$red,
+		$red,
+	);
+	$self->MarkerDefine(
+		Padre::Wx::MarkWarn(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		$orange,
+		$orange,
+	);
+	$self->MarkerDefine(
+		Padre::Wx::MarkLocation(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		$green,
+		$green,
+	);
+	$self->MarkerDefine(
+		Padre::Wx::MarkBreakpoint(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		$blue,
+		$blue,
+	);
 
 	return $self;
 }

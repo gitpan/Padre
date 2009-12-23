@@ -43,6 +43,7 @@ inc/Module/Install/With.pm
 inc/Module/Install/WriteAll.pm
 lib/Padre.pm
 lib/Padre/Action.pm
+lib/Padre/Action/Debugger.pm
 lib/Padre/Action/Help.pm
 lib/Padre/Action/Internal.pm
 lib/Padre/Action/Perl.pm
@@ -75,7 +76,6 @@ lib/Padre/DB/Session.pm
 lib/Padre/DB/SessionFile.pm
 lib/Padre/DB/Snippets.pod
 lib/Padre/DB/SyntaxHighlight.pm
-lib/Padre/Debug.pm
 lib/Padre/DocBrowser.pm
 lib/Padre/DocBrowser/document.pm
 lib/Padre/DocBrowser/POD.pm
@@ -95,6 +95,7 @@ lib/Padre/HelpProvider/Perl.pm
 lib/Padre/Locale.pm
 lib/Padre/Lock.pm
 lib/Padre/Locker.pm
+lib/Padre/Logger.pm
 lib/Padre/Manual.pod
 lib/Padre/Manual/Hacking.pod
 lib/Padre/MimeTypes.pm
@@ -152,11 +153,14 @@ lib/Padre/Wx/AuiManager.pm
 lib/Padre/Wx/Bottom.pm
 lib/Padre/Wx/CPAN.pm
 lib/Padre/Wx/CPAN/Listview.pm
+lib/Padre/Wx/Debugger.pm
+lib/Padre/Wx/Debugger/View.pm
 lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
 lib/Padre/Wx/Dialog/Encode.pm
 lib/Padre/Wx/Dialog/FilterTool.pm
 lib/Padre/Wx/Dialog/Find.pm
+lib/Padre/Wx/Dialog/Form.pm
 lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
@@ -174,6 +178,7 @@ lib/Padre/Wx/Dialog/Replace.pm
 lib/Padre/Wx/Dialog/Search.pm
 lib/Padre/Wx/Dialog/SessionManager.pm
 lib/Padre/Wx/Dialog/SessionSave.pm
+lib/Padre/Wx/Dialog/Shortcut.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/SpecialValues.pm
 lib/Padre/Wx/Dialog/Text.pm
@@ -195,6 +200,7 @@ lib/Padre/Wx/Icon.pm
 lib/Padre/Wx/Left.pm
 lib/Padre/Wx/Main.pm
 lib/Padre/Wx/Menu.pm
+lib/Padre/Wx/Menu/Debug.pm
 lib/Padre/Wx/Menu/Edit.pm
 lib/Padre/Wx/Menu/File.pm
 lib/Padre/Wx/Menu/Help.pm
@@ -278,6 +284,12 @@ share/icons/gnome218/16x16/actions/stop.png
 share/icons/gnome218/16x16/places/folder-saved-search.png
 share/icons/gnome218/16x16/places/stock_folder.png
 share/icons/gnome218/16x16/status/info.png
+share/icons/gnome218/16x16/stock/code/stock_macro-insert-breakpoint.png
+share/icons/gnome218/16x16/stock/code/stock_macro-jump-back.png
+share/icons/gnome218/16x16/stock/code/stock_macro-stop-after-command.png
+share/icons/gnome218/16x16/stock/code/stock_macro-stop-after-procedure.png
+share/icons/gnome218/16x16/stock/code/stock_macro-watch-variable.png
+share/icons/gnome218/16x16/stock/code/stock_tools-macro.png
 share/icons/gnome218/16x16/stock/generic/stock_example.png
 share/icons/gnome218/README.txt
 share/icons/padre/16x16/actions/toggle-comments.png

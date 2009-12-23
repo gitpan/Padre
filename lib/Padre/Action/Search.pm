@@ -11,7 +11,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 
 
@@ -98,6 +98,7 @@ sub new {
 		name        => 'search.quick_find',
 		need_editor => 1,
 		label       => Wx::gettext('Quick Find'),
+		comment     => Wx::gettext('Incremental search seen at the bottom of the window'),
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
 			$_[0]->config->set(
@@ -150,6 +151,7 @@ sub new {
 		name       => 'search.find_in_files',
 		label      => Wx::gettext('Find in Fi&les...'),
 		comment    => Wx::gettext('Search for a text in all files below a given directory'),
+		shortcut   => 'Ctrl-Shift-F',
 		menu_event => sub {
 			require Padre::Wx::Ack;
 			Padre::Wx::Ack::on_ack(@_);
@@ -159,6 +161,7 @@ sub new {
 	Padre::Action->new(
 		name       => 'search.open_resource',
 		label      => Wx::gettext('Open Resource'),
+		comment    => Wx::gettext('Type in a filter to select a file'),
 		shortcut   => 'Ctrl-Shift-R',
 		menu_event => sub {
 

@@ -25,20 +25,20 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use Cwd                           ();
-use Carp                          ();
-use IPC::Open3                    ();
-use File::Spec                    ();
-use File::HomeDir                 ();
-use File::Basename                ();
-use File::Temp                    ();
-use List::Util                    ();
-use Scalar::Util                  ();
-use Params::Util                  ();
-use Time::HiRes                   ();
-use Padre::Action                 ();
-use Padre::Constant               ();
-use Padre::Util                   ();
+use Cwd             ();
+use Carp            ();
+use IPC::Open3      ();
+use File::Spec      ();
+use File::HomeDir   ();
+use File::Basename  ();
+use File::Temp      ();
+use List::Util      ();
+use Scalar::Util    ();
+use Params::Util    ();
+use Time::HiRes     ();
+use Padre::Action   ();
+use Padre::Constant ();
+use Padre::Util qw(_T);
 use Padre::Perl                   ();
 use Padre::Locale                 ();
 use Padre::Current                ();
@@ -50,6 +50,7 @@ use Padre::Wx::Icon               ();
 use Padre::Wx::Left               ();
 use Padre::Wx::Right              ();
 use Padre::Wx::Bottom             ();
+use Padre::Wx::Debugger           ();
 use Padre::Wx::Editor             ();
 use Padre::Wx::Output             ();
 use Padre::Wx::Syntax             ();
@@ -64,9 +65,9 @@ use Padre::Wx::FileDropTarget     ();
 use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Wx::Progress           ();
-use Padre::Debug;
+use Padre::Logger;
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -127,26 +128,35 @@ sub new {
 	# This prevents tons of ide->config
 	$self->{config} = $config;
 
+	# Create the lock manager before any gui operations,
+	# so that we can do locking operations during startup.
+	$self->{locker} = Padre::Locker->new($self);
+
 	# Determine the window title (needs ide & config)
-	$self->set_title;
+	$self->refresh_title;
 
-	# Having recorded the "current working directory" move
-	# the OS directory cursor away from this directory, so
-	# that Padre won't hold a lock on the current directory.
-	# If changing the directory fails, ignore errors (for now)
+	# Remember where the editor started from,
+	# this could be handy later.
 	$self->{cwd} = Cwd::cwd();
-	if (Padre::Constant::WIN32) {
 
-		# Directory locking problem only exists on Win
+	# There is a directory locking problem on Win32.
+	# If we open Padre from a directory and leave the Cwd cursor
+	# in that directory, then it can NEVER be deleted.
+	# Having recorded the "current working directory" move
+	# the OS directory cursor away from this starting directory,
+	# so that Padre won't hold an implicit OS lock on it.
+	# NOTE: If changing the directory fails, ignore errors for now,
+	#       since that means we have WAY bigger problems.
+	if (Padre::Constant::WIN32) {
 		chdir( File::HomeDir->my_home );
 	}
+
+	# Bootstrap locale support before we start fiddling with the GUI.
+	$self->{locale} = Padre::Locale::object();
 
 	# A large complex application looks, frankly, utterly stupid
 	# if it gets very small, or even mildly small.
 	$self->SetMinSize( Wx::Size->new( 500, 400 ) );
-
-	# Set the locale
-	$self->{locale} = Padre::Locale::object();
 
 	# Drag and drop support
 	Padre::Wx::FileDropTarget->set($self);
@@ -224,14 +234,18 @@ sub new {
 	# Use Padre's icon
 	$self->SetIcon(Padre::Wx::Icon::PADRE);
 
-	# Show the tools that the configuration dictates
-	$self->show_functions( $self->config->main_functions );
-	$self->show_outline( $self->config->main_outline );
-	$self->show_directory( $self->config->main_directory );
-	$self->show_output( $self->config->main_output );
+	# Show the tools that the configuration dictates.
+	# Use the fast and crude internal versions here only,
+	# so we don't accidentally trigger any configuration writes.
+	$self->_show_functions( $self->config->main_functions );
+	$self->_show_outline( $self->config->main_outline );
+	$self->_show_directory( $self->config->main_directory );
+	$self->_show_output( $self->config->main_output );
 
 	# Lock the panels if needed
 	$self->aui->lock_panels( $self->config->main_lockinterface );
+
+	$self->{_debugger_} = Padre::Wx::Debugger->new;
 
 	# we need an event immediately after the window opened
 	# (we had an issue that if the default of main_statusbar was false it did
@@ -303,8 +317,6 @@ Accessors to operating data:
 
 =item * C<cwd>
 
-=item * C<no_refresh>
-
 =back
 
 Accessors that may not belong to this class:
@@ -321,6 +333,7 @@ use Class::XSAccessor predicates => {
 
 	# Needed for lazily-constructed gui elements
 	has_about     => 'about',
+	has_debugger  => 'debugger',
 	has_find      => 'find',
 	has_replace   => 'replace',
 	has_outline   => 'outline',
@@ -329,9 +342,9 @@ use Class::XSAccessor predicates => {
 	getters => {
 
 	# GUI Elements
-	title               => 'title',
-	config              => 'config',
 	ide                 => 'ide',
+	config              => 'config',
+	title               => 'title',
 	aui                 => 'aui',
 	menu                => 'menu',
 	notebook            => 'notebook',
@@ -346,9 +359,9 @@ use Class::XSAccessor predicates => {
 	infomessage_timeout => 'infomessage_timeout',
 
 	# Operating Data
-	cwd        => 'cwd',
-	search     => 'search',
-	no_refresh => '_no_refresh',
+	locker => 'locker',
+	cwd    => 'cwd',
+	search => 'search',
 
 	# Things that are probably in the wrong place
 	ack => 'ack',
@@ -361,6 +374,15 @@ sub about {
 		$self->{about} = Padre::Wx::About->new($self);
 	}
 	return $self->{about};
+}
+
+sub debugger {
+	my $self = shift;
+	unless ( defined $self->{debugger} ) {
+		require Padre::Wx::Debugger::View;
+		$self->{debugger} = Padre::Wx::Debugger::View->new($self);
+	}
+	return $self->{debugger};
 }
 
 sub outline {
@@ -518,6 +540,20 @@ sub load_files {
 		return;
 	}
 
+	# Config setting 'session' means: Show the session manager
+	if ( $startup eq 'session' ) {
+		require Padre::Wx::Dialog::SessionManager;
+		Padre::Wx::Dialog::SessionManager->new($self)->show;
+		return;
+	}
+
+	# Last session functionality is not in use, do we disable it for
+	# performance reasons (it's expensive to maintain the session).
+	# Remove the session if it exists, because we won't be saving
+	# this information and we don't want an old stale session to
+	# be hanging around in the database pointlessly.
+	Padre::DB::Session->clear_last_session;
+
 	# Config setting 'nothing' means start-up with nothing open
 	if ( $startup eq 'nothing' ) {
 		return;
@@ -526,13 +562,6 @@ sub load_files {
 	# Config setting 'new' means start-up with a single new file open
 	if ( $startup eq 'new' ) {
 		$self->setup_editors;
-		return;
-	}
-
-	# Config setting 'session' means: Show the session manager
-	if ( $startup eq 'session' ) {
-		require Padre::Wx::Dialog::SessionManager;
-		Padre::Wx::Dialog::SessionManager->new($self)->show;
 		return;
 	}
 
@@ -548,16 +577,17 @@ sub _timer_post_init {
 	my $manager = $self->ide->plugin_manager;
 
 	# Do an initial Show/paint of the complete-looking main window
-	# without any files loaded. Then immediately Freeze so that the
-	# loading of the files is done in a single render pass.
+	# without any files loaded. We'll then immediately start an Update lock
+	# so that loading of the files is done in a single render pass.
 	# This gives us an optimum compromise between being PERCEIVED
 	# to start-up quickly, and ACTUALLY starting up quickly.
 	$self->Show(1);
-	$self->Freeze;
 
 	# If the position mandated by the configuration is now
 	# off the screen (typically because we've changed the screen
 	# size, reposition to the defaults).
+	# This must happen AFTER the initial ->Show(1) because otherwise
+	# ->IsShownOnScreen returns a false-negative result.
 	unless ( $self->IsShownOnScreen ) {
 		$self->SetSize(
 			Wx::Size->new(
@@ -568,28 +598,28 @@ sub _timer_post_init {
 		$self->CentreOnScreen;
 	}
 
-	# Load all files and refresh the application so that it
-	# represents the loaded state.
-	$self->load_files;
+	# Lock everything during the initial opening of files
+	SCOPE: {
+		my $lock = $self->lock( 'UPDATE', 'DB', 'refresh' );
 
-	# Cannot use the toggle sub here as that one reads from the Menu and
-	# on some machines the Menu is not configured yet at this point.
-	if ( $config->main_statusbar ) {
-		$self->GetStatusBar->Show;
-	} else {
-		$self->GetStatusBar->Hide;
+		# Load all files and refresh the application so that it
+		# represents the loaded state.
+		$self->load_files;
+
+		# Cannot use the toggle sub here as that one reads from the Menu and
+		# on some machines the Menu is not configured yet at this point.
+		if ( $config->main_statusbar ) {
+			$self->GetStatusBar->Show;
+		} else {
+			$self->GetStatusBar->Hide;
+		}
+		$manager->enable_editors_for_all;
+
+		$self->show_syntax( $config->main_syntaxcheck );
+		if ( $config->main_errorlist ) {
+			$self->errorlist->enable;
+		}
 	}
-	$manager->enable_editors_for_all;
-
-	$self->show_syntax( $config->main_syntaxcheck );
-	if ( $config->main_errorlist ) {
-		$self->errorlist->enable;
-	}
-
-	$self->refresh;
-
-	# Now we are fully loaded and can paint continuously
-	$self->Thaw;
 
 	# Start the single instance server
 	if ( $config->main_singleinstance ) {
@@ -618,16 +648,74 @@ sub _timer_post_init {
 
 =pod
 
-=head2 C<freezer>
+=head2 C<lock>
 
-   my $locker = $main->freezer;
+  my $lock = $main->lock('UPDATE', 'BUSY', 'refresh_toolbar');
 
-Create and return an automatic C<freeze> object that will C<thaw> on destruction.
+Create and return a guard object that holds resource locks of various types.
+
+The method takes a parameter list of the locks you wish to exist for the
+current scope. Special types of locks are provided in capitals,
+refresh/method locks are provided in lowercase.
+
+The C<UPDATE> lock creates a Wx repaint lock using the built in
+L<Wx::WindowUpdateLocker> class.
+
+You should use an update lock during GUI construction/modification to
+prevent screen flicker. As a side effect of not updating, the GUI changes
+happen B<significantly> faster as well. Update locks should only be held for
+short periods of time, as the operating system will begin to treat your\
+application as "hung" if an update lock persists for more than a few
+seconds. In this situation, you may begin to see GUI corruption.
+
+The C<BUSY> lock creates a Wx "busy" lock using the built in
+L<Wx::WindowDisabler> class.
+
+You should use a busy lock during times when Padre has to do a long and/or
+complex operation in the foreground, or when you wish to disable use of any
+user interface elements until a background thread is finished.
+
+Busy locks can be held for long periods of time, however your users may
+start to suspect trouble if you do not provide any periodic feedback to them.
+
+Lowercase lock names are used to delay the firing of methods that will
+themselves generate GUI events you may want to delay until you are sure
+you want to rebuild the GUI.
+
+For example, opening a file will require a Padre::Wx::Main refresh call,
+which will itself generate more refresh calls on the directory browser, the
+function list, output window, menus, and so on.
+
+But if you open more than one file at a time, you don't want to refresh the
+menu for the first file, only to do it again on the second, third and
+fourth files.
+
+By creating refresh locks in the top level operation, you allow the lower
+level operation to make requests for parts of the GUI to be refreshed, but
+have the actual refresh actions delayed until the lock expires.
+
+This should make operations with a high GUI intensity both simpler and
+faster.
+
+The name of the lowercase MUST be the name of a Padre::Wx::Main method,
+which will be fired (with no params) when the method lock expires.
 
 =cut
 
-sub freezer {
-	Wx::WindowUpdateLocker->new( $_[0] );
+sub lock {
+	shift->{locker}->lock(@_);
+}
+
+=pod
+
+=head2 locked
+
+This method provides the ability to check if a resource is currently locked.
+
+=cut
+
+sub locked {
+	shift->{locker}->locked(@_);
 }
 
 =pod
@@ -899,17 +987,17 @@ individual refresh methods)
 
 sub refresh {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 
 	# Freeze during the refresh
-	my $guard   = $self->freezer;
+	my $lock    = $self->lock('UPDATE');
 	my $current = $self->current;
 
 	$self->refresh_menubar($current);
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 	$self->refresh_functions($current);
-	$self->set_title;
+	$self->refresh_title;
 
 	my $notebook = $self->notebook;
 	if ( $notebook->GetPageCount ) {
@@ -931,6 +1019,83 @@ sub refresh {
 
 =pod
 
+=head3 C<refresh_title>
+
+Sets or updates the Window title.
+
+=cut
+
+sub refresh_title {
+	my $self    = shift;
+	my $config  = $self->{config};
+	my $current = $self->current;
+
+	my %variable_data = (
+		'%' => '%',
+		'v' => $Padre::VERSION,
+		'f' => '',             # Initlize space for filename
+		'b' => '',             # Initlize space for filename - basename
+		'd' => '',             # Initlize space for filename - dirname
+		'F' => '',             # Initlize space for filename relative to project dir
+		'p' => '',             # Initlize space for project name
+	);
+
+	# We may run within window start-up, there may be no "current" or
+	# "document" or "document->file":
+	if (    defined $current
+		and defined $current->document
+		and defined $current->document->file )
+	{
+		my $document = $current->document;
+		my $file     = $document->file;
+		$variable_data{'f'} = $file->{filename};
+		$variable_data{'b'} = $file->basename;
+		$variable_data{'d'} = $file->dirname;
+
+		$variable_data{'F'} = $file->{filename};
+		my $project_dir = $document->project_dir;
+		if ( defined $project_dir ) {
+			$project_dir = quotemeta $project_dir;
+			$variable_data{'F'} =~ s/^$project_dir//;
+		}
+	}
+
+	# Fill in the session, if any
+	if ( defined $self->ide->{session} ) {
+		my ($session) = Padre::DB::Session->select(
+			'where id = ?', $self->ide->{session},
+		);
+		$variable_data{'p'} = $session->{name};
+	}
+
+	# Keep it for later usage
+	$self->{title} = $config->window_title;
+
+	my $Vars = join( '', keys(%variable_data) );
+
+	$self->{title} =~ s/\%([$Vars])/$variable_data{$1}/g;
+
+	$self->{title} = 'Padre ' . $Padre::VERSION
+		if !defined( $self->{title} );
+
+	my $revision = Padre::Constant::PADRE_REVISION;
+	$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)"
+		if defined($revision);
+
+	if ( $self->GetTitle ne $self->{title} ) {
+
+		# Push the title to the window
+		$self->SetTitle( $self->{title} );
+
+		# Push the title to the process list for better identification
+		$0 = $self->{title}; ## no critic (RequireLocalizedPunctuationVars)
+	}
+
+	return;
+}
+
+=pod
+
 =head3 C<refresh_syntaxcheck>
 
     $main->refresh_syntaxcheck;
@@ -942,7 +1107,7 @@ since actual syntax check is happening in the background.
 
 sub refresh_syntaxcheck {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	return if not $self->menu->view->{show_syntaxcheck}->IsChecked;
 	$self->syntax->on_timer( undef, 1 );
 	return;
@@ -961,7 +1126,7 @@ depending on current document or Padre internal state.
 
 sub refresh_menu {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	$self->menu->refresh;
 }
 
@@ -977,8 +1142,22 @@ Force a refresh of Padre's menu bar.
 
 sub refresh_menubar {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	$self->menu->refresh_top;
+}
+
+=pod
+
+=head3 C<refresh_recent>
+
+Specifically refresh the Recent Files entries in the File dialog
+
+=cut
+
+sub refresh_recent {
+	my $self = shift;
+	return if $self->locked('REFRESH');
+	$self->menu->file->update_recentfiles;
 }
 
 =pod
@@ -993,7 +1172,7 @@ Force a refresh of Padre's toolbar.
 
 sub refresh_toolbar {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	my $toolbar = $self->GetToolBar;
 	if ($toolbar) {
 		$toolbar->refresh( $_[0] or $self->current );
@@ -1012,7 +1191,7 @@ Force a refresh of Padre's status bar.
 
 sub refresh_status {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	$self->GetStatusBar->refresh( $_[0] or $self->current );
 }
 
@@ -1028,13 +1207,13 @@ Force a refresh of the position of the cursor on Padre's status bar.
 
 sub refresh_cursorpos {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	$self->GetStatusBar->update_pos( $_[0] or $self->current );
 }
 
 sub refresh_rdstatus {
 	my $self = shift;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	$self->GetStatusBar->is_read_only( $_[0] or $self->current );
 }
 
@@ -1054,11 +1233,28 @@ sub refresh_functions {
 	# this even though that should not be necessary can that be
 	# eliminated ?
 	my ( $self, $current ) = @_;
-	return if $self->no_refresh;
+	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{functions}->IsChecked;
 
 	$self->functions->refresh($current);
 
+	return;
+}
+
+=pod
+
+=head3 C<refresh_directory>
+
+Force a refresh of the directory tree
+
+=cut
+
+sub refresh_directory {
+	my $self = shift;
+	return if $self->locked('REFRESH');
+	if ( $self->has_directory ) {
+		$self->directory->refresh;
+	}
 	return;
 }
 
@@ -1207,7 +1403,7 @@ sub reconfig {
 	my $config = shift;
 
 	# Do everything inside a freeze
-	my $guard = $self->freezer;
+	my $lock = $self->lock('UPDATE');
 
 	# The biggest potential change is that the user may have a
 	# different forced locale.
@@ -1284,16 +1480,21 @@ sub show_functions {
 	$self->config->set( main_functions => $on );
 	$self->config->write;
 
-	if ($on) {
-		$self->right->show( $self->functions );
-	} else {
-		$self->right->hide( $self->functions );
-	}
+	$self->_show_functions($on);
 
 	$self->aui->Update;
 	$self->ide->save_config;
 
 	return;
+}
+
+sub _show_functions {
+	my $self = shift;
+	if ( $_[0] ) {
+		$self->right->show( $self->functions );
+	} else {
+		$self->right->hide( $self->functions );
+	}
 }
 
 =pod
@@ -1318,14 +1519,51 @@ sub show_outline {
 	$self->config->set( main_outline => $on );
 	$self->config->write;
 
-	if ($on) {
-		my $outline = $self->outline;
+	$self->_show_outline($on);
+
+	$self->aui->Update;
+	$self->ide->save_config;
+
+	return;
+}
+
+sub _show_outline {
+	my $self    = shift;
+	my $outline = $self->outline;
+	if ( $_[0] ) {
 		$self->right->show($outline);
 		$outline->start unless $outline->running;
 	} elsif ( $self->has_outline ) {
-		my $outline = $self->outline;
 		$self->right->hide($outline);
 		$outline->stop if $outline->running;
+	}
+}
+
+=pod
+
+=head3 C<show_debugger>
+
+    $main->show_debugger( $visible );
+
+=cut
+
+sub show_debugger {
+	my $self = shift;
+
+	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+
+	#	unless ( $on == $self->menu->view->{debugger}->IsChecked ) {
+	#		$self->menu->view->{debugger}->Check($on);
+	#	}
+	#	$self->config->set( main_debugger => $on );
+	#	$self->config->write;
+
+	if ($on) {
+		my $debugger = $self->debugger;
+		$self->right->show($debugger);
+	} elsif ( $self->has_debugger ) {
+		my $debugger = $self->debugger;
+		$self->right->hide($debugger);
 	}
 
 	$self->aui->Update;
@@ -1333,6 +1571,7 @@ sub show_outline {
 
 	return;
 }
+
 
 =pod
 
@@ -1356,18 +1595,23 @@ sub show_directory {
 	$self->config->set( main_directory => $on );
 	$self->config->write;
 
-	if ($on) {
+	$self->_show_directory($on);
+
+	$self->aui->Update;
+	$self->ide->save_config;
+
+	return;
+}
+
+sub _show_directory {
+	my $self = shift;
+	if ( $_[0] ) {
 		my $directory = $self->directory;
 		$self->directory_panel->show($directory);
 		$directory->refresh;
 	} elsif ( $self->has_directory ) {
 		$self->directory_panel->hide( $self->directory );
 	}
-
-	$self->aui->Update;
-	$self->ide->save_config;
-
-	return;
 }
 
 =pod
@@ -1391,16 +1635,26 @@ sub show_output {
 	$self->config->set( main_output => $on );
 	$self->config->write;
 
-	if ($on) {
-		$self->bottom->show( $self->output, sub { $self->show_output(0); } );
-	} else {
-		$self->bottom->hide( $self->output );
-	}
+	$self->_show_output($on);
 
 	$self->aui->Update;
 	$self->ide->save_config;
 
 	return;
+}
+
+sub _show_output {
+	my $self = shift;
+	if ( $_[0] ) {
+		$self->bottom->show(
+			$self->output,
+			sub {
+				$self->show_output(0);
+			}
+		);
+	} else {
+		$self->bottom->hide( $self->output );
+	}
 }
 
 =pod
@@ -1584,15 +1838,34 @@ sub on_run_tdd_tests {
 	my $project_dir = $document->project_dir;
 	unless ($project_dir) {
 		return $self->error( Wx::gettext("Could not find project root") );
-
-
 	}
 
 	my $dir = Cwd::cwd;
 	chdir $project_dir;
-	$self->run_command('perl Build test') if ( -e 'Build' );
 
-	$self->run_command('make test') if ( -e 'Makefile' ); # this should do dmake, nmake so on
+	# TODO maybe add save file(s) to this action?
+
+	my $perl =
+		$self->config
+		->run_perl_cmd; # TODO make this the user selected perl also do it in Padre::Document::Perl::get_command
+	unless ($perl) {
+		$perl = Padre::Perl::cperl();
+	}
+
+	if ($perl) {
+		if ( -e 'Build.PL' ) {
+			$self->run_command("$perl Build.PL");
+			$self->run_command("$perl Build test");
+		} elsif ( -e 'Makefile.PL' ) {
+			$self->run_command("$perl Makefile.PL");
+			my $make = 'make'; # TODO this should do dmake, nmake on Win32
+			$self->run_command("$make test");
+		} else {
+			$self->error( Wx::gettext("No Build.PL nor Makefile.PL found") );
+		}
+	} else {
+		$self->error( Wx::gettext("Could not find perl executable") );
+	}
 	chdir $dir;
 }
 
@@ -1877,54 +2150,6 @@ sub run_document {
 	return;
 }
 
-=pod
-
-=head3 C<debug_perl>
-
-    $main->debug_perl;
-
-Run current document under Perl debugger. An error is reported if
-current is not a Perl document.
-
-=cut
-
-sub debug_perl {
-	my $self     = shift;
-	my $document = $self->current->document;
-	unless ( $document->isa('Perl::Document::Perl') ) {
-		return $self->error( Wx::gettext("Not a Perl document") );
-	}
-
-	# Check the file name
-	my $filename = defined( $document->{file} ) ? $document->{file}->filename : undef;
-
-	#	unless ( $filename =~ /\.pl$/i ) {
-	#		return $self->error(Wx::gettext("Only .pl files can be executed"));
-	#	}
-
-	# Apply the user's save-on-run policy
-	# TO DO: Make this code suck less
-	my $config = $self->config;
-	if ( $config->run_save eq 'same' ) {
-		$self->on_save;
-	} elsif ( $config->run_save eq 'all_files' ) {
-		$self->on_save_all;
-	} elsif ( $config->run_save eq 'all_buffer' ) {
-		$self->on_save_all;
-	}
-
-	# Set up the debugger
-	my $host = 'localhost';
-	my $port = 12345;
-
-	# $self->_setup_debugger($host, $port);
-	local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
-
-	# Run with console Perl to prevent unexpected results under wperl
-	my $perl = Padre::Perl::cperl();
-	$self->run_command(qq["$perl" -d "$filename"]);
-
-}
 
 =pod
 
@@ -2034,7 +2259,7 @@ sub open_session {
 	# This could run in non-blocking space:
 	my $editor = $self->current->editor;
 	$self->update_directory;
-	$self->set_title;
+	$self->refresh_title;
 }
 
 =pod
@@ -2052,12 +2277,12 @@ associated to C<$session>. Note that C<$session> should already exist.
 sub save_session {
 	my ( $self, $session, @session ) = @_;
 
-	Padre::DB->begin;
+	my $transaction = $self->lock('DB');
 	foreach my $file (@session) {
 		$file->{session} = $session->id;
 		$file->insert;
 	}
-	Padre::DB->commit;
+
 }
 
 sub save_current_session {
@@ -2528,9 +2753,18 @@ sub on_close_window {
 
 	TRACE("on_close_window") if DEBUG;
 
+	# Wrap one big database transaction around this entire shutdown process.
+	# If the user aborts the shutdown, then the resulting commit will
+	# just save some basic parts like the last session and so on.
+	# Some of the steps in the shutdown have transactions anyway, but
+	# this will expand them to cover everything.
+	my $transaction = $self->lock('DB');
+
 	# Capture the current session, before we start the interactive
 	# part of the shutdown which will mess it up.
 	$self->update_last_session;
+
+	$self->{_debugger_}->quit;
 
 	TRACE("went over list of files") if DEBUG;
 
@@ -2587,6 +2821,7 @@ sub on_close_window {
 	# perceives the application as closing faster.
 	# This knocks about quarter of a second off the speed
 	# at which Padre appears to close.
+	$self->locker->shutdown;
 	$self->Show(0);
 
 	# Save the window geometry
@@ -2625,7 +2860,9 @@ sub on_close_window {
 	# Stop all Task Manager's worker threads
 	$self->ide->task_manager->cleanup;
 
-	# Vacuum database on exit so that it does not grow
+	# Vacuum database on exit so that it does not grow.
+	# Since you can't VACUUM inside a transaction, finish it here.
+	undef $transaction;
 	Padre::DB->vacuum;
 
 	TRACE("Closing Padre") if DEBUG;
@@ -2636,13 +2873,17 @@ sub on_close_window {
 sub update_last_session {
 	my $self = shift;
 
-	# Write the current session to the database
-	Padre::DB->begin;
-	my $session = Padre::DB::Session->last_padre_session;
-	Padre::DB::SessionFile->delete( 'where session = ?', $session->id );
-	Padre::DB->commit;
-	$self->save_session( $session, $self->capture_session );
+	# Only save if the user cares about sessions
+	my $main_startup = $self->config->main_startup;
+	unless ( $main_startup eq 'last' or $main_startup eq 'session' ) {
+		return;
+	}
 
+	# Write the current session to the database
+	my $transaction = $self->lock('DB');
+	my $session     = Padre::DB::Session->last_padre_session;
+	Padre::DB::SessionFile->delete( 'where session = ?', $session->id );
+	$self->save_session( $session, $self->capture_session );
 }
 
 =pod
@@ -2662,9 +2903,13 @@ sub setup_editors {
 	TRACE("setup_editors @files") if DEBUG;
 	SCOPE: {
 
-		# Lock both Perl and Wx-level updates
-		local $self->{_no_refresh} = 1;
-		my $guard = $self->freezer;
+		# Update the menus AFTER the initial GUI update,
+		# because it makes file loading LOOK faster.
+		# Do the menu/etc refresh in the time it takes the
+		# user to actually perceive the file has been opened.
+		# Lock both Perl and Wx-level updates, and throw in a
+		# database transaction for good measure.
+		my $lock = $self->lock( 'UPDATE', 'DB', 'refresh', 'update_last_session' );
 
 		# If and only if there is only one current file,
 		# and it is unused, close it. This is a somewhat
@@ -2678,19 +2923,12 @@ sub setup_editors {
 
 		if (@files) {
 			foreach my $f (@files) {
-				$self->setup_editor( $f, 1 );
+				$self->setup_editor($f);
 			}
-			$self->update_last_session;
 		} else {
 			$self->setup_editor;
 		}
 	}
-
-	# Update the menus AFTER the initial GUI update,
-	# because it makes file loading LOOK faster.
-	# Do the menu/etc refresh in the time it takes the
-	# user to actually perceive the file has been opened.
-	$self->refresh;
 
 	my $manager = $self->{ide}->plugin_manager;
 	$manager->plugin_event('editor_changed');
@@ -2731,7 +2969,7 @@ exist, create an empty file before opening it.
 =cut
 
 sub setup_editor {
-	my ( $self, $file, $skip_update_session ) = @_;
+	my ( $self, $file ) = @_;
 	my $config = $self->config;
 
 	my $manager = $self->{ide}->plugin_manager;
@@ -2780,8 +3018,7 @@ sub setup_editor {
 		}
 	}
 
-	local $self->{_no_refresh} = 1;
-
+	my $lock = $self->lock('REFRESH');
 	my $doc = Padre::Document->new( filename => $file, );
 
 	# Catch critical errors:
@@ -2815,18 +3052,20 @@ sub setup_editor {
 		}
 	}
 
-	if ( !$doc->is_new ) {
+	if ( $doc->is_new ) {
+		$doc->{project_dir} =
+			  $self->current->document
+			? $self->current->document->project_dir
+			: $self->ide->config->default_projects_directory;
+	} else {
 		TRACE( "Adding new file to history: " . $doc->filename ) if DEBUG;
 		Padre::DB::History->create(
 			type => 'files',
 			name => $doc->filename,
 		);
-		$self->menu->file->update_recentfiles;
-	} else {
-		$doc->{project_dir} =
-			  $self->current->document
-			? $self->current->document->project_dir
-			: $self->ide->config->default_projects_directory;
+
+		# Call the method immediately if not locked
+		$self->lock('refresh_recent');
 	}
 
 	my $id = $self->create_tab( $editor, $title );
@@ -2839,11 +3078,11 @@ sub setup_editor {
 
 	$doc->restore_cursor_position;
 
-	$self->update_last_session unless $skip_update_session;
-	$manager->plugin_event('editor_changed') unless $skip_update_session;
+	# Update and refresh immediately if not locked
+	$self->lock( 'update_last_session', 'refresh_menu' );
 
-	# Refresh the menu (to include or remove document dependent menu items)
-	$self->menu->refresh;
+	# Notify plugins
+	$manager->plugin_event('editor_changed');
 
 	return $id;
 }
@@ -3146,7 +3385,11 @@ sub open_file_dialog {
 
 		push @files, $FN;
 	}
-	$self->setup_editors(@files) if $#files > -1;
+
+	if ( $#files > -1 ) {
+		my $lock = $self->lock('REFRESH');
+		$self->setup_editors(@files);
+	}
 
 	$self->ide->{session_autosave} and $self->save_current_session;
 
@@ -3169,9 +3412,9 @@ Reload all open files from disk.
 =cut
 
 sub reload_all {
-	my $self  = shift;
-	my $skip  = shift;
-	my $guard = $self->freezer;
+	my $self = shift;
+	my $skip = shift;
+	my $lock = $self->lock('UPDATE');
 
 	my @pages = $self->pageids;
 
@@ -3395,7 +3638,11 @@ sub on_save_as {
 			type => 'files',
 			name => $filename,
 		);
-		$self->menu->file->update_recentfiles;
+
+		# Immediately refresh the recent list, or save the request
+		# for refresh lock expiry. We probably should add a specific
+		# lock method for this non-guard-object case.
+		$self->lock('refresh_recent');
 	}
 
 	$self->refresh;
@@ -3493,7 +3740,11 @@ sub on_save_intuition {
 			type => 'files',
 			name => $filename,
 		);
-		$self->menu->file->update_recentfiles;
+
+		# Immediately refresh the recent list, or save the request
+		# for refresh lock expiry. We probably should add a specific
+		# lock method for this non-guard-object case.
+		$self->lock('refresh_recent');
 	}
 
 	$self->refresh;
@@ -3591,11 +3842,16 @@ sub on_close {
 		$event->Veto;
 	}
 	$self->close;
-	$self->refresh;
 
-	$self->ide->{session_autosave} and $self->save_current_session;
-	$self->update_last_session;
+	# Transaction-wrap the session saving, and trigger a full refresh
+	# once we are finished the current action.
+	my $lock = $self->lock( 'DB', 'update_last_session', 'refresh' );
 
+	if ( $self->ide->{session_autosave} ) {
+		$self->save_current_session;
+	}
+
+	return;
 }
 
 =pod
@@ -3620,8 +3876,7 @@ sub close {
 
 	my $editor = $notebook->GetPage($id) or return;
 	my $doc    = $editor->{Document}     or return;
-
-	local $self->{_no_refresh} = 1;
+	my $lock = $self->lock( 'REFRESH', 'refresh_directory' );
 
 	if ( $doc->is_modified and not $doc->is_unused ) {
 		my $ret = Wx::MessageBox(
@@ -3651,14 +3906,9 @@ sub close {
 	if ( $self->has_outline ) {
 		$self->outline->clear;
 	}
-	if ( $self->has_directory ) {
-		$self->directory->refresh;
-	}
 
 	# Remove the entry from the Window menu
 	$self->menu->window->refresh( $self->current );
-
-	# $self->update_last_session;
 
 	return 1;
 }
@@ -3675,9 +3925,9 @@ close the tab with this id. Return true upon success, false otherwise.
 =cut
 
 sub close_all {
-	my $self  = shift;
-	my $skip  = shift;
-	my $guard = $self->freezer;
+	my $self = shift;
+	my $skip = shift;
+	my $lock = $self->lock('UPDATE');
 
 	my $manager = $self->{ide}->plugin_manager;
 
@@ -3694,18 +3944,19 @@ sub close_all {
 		lazy => 1
 	);
 
-	foreach my $no ( 0 .. $#pages ) {
-		$progress->update( $no, ( $no + 1 ) . '/' . scalar(@pages) );
-		if ( defined $skip and $skip == $pages[$no] ) {
-			next;
+	SCOPE: {
+		my $lock = $self->lock('refresh');
+		foreach my $no ( 0 .. $#pages ) {
+			$progress->update( $no, ( $no + 1 ) . '/' . scalar(@pages) );
+			if ( defined $skip and $skip == $pages[$no] ) {
+				next;
+			}
+			$self->close( $pages[$no] ) or return 0;
 		}
-		$self->close( $pages[$no] ) or return 0;
 	}
 
-	$self->refresh;
-
 	# Recalculate window title
-	$self->set_title;
+	$self->refresh_title;
 
 	$manager->plugin_event('editor_changed');
 
@@ -3735,7 +3986,7 @@ sub close_where {
 	my $self     = shift;
 	my $where    = shift;
 	my $notebook = $self->notebook;
-	my $guard    = $self->freezer;
+	my $lock     = $self->lock('UPDATE');
 	foreach my $id ( reverse $self->pageids ) {
 		if ( $where->( $notebook->GetPage($id)->{Document} ) ) {
 			$self->close($id) or return 0;
@@ -4948,8 +5199,9 @@ sub on_last_visited_pane {
 
 		@$history[ -1, -2 ] = @$history[ -2, -1 ];
 		foreach my $i ( $self->pageids ) {
-			my $editor = $_[0]->notebook->GetPage($i);
-			if ( Scalar::Util::refaddr($editor) eq $history->[ $self->{last_visited_pane_depth} ] ) {
+			my $editor   = $_[0]->notebook->GetPage($i);
+			my $histaddr = $history->[ $self->{last_visited_pane_depth} ];
+			if ( $histaddr and $histaddr eq Scalar::Util::refaddr($editor) ) {
 				$self->notebook->SetSelection($i);
 
 				--$self->{last_visited_pane_depth};
@@ -5039,7 +5291,9 @@ sub on_new_from_template {
 	);
 
 	# Create the file from the content
-	return $self->new_document_from_string( $output, @_ );
+	require Padre::MimeTypes;
+	my $mime_type = Padre::MimeTypes->guess_mimetype( $output, $file );
+	return $self->new_document_from_string( $output, $mime_type );
 }
 
 =pod
@@ -5141,9 +5395,11 @@ C<Ctrl>+key combinations used within Padre.
 sub key_up {
 	my $self  = shift;
 	my $event = shift;
-	my $mod   = $event->GetModifiers || 0;
-	my $code  = $event->GetKeyCode;
 
+	my $mod = $event->GetModifiers || 0;
+	my $code = $event->GetKeyCode;
+
+	my $config = $self->config;
 
 	# Remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
 	# () needed after the constants as they are functions in Perl and
@@ -5153,14 +5409,23 @@ sub key_up {
 		                           # Ctrl-TAB  #TO DO it is already in the menu
 		if ( $code == Wx::WXK_TAB ) {
 
-			# TODO: Catch up the right action for this shortcut
-			$self->on_next_pane;
+			if ( $config->swap_ctrl_tab_alt_right ) {
+				&{ $self->ide->actions->{'window.next_file'}->menu_event }( $self, $event );
+			} else {
+				&{ $self->ide->actions->{'window.last_visited_file'}->menu_event }( $self, $event );
+			}
 		}
 	} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) { # Ctrl-Shift
 		                                                      # Ctrl-Shift-TAB
 		                                                      # TODO it is already in the menu
-		                                                      # TODO: Catch up the right action for this shortcut
-		$self->on_prev_pane if $code == Wx::WXK_TAB;
+		if ( $code == Wx::WXK_TAB ) {
+
+			if ( $config->swap_ctrl_tab_alt_right ) {
+				&{ $self->ide->actions->{'window.previous_file'}->menu_event }( $self, $event );
+			} else {
+				&{ $self->ide->actions->{'window.oldest_visited_file'}->menu_event }( $self, $event );
+			}
+		}
 	} elsif ( $mod == Wx::wxMOD_ALT() ) {
 
 		#		my $current_focus = Wx::Window::FindFocus();
@@ -5181,6 +5446,11 @@ sub key_up {
 		#			#$self->bottom->GetSelection;
 		#		}
 	}
+
+	if ( $config->autocomplete_always and ( !$mod ) ) {
+		$self->on_autocompletion($event);
+	}
+
 	$event->Skip;
 	return;
 }
@@ -5261,72 +5531,6 @@ sub set_mimetype {
 		$doc->colourize;
 	}
 	$self->refresh;
-}
-
-sub set_title {
-
-	# Determine the window title
-
-	# The syntax string could be set in the preferences dialog.
-
-	my $self   = shift;
-	my $config = $self->{config};
-
-	my %variable_data = (
-		'%' => '%',
-		'v' => $Padre::VERSION,
-		'f' => '',             # Initlize space for filename
-		'b' => '',             # Initlize space for filename - basename
-		'd' => '',             # Initlize space for filename - dirname
-		'F' => '',             # Initlize space for filename relative to project dir
-		'p' => '',             # Initlize space for project name
-	);
-
-	# We may run within window start-up, there may be no "current" or
-	# "document" or "document->file":
-	if (    defined( $self->current )
-		and defined( $self->current->document )
-		and defined( $self->current->document->file ) )
-	{
-		my $document = $self->current->document;
-		$variable_data{'f'} = $document->file->{filename};
-		$variable_data{'b'} = $document->file->basename;
-		$variable_data{'d'} = $document->file->dirname;
-
-		$variable_data{'F'} = $document->file->{filename};
-		if ( defined( $document->project_dir ) ) {
-			my $project_dir = quotemeta $document->project_dir;
-			$variable_data{'F'} =~ s/^$project_dir//;
-		}
-	}
-
-	# Fill in the session, if any
-	if ( defined( $self->ide->{session} ) ) {
-		my ($session) = Padre::DB::Session->select(
-			'where id = ?', $self->ide->{session},
-		);
-		$variable_data{'p'} = $session->{name};
-	}
-
-	# Keep it for later usage
-	$self->{title} = $config->window_title;
-
-	my $Vars = join( '', keys(%variable_data) );
-
-	$self->{title} =~ s/\%([$Vars])/$variable_data{$1}/g;
-
-	$self->{title} = 'Padre ' . $Padre::VERSION
-		if !defined( $self->{title} );
-
-	my $revision = Padre::Constant::PADRE_REVISION;
-	$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)"
-		if defined($revision);
-
-	# Push the title to the window
-	$self->SetTitle( $self->{title} );
-
-	# Push the title to the process list for better identification
-	$0 = $self->{title}; ## no critic (RequireLocalizedPunctuationVars)
 }
 
 =pod

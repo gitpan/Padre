@@ -41,7 +41,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 
 
@@ -223,7 +223,7 @@ sub reset_my_plugin {
 sub shutdown {
 	my $self = shift;
 
-	Padre::DB->begin;
+	my $transaction = Padre::Current->main->lock('DB');
 	foreach my $module ( $self->plugin_order ) {
 		my $plugin = $self->_plugin($module);
 		if ( $plugin->enabled ) {
@@ -238,7 +238,6 @@ sub shutdown {
 			);
 		}
 	}
-	Padre::DB->commit;
 
 	return 1;
 }

@@ -6,7 +6,7 @@ use warnings;
 use Padre::Current ();
 use Padre::Wx      ();
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::SearchCtrl';
 
 # Create a new Search object and show a search text field above the tree
@@ -517,7 +517,7 @@ sub _on_text {
 
 	# Lock the gui here to make the updates look slicker
 	# The locker holds the gui freeze until the update is done.
-	my $locker = $self->current->main->freezer;
+	my $lock = $self->current->main->lock('UPDATE');
 
 	# Cleans the Directory Browser window to show the result
 	my $root = $tree->GetRootItem;

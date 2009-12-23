@@ -45,12 +45,12 @@ use Padre::Constant ();
 use Padre::Util     ('_T');
 use Padre::Config   ();
 use Padre::Wx       ();
-use Padre::Debug;
+use Padre::Logger;
 
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => File::Spec->rel2abs( Padre::Util::sharedir('locale') );
 
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data

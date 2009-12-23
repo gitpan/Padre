@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.52';
+our $VERSION = '0.53';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -14,15 +14,16 @@ use Padre::Wx::Icon ();
 
 # accessors
 use Class::XSAccessor accessors => {
-	_hbox          => '_hbox',          # horizontal box sizer
-	_search_text   => '_search_text',   # search text control
-	_list          => '_list',          # matches list
-	_index         => '_index',         # help topic list
-	_help_viewer   => '_help_viewer',   # HTML Help Viewer
-	_main          => '_main',          # Padre's main window
-	_topic         => '_topic',         # default help topic
-	_help_provider => '_help_provider', # Help Provider
-	_status        => '_status'         # status label
+	_hbox           => '_hbox',           # horizontal box sizer
+	_topic_selector => '_topic_selector', # Topic selector
+	_search_text    => '_search_text',    # search text control
+	_list           => '_list',           # matches list
+	_index          => '_index',          # help topic list
+	_help_viewer    => '_help_viewer',    # HTML Help Viewer
+	_main           => '_main',           # Padre's main window
+	_topic          => '_topic',          # default help topic
+	_help_provider  => '_help_provider',  # Help Provider
+	_status         => '_status'          # status label
 };
 
 # -- constructor
@@ -70,7 +71,7 @@ sub _display_help_in_viewer {
 		if ( $topic && $self->_help_provider ) {
 			eval { ( $html, $location ) = $self->_help_provider->help_render($topic); };
 			if ($@) {
-				$self->_main->error( Wx::gettext("Error while calling help_render: ") . $@ );
+				$self->_main->error( sprintf( Wx::gettext('Error while calling %s'), 'help_render', $@ ) );
 				return;
 			}
 		}
@@ -82,7 +83,7 @@ sub _display_help_in_viewer {
 		$html =~ s/<pre>/<table border="0" width="100%" bgcolor="#EEEEEE"><tr><td><pre>/ig;
 		$html =~ s/<\/pre>/<\/pre\><\/td><\/tr><\/table>/ig;
 	} else {
-		$html = '<b>' . Wx::gettext('No Help found') . '</b>';
+		$html = '<b><font size="+2">' . Wx::gettext('No Help found') . '</font></b>';
 	}
 
 	$self->SetTitle( Wx::gettext('Help Search') . ( defined $location ? ' - ' . $location : '' ) );
@@ -90,8 +91,6 @@ sub _display_help_in_viewer {
 
 	return;
 }
-
-# -- private methods
 
 #
 # create the dialog itself.
@@ -106,7 +105,7 @@ sub _create {
 	$self->_create_controls;
 
 	# wrap everything in a box to add some padding
-	$self->SetMinSize( [ 640, 480 ] );
+	$self->SetMinSize( [ 750, 550 ] );
 	$self->SetSizer( $self->_hbox );
 
 	return;
@@ -122,12 +121,14 @@ sub _create_controls {
 		$self, -1,
 		Wx::gettext('Select the help &topic')
 	);
-	my @topics         = ('perl 5');
-	my $topic_selector = Wx::Choice->new(
-		$self, -1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		\@topics,
+	my @topics = ('perl 5');
+	$self->_topic_selector(
+		Wx::Choice->new(
+			$self, -1,
+			Wx::wxDefaultPosition,
+			Wx::wxDefaultSize,
+			\@topics,
+		)
 	);
 
 	#Wx::Event::EVT_CHOICE($self, $topic_selector, \&select_topic);
@@ -173,14 +174,14 @@ sub _create_controls {
 
 	my $vbox = Wx::BoxSizer->new(Wx::wxVERTICAL);
 
-	$vbox->Add( $topic_label,        0, Wx::wxALL | Wx::wxEXPAND,     2 );
-	$vbox->Add( $topic_selector,     0, Wx::wxALL | Wx::wxEXPAND,     2 );
-	$vbox->Add( $search_label,       0, Wx::wxALL | Wx::wxEXPAND,     2 );
-	$vbox->Add( $self->_search_text, 0, Wx::wxALL | Wx::wxEXPAND,     2 );
-	$vbox->Add( $matches_label,      0, Wx::wxALL | Wx::wxEXPAND,     2 );
-	$vbox->Add( $self->_list,        1, Wx::wxALL | Wx::wxEXPAND,     2 );
-	$vbox->Add( $self->_status,      0, Wx::wxALL | Wx::wxEXPAND,     0 );
-	$vbox->Add( $close_button,       0, Wx::wxALL | Wx::wxALIGN_LEFT, 0 );
+	$vbox->Add( $topic_label,           0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_topic_selector, 0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $search_label,          0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_search_text,    0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $matches_label,         0, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_list,           1, Wx::wxALL | Wx::wxEXPAND,     2 );
+	$vbox->Add( $self->_status,         0, Wx::wxALL | Wx::wxEXPAND,     0 );
+	$vbox->Add( $close_button,          0, Wx::wxALL | Wx::wxALIGN_LEFT, 0 );
 	$self->_hbox->Add( $vbox, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
 	$self->_hbox->Add(
 		$self->_help_viewer,                                                        1,
@@ -258,9 +259,25 @@ sub show {
 		if ($doc) {
 			$self->_help_provider(undef);
 		}
-		return if not $self->_search;
-		$self->_update_list_box;
 		$self->Show(1);
+		$self->_search_text->Enable(0);
+		$self->_topic_selector->Enable(0);
+		$self->_list->Enable(0);
+		$self->_help_viewer->SetPage(
+			'<b><font size="+2">' . Wx::gettext('Reading items. Please wait') . '</font></b>' );
+		Wx::Event::EVT_IDLE(
+			$self,
+			sub {
+				if ( $self->_search ) {
+					$self->_update_list_box;
+				}
+				$self->_search_text->Enable(1);
+				$self->_topic_selector->Enable(1);
+				$self->_list->Enable(1);
+				$self->_search_text->SetFocus();
+				Wx::Event::EVT_IDLE( $self, undef );
+			}
+		);
 	}
 	$self->_search_text->SetFocus();
 
@@ -283,7 +300,7 @@ sub _search {
 		if ($doc) {
 			eval { $self->_help_provider( $doc->get_help_provider ); };
 			if ($@) {
-				$self->_main->error( Wx::gettext("Error while calling get_help_provider: ") . $@ );
+				$self->_main->error( sprintf( Wx::gettext('Error while calling %s'), 'get_help_provider', $@ ) );
 				return;
 			}
 			if ( not $self->_help_provider ) {
@@ -296,7 +313,7 @@ sub _search {
 	return if not $self->_help_provider;
 	eval { $self->_index( $self->_help_provider->help_list ); };
 	if ($@) {
-		$self->_main->error( Wx::gettext("Error while calling help_list: ") . $@ );
+		$self->_main->error( sprintf( Wx::gettext('Error while calling %s'), 'help_list', $@ ) );
 		return;
 	}
 
