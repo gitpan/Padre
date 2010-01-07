@@ -26,7 +26,7 @@ use Padre::Util::Win32 ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -36,18 +36,20 @@ use Padre::DB       ();
 use Padre::Action::Queue;
 
 # Generate faster accessors
-use Class::XSAccessor getters => {
-	original_cwd   => 'original_cwd',
-	opts           => 'opts',
-	config         => 'config',
-	wx             => 'wx',
-	task_manager   => 'task_manager',
-	plugin_manager => 'plugin_manager',
+use Class::XSAccessor {
+	getters => {
+		original_cwd   => 'original_cwd',
+		opts           => 'opts',
+		config         => 'config',
+		wx             => 'wx',
+		task_manager   => 'task_manager',
+		plugin_manager => 'plugin_manager',
 	},
 	accessors => {
-	actions     => 'actions',
-	instance_id => 'instance_id',
-	};
+		actions     => 'actions',
+		instance_id => 'instance_id',
+	},
+};
 
 my $SINGLETON = undef;
 
@@ -1084,7 +1086,7 @@ See also L<http://padre.perlide.org/>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 L<http://padre.perlide.org/>
 
 =head1 LICENSE
@@ -1157,7 +1159,7 @@ Kenichi Ishigaki - 石垣憲一 (ISHIGAKI) E<lt>ishigaki@cpan.orgE<gt>
 
 Max Maischein (CORION)
 
-Patrick Donelan (PATSPAM)
+Patrick Donelan (PDONELAN) E<lt>pat@patspam.comE<gt>
 
 Paweł Murias (PMURIAS)
 
@@ -1265,7 +1267,7 @@ Tatsuhiko Miyagawa for consulting on our I18N and L10N support.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

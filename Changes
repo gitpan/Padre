@@ -1,6 +1,34 @@
 Changes for Perl Application Development and Refactoring Environment
 
 0.54 To Be Released
+    - Added experimental support for clickable filenames in Output panel.
+      Currently only matches: <error> at <file> line 5. (PDONELAN)
+    - If all files are closed, the function list would ->Hide itself
+      permanently and never come back. Resolved (ADAMK)
+    - Fix perl interpreter selection (SZABGAB)
+    - Updated DBD::SQLite dependency to 1.27 and ORLite dependency to 1.30.
+      This should now correctly throw an exception on a corrupt padre.db file
+      which will cause an immediate crash at startup with a SQLite-related
+      error message instead of a secondary error message complaining about
+      missing Padre::DB classes (ADAMK)
+    - Moved Padre::HelpProvider::Perl to Padre::Document::Perl::Help to
+      prevent plugin classes from being scattered all over the namespace
+      tree (ADAMK)
+    - Moved Padre::QuickFixProvider::Perl to Padre::Document::Perl::QuickFix
+      to prevent plugin classes from being scattered all over the namespace
+      tree (ADAMK)
+    - During shutdown, be more precise about the order in which we clean up
+      and be more careful to ensure that ->Update is NOT disabled, to prevent
+      segfaults on Windows from the "disabled update at exit" bug (ADAMK)
+    - Added the first PROJECT-backend config_perltidy setting, so that
+      projects can for the first time define a project tidy policy. This
+      project-specific policy isn't being used by the plugin itself yet,
+      but this change clears the way for that kind of functionality (ADAMK)
+    - Added config_perlcritic configuration setting, so that projects can
+      define perlcritic policies (ADAMK)
+    - All tests now run without the need for a visible Padre window (ADAMK)
+    - Ticket #756: Wx::Perl::ProcessStream 0.24 solved this issue
+      Changed the dependency to 0.24 (SEWI)
 
 0.53 2009.12.23
     - Add initial version of a debugger using Debug::Client (SZABGAB)

@@ -9,7 +9,7 @@ use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
 use Padre::Constant();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::ToolBar';
 
 # NOTE: Something is wrong with dockable toolbars on Windows
@@ -59,23 +59,19 @@ sub new {
 			next;
 		}
 
-		if ( $item =~ /^(.+?)\((.*)\)(\:(.*))?$/ ) {
+		if ( $item =~ /^(.+?)\((.*)\)$/ ) {
 			my $action = $1;
-			my $icon   = $4;
 			$self->add_tool_item(
 				action => $action,
-				icon   => $icon,
 				args   => split( /\,/, $2 ),
 			);
 			next;
 		}
 
-		if ( $item =~ /^(.+?)(\:(.*))?$/ ) {
+		if ( $item =~ /^(.+?)$/ ) {
 			my $action = $1;
-			my $icon   = $3;
 			$self->add_tool_item(
 				action => $action,
-				icon   => $icon,
 			);
 			next;
 		}
@@ -83,134 +79,6 @@ sub new {
 		warn( 'Unknown toolbar item: ' . $item );
 
 	}
-
-	# This stays here for the moment in case something went wrong while converting
-	# the toolbar to a dynamic one.
-
-	# Populate the toolbar
-	#	$self->add_tool_item(
-	#		action => 'file.new',
-	#		icon   => 'actions/document-new',
-	#	);
-	#
-	#	$self->add_tool_item(
-	#		action => 'file.open',
-	#		icon   => 'actions/document-open',
-	#	);
-
-	#	$self->{save} = $self->add_tool_item(
-	#		action => 'file.save',
-	#		icon   => 'actions/document-save',
-	#	);
-	#
-	#	$self->{save_as} = $self->add_tool_item(
-	#		action => 'file.save_as',
-	#		icon   => 'actions/document-save-as',
-	#	);
-	#
-	#	$self->{save_all} = $self->add_tool_item(
-	#		action => 'file.save_all',
-	#		icon   => 'actions/stock_data-save',
-	#	);
-	#
-	#	$self->{close} = $self->add_tool_item(
-	#		action => 'file.close',
-	#		icon   => 'actions/x-document-close',
-	#	);
-	#
-	#	$self->AddSeparator; print "'|;'.\n";
-	#	$self->{open_example} = $self->add_tool_item(
-	#		action => 'file.open_example',
-	#		icon   => 'stock/generic/stock_example',
-	#	);
-	#
-	#	# Undo/Redo Support
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{undo} = $self->add_tool_item(
-	#		action => 'edit.undo',
-	#		icon   => 'actions/edit-undo',
-	#	);
-	#
-	#	$self->{redo} = $self->add_tool_item(
-	#		action => 'edit.redo',
-	#		icon   => 'actions/edit-redo',
-	#	);
-	#
-	#	# Cut/Copy/Paste
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{cut} = $self->add_tool_item(
-	#		action => 'edit.cut',
-	#		icon   => 'actions/edit-cut',
-	#	);
-	#
-	#	$self->{copy} = $self->add_tool_item(
-	#		action => 'edit.copy',
-	#		icon   => 'actions/edit-copy',
-	#	);
-	#
-	#	$self->{paste} = $self->add_tool_item(
-	#		action => 'edit.paste',
-	#		icon   => 'actions/edit-paste',
-	#	);
-	#
-	#	$self->{select_all} = $self->add_tool_item(
-	#		action => 'edit.select_all',
-	#		icon   => 'actions/edit-select-all',
-	#	);
-	#
-	#	# find and replace
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{find} = $self->add_tool_item(
-	#		action => 'search.find',
-	#		icon   => 'actions/edit-find',
-	#	);
-	#
-	#	$self->{replace} = $self->add_tool_item(
-	#		action => 'search.replace',
-	#		icon   => 'actions/edit-find-replace',
-	#	);
-	#
-	#	# Document Transforms
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{comment_toggle} = $self->add_tool_item(
-	#		action => 'edit.comment_toggle',
-	#		icon   => 'actions/toggle-comments',
-	#	);
-	#
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{doc_stat} = $self->add_tool_item(
-	#		action => 'file.doc_stat',
-	#		icon   => 'actions/document-properties',
-	#	);
-	#
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{open_resource} = $self->add_tool_item(
-	#		action => 'search.open_resource',
-	#		icon   => 'places/folder-saved-search',
-	#	);
-	#
-	#	$self->{quick_menu_access} = $self->add_tool_item(
-	#		action => 'search.quick_menu_access',
-	#		icon   => 'status/info',
-	#	);
-	#
-	#	$self->AddSeparator; print "'|;'.\n";
-	#
-	#	$self->{run} = $self->add_tool_item(
-	#		action => 'run.run_document',
-	#		icon   => 'actions/player_play',
-	#	);
-	#
-	#	$self->{stop} = $self->add_tool_item(
-	#		action => 'run.stop',
-	#		icon   => 'actions/stop',
-	#	);
 
 	return $self;
 }
@@ -224,8 +92,15 @@ sub add_tool_item {
 	my $actions = Padre::ide->actions;
 
 	my $action = $actions->{ $args{action} };
-	die( "No action with the name " . $args{name} )
-		unless $action;
+	unless ($action) {
+		warn("No action called $args{action}\n");
+		return;
+	}
+	my $icon = $action->toolbar_icon;
+	unless ($icon) {
+		warn("Action $args{action} does not have an icon defined\n");
+		return;
+	}
 
 	# the ID code should be unique otherwise it can break the event system.
 	# If set to -1 such as in the default call below, it will override
@@ -241,7 +116,7 @@ sub add_tool_item {
 	# Create the tool
 	$self->AddTool(
 		$id, '',
-		Padre::Wx::Icon::find( $args{icon} ),
+		Padre::Wx::Icon::find($icon),
 		$action->label_text,
 	);
 
@@ -307,7 +182,7 @@ sub refresh {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

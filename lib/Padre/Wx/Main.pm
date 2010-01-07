@@ -67,7 +67,7 @@ use Padre::Wx::Dialog::FilterTool ();
 use Padre::Wx::Progress           ();
 use Padre::Logger;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -266,6 +266,16 @@ sub new {
 
 	return $self;
 }
+
+# When the $Padre::INVISIBLE variable is set (during testing) never show
+# the main window.
+sub Show {
+	return shift->SUPER::Show( $Padre::Test::VERSION ? 0 : @_ );
+}
+
+
+
+
 
 #####################################################################
 
@@ -2077,10 +2087,7 @@ sub run_command {
 	unless ( $self->{command} ) {
 
 		# Failed to start the command. Clean up.
-		Wx::MessageBox(
-			sprintf( Wx::gettext("Failed to start '%s' command"), $cmd ),
-			Wx::gettext("Error"), Wx::wxOK, $self
-		);
+		$self->error( sprintf( Wx::gettext("Failed to start '%s' command"), $cmd ) );
 		$self->menu->run->enable;
 	}
 
@@ -2371,6 +2378,7 @@ The dialog has only a OK button and there is no return value.
 sub info {
 	my $self    = shift;
 	my $message = shift;
+	my $title   = shift;
 
 	my $ide    = $self->ide;
 	my $config = $ide->config;
@@ -2381,8 +2389,7 @@ sub info {
 		$self->{infomessage_timeout} = time + 10;
 		$self->refresh_status;
 	} else {
-		my $title = shift || Wx::gettext('Message');
-		Wx::MessageBox( $message, $title, Wx::wxOK | Wx::wxCENTRE, $self );
+		$self->message( $message, $title );
 	}
 
 	return;
@@ -2633,7 +2640,12 @@ sub on_comment_block {
 	my $begin           = $editor->LineFromPosition($selection_start);
 	my $end             = $editor->LineFromPosition($selection_end);
 	my $string          = $document->comment_lines_str;
-	return unless defined $string;
+	if ( not defined $string ) {
+
+		#$self->error(sprintf( Wx::gettext("Could not determine the comment character for %s document type"),
+		#	Padre::MimeTypes->get_mime_type_name( $document->get_mimetype ) ));
+		return;
+	}
 
 	if ( $operation eq 'TOGGLE' ) {
 		$editor->comment_toggle_lines( $begin, $end, $string );
@@ -2677,9 +2689,7 @@ sub on_autocompletion {
 	return if $#words == -1;
 
 	if ( $length =~ /\D/ ) {
-		Wx::MessageBox(
-			$length, Wx::gettext("Autocompletion error"), Wx::wxOK,
-		);
+		$self->message( $length, Wx::gettext("Autocompletion error") );
 	}
 	if (@words) {
 		my $editor = $document->editor;
@@ -2821,6 +2831,8 @@ sub on_close_window {
 	# perceives the application as closing faster.
 	# This knocks about quarter of a second off the speed
 	# at which Padre appears to close.
+	# NOTE: I'm not entirely sure WHY these two statements aren't the
+	# other way around... but I have some vague memories it matters.
 	$self->locker->shutdown;
 	$self->Show(0);
 
@@ -2846,8 +2858,9 @@ sub on_close_window {
 		$self->{help}->Destroy;
 	}
 
-	# Shut down all the plug-ins before saving the configuration
-	# so that plug-ins have a change to save their configuration.
+	# Shut down and destroy all the plug-ins before saving the
+	# configuration so that plug-ins have a change to save their
+	# configuration.
 	$ide->plugin_manager->shutdown;
 	TRACE("After plugin manager shutdown") if DEBUG;
 
@@ -3174,10 +3187,9 @@ sub on_open_selection {
 	}
 
 	unless (@files) {
-		Wx::MessageBox(
+		$self->message(
 			sprintf( Wx::gettext("Could not find file '%s'"), $text ),
-			Wx::gettext("Open Selection"),
-			Wx::wxOK, $self,
+			Wx::gettext("Open Selection")
 		);
 		return;
 	}
@@ -3805,9 +3817,9 @@ sub _save_buffer {
 	}
 
 	unless ( $doc->save_file ) {
-		Wx::MessageBox(
+		$self->error(
 			Wx::gettext("Could not save file: ") . $doc->errstr,
-			Wx::gettext("Error"), Wx::wxOK, $self,
+			Wx::gettext("Error"),
 		);
 		return;
 	}
@@ -3876,7 +3888,7 @@ sub close {
 
 	my $editor = $notebook->GetPage($id) or return;
 	my $doc    = $editor->{Document}     or return;
-	my $lock = $self->lock( 'REFRESH', 'refresh_directory' );
+	my $lock = $self->lock( 'REFRESH', 'refresh_directory', 'refresh_menu' );
 
 	if ( $doc->is_modified and not $doc->is_unused ) {
 		my $ret = Wx::MessageBox(
@@ -3906,9 +3918,6 @@ sub close {
 	if ( $self->has_outline ) {
 		$self->outline->clear;
 	}
-
-	# Remove the entry from the Window menu
-	$self->menu->window->refresh( $self->current );
 
 	return 1;
 }
@@ -4754,10 +4763,9 @@ sub run_in_padre {
 	my $code = $doc->text_get;
 	my @rv   = eval $code;
 	if ($@) {
-		Wx::MessageBox(
+		$self->error(
 			sprintf( Wx::gettext("Error: %s"), $@ ),
 			Wx::gettext("Internal error"),
-			Wx::wxOK, $self,
 		);
 		return;
 	}
@@ -5447,7 +5455,8 @@ sub key_up {
 		#		}
 	}
 
-	if ( $config->autocomplete_always and ( !$mod ) ) {
+
+	if ( $config->autocomplete_always and ( !$mod ) and ( $code == 8 ) ) {
 		$self->on_autocompletion($event);
 	}
 
@@ -5655,7 +5664,7 @@ sub _filter_tool_run {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -5665,7 +5674,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

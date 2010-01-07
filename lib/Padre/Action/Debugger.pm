@@ -17,7 +17,7 @@ use warnings;
 use Padre::Action ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 #####################################################################
 
@@ -37,6 +37,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'stock/code/stock_macro-stop-after-command',
 		label        => Wx::gettext('Step In') . ' (&s) ',
 		comment      => Wx::gettext(
 			'Execute the next statement, enter subroutine if needed. (Start debugging if it is not yet running)'),
@@ -52,6 +53,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'stock/code/stock_macro-stop-after-procedure',
 		label        => Wx::gettext('Step Over') . ' (&n) ',
 		comment      => Wx::gettext(
 			'Execute the next statement, If it is a subroutine call, stop only after it returned. (Start debugging if it is not yet running)'
@@ -69,6 +71,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'stock/code/stock_macro-jump-back',
 		label        => Wx::gettext('Step Out') . ' (&r) ',
 		comment      => Wx::gettext('If withing a subroutine, run till return is called and then stop.'),
 
@@ -83,8 +86,9 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'stock/code/stock_tools-macro',
 		label        => Wx::gettext('Run till breakpoint') . ' (&c) ',
-		comment      => Wx::gettext('Start running and/or continoue running till next breakpoint or watch'),
+		comment      => Wx::gettext('Start running and/or continue running till next breakpoint or watch'),
 
 		#shortcut     => 'Shift-F5',
 		menu_event => sub {
@@ -111,6 +115,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'stock/code/stock_macro-insert-breakpoint',
 		label        => Wx::gettext('Set breakpoint') . ' (&b) ',
 		comment      => Wx::gettext('Set a breakpoint to the current location of the cursor with a condition'),
 
@@ -182,6 +187,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'stock/code/stock_macro-watch-variable',
 		label        => Wx::gettext('Display value'),
 		comment      => Wx::gettext('Display the current value of a variable in the right hand side debugger pane'),
 
@@ -224,6 +230,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
+		toolbar      => 'actions/stop',
 		label        => Wx::gettext('Quit Debugger') . ' (&q) ',
 		comment      => Wx::gettext('Quit the process being debugged'),
 
@@ -240,7 +247,7 @@ sub new {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

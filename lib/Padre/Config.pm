@@ -23,7 +23,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 # Master storage of the settings
 our %SETTING = ();
@@ -39,10 +39,12 @@ our $REVISION = 1;
 our $SINGLETON = undef;
 
 # Accessor generation
-use Class::XSAccessor::Array getters => {
-	host    => Padre::Constant::HOST,
-	human   => Padre::Constant::HUMAN,
-	project => Padre::Constant::PROJECT,
+use Class::XSAccessor::Array {
+	getters => {
+		host    => Padre::Constant::HOST,
+		human   => Padre::Constant::HUMAN,
+		project => Padre::Constant::PROJECT,
+	}
 };
 
 
@@ -317,6 +319,7 @@ setting(
 
 	# Toolbars are not typically used for Mac apps.
 	# Hide it by default so Padre looks "more Mac'ish"
+	# NOTE: Or at least, so we were told. Opinions apparently vary.
 	default => Padre::Constant::MAC ? 0 : 1,
 );
 setting(
@@ -324,43 +327,43 @@ setting(
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HUMAN,
 
-	# This lifes here until a better place is found:
+	# This lives here until a better place is found:
 	# This is a list of toolbar items, seperated by ;
 	# The following items are supported:
-	#   action:icon
-	#     Insert the action with the named icon
-	#   action(argument,argument):icon
+	#   action
+	#     Insert the action
+	#   action(argument,argument)
 	#     Insert an action which requires one or more arguments
 	#   |
 	#     Insert a seperator
-	default => 'file.new:actions/document-new;'
-		. 'file.open:actions/document-open;'
-		. 'file.save:actions/document-save;'
-		. 'file.save_as:actions/document-save-as;'
-		. 'file.save_all:actions/stock_data-save;'
-		. 'file.close:actions/x-document-close;' . '|;'
-		. 'file.open_example:stock/generic/stock_example;' . '|;'
-		. 'edit.undo:actions/edit-undo;'
-		. 'edit.redo:actions/edit-redo;' . '|;'
-		. 'edit.cut:actions/edit-cut;'
-		. 'edit.copy:actions/edit-copy;'
-		. 'edit.paste:actions/edit-paste;'
-		. 'edit.select_all:actions/edit-select-all;' . '|;'
-		. 'search.find:actions/edit-find;'
-		. 'search.replace:actions/edit-find-replace;' . '|;'
-		. 'edit.comment_toggle:actions/toggle-comments;' . '|;'
-		. 'file.doc_stat:actions/document-properties;' . '|;'
-		. 'search.open_resource:places/folder-saved-search;'
-		. 'search.quick_menu_access:status/info;' . '|;'
-		. 'run.run_document:actions/player_play;'
-		. 'run.stop:actions/stop;' . '|;'
-		. 'debug.step_in:stock/code/stock_macro-stop-after-command;'
-		. 'debug.step_over:stock/code/stock_macro-stop-after-procedure;'
-		. 'debug.step_out:stock/code/stock_macro-jump-back;'
-		. 'debug.run:stock/code/stock_tools-macro;'
-		. 'debug.set_breakpoint:stock/code/stock_macro-insert-breakpoint;'
-		. 'debug.display_value:stock/code/stock_macro-watch-variable;'
-		. 'debug.quit:actions/stop;'
+	default => 'file.new;'
+		. 'file.open;'
+		. 'file.save;'
+		. 'file.save_as;'
+		. 'file.save_all;'
+		. 'file.close;' . '|;'
+		. 'file.open_example;' . '|;'
+		. 'edit.undo;'
+		. 'edit.redo;' . '|;'
+		. 'edit.cut;'
+		. 'edit.copy;'
+		. 'edit.paste;'
+		. 'edit.select_all;' . '|;'
+		. 'search.find;'
+		. 'search.replace;' . '|;'
+		. 'edit.comment_toggle;' . '|;'
+		. 'file.doc_stat;' . '|;'
+		. 'search.open_resource;'
+		. 'search.quick_menu_access;' . '|;'
+		. 'run.run_document;'
+		. 'run.stop;' . '|;'
+		. 'debug.step_in;'
+		. 'debug.step_over;'
+		. 'debug.step_out;'
+		. 'debug.run;'
+		. 'debug.set_breakpoint;'
+		. 'debug.display_value;'
+		. 'debug.quit;'
 );
 
 setting(
@@ -368,7 +371,7 @@ setting(
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HUMAN,
 
-	# This lifes here until a better place is found:
+	# This lives here until a better place is found:
 	# This is a list of menubar items, seperated by ;
 	# The following items are supported:
 	#   menu.MenuName
@@ -447,9 +450,9 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 'deep',
 	options => [
-		'no'   => 'No Autoindent',
-		'same' => 'Indent to Same Depth',
-		'deep' => 'Indent Deeply',
+		'no'   => _T('No Autoindent'),
+		'same' => _T('Indent to Same Depth'),
+		'deep' => _T('Indent Deeply'),
 	],
 );
 setting(
@@ -681,6 +684,14 @@ setting(
 	default => 0,
 );
 
+setting(
+	name    => 'mid_button_paste',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+
 # By default use background threads unless profiling
 # TO DO - Make the default actually change
 
@@ -771,7 +782,7 @@ setting(
 	default => '',
 );
 
-# Enable/Disable functions
+# Enable/Disable entire functions that some people dislike
 setting(
 	name    => 'func_config',
 	type    => Padre::Constant::BOOLEAN,
@@ -930,6 +941,36 @@ setting(
 	default => 0,
 );
 
+# The "config_" namespace is for the paths of other non-Padre config files
+# for various external tools (usually so that projects can define the
+# the location of their project-specific policies).
+
+# Location of the Perl::Tidy RC file, if a project wants to set a custom one.
+# When set to false, allow Perl::Tidy to use its own default config location.
+# Load this from the project backend in preference to the host one, so that
+# projects can set their own project-specific config file.
+setting(
+	name    => 'config_perltidy',
+	type    => Padre::Constant::PATH,
+	store   => Padre::Constant::PROJECT,
+	default => '',
+);
+
+# Location of the Perl::Critic RC file, if a project wants to set a custom
+# one. When set to false, allow Perl::Critic to use its own default config
+# location. Load this from the project backend in preference to the host one,
+# so that projects can set their own project-specific config file.
+setting(
+	name    => 'config_perlcritic',
+	type    => Padre::Constant::PATH,
+	store   => Padre::Constant::PROJECT,
+	default => '',
+);
+
+
+
+
+
 #####################################################################
 # Constructor and Accessors
 
@@ -974,7 +1015,7 @@ sub read {
 		# Hand off to the constructor
 		$SINGLETON = $class->new( $host, $human );
 
-		$SINGLETON->Padre::Config::Upgrade::check();
+		Padre::Config::Upgrade::check($SINGLETON);
 	}
 
 	return $SINGLETON;
@@ -1174,14 +1215,14 @@ a own value.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute it and/or modify it under the
 same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

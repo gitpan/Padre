@@ -1,4 +1,4 @@
-package Padre::HelpProvider::Perl;
+package Padre::Document::Perl::Help;
 
 use 5.008;
 use strict;
@@ -12,7 +12,7 @@ use Padre::DocBrowser::POD ();
 use Padre::Pod2HTML        ();
 use Padre::Logger;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Padre::HelpProvider';
 
 # for caching help list (for faster access)
@@ -158,6 +158,7 @@ sub help_init {
 sub _find_installed_modules {
 	my $self = shift;
 	my %seen;
+	require File::Find::Rule;
 	for my $path (@INC) {
 		for my $file ( File::Find::Rule->name('*.pm')->in($path) ) {
 			my $module = substr( $file, length($path) + 1 );
@@ -243,6 +244,14 @@ sub help_render {
 			}
 		}
 
+
+		# Determine if the padre locale and/or the
+		#  system language is NOT english
+
+		if ( Padre::Locale::iso639() !~ /^en/i ) {
+			$hints->{lang} = Padre::Locale::iso639();
+		}
+
 		# Render using perldoc pseudo code package
 		my $pod      = Padre::DocBrowser::POD->new;
 		my $doc      = $pod->resolve( $topic, $hints );
@@ -274,7 +283,7 @@ __END__
 
 =head1 NAME
 
-Padre::HelpProvider::Perl - Perl 5 Help Provider
+Padre::Document::Perl::Help - Perl 5 Help Provider
 
 =head1 DESCRIPTION
 
@@ -284,7 +293,7 @@ Perl 5 Help index is built here and rendered.
 
 Ahmad M. Zawawi C<ahmad.zawawi@gmail.com>
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

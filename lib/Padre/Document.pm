@@ -135,7 +135,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 
 
@@ -1404,7 +1404,7 @@ sub autocomplete {
 	my $pre  = $editor->GetTextRange( 0, $first + length($prefix) );
 	my $post = $editor->GetTextRange( $first, $last );
 
-	my $regex = eval {qr{\b($prefix\w+)\b}};
+	my $regex = eval {qr{\b(\Q$prefix\E\w+)\b}};
 	if ($@) {
 		return ("Cannot build regex for '$prefix'");
 	}
@@ -1445,7 +1445,7 @@ sub get_help_provider {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

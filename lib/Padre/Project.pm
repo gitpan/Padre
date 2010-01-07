@@ -5,15 +5,18 @@ package Padre::Project;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec    ();
-use YAML::Tiny    ();
-use Padre::Config ();
+use File::Spec     ();
+use YAML::Tiny     ();
+use Padre::Config  ();
+use Padre::Current ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
-use Class::XSAccessor getters => {
-	root      => 'root',
-	padre_yml => 'padre_yml',
+use Class::XSAccessor {
+	getters => {
+		root      => 'root',
+		padre_yml => 'padre_yml',
+	}
 };
 
 
@@ -88,7 +91,7 @@ sub config {
 	unless ( $self->{config} ) {
 
 		# Get the default config object
-		my $config = Padre->ide->config;
+		my $config = Padre::Current->config;
 
 		# If we have a padre.yml file create a custom config object
 		if ( $self->{padre_yml} ) {
@@ -135,7 +138,7 @@ sub ignore_rule {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

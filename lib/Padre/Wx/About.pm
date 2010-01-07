@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -107,7 +107,7 @@ sub _content_about {
     <font size="+1">&nbsp;&nbsp;Perl Application Development and Refactoring Environment</font>
     </strong>
     <p>Created by Gábor Szabó</p>
-    <p>Copyright 2008 - 2009 The Padre Development Team</p>
+    <p>Copyright 2008 - 2010 The Padre Development Team</p>
     <p>"Blue butterfly on a green leaf" splash image is based on work by 
     Jerry Charlotte (blackbutterfly)</p>
     <p>
@@ -269,17 +269,16 @@ sub _content_translators {
 END_HTML
 }
 
+# Create the content for the Info page
 sub _content_info {
-
-	# Create the content for the Info page
 	my $self           = shift;
 	my $padre_info     = Wx::gettext('Info');
 	my $wx_widgets     = Wx::wxVERSION_STRING();
 	my $config_dir_txt = Wx::gettext('Config dir:');
 	my $config_dir     = Padre::Constant::CONFIG_DIR;
+	my $uptime         = time - $^T;
+	my @uptime_parts   = ( 0, 0, 0 );
 
-	my $uptime = time - $^T;
-	my @uptime_parts = ( 0, 0, 0 );
 	if ( $uptime > 3600 ) {
 		$uptime_parts[0] = int( $uptime / 3600 );
 		$uptime -= $uptime_parts[0] * 3600;
@@ -369,12 +368,10 @@ END_HTML
 sub ShowModal {
 	my $self = shift;
 	$self->_content_info;
-	return $self->Wx::Dialog::ShowModal;
+	return $self->SUPER::ShowModal;
 }
 
-#
 # Arabic and Hebrew names are not showing up correctly
-#
 sub _rtl {
 	my ( $self, $text ) = @_;
 	$text =~ s/(\p{InArabic}+)\s+(\p{InArabic}+)\s+(\p{InArabic}+)/$3 $2 $1/g;
@@ -384,7 +381,7 @@ sub _rtl {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

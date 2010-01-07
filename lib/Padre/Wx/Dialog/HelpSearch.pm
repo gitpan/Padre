@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -308,6 +308,11 @@ sub _search {
 						. Padre::MimeTypes->get_mime_type_name( $doc->get_mimetype ) );
 				return;
 			}
+		} else {
+
+			# If there no document, use Perl 5 help provider
+			require Padre::Document::Perl::Help;
+			$self->_help_provider( Padre::Document::Perl::Help->new );
 		}
 	}
 	return if not $self->_help_provider;
@@ -430,14 +435,14 @@ Ahmad M. Zawawi C<< <ahmad.zawawi at gmail.com> >>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

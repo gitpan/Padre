@@ -7,7 +7,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 # TO DO - Don't store run-time data in package lexicals
@@ -229,7 +229,7 @@ sub on_delete_all_bookmark {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

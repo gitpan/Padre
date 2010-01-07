@@ -44,6 +44,8 @@ inc/Module/Install/WriteAll.pm
 lib/Padre.pm
 lib/Padre/Action.pm
 lib/Padre/Action/Debugger.pm
+lib/Padre/Action/Edit.pm
+lib/Padre/Action/File.pm
 lib/Padre/Action/Help.pm
 lib/Padre/Action/Internal.pm
 lib/Padre/Action/Perl.pm
@@ -52,6 +54,7 @@ lib/Padre/Action/Queue.pm
 lib/Padre/Action/Refactor.pm
 lib/Padre/Action/Run.pm
 lib/Padre/Action/Search.pm
+lib/Padre/Action/View.pm
 lib/Padre/Action/Window.pm
 lib/Padre/Autosave.pm
 lib/Padre/Config.pm
@@ -83,15 +86,18 @@ lib/Padre/DocBrowser/PseudoPerldoc.pm
 lib/Padre/Document.pm
 lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl/Beginner.pm
+lib/Padre/Document/Perl/Help.pm
 lib/Padre/Document/Perl/Lexer.pm
 lib/Padre/Document/Perl/PPILexer.pm
+lib/Padre/Document/Perl/QuickFix.pm
+lib/Padre/Document/Perl/QuickFix/IncludeModule.pm
+lib/Padre/Document/Perl/QuickFix/StrictWarnings.pm
 lib/Padre/Document/POD.pm
 lib/Padre/File.pm
 lib/Padre/File/FTP.pm
 lib/Padre/File/HTTP.pm
 lib/Padre/File/Local.pm
 lib/Padre/HelpProvider.pm
-lib/Padre/HelpProvider/Perl.pm
 lib/Padre/Locale.pm
 lib/Padre/Lock.pm
 lib/Padre/Locker.pm
@@ -114,9 +120,6 @@ lib/Padre/Project.pm
 lib/Padre/Project/Null.pm
 lib/Padre/Project/Perl.pm
 lib/Padre/QuickFixProvider.pm
-lib/Padre/QuickFixProvider/Perl.pm
-lib/Padre/QuickFixProvider/Perl/IncludeModule.pm
-lib/Padre/QuickFixProvider/Perl/StrictWarnings.pm
 lib/Padre/Search.pm
 lib/Padre/Service.pm
 lib/Padre/Splash.pm
@@ -140,6 +143,7 @@ lib/Padre/Task/PPI/LexicalReplaceVariable.pm
 lib/Padre/Task/SyntaxChecker.pm
 lib/Padre/Task/SyntaxChecker/Perl.pm
 lib/Padre/TaskManager.pm
+lib/Padre/Test.pm
 lib/Padre/Transform.pm
 lib/Padre/Transform/Perl.pm
 lib/Padre/Transform/Perl/UpdateCopyright.pm
@@ -207,6 +211,7 @@ lib/Padre/Wx/Menu/Help.pm
 lib/Padre/Wx/Menu/Perl.pm
 lib/Padre/Wx/Menu/Plugins.pm
 lib/Padre/Wx/Menu/Refactor.pm
+lib/Padre/Wx/Menu/RightClick.pm
 lib/Padre/Wx/Menu/Run.pm
 lib/Padre/Wx/Menu/Search.pm
 lib/Padre/Wx/Menu/View.pm

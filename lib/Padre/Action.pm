@@ -5,7 +5,10 @@ use strict;
 use warnings;
 
 use Padre::Constant         ();
+use Padre::Action::View     ();
+use Padre::Action::File     ();
 use Padre::Action::Help     ();
+use Padre::Action::Edit     ();
 use Padre::Action::Perl     ();
 use Padre::Action::Plugins  ();
 use Padre::Action::Refactor ();
@@ -15,20 +18,25 @@ use Padre::Action::Search   ();
 use Padre::Action::Window   ();
 use Padre::Action::Internal ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 # Generate faster accessors
-use Class::XSAccessor getters => {
-	id            => 'id',
-	icon          => 'icon',
-	comment       => 'comment',
-	name          => 'name',
-	label         => 'label',
-	shortcut      => 'shortcut',
-	menu_event    => 'menu_event',
-	toolbar_event => 'toolbar_event',
-	menu_method   => 'menu_method',
+use Class::XSAccessor {
+	getters => {
+		id            => 'id',
+		icon          => 'icon',
+		comment       => 'comment',
+		name          => 'name',
+		label         => 'label',
+		shortcut      => 'shortcut',
+		menu_event    => 'menu_event',
+		toolbar_event => 'toolbar_event',
+		menu_method   => 'menu_method',
+		toolbar_icon  => 'toolbar',
+	}
 };
+
+
 
 
 
@@ -39,7 +47,10 @@ use Class::XSAccessor getters => {
 sub create {
 	my $main = shift;
 
+	Padre::Action::View->new($main);
+	Padre::Action::File->new($main);
 	Padre::Action::Help->new($main);
+	Padre::Action::Edit->new($main);
 	Padre::Action::Perl->new($main);
 	Padre::Action::Plugins->new($main);
 	Padre::Action::Refactor->new($main);
@@ -71,6 +82,7 @@ sub create {
 
 sub new {
 	my $class = shift;
+	Carp::confess( Data::Dumper::Dumper \@_ ) if @_ % 2;
 	my $self = bless {@_}, $class;
 	$self->{id} ||= -1;
 
@@ -344,7 +356,7 @@ A default constructor for action objects.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -356,7 +368,7 @@ LICENSE file included with this module.
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -8,7 +8,7 @@ use Padre::Constant ();
 use Padre::Wx       ();
 use Padre::Locale   ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor getters => {
@@ -187,7 +187,7 @@ sub clear {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

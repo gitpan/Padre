@@ -9,7 +9,7 @@ use strict;
 use warnings;
 use Padre::Current ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 # -- constructors
 
@@ -62,8 +62,15 @@ sub write {
 	# As a result, it uses slightly bizarre locking code to make sure it runs
 	# inside a transaction correctly in both cases (has a ::Main, or not)
 	my $main = eval {
-		local $@;
-		Padre::Current->main;
+
+		# If ::Main isn't even loaded, we don't need the more
+		# intensive Padre::Current call. It also prevents loading
+		# the Wx subsystem when we are running light and headless
+		# with no GUI at all.
+		if ($Padre::Wx::Main::VERSION) {
+			local $@;
+			Padre::Current->main;
+		}
 	};
 	my $lock = $main ? $main->lock('DB') : undef;
 	Padre::DB->begin unless $lock;
@@ -144,7 +151,7 @@ No parameters.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute it and/or modify it under the
 same terms as Perl 5 itself.
@@ -152,7 +159,7 @@ same terms as Perl 5 itself.
 =cut
 
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

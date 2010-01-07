@@ -7,7 +7,7 @@ use Params::Util qw{ _STRING };
 use Padre::Wx ();
 use Padre::Current ('_CURRENT');
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::Panel';
 
 
@@ -195,7 +195,12 @@ sub refresh {
 	return unless $current;
 	my $document  = $current->document;
 	my $functions = $self->{functions};
-	unless ($document) {
+
+	# Hide the widgets when no files are open
+	if ($document) {
+		$self->{search}->Show(1);
+		$self->{functions}->Show(1);
+	} else {
 		$functions->Clear;
 		$self->{search}->Hide;
 		$self->{functions}->Hide;
@@ -275,7 +280,7 @@ sub _update_functions_list {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

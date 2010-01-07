@@ -1,10 +1,10 @@
-package Padre::QuickFixProvider::Perl::StrictWarnings;
+package Padre::Document::Perl::QuickFix::StrictWarnings;
 
 use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 #
 # Constructor.
@@ -106,7 +106,7 @@ __END__
 
 =head1 NAME
 
-Padre::QuickFixProvider::Perl::StrictWarnings - Check for strict and warnings pragmas
+Padre::Document::Perl::QuickFix::StrictWarnings - Check for strict and warnings pragmas
 
 =head1 DESCRIPTION
 
@@ -115,7 +115,7 @@ This ensures that you have the following in your script:
 	use strict;
 	use warnings;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

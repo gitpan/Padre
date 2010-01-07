@@ -41,7 +41,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 
 
@@ -69,13 +69,13 @@ sub new {
 		or Carp::croak("Creation of a Padre::PluginManager without a Padre not possible");
 
 	my $self = bless {
-		parent       => $parent,
-		plugins      => {},
-		plugin_dir   => Padre::Constant::PLUGIN_DIR,
-		plugin_order => [],
+		parent                    => $parent,
+		plugins                   => {},
+		plugin_dir                => Padre::Constant::PLUGIN_DIR,
+		plugin_order              => [],
+		plugins_with_context_menu => {},
 
 		#par_loaded               => 0,
-		plugins_with_context_menu => {},
 		@_,
 	}, $class;
 
@@ -238,6 +238,12 @@ sub shutdown {
 			);
 		}
 	}
+
+	# Remove the circular reference between the main application and
+	# the plugin manager to complete the destruction.
+	# This breaks encapsulation a bit, but will do for now.
+	delete $self->{parent}->{plugin_manager};
+	delete $self->{parent};
 
 	return 1;
 }
@@ -844,6 +850,7 @@ sub get_menu {
 	my ( $label, $menu ) = eval { $plugin->{object}->menu_plugins($main) };
 	if ($@) {
 		$plugin->errstr( Wx::gettext("Error when calling menu for plug-in") . "'$module': $@" );
+		$plugin->{status} = 'error';
 
 		# TO DO: make sure these error messages show up somewhere or it will drive
 		# crazy anyone trying to write a plug-in
@@ -1055,7 +1062,7 @@ L<Padre>, L<Padre::Config>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 =head1 LICENSE
 
@@ -1064,7 +1071,7 @@ modify it under the same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

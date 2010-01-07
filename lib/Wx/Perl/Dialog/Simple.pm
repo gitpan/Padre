@@ -48,7 +48,7 @@ use Cwd        ();
 use Exporter   ();
 use File::Spec ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Exporter';
 
 # I'd change this, but I suspect it's rather breaky
@@ -335,7 +335,7 @@ The idea was taken from the Zenity project.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

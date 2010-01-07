@@ -119,7 +119,7 @@ use Padre::Plugin ();
 use Padre::Task::HTTPClient;
 use Padre::Constant();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Padre::Plugin';
 
 # Track the number of times actions are used
@@ -325,7 +325,7 @@ See the support section of the main L<Padre> module.
 
 =head1 COPYRIGHT
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 =head1 LICENSE
 
@@ -334,7 +334,7 @@ modify it under the same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
 #
 # Constructor.
@@ -34,7 +34,7 @@ __END__
 
 =head1 NAME
 
-Padre::QuickFixProvider - Padre Quick Fix Provider API
+Padre::Document::Perl::QuickFix - Padre Quick Fix Provider API
 
 =head1 DESCRIPTION
 
@@ -68,10 +68,10 @@ Please see the following sample implementation:
 
 =cut
 
-The B<Padre::QuickFixProvider> class provides a base class, default implementation
+The B<Padre::Document::Perl::QuickFix> class provides a base class, default implementation
 and API documentation for quick fix provision support in L<Padre>.
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

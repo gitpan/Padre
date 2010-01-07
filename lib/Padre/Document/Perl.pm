@@ -17,7 +17,7 @@ use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
 use Padre::Logger;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Padre::Document';
 
 
@@ -278,18 +278,24 @@ sub get_command {
 	my $perl = $config->run_perl_cmd;
 
 	# Warn if the Perl interpreter is not executable:
-	if ( defined($perl) and ( $perl ne '' ) and ( !-x $perl ) ) {
-		my $ret = Wx::MessageBox(
-			Wx::gettext(
-				sprintf( '%s seems to be no executable Perl interpreter, use the system default perl instead?', $perl )
-			),
-			Wx::gettext('Run'),
-			Wx::wxYES_NO | Wx::wxCENTRE,
-			Padre->ide->wx->main,
-		);
-		$perl = Padre::Perl::cperl()
-			if $ret == Wx::wxYES;
-
+	if ( defined $perl and $perl ne '' ) {
+		if ( !-x $perl ) {
+			my $ret = Wx::MessageBox(
+				Wx::gettext(
+					sprintf(
+						'%s seems to be no executable Perl interpreter, use the system default perl instead?', $perl
+					)
+				),
+				Wx::gettext('Run'),
+				Wx::wxYES_NO | Wx::wxCENTRE,
+				Padre->ide->wx->main,
+			);
+			if ( $ret == Wx::wxYES ) {
+				$perl = Padre::Perl::cperl();
+			} else {
+				return;
+			}
+		}
 	} else {
 		$perl = Padre::Perl::cperl();
 	}
@@ -432,7 +438,7 @@ sub beginner_check {
 	my $error = $Beginner->error;
 
 	if ($error) {
-		Padre->ide->wx->main->error( Wx::gettext("Error:\n") . $error );
+		Padre->ide->wx->main->error( Wx::gettext("Error: ") . $error );
 	} else {
 		Padre->ide->wx->main->message( Wx::gettext('No errors found.') );
 	}
@@ -1617,16 +1623,16 @@ sub event_on_left_up {
 # Returns Perl's Help Provider
 #
 sub get_help_provider {
-	require Padre::HelpProvider::Perl;
-	return Padre::HelpProvider::Perl->new;
+	require Padre::Document::Perl::Help;
+	return Padre::Document::Perl::Help->new;
 }
 
 #
 # Returns Perl's Quick Fix Provider
 #
 sub get_quick_fix_provider {
-	require Padre::QuickFixProvider::Perl;
-	return Padre::QuickFixProvider::Perl->new;
+	require Padre::Document::Perl::QuickFix;
+	return Padre::Document::Perl::QuickFix->new;
 }
 
 sub autoclean {
@@ -1776,7 +1782,7 @@ sub guess_filename_to_open {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

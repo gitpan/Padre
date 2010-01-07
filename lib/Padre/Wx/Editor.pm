@@ -11,7 +11,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -73,6 +73,7 @@ sub new {
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
 	Wx::Event::EVT_MIDDLE_UP( $self, \&on_middle_up );
+
 
 	# Smart highlighting:
 	# Selecting a word or small block of text causes all other occurrences to be highlighted
@@ -866,12 +867,18 @@ sub on_smart_highlight_end {
 sub on_left_up {
 	my ( $self, $event ) = @_;
 
+	my $config = $self->main->ide->config;
+
 	my $text = $self->GetSelectedText;
 	if ( Padre::Constant::WXGTK and defined $text and $text ne '' ) {
 
 		# Only on X11 based platforms
 		#		Wx::wxTheClipboard->UsePrimarySelection(1);
-		$self->put_text_to_clipboard($text);
+		if ( $config->mid_button_paste ) {
+			$self->put_text_to_clipboard( $text, 1 );
+		} else {
+			$self->put_text_to_clipboard($text);
+		}
 
 		#		Wx::wxTheClipboard->UsePrimarySelection(0);
 	}
@@ -888,20 +895,35 @@ sub on_left_up {
 sub on_middle_up {
 	my ( $self, $event ) = @_;
 
+	my $config = $self->main->ide->config;
+
 	# TO DO: Sometimes there are unexpected effects when using the middle button.
 	# It seems that another event is doing something but not within this module.
 	# Please look at ticket #390 for details!
 
-	Padre::Current->editor->Paste;
+	Wx::wxTheClipboard->UsePrimarySelection(1)
+		if $config->mid_button_paste;
+
+	if ( Padre::Constant::WIN32 or ( !$config->mid_button_paste ) ) {
+		Padre::Current->editor->Paste;
+	}
 
 	my $doc = $self->{Document};
 	if ( $doc->can('event_on_middle_up') ) {
 		$doc->event_on_middle_up( $self, $event );
 	}
 
-	$event->Skip;
+	Wx::wxTheClipboard->UsePrimarySelection(0)
+		if $config->mid_button_paste;
+
+	if ( $config->mid_button_paste ) {
+		$event->Skip;
+	} else {
+		$event->Skip(0);
+	}
 	return;
 }
+
 
 sub on_right_down {
 	my $self  = shift;
@@ -914,167 +936,13 @@ sub on_right_down {
 	#my $p = $event->GetLogicalPosition;
 	#print "x: ", $p->x, "\n";
 
-	my $menu = Wx::Menu->new;
-	my $undo = $menu->Append( Wx::wxID_UNDO, '' );
-	if ( not $self->CanUndo ) {
-		$undo->Enable(0);
-	}
-	my $z = Wx::Event::EVT_MENU(
-		$main, # Ctrl-Z
-		$undo,
-		sub {
-			my $editor = Padre::Current->editor;
-			if ( $editor->CanUndo ) {
-				$editor->Undo;
-			}
-			return;
-		},
-	);
-	my $redo = $menu->Append( Wx::wxID_REDO, '' );
-	if ( not $self->CanRedo ) {
-		$redo->Enable(0);
-	}
-
-	Wx::Event::EVT_MENU(
-		$main, # Ctrl-Y
-		$redo,
-		sub {
-			my $editor = Padre::Current->editor;
-			if ( $editor->CanRedo ) {
-				$editor->Redo;
-			}
-			return;
-		},
-	);
-	$menu->AppendSeparator;
-
-	my $selection_exists = 0;
-	my $id               = $main->notebook->GetSelection;
-	if ( $id != -1 ) {
-		my $text = $main->notebook->GetPage($id)->GetSelectedText;
-		if ( defined($text) && length($text) > 0 ) {
-			$selection_exists = 1;
-		}
-	}
-
-	my $sel_all = $menu->Append( Wx::wxID_SELECTALL, Wx::gettext("Select all\tCtrl-A") );
-	if ( not $main->notebook->GetPage($id)->GetTextLength > 0 ) {
-		$sel_all->Enable(0);
-	}
-	Wx::Event::EVT_MENU(
-		$main, # Ctrl-A
-		$sel_all,
-		sub { \&text_select_all(@_) },
-	);
-	$menu->AppendSeparator;
-
-	my $copy = $menu->Append( Wx::wxID_COPY, Wx::gettext("&Copy\tCtrl-C") );
-	if ( not $selection_exists ) {
-		$copy->Enable(0);
-	}
-	Wx::Event::EVT_MENU(
-		$main, # Ctrl-C
-		$copy,
-		sub {
-			Padre::Current->editor->Copy;
-		}
-	);
-
-	my $cut = $menu->Append( Wx::wxID_CUT, Wx::gettext("Cu&t\tCtrl-X") );
-	if ( not $selection_exists ) {
-		$cut->Enable(0);
-	}
-	Wx::Event::EVT_MENU(
-		$main, # Ctrl-X
-		$cut,
-		sub {
-			Padre::Current->editor->Cut;
-		}
-	);
-
-	my $paste = $menu->Append( Wx::wxID_PASTE, Wx::gettext("&Paste\tCtrl-V") );
-	my $text = $self->get_text_from_clipboard();
-
-	if ( defined($text) and length($text) && $main->notebook->GetPage($id)->CanPaste ) {
-		Wx::Event::EVT_MENU(
-			$main, # Ctrl-V
-			$paste,
-			sub {
-				Padre::Current->editor->Paste;
-			},
-		);
-	} else {
-		$paste->Enable(0);
-	}
-
-	$menu->AppendSeparator;
-
-	my $commentToggle = $menu->Append( -1, Wx::gettext("&Toggle Comment\tCtrl-Shift-C") );
-	Wx::Event::EVT_MENU(
-		$main,
-		$commentToggle,
-		sub {
-			Padre::Wx::Main::on_comment_block( $_[0], 'TOGGLE' );
-		},
-	);
-	my $comment = $menu->Append( -1, Wx::gettext("&Comment Selected Lines\tCtrl-M") );
-	Wx::Event::EVT_MENU(
-		$main, $comment,
-		sub {
-			Padre::Wx::Main::on_comment_block( $_[0], 'COMMENT' );
-		},
-	);
-	my $uncomment = $menu->Append( -1, Wx::gettext("&Uncomment Selected Lines\tCtrl-Shift-M") );
-	Wx::Event::EVT_MENU(
-		$main,
-		$uncomment,
-		sub {
-			Padre::Wx::Main::on_comment_block( $_[0], 'UNCOMMENT' );
-		},
-	);
-
-	if (    $event->isa('Wx::MouseEvent')
-		and $self->main->ide->config->editor_folding )
-	{
-		$menu->AppendSeparator;
-
-		my $mousePos         = $event->GetPosition;
-		my $line             = $self->LineFromPosition( $self->PositionFromPoint($mousePos) );
-		my $firstPointInLine = $self->PointFromPosition( $self->PositionFromLine($line) );
-
-		if (   $mousePos->x < $firstPointInLine->x
-			&& $mousePos->x > ( $firstPointInLine->x - 18 ) )
-		{
-			my $fold = $menu->Append( -1, Wx::gettext("Fold all") );
-			Wx::Event::EVT_MENU(
-				$main, $fold,
-				sub {
-					$_[0]->current->editor->fold_all;
-				},
-			);
-			my $unfold = $menu->Append( -1, Wx::gettext("Unfold all") );
-			Wx::Event::EVT_MENU(
-				$main, $unfold,
-				sub {
-					$_[0]->current->editor->unfold_all;
-				},
-			);
-			$menu->AppendSeparator;
-		}
-	}
-
-	my $doc = $self->{Document};
-	if ( $doc->can('event_on_right_down') ) {
-		$doc->event_on_right_down( $self, $menu, $event );
-	}
-
-	# Let the plugins have a go
-	$self->main->ide->plugin_manager->on_context_menu( $doc, $self, $menu, $event );
+	require Padre::Wx::Menu::RightClick;
+	my $menu = Padre::Wx::Menu::RightClick->new( $main, $self, $event );
 
 	if ( $event->isa('Wx::MouseEvent') ) {
-		$self->PopupMenu( $menu, $event->GetX, $event->GetY );
+		$self->PopupMenu( $menu->wx, $event->GetX, $event->GetY );
 	} else { #Wx::CommandEvent
-		$self->PopupMenu( $menu, 50, 50 ); # TO DO better location
+		$self->PopupMenu( $menu->wx, 50, 50 ); # TO DO better location
 	}
 }
 
@@ -1262,10 +1130,14 @@ sub _convert_paste_eols {
 }
 
 sub put_text_to_clipboard {
-	my ( $self, $text ) = @_;
+	my ( $self, $text, $clipboard ) = @_;
 	@_ = (); # Feeble attempt to kill Scalars Leaked
 
 	return if $text eq '';
+
+	my $config = $self->main->ide->config;
+
+	$clipboard ||= 0;
 
 	# Backup last clipboard value:
 	$self->{Clipboard_Old} = $self->get_text_from_clipboard;
@@ -1273,6 +1145,8 @@ sub put_text_to_clipboard {
 	#         if $self->{Clipboard_Old} ne $self->get_text_from_clipboard;
 
 	Wx::wxTheClipboard->Open;
+	Wx::wxTheClipboard->UsePrimarySelection($clipboard)
+		if $config->mid_button_paste;
 	Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($text) );
 	Wx::wxTheClipboard->Close;
 
@@ -1555,7 +1429,7 @@ sub needs_manual_colorize {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

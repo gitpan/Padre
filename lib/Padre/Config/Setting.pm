@@ -6,19 +6,22 @@ use 5.008;
 use strict;
 use warnings;
 use Carp            ();
+use File::Spec      ();
 use Params::Util    ();
 use Padre::Constant ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 
-use Class::XSAccessor getters => {
-	name    => 'name',
-	type    => 'type',
-	store   => 'store',
-	default => 'default',
-	project => 'project',
-	options => 'options',
-	apply   => 'apply',
+use Class::XSAccessor {
+	getters => {
+		name    => 'name',
+		type    => 'type',
+		store   => 'store',
+		default => 'default',
+		project => 'project',
+		options => 'options',
+		apply   => 'apply',
+	}
 };
 
 sub new {
@@ -58,31 +61,52 @@ sub code {
 	my $name  = $self->name;
 	my $store = $self->store;
 
-	# Special accessor for filesystem paths
-	return <<"END_PERL" if $self->type == Padre::Constant::PATH;
+	# Vanilla code for everything other than PATH entries
+	return <<"END_PERL" unless $self->type == Padre::Constant::PATH;
 package Padre::Config;
 
 sub $name {
 	my \$self = shift;
-	if ( exists \$self->[$store]->{'$name'} ) {
-		if ( -e \$self->[$store]->{'$name'} ) {
-			return \$self->[$store]->{'$name'};
-		}
+	if ( exists \$self->[$store]->{$name} ) {
+		return \$self->[$store]->{$name};
 	}
-	return \$DEFAULT{'$name'};
+	return \$DEFAULT{$name};
 }
 END_PERL
 
-	# Generate a Vanilla accessor
+	# Literal paths for HOST values
+	# NOTE: This will need to change if we want to support Portable.pm
+	return <<"END_PERL" unless $store == Padre::Constant::PROJECT;
+package Padre::Config;
+
+sub $name {
+	my \$self = shift;
+	if ( exists \$self->[$store]->{$name} ) {
+		if ( -e \$self->[$store]->{$name} ) {
+			return \$self->[$store]->{$name};
+		}
+	}
+	return \$DEFAULT{$name};
+}
+END_PERL
+
+	# Relative paths for project-specific paths
 	return <<"END_PERL";
 package Padre::Config;
 
 sub $name {
 	my \$self = shift;
-	if ( exists \$self->[$store]->{'$name'} ) {
-		return \$self->[$store]->{'$name'};
+	if ( \$self->[$store] ) {
+		my \$dirname  = \$self->[$store]->dirname;
+		my \$relative = \$self->[$store]->{$name};
+		if ( defined \$relative ) {
+			my \$literal = File::Spec->catfile(
+				\$dirname, \$relative,
+			);
+			return \$literal if -e \$literal;
+		}
 	}
-	return \$DEFAULT{'$name'};
+	return \$DEFAULT{$name};
 }
 END_PERL
 }
@@ -104,7 +128,7 @@ sub _STORE {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Wx::Perl::Dialog ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Wx::Perl::Dialog';
 
 sub create_widget {
@@ -268,7 +268,7 @@ Padre::Wx::Dialog - Dummy Padre wrapper around Wx::Perl::Dialog
 
 =cut
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

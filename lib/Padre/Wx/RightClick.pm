@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 use constant HEIGHT => 30;
 
 sub on_right_down {
@@ -41,7 +41,7 @@ sub on_right {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

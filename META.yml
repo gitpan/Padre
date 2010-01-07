@@ -63,7 +63,7 @@ requires:
   Class::Unload: 0.03
   Class::XSAccessor: 1.05
   Cwd: 3.2701
-  DBD::SQLite: 1.10
+  DBD::SQLite: 1.27
   DBI: 1.58
   Data::Dumper: 0
   Debug::Client: 0.11
@@ -100,7 +100,7 @@ requires:
   Module::CoreList: 0
   Module::Refresh: 0.13
   Module::Starter: 1.50
-  ORLite: 1.20
+  ORLite: 1.30
   ORLite::Migrate: 0.03
   POSIX: 0
   PPI: 1.205
@@ -120,11 +120,11 @@ requires:
   Term::ReadLine: 0
   Text::Balanced: 0
   Text::Diff: 0.35
-  Text::FindIndent: 0.05
+  Text::FindIndent: 0.06
   Thread::Queue: 2.11
   URI: 0
   Wx: 0.91
-  Wx::Perl::ProcessStream: 0.20
+  Wx::Perl::ProcessStream: 0.24
   YAML::Tiny: 1.32
   perl: 5.008005
   pip: 0.13
@@ -136,4 +136,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.53
+version: 0.54

@@ -10,7 +10,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.53';
+our $VERSION = '0.54';
 our @ISA     = 'Padre::Wx::Dialog';
 
 our %PANELS = (
@@ -298,6 +298,13 @@ sub _behaviour_panel {
 				'window_list_shorten_path',
 				( $config->window_list_shorten_path ? 1 : 0 ),
 				Wx::gettext("Shorten the common path in window list?")
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox',
+				'mid_button_paste',
+				( $config->mid_button_paste ? 1 : 0 ),
+				Wx::gettext("Use X11 middle button paste style")
 			],
 			[]
 		],
@@ -1086,6 +1093,10 @@ sub run {
 		'window_list_shorten_path',
 		$data->{window_list_shorten_path} ? 1 : 0
 	);
+	$config->set(
+		'mid_button_paste',
+		$data->{mid_button_paste} ? 1 : 0
+	);
 
 
 	# Don't save options which are not shown as this may result in
@@ -1141,7 +1152,7 @@ sub run {
 
 1;
 
-# Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

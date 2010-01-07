@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.53';
+our $VERSION    = '0.54';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -602,10 +602,66 @@ If the method return a null list, no menu entry will be created for the plug-in.
 sub menu_plugins {
 	my $self   = shift;
 	my $main   = shift;
-	my @simple = $self->menu_plugins_simple or return ();
-	my $label  = $simple[0];
-	my $menu   = $self->_menu_plugins_submenu( $main, $simple[1] ) or return ();
-	return ( $label, $menu );
+	my @simple = $self->menu_plugins_simple;
+	if (@simple) {
+		my $label = $simple[0];
+		my $menu = $self->_menu_plugins_submenu( $main, $simple[1] ) or return ();
+		return ( $label, $menu );
+	}
+	my @actions = $self->menu_actions;
+	if (@actions) {
+		my $label   = $actions[0];
+		my $topmenu = Padre::Wx::Menu->new;
+		return $topmenu->build_menu_from_actions( $main, \@actions );
+	}
+
+	return ();
+}
+
+# Very Experimental !!!
+sub _menu_actions_submenu {
+	my $self    = shift;
+	my $main    = shift;
+	my $topmenu = shift;
+	my $menu    = shift;
+	my $items   = shift;
+	unless ( $items and ref $items and ref $items eq 'ARRAY' ) {
+		Carp::cluck("Invalid list of actions in plugin");
+		return;
+	}
+
+	# Fill the menu
+	while (@$items) {
+		my $value = shift @$items;
+
+		# Separator
+		if ( $value eq '---' ) {
+			$menu->AppendSeparator;
+			next;
+		}
+
+		# Array Reference (submenu)
+		if ( Params::Util::_ARRAY0($value) ) {
+			my $label = shift @$value;
+			if ( not defined $label ) {
+				Carp::cluck("No label in action sublist");
+				next;
+			}
+
+			my $submenu = Wx::Menu->new;
+			$menu->Append( -1, $label, $submenu );
+			$self->_menu_actions_submenu( $main, $topmenu, $submenu, $value );
+			next;
+		}
+
+		# Action name
+		$topmenu->{"menu_$value"} = $topmenu->add_menu_action(
+			$menu,
+			$value,
+		);
+	}
+
+	return;
 }
 
 sub _menu_plugins_submenu {
@@ -796,7 +852,7 @@ L<Padre>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2009 The Padre development team as listed in Padre.pm.
+Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
