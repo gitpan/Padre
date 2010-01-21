@@ -4,14 +4,17 @@ use 5.008;
 use strict;
 use warnings;
 use File::Basename ();
-use Class::XSAccessor constructor => 'new', accessors => {
-	'mimetype' => 'mime_type',
-	'body'     => 'body',
-	'title'    => 'title',
-	'filename' => 'filename',
+use Class::XSAccessor {
+	constructor => 'new',
+	accessors   => {
+		mimetype => 'mime_type',
+		body     => 'body',
+		title    => 'title',
+		filename => 'filename',
+	},
 };
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 =pod
 

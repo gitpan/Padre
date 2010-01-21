@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use utf8;
 
-# Non-Padre modules we need in order to the single-instance
+# Non-Padre modules we need in order to do the single-instance
 # check should be loaded early to simplify the load order.
 use Carp               ();
 use Cwd                ();
@@ -26,7 +26,7 @@ use Padre::Util::Win32 ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 # Since everything is used OO-style,
 # autouse everything other than the bare essentials
@@ -50,6 +50,36 @@ use Class::XSAccessor {
 		instance_id => 'instance_id',
 	},
 };
+
+sub import {
+	unless ( $_[1] and $_[1] eq ':everything' ) {
+		return;
+	}
+
+	# Find the location of Padre.pm
+	my $padre = $INC{'Padre.pm'};
+	my $parent = substr( $padre, 0, length($padre) - 3 );
+
+	# Find everything under Padre:: with a matching version,
+	# which almost certainly means it is part of the main Padre release.
+	require File::Find::Rule;
+	require ExtUtils::MakeMaker;
+	my @children = grep { not $INC{$_} }
+		map {"Padre/$_->[0]"}
+		grep { defined( $_->[1] ) and $_->[1] eq $VERSION }
+		map { [ $_, ExtUtils::MM_Unix->parse_version( File::Spec->catfile( $parent, $_ ) ) ] }
+		File::Find::Rule->name('*.pm')->file->relative->in($parent);
+
+	# Load all of them (ignoring errors)
+	my $loaded = 0;
+	foreach my $child (@children) {
+		eval { require $child; };
+		next if $@;
+		$loaded++;
+	}
+
+	return $loaded;
+}
 
 my $SINGLETON = undef;
 

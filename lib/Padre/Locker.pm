@@ -14,7 +14,7 @@ use warnings;
 use Padre::Lock ();
 use Padre::DB   ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 sub new {
 	my $class = shift;
@@ -107,6 +107,10 @@ sub db_decrement {
 sub update_increment {
 	my $self = shift;
 	unless ( $self->{update_depth}++ ) {
+
+		# When a Wx application quits with ->Update locked, windows will segfault.
+		# During shutdown, do not allow the application to enable an update lock.
+		# This should be pointless anyway, because the window shouldn't be visible.
 		return if $self->{shutdown};
 
 		# Locking for the first time
@@ -165,12 +169,30 @@ sub method_decrement {
 		# Once we start the shutdown process, don't run anything
 		return if $self->{shutdown};
 
+		# Optimise the refresh methods
+		$self->method_trim;
+
 		# Run all of the pending methods
 		foreach ( keys %{ $self->{method_pending} } ) {
 			next if $_ eq uc($_);
 			$self->{owner}->$_();
 		}
 		$self->{method_pending} = {};
+	}
+	return;
+}
+
+# Optimise the refresh by removing low level refresh methods that are
+# contained within high level refresh methods we need to run anyway.
+sub method_trim {
+	my $self    = shift;
+	my $pending = $self->{method_pending};
+	if ( defined $pending->{refresh} ) {
+		delete $pending->{refresh_menubar};
+		delete $pending->{refresh_toolbar};
+		delete $pending->{refresh_status};
+		delete $pending->{refresh_functions};
+		delete $pending->{refresh_directory};
 	}
 	return;
 }

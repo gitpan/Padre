@@ -8,20 +8,22 @@ use Padre::Current ();
 use Padre::Locale  ();
 use Params::Util qw{ _STRING _IDENTIFIER _CLASS _INSTANCE };
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 use overload
 	'bool' => sub () {1},
 	'""' => 'plugin_name',
 	'fallback' => 0;
 
-use Class::XSAccessor getters => {
-	class  => 'class',
-	object => 'object',
+use Class::XSAccessor {
+	getters => {
+		class  => 'class',
+		object => 'object',
 	},
 	accessors => {
-	errstr => 'errstr',
-	};
+		errstr => 'errstr',
+	},
+};
 
 
 

@@ -34,7 +34,7 @@ use Carp ();
 use Params::Util qw{ _INSTANCE };
 use Padre::Wx ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 our @ISA     = 'Wx::App';
 
 
@@ -77,9 +77,11 @@ application.
 
 =cut
 
-use Class::XSAccessor getters => {
-	ide  => 'ide',
-	main => 'main',
+use Class::XSAccessor {
+	getters => {
+		ide  => 'ide',
+		main => 'main',
+	}
 };
 
 =pod

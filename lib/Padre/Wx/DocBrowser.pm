@@ -21,12 +21,14 @@ use Padre::DocBrowser       ();
 use Padre::Util qw( _T );
 use Wx::Perl::Dialog::Simple ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 our @ISA     = 'Wx::Dialog';
 
-use Class::XSAccessor accessors => {
-	notebook => 'notebook',
-	provider => 'provider',
+use Class::XSAccessor {
+	accessors => {
+		notebook => 'notebook',
+		provider => 'provider',
+	}
 };
 
 our %VIEW = (

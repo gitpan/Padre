@@ -41,7 +41,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 
 
@@ -112,11 +112,13 @@ See L<Padre::Plugin>.
 
 =cut
 
-use Class::XSAccessor getters => {
-	parent                    => 'parent',
-	plugin_dir                => 'plugin_dir',
-	plugins                   => 'plugins',
-	plugins_with_context_menu => 'plugins_with_context_menu',
+use Class::XSAccessor {
+	getters => {
+		parent                    => 'parent',
+		plugin_dir                => 'plugin_dir',
+		plugins                   => 'plugins',
+		plugins_with_context_menu => 'plugins_with_context_menu',
+	},
 };
 
 # Get the prefered plugin order.
@@ -167,8 +169,8 @@ sub relocale {
 
 		# Add the plug-in locale dir to search path
 		my $object = $plugin->{object};
-		if ( $object->can('plugin_locale_directory') ) {
-			my $dir = $object->plugin_locale_directory;
+		if ( $object->can('plugin_directory_locale') ) {
+			my $dir = $object->plugin_directory_locale;
 			if ( defined $dir and -d $dir ) {
 				$locale->AddCatalogLookupPathPrefix($dir);
 			}
@@ -495,7 +497,7 @@ sub load_plugin {
 #
 # MAINTAINER NOTE: This method looks fairly long, but it's doing
 # a very specific and controlled series of steps. Splitting this up
-# would just make the process hardner to understand, so please don't.
+# would just make the process harder to understand, so please don't.
 sub _load_plugin {
 	my $self   = shift;
 	my $module = shift;
@@ -511,8 +513,12 @@ sub _load_plugin {
 	delete $self->{plugin_order};
 
 	# Attempt to load the plug-in
-	my $code = "use $module ();";
-	eval $code;
+	SCOPE: {
+
+		# Suppress warnings while loading plugins
+		local $SIG{__WARN__} = sub () { };
+		eval "use $module ();";
+	}
 
 	# Did it compile?
 	if ($@) {
@@ -578,8 +584,8 @@ sub _load_plugin {
 	}
 
 	# Add a new directory for locale to search translation catalogs.
-	if ( $object->can('plugin_locale_directory') ) {
-		my $dir = $object->plugin_locale_directory;
+	if ( $object->can('plugin_directory_locale') ) {
+		my $dir = $object->plugin_directory_locale;
 		if ( defined $dir and -d $dir ) {
 			my $locale = Padre::Current->main->{locale};
 			$locale->AddCatalogLookupPathPrefix($dir);

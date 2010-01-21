@@ -34,7 +34,7 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.54';
+our $VERSION   = '0.55';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
@@ -409,6 +409,7 @@ sub get_project_dir {
 	while (1) {
 		return $dir if -e File::Spec->catfile( $dir, 'Makefile.PL' );
 		return $dir if -e File::Spec->catfile( $dir, 'Build.PL' );
+		return $dir if -e File::Spec->catfile( $dir, 'dist.ini' );
 		$olddir = $dir;
 		$dir    = File::Basename::dirname($dir);
 		last if $olddir eq $dir;

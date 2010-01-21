@@ -10,7 +10,7 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Logger;
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -94,7 +94,7 @@ sub new {
 	Padre::Action->new(
 		name       => 'file.open',
 		id         => Wx::wxID_OPEN,
-		label      => Wx::gettext('&Open...'),
+		label      => Wx::gettext('&Open'),
 		comment    => Wx::gettext('Browse directory of the current document to open a file'),
 		shortcut   => 'Ctrl-O',
 		toolbar    => 'actions/document-open',
@@ -134,7 +134,7 @@ sub new {
 		shortcut    => 'Ctrl-W',
 		toolbar     => 'actions/x-document-close',
 		menu_event  => sub {
-			$_[0]->on_close;
+			$_[0]->close;
 		},
 	);
 

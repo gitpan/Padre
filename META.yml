@@ -58,7 +58,6 @@ no_index:
     - xt
 requires:
   App::Ack: 1.86
-  Carp: 0
   Class::Adapter: 1.05
   Class::Unload: 0.03
   Class::XSAccessor: 1.05
@@ -101,7 +100,6 @@ requires:
   Module::Refresh: 0.13
   Module::Starter: 1.50
   ORLite: 1.30
-  ORLite::Migrate: 0.03
   POSIX: 0
   PPI: 1.205
   PPIx::EditorTools: 0.09
@@ -136,4 +134,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.54
+version: 0.55

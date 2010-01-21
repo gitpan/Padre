@@ -32,15 +32,17 @@ use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
-use Class::XSAccessor getters => {
-	find_term    => 'find_term',
-	find_case    => 'find_case',
-	find_regex   => 'find_regex',
-	find_reverse => 'find_reverse',
-	replace_term => 'replace_term',
-	search_regex => 'search_regex',
+use Class::XSAccessor {
+	getters => {
+		find_term    => 'find_term',
+		find_case    => 'find_case',
+		find_regex   => 'find_regex',
+		find_reverse => 'find_reverse',
+		replace_term => 'replace_term',
+		search_regex => 'search_regex',
+	}
 };
 
 sub new {

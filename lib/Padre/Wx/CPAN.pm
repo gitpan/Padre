@@ -9,14 +9,16 @@ use Params::Util qw( _INSTANCE );
 use Padre::Wx                 ();
 use Padre::Wx::CPAN::Listview ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 our @ISA     = 'Wx::Frame';
 
-use Class::XSAccessor accessors => {
-	listview => 'listview',
-	entry    => 'entry',
-	cpan     => 'cpan',
-	main     => 'main',
+use Class::XSAccessor {
+	accessors => {
+		listview => 'listview',
+		entry    => 'entry',
+		cpan     => 'cpan',
+		main     => 'main',
+	},
 };
 
 =pod

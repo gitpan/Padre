@@ -23,7 +23,6 @@ BEGIN {
 	}
 }
 
-
 # Configure-time dependencies MUST be done first.
 # This version ensures that we have a new MakeMaker that
 # WON'T load modules to determine the version.
@@ -45,6 +44,7 @@ configure_requires 'ExtUtils::MakeMaker' => '6.52';
 
 
 
+
 #####################################################################
 # Normal Boring Commands
 
@@ -56,7 +56,6 @@ author 'Gabor Szabo';
 all_from 'lib/Padre.pm';
 requires 'perl'                  => '5.008005';
 requires 'App::Ack'              => '1.86';
-requires 'Carp'                  => 0;
 requires 'Class::Adapter'        => '1.05';
 requires 'Class::Unload'         => '0.03';
 requires 'Class::XSAccessor'     => '1.05';
@@ -102,7 +101,9 @@ requires 'List::MoreUtils' => '0.22';
 requires 'Module::Refresh' => '0.13';
 requires 'Module::Starter' => '1.50';
 requires 'ORLite'          => '1.30';
-requires 'ORLite::Migrate' => '0.03';
+
+# Temporarily disabled as we have cloned a private copy
+# requires 'ORLite::Migrate' => '1.06';
 
 #requires      'PAR'                      => '0.989';
 requires 'Params::Util'             => '0.33';
@@ -131,7 +132,9 @@ requires 'threads'                 => '1.71';
 requires 'threads::shared'         => '1.26';
 requires 'URI'                     => '0';
 requires 'version'                 => 0;
+requires 'Win32'                   => '0.31' if win32;
 requires 'Win32::API'              => '0.58' if win32;
+requires 'Win32::Shortcut'         => '0.07' if win32;
 requires 'Wx'                      => '0.91';
 requires 'Wx::Perl::ProcessStream' => '0.24';
 requires 'YAML::Tiny'              => '1.32';

@@ -65,7 +65,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 use Params::Util qw{_INSTANCE};
 
@@ -82,11 +82,13 @@ use Padre::Service ();
 use Padre::Wx      ();
 use Padre::Logger;
 
-use Class::XSAccessor getters => {
-	task_queue     => 'task_queue',
-	reap_interval  => 'reap_interval',
-	use_threads    => 'use_threads',
-	max_no_workers => 'max_no_workers',
+use Class::XSAccessor {
+	getters => {
+		task_queue     => 'task_queue',
+		reap_interval  => 'reap_interval',
+		use_threads    => 'use_threads',
+		max_no_workers => 'max_no_workers',
+	}
 };
 
 # This event is triggered by the worker thread main loop after

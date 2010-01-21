@@ -73,17 +73,21 @@ lib/Padre/DB/Bookmark.pm
 lib/Padre/DB/History.pm
 lib/Padre/DB/HostConfig.pm
 lib/Padre/DB/LastPositionInFile.pm
+lib/Padre/DB/Migrate.pm
+lib/Padre/DB/Migrate/Patch.pm
 lib/Padre/DB/Plugin.pm
 lib/Padre/DB/RecentlyUsed.pm
 lib/Padre/DB/Session.pm
 lib/Padre/DB/SessionFile.pm
 lib/Padre/DB/Snippets.pod
 lib/Padre/DB/SyntaxHighlight.pm
+lib/Padre/Desktop.pm
 lib/Padre/DocBrowser.pm
 lib/Padre/DocBrowser/document.pm
 lib/Padre/DocBrowser/POD.pm
 lib/Padre/DocBrowser/PseudoPerldoc.pm
 lib/Padre/Document.pm
+lib/Padre/Document/Config.pm
 lib/Padre/Document/Perl.pm
 lib/Padre/Document/Perl/Beginner.pm
 lib/Padre/Document/Perl/Help.pm
@@ -359,7 +363,6 @@ share/timeline/migrate-6.pl
 share/timeline/migrate-7.pl
 share/timeline/migrate-8.pl
 share/timeline/migrate-9.pl
-t/00-compile.t
 t/01-load.t
 t/02-new.t
 t/03-wx.t
@@ -434,6 +437,7 @@ t/win32/011-file-open.t
 t/win32/012-file-open-selection.t
 xt/01-copyright.t
 xt/02-eol.t
+xt/03-compile.t
 xt/11-pragmas.t
 xt/12-badcode.t
 xt/13-perl-beginner.t

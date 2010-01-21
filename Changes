@@ -1,6 +1,43 @@
 Changes for Perl Application Development and Refactoring Environment
 
-0.54 To Be Released
+0.56 To Be Released
+
+0.55 2010.01.21
+    - Add full list of file types to the View Document As menu (SZABGAB)
+    - dist-zilla projects detection finally fixed (#489) (JQUELIN)
+    - The directory tree refresh method will shortcut if nothing has
+      changed, which should fix a number of bugs relating to the
+      directory tree "doing things" when it shouldn't be (ADAMK)
+    - Saving files to somewhere other than the current project will now
+      correctly flush the document project state, and triggers a directory
+      tree flush so that we communicate the change in project (ADAMK)
+    - Cloned ORLite::Migrate to a private version as Padre::DB::Migrate
+      so we have a better chance of fixing bug #796 (ADAMK)
+    - Tentatively fixed #796 by spawning migration scripts in a manner which
+      does NOT assume the pre-existance of STDOUT. This is at best a
+      short-term hack, because this STDOUT problem is going to come back and
+      bite us in other ways in the future, for sure (ADAMK)
+    - Tuned the directory tree refresh logic to improve startup speed when
+      launching Padre with specific named files to open (ADAMK)
+    - Tuned the creation and management of tool widgets to remove the need
+      to load or construct tools at startup time that are turned off in the
+      user's configuration.
+    - Tuned lock-release refresh execution to remove low-level refresh
+      methods that are also contained in higher level refresh methods.
+    - Removed a superfluous AUI Update from the refresh method (ADAMK)
+    - Delay loading some additional GUI classes and objects until they
+      definitely needed (ADAMK)
+    - Suppress warnings that occur during plugin loading (ADAMK)
+    - 'Simple' possible fix for #331 to update the tabs when 'save all' is 
+      run in Padre. (PLAVEN)
+    - Fixed #819: Don't crash on missing project dir (SEWI)
+    - Upgrading --desktop option from VBScript to a new Win32::Shortcut-based
+      Padre::Desktop. Desktop link creation works on Vista and newer
+      operating systems again (ADAMK)
+    - Tuned menubar refresh to only fire if we change document mimetype,
+      which saves a ton of CPU and seems to reduce flicker (ADAMK)
+
+0.54 2010.01.07
     - Added experimental support for clickable filenames in Output panel.
       Currently only matches: <error> at <file> line 5. (PDONELAN)
     - If all files are closed, the function list would ->Hide itself

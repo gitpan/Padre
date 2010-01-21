@@ -23,7 +23,7 @@ use File::Basename ();
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 
 #####################################################################
 # Document Registration
@@ -250,40 +250,41 @@ sub _initialize {
 		'text/x-config' => {
 			name  => 'Config',
 			lexer => Wx::wxSTC_LEX_CONF,
+			class => 'Padre::Document::Config',
 		},
 
 		# text/xml specifically means "human-readable XML".
 		# This is prefered to the more generic application/xml
 		'text/xml' => {
 			name  => 'XML',
-			lexer => Wx::wxSTC_LEX_XML,       # CONFIRMED
+			lexer => Wx::wxSTC_LEX_XML, # CONFIRMED
 		},
 
 		'text/x-yaml' => {
 			name  => 'YAML',
-			lexer => Wx::wxSTC_LEX_YAML,      # CONFIRMED
+			lexer => Wx::wxSTC_LEX_YAML, # CONFIRMED
 		},
 		'application/x-pir' => {
 			name  => 'PIR',
-			lexer => Wx::wxSTC_LEX_NULL,      # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL, # CONFIRMED
 		},
 		'application/x-pasm' => {
 			name  => 'PASM',
-			lexer => Wx::wxSTC_LEX_NULL,      # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL, # CONFIRMED
 		},
 		'application/x-perl6' => {
 			name  => 'Perl 6',
-			lexer => Wx::wxSTC_LEX_NULL,      # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL, # CONFIRMED
 		},
 		'text/plain' => {
 			name  => 'Text',
-			lexer => Wx::wxSTC_LEX_NULL,      # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL, # CONFIRMED
 		},
 
 		# Completely custom mime types
-		'text/x-perlxs' => {                  # totally not confirmed
+		'text/x-perlxs' => {             # totally not confirmed
 			name  => 'XS',
-			lexer => Wx::wxSTC_LEX_CPP,       # for the lack of a better XS lexer (vim?)
+			lexer => Wx::wxSTC_LEX_CPP,  # for the lack of a better XS lexer (vim?)
 		},
 		'text/x-perltt' => {
 			name  => 'Template Toolkit',
@@ -708,6 +709,10 @@ sub is_perl6 {
 	return;
 }
 
+
+sub menu_view_mimes {
+	return map { $MIME_TYPES{$_}{name} => $_ } keys %MIME_TYPES;
+}
 
 1;
 

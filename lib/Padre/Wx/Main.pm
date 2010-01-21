@@ -25,20 +25,21 @@ use 5.008;
 use strict;
 use warnings;
 use FindBin;
-use Cwd             ();
-use Carp            ();
-use IPC::Open3      ();
-use File::Spec      ();
-use File::HomeDir   ();
-use File::Basename  ();
-use File::Temp      ();
-use List::Util      ();
-use Scalar::Util    ();
-use Params::Util    ();
-use Time::HiRes     ();
-use Padre::Action   ();
-use Padre::Constant ();
-use Padre::Util qw(_T);
+use Cwd                           ();
+use Carp                          ();
+use Config                        ();
+use IPC::Open3                    ();
+use File::Spec                    ();
+use File::HomeDir                 ();
+use File::Basename                ();
+use File::Temp                    ();
+use List::Util                    ();
+use Scalar::Util                  ();
+use Params::Util                  ();
+use Time::HiRes                   ();
+use Padre::Action                 ();
+use Padre::Constant               ();
+use Padre::Util                   ('_T');
 use Padre::Perl                   ();
 use Padre::Locale                 ();
 use Padre::Current                ();
@@ -47,27 +48,19 @@ use Padre::DB                     ();
 use Padre::Locker                 ();
 use Padre::Wx                     ();
 use Padre::Wx::Icon               ();
-use Padre::Wx::Left               ();
-use Padre::Wx::Right              ();
-use Padre::Wx::Bottom             ();
 use Padre::Wx::Debugger           ();
 use Padre::Wx::Editor             ();
-use Padre::Wx::Output             ();
-use Padre::Wx::Syntax             ();
 use Padre::Wx::Menubar            ();
 use Padre::Wx::ToolBar            ();
 use Padre::Wx::Notebook           ();
 use Padre::Wx::StatusBar          ();
-use Padre::Wx::ErrorList          ();
 use Padre::Wx::AuiManager         ();
-use Padre::Wx::FunctionList       ();
 use Padre::Wx::FileDropTarget     ();
 use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
-use Padre::Wx::Progress           ();
 use Padre::Logger;
 
-our $VERSION = '0.54';
+our $VERSION = '0.55';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -111,7 +104,6 @@ sub new {
 	my $style  = Wx::wxDEFAULT_FRAME_STYLE;
 	if ( $config->main_maximized ) {
 		$style |= Wx::wxMAXIMIZE;
-		$style |= Wx::wxCLIP_CHILDREN;
 	}
 
 	# Create the underlying Wx frame
@@ -180,8 +172,10 @@ sub new {
 	$self->SetMenuBar( $self->{menu}->wx );
 
 	# Create the tool bar
-	$self->SetToolBar( Padre::Wx::ToolBar->new($self) );
-	$self->GetToolBar->Realize;
+	if ( $config->main_toolbar ) {
+		$self->SetToolBar( Padre::Wx::ToolBar->new($self) );
+		$self->GetToolBar->Realize;
+	}
 
 	# Create the status bar
 	my $statusbar = Padre::Wx::StatusBar->new($self);
@@ -190,15 +184,6 @@ sub new {
 	# Create the notebooks (document and tools) that
 	# serve as the main AUI manager GUI elements.
 	$self->{notebook} = Padre::Wx::Notebook->new($self);
-	$self->{left}     = Padre::Wx::Left->new($self);
-	$self->{right}    = Padre::Wx::Right->new($self);
-	$self->{bottom}   = Padre::Wx::Bottom->new($self);
-
-	# Creat the various tools that will live in the panes
-	$self->{output}    = Padre::Wx::Output->new($self);
-	$self->{syntax}    = Padre::Wx::Syntax->new($self);
-	$self->{functions} = Padre::Wx::FunctionList->new($self);
-	$self->{errorlist} = Padre::Wx::ErrorList->new($self);
 
 	# Set up the pane close event
 	Wx::Event::EVT_AUI_PANE_CLOSE(
@@ -339,43 +324,43 @@ Accessors that may not belong to this class:
 
 =cut
 
-use Class::XSAccessor predicates => {
+use Class::XSAccessor {
+	predicates => {
 
-	# Needed for lazily-constructed gui elements
-	has_about     => 'about',
-	has_debugger  => 'debugger',
-	has_find      => 'find',
-	has_replace   => 'replace',
-	has_outline   => 'outline',
-	has_directory => 'directory',
+		# Needed for lazily-constructed gui elements
+		has_about     => 'about',
+		has_left      => 'left',
+		has_right     => 'right',
+		has_bottom    => 'bottom',
+		has_output    => 'output',
+		has_ack       => 'ack',
+		has_syntax    => 'syntax',
+		has_functions => 'functions',
+		has_debugger  => 'debugger',
+		has_find      => 'find',
+		has_replace   => 'replace',
+		has_outline   => 'outline',
+		has_directory => 'directory',
+		has_errorlist => 'errorlist',
 	},
 	getters => {
 
-	# GUI Elements
-	ide                 => 'ide',
-	config              => 'config',
-	title               => 'title',
-	aui                 => 'aui',
-	menu                => 'menu',
-	notebook            => 'notebook',
-	left                => 'left',
-	right               => 'right',
-	functions           => 'functions',
-	bottom              => 'bottom',
-	output              => 'output',
-	syntax              => 'syntax',
-	errorlist           => 'errorlist',
-	infomessage         => 'infomessage',
-	infomessage_timeout => 'infomessage_timeout',
+		# GUI Elements
+		ide                 => 'ide',
+		config              => 'config',
+		title               => 'title',
+		aui                 => 'aui',
+		menu                => 'menu',
+		notebook            => 'notebook',
+		infomessage         => 'infomessage',
+		infomessage_timeout => 'infomessage_timeout',
 
-	# Operating Data
-	locker => 'locker',
-	cwd    => 'cwd',
-	search => 'search',
-
-	# Things that are probably in the wrong place
-	ack => 'ack',
-	};
+		# Operating Data
+		locker => 'locker',
+		cwd    => 'cwd',
+		search => 'search',
+	},
+};
 
 sub about {
 	my $self = shift;
@@ -384,6 +369,60 @@ sub about {
 		$self->{about} = Padre::Wx::About->new($self);
 	}
 	return $self->{about};
+}
+
+sub left {
+	my $self = shift;
+	unless ( defined $self->{left} ) {
+		require Padre::Wx::Left;
+		$self->{left} = Padre::Wx::Left->new($self);
+	}
+	return $self->{left};
+}
+
+sub right {
+	my $self = shift;
+	unless ( defined $self->{right} ) {
+		require Padre::Wx::Right;
+		$self->{right} = Padre::Wx::Right->new($self);
+	}
+	return $self->{right};
+}
+
+sub bottom {
+	my $self = shift;
+	unless ( defined $self->{bottom} ) {
+		require Padre::Wx::Bottom;
+		$self->{bottom} = Padre::Wx::Bottom->new($self);
+	}
+	return $self->{bottom};
+}
+
+sub output {
+	my $self = shift;
+	unless ( defined $self->{output} ) {
+		require Padre::Wx::Output;
+		$self->{output} = Padre::Wx::Output->new($self);
+	}
+	return $self->{output};
+}
+
+sub functions {
+	my $self = shift;
+	unless ( defined $self->{functions} ) {
+		require Padre::Wx::FunctionList;
+		$self->{functions} = Padre::Wx::FunctionList->new($self);
+	}
+	return $self->{functions};
+}
+
+sub syntax {
+	my $self = shift;
+	unless ( defined $self->{syntax} ) {
+		require Padre::Wx::Syntax;
+		$self->{syntax} = Padre::Wx::Syntax->new($self);
+	}
+	return $self->{syntax};
 }
 
 sub debugger {
@@ -411,6 +450,15 @@ sub directory {
 		$self->{directory} = Padre::Wx::Directory->new($self);
 	}
 	return $self->{directory};
+}
+
+sub errorlist {
+	my $self = shift;
+	unless ( defined $self->{errorlist} ) {
+		require Padre::Wx::ErrorList;
+		$self->{errorlist} = Padre::Wx::ErrorList->new($self);
+	}
+	return $self->{errorlist};
 }
 
 sub directory_panel {
@@ -1007,6 +1055,7 @@ sub refresh {
 	$self->refresh_toolbar($current);
 	$self->refresh_status($current);
 	$self->refresh_functions($current);
+	$self->refresh_directory($current);
 	$self->refresh_title;
 
 	my $notebook = $self->notebook;
@@ -1020,9 +1069,6 @@ sub refresh {
 	} else {
 		$self->aui->GetPane('notebook')->PaneBorder(1);
 	}
-
-	# Update the GUI
-	$self->aui->Update;
 
 	return;
 }
@@ -1117,8 +1163,9 @@ since actual syntax check is happening in the background.
 
 sub refresh_syntaxcheck {
 	my $self = shift;
+	return unless $self->has_syntax;
 	return if $self->locked('REFRESH');
-	return if not $self->menu->view->{show_syntaxcheck}->IsChecked;
+	return unless $self->menu->view->{show_syntaxcheck}->IsChecked;
 	$self->syntax->on_timer( undef, 1 );
 	return;
 }
@@ -1237,17 +1284,15 @@ Force a refresh of the function list on the right.
 
 =cut
 
+# TO DO now on every ui change (move of the mouse) we refresh
+# this even though that should not be necessary can that be
+# eliminated ?
 sub refresh_functions {
-
-	# TO DO now on every ui change (move of the mouse) we refresh
-	# this even though that should not be necessary can that be
-	# eliminated ?
-	my ( $self, $current ) = @_;
+	my $self = shift;
+	return unless $self->has_functions;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{functions}->IsChecked;
-
-	$self->functions->refresh($current);
-
+	$self->functions->refresh(@_);
 	return;
 }
 
@@ -1261,10 +1306,9 @@ Force a refresh of the directory tree
 
 sub refresh_directory {
 	my $self = shift;
+	return unless $self->has_directory;
 	return if $self->locked('REFRESH');
-	if ( $self->has_directory ) {
-		$self->directory->refresh;
-	}
+	$self->directory->refresh(@_);
 	return;
 }
 
@@ -1386,9 +1430,18 @@ sub relocale {
 
 	# Update window manager captions
 	$self->aui->relocale;
-	$self->bottom->relocale;
-	$self->right->relocale;
-	$self->syntax->relocale;
+	if ( $self->has_left ) {
+		$self->left->relocale;
+	}
+	if ( $self->has_right ) {
+		$self->right->relocale;
+	}
+	if ( $self->has_bottom ) {
+		$self->bottom->relocale;
+	}
+	if ( $self->has_syntax ) {
+		$self->syntax->relocale;
+	}
 
 	return;
 }
@@ -1462,6 +1515,10 @@ sub rebuild_toolbar {
 	return 1;
 }
 
+
+
+
+
 #####################################################################
 
 =pod
@@ -1502,8 +1559,9 @@ sub _show_functions {
 	my $self = shift;
 	if ( $_[0] ) {
 		$self->right->show( $self->functions );
-	} else {
+	} elsif ( $self->has_functions ) {
 		$self->right->hide( $self->functions );
+		delete $self->{functions};
 	}
 }
 
@@ -1538,14 +1596,16 @@ sub show_outline {
 }
 
 sub _show_outline {
-	my $self    = shift;
-	my $outline = $self->outline;
+	my $self = shift;
 	if ( $_[0] ) {
+		my $outline = $self->outline;
 		$self->right->show($outline);
 		$outline->start unless $outline->running;
 	} elsif ( $self->has_outline ) {
+		my $outline = $self->outline;
 		$self->right->hide($outline);
 		$outline->stop if $outline->running;
+		delete $self->{outline};
 	}
 }
 
@@ -1616,11 +1676,10 @@ sub show_directory {
 sub _show_directory {
 	my $self = shift;
 	if ( $_[0] ) {
-		my $directory = $self->directory;
-		$self->directory_panel->show($directory);
-		$directory->refresh;
+		$self->directory_panel->show( $self->directory );
 	} elsif ( $self->has_directory ) {
 		$self->directory_panel->hide( $self->directory );
+		delete $self->{directory};
 	}
 }
 
@@ -1658,12 +1717,11 @@ sub _show_output {
 	if ( $_[0] ) {
 		$self->bottom->show(
 			$self->output,
-			sub {
-				$self->show_output(0);
-			}
+			sub { $self->show_output(0) },
 		);
-	} else {
+	} elsif ( $self->has_output ) {
 		$self->bottom->hide( $self->output );
+		delete $self->{output};
 	}
 }
 
@@ -1680,26 +1738,36 @@ the panel.
 =cut
 
 sub show_syntax {
-	my $self   = shift;
-	my $syntax = $self->syntax;
+	my $self = shift;
 
 	my $on = @_ ? $_[0] ? 1 : 0 : 1;
 	unless ( $on == $self->menu->view->{show_syntaxcheck}->IsChecked ) {
 		$self->menu->view->{show_syntaxcheck}->Check($on);
 	}
 
-	if ($on) {
-		$self->bottom->show( $syntax, sub { $self->show_syntax(0); } );
-		$syntax->start unless $syntax->running;
-	} else {
-		$self->bottom->hide( $self->syntax );
-		$syntax->stop if $syntax->running;
-	}
+	$self->_show_syntax($on);
 
 	$self->aui->Update;
 	$self->ide->save_config;
 
 	return;
+}
+
+sub _show_syntax {
+	my $self = shift;
+	if ( $_[0] ) {
+		my $syntax = $self->syntax;
+		$self->bottom->show(
+			$syntax,
+			sub { $self->show_syntax(0) },
+		);
+		$syntax->start unless $syntax->running;
+	} elsif ( $self->has_syntax ) {
+		my $syntax = $self->syntax;
+		$self->bottom->hide($syntax);
+		$syntax->stop if $syntax->running;
+		delete $self->{syntax};
+	}
 }
 
 =pod
@@ -1868,10 +1936,13 @@ sub on_run_tdd_tests {
 			$self->run_command("$perl Build test");
 		} elsif ( -e 'Makefile.PL' ) {
 			$self->run_command("$perl Makefile.PL");
-			my $make = 'make'; # TODO this should do dmake, nmake on Win32
+			my $make = $Config::Config{make};
+			$make = 'make' unless defined $make;
 			$self->run_command("$make test");
+		} elsif ( -e 'dist.ini' ) {
+			$self->run_command("dzil test");
 		} else {
-			$self->error( Wx::gettext("No Build.PL nor Makefile.PL found") );
+			$self->error( Wx::gettext("No Build.PL nor Makefile.PL nor dist.ini found") );
 		}
 	} else {
 		$self->error( Wx::gettext("Could not find perl executable") );
@@ -2222,6 +2293,7 @@ sub open_session {
 	# prevent redrawing until we're done
 	$self->Freeze;
 
+	require Padre::Wx::Progress;
 	my $progress = Padre::Wx::Progress->new(
 		$self,
 		sprintf(
@@ -2641,9 +2713,12 @@ sub on_comment_block {
 	my $end             = $editor->LineFromPosition($selection_end);
 	my $string          = $document->comment_lines_str;
 	if ( not defined $string ) {
-
-		#$self->error(sprintf( Wx::gettext("Could not determine the comment character for %s document type"),
-		#	Padre::MimeTypes->get_mime_type_name( $document->get_mimetype ) ));
+		$self->error(
+			sprintf(
+				Wx::gettext("Could not determine the comment character for %s document type"),
+				Padre::MimeTypes->get_mime_type_name( $document->get_mimetype )
+			)
+		);
 		return;
 	}
 
@@ -2827,12 +2902,9 @@ sub on_close_window {
 
 	TRACE("Files saved (or not), hiding window") if DEBUG;
 
-	# Immediately hide the window so that the user
-	# perceives the application as closing faster.
-	# This knocks about quarter of a second off the speed
-	# at which Padre appears to close.
-	# NOTE: I'm not entirely sure WHY these two statements aren't the
-	# other way around... but I have some vague memories it matters.
+	# Immediately hide the window so that the user perceives the application
+	# as closing faster. This knocks about quarter of a second off the speed
+	# at which Padre appears to close compared to letting it close naturally.
 	$self->locker->shutdown;
 	$self->Show(0);
 
@@ -2930,7 +3002,7 @@ sub setup_editors {
 		# clearly looks wrong when we DON'T do it.
 		if ( $self->notebook->GetPageCount == 1 ) {
 			if ( $self->current->document->is_unused ) {
-				$self->on_close($self);
+				$self->close;
 			}
 		}
 
@@ -2982,10 +3054,11 @@ exist, create an empty file before opening it.
 =cut
 
 sub setup_editor {
-	my ( $self, $file ) = @_;
-	my $config = $self->config;
-
-	my $manager = $self->{ide}->plugin_manager;
+	my $self    = shift;
+	my $file    = shift;
+	my $ide     = $self->ide;
+	my $config  = $ide->config;
+	my $plugins = $ide->plugin_manager;
 
 	TRACE( "setup_editor called for '" . ( $file || '' ) . "'" ) if DEBUG;
 
@@ -3032,27 +3105,27 @@ sub setup_editor {
 	}
 
 	my $lock = $self->lock('REFRESH');
-	my $doc = Padre::Document->new( filename => $file, );
+	my $document = Padre::Document->new( filename => $file, );
 
 	# Catch critical errors:
-	if ( !defined($doc) ) {
+	unless ( defined $document ) {
 		return;
 	}
 
 	$file ||= ''; #to avoid warnings
-	if ( $doc->errstr ) {
-		warn $doc->errstr . " when trying to open '$file'";
+	if ( $document->errstr ) {
+		warn $document->errstr . " when trying to open '$file'";
 		return;
 	}
 
 	TRACE("Document created for '$file'") if DEBUG;
 
 	my $editor = Padre::Wx::Editor->new( $self->notebook );
-	$editor->{Document} = $doc;
-	$doc->set_editor($editor);
-	$editor->configure_editor($doc);
+	$editor->{Document} = $document;
+	$document->set_editor($editor);
+	$editor->configure_editor($document);
 
-	$self->ide->plugin_manager->editor_enable($editor);
+	$plugins->editor_enable($editor);
 
 	my $title = $editor->{Document}->get_title;
 
@@ -3065,16 +3138,18 @@ sub setup_editor {
 		}
 	}
 
-	if ( $doc->is_new ) {
-		$doc->{project_dir} =
+	if ( $document->is_new ) {
+
+		# The project is probably the same as the previous file we had open
+		$document->{project_dir} =
 			  $self->current->document
 			? $self->current->document->project_dir
-			: $self->ide->config->default_projects_directory;
+			: $config->default_projects_directory;
 	} else {
-		TRACE( "Adding new file to history: " . $doc->filename ) if DEBUG;
+		TRACE( "Adding new file to history: " . $document->filename ) if DEBUG;
 		Padre::DB::History->create(
 			type => 'files',
-			name => $doc->filename,
+			name => $document->filename,
 		);
 
 		# Call the method immediately if not locked
@@ -3085,17 +3160,16 @@ sub setup_editor {
 	$self->notebook->GetPage($id)->SetFocus;
 
 	# no need to call this here as set_preferences already calls padre_setup.
-	#$editor->padre_setup;
-
+	# $editor->padre_setup;
 	Wx::Event::EVT_MOTION( $editor, \&Padre::Wx::Editor::on_mouse_motion );
 
-	$doc->restore_cursor_position;
+	$document->restore_cursor_position;
 
 	# Update and refresh immediately if not locked
 	$self->lock( 'update_last_session', 'refresh_menu' );
 
 	# Notify plugins
-	$manager->plugin_event('editor_changed');
+	$plugins->plugin_event('editor_changed');
 
 	return $id;
 }
@@ -3285,8 +3359,6 @@ sub on_open {
 		$self->{cwd} = File::Basename::dirname($filename);
 	}
 	$self->open_file_dialog;
-
-	return;
 }
 
 # TO DO: let's allow this to be used by plug-ins
@@ -3377,7 +3449,7 @@ sub open_file_dialog {
 
 		my $FN = File::Spec->catfile( $self->cwd, $filename );
 
-		if ( !-e $FN ) {
+		unless ( -e $FN ) {
 
 			# This could be checked by a Windows dialog, but a Gnome dialog doesn't,
 			# and created empty files when you do a typo in the open box when
@@ -3398,19 +3470,15 @@ sub open_file_dialog {
 		push @files, $FN;
 	}
 
-	if ( $#files > -1 ) {
-		my $lock = $self->lock('REFRESH');
-		$self->setup_editors(@files);
-	}
-
-	$self->ide->{session_autosave} and $self->save_current_session;
+	my $lock = $self->lock( 'REFRESH', 'DB' );
+	$self->setup_editors(@files) if $#files > -1;
+	$self->save_current_session  if $self->ide->{session_autosave};
 
 	return;
 }
 
 sub on_open_example {
-	my $self = shift;
-	return $self->open_file_dialog( Padre::Util::sharedir('examples') );
+	$_[0]->open_file_dialog( Padre::Util::sharedir('examples') );
 }
 
 =pod
@@ -3424,12 +3492,12 @@ Reload all open files from disk.
 =cut
 
 sub reload_all {
-	my $self = shift;
-	my $skip = shift;
-	my $lock = $self->lock('UPDATE');
-
+	my $self  = shift;
+	my $skip  = shift;
+	my $lock  = $self->lock('UPDATE');
 	my @pages = $self->pageids;
 
+	require Padre::Wx::Progress;
 	my $progress = Padre::Wx::Progress->new(
 		$self, Wx::gettext('Reload all files'), $#pages,
 		lazy => 1
@@ -3623,13 +3691,13 @@ sub on_save_as {
 				Wx::gettext("Exist"), Wx::wxYES_NO, $self,
 			);
 			if ( $response == Wx::wxYES ) {
-				$document->_set_filename($path);
+				$document->set_filename($path);
 				$document->save_file;
 				$document->set_newline_type(Padre::Constant::NEWLINE);
 				last;
 			}
 		} else {
-			$document->_set_filename($path);
+			$document->set_filename($path);
 			$document->save_file;
 			$document->set_newline_type(Padre::Constant::NEWLINE);
 			delete $document->{project_dir};
@@ -3644,8 +3712,10 @@ sub on_save_as {
 	$document->rebless;
 	$document->colourize;
 
-	$filename = $document->{file}->filename if defined( $document->{file} );
-	if ( defined($filename) ) {
+	if ( defined $document->{file} ) {
+		$filename = $document->{file}->filename;
+	}
+	if ( defined $filename ) {
 		Padre::DB::History->create(
 			type => 'files',
 			name => $filename,
@@ -3654,7 +3724,9 @@ sub on_save_as {
 		# Immediately refresh the recent list, or save the request
 		# for refresh lock expiry. We probably should add a specific
 		# lock method for this non-guard-object case.
-		$self->lock('refresh_recent');
+		# We also need to refresh the directory list, in case a change
+		# in file name means the project context has changed.
+		$self->lock( 'refresh_recent', 'refresh_directory' );
 	}
 
 	$self->refresh;
@@ -3732,7 +3804,7 @@ sub on_save_intuition {
 	}
 
 	# Save the file
-	$document->_set_filename($path);
+	$document->set_filename($path);
 	$document->save_file;
 	$document->set_newline_type(Padre::Constant::NEWLINE);
 
@@ -3777,13 +3849,22 @@ saved, false otherwise.
 
 sub on_save_all {
 	my $self = shift;
+
+	# TODO: Discuss this implementation
+	# trac ticket is: http://padre.perlide.org/trac/ticket/331
+	my $currentID = $self->notebook->GetSelection;
 	foreach my $id ( $self->pageids ) {
 		my $editor = $self->notebook->GetPage($id) or next;
+
 		my $doc = $editor->{Document}; # TO DO no accessor for document?
 		if ( $doc->is_modified ) {
+			$editor->SetFocus;
 			$self->on_save($doc) or return 0;
 		}
 	}
+
+	# set focus back to the currentDocument
+	$self->notebook->SetSelection($currentID);
 	return 1;
 }
 
@@ -3914,7 +3995,9 @@ sub close {
 
 	$self->notebook->DeletePage($id);
 
-	$self->syntax->clear;
+	if ( $self->has_syntax ) {
+		$self->syntax->clear;
+	}
 	if ( $self->has_outline ) {
 		$self->outline->clear;
 	}
@@ -3948,6 +4031,7 @@ sub close_all {
 
 	my @pages = reverse $self->pageids;
 
+	require Padre::Wx::Progress;
 	my $progress = Padre::Wx::Progress->new(
 		$self, Wx::gettext('Close all'), $#pages,
 		lazy => 1
