@@ -6,11 +6,11 @@ use 5.008;
 use strict;
 use warnings;
 use File::Spec     ();
-use YAML::Tiny     ();
 use Padre::Config  ();
 use Padre::Current ();
+use File::Spec     ();
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 use Class::XSAccessor {
 	getters => {
@@ -31,7 +31,7 @@ sub class {
 	my $root  = shift;
 	unless ( -d $root ) {
 
-		#		Carp::croak("Project directory '$root' does not exist");
+		# Carp::croak("Project directory '$root' does not exist");
 		# Project root doesn't exist, this might cause problems
 		# but croaking completly crashs Padre. Fix for #819
 		Padre->ide->wx->main->error(
@@ -59,7 +59,6 @@ sub class {
 		return 'Padre::Project';
 	}
 	return 'Padre::Project::Null';
-
 }
 
 
@@ -80,7 +79,7 @@ sub new {
 	unless ( -d $self->root ) {
 		return undef;
 
-		#		Carp::croak( "Root directory " . $self->root . " does not exist" );
+		# Carp::croak( "Root directory " . $self->root . " does not exist" );
 	}
 
 	# Check for a padre.yml file
@@ -93,6 +92,80 @@ sub new {
 	}
 
 	return $self;
+}
+
+sub from_file {
+	my $class = shift;
+	my $file  = shift;
+
+	# Split and scan
+	my ( $v, $d, $f ) = File::Spec->splitpath($file);
+	my @d = File::Spec->splitdir($d);
+	if ( defined $d[-1] and $d[-1] eq '' ) {
+		pop @d;
+	}
+	foreach ( reverse 0 .. $#d ) {
+		my $dir = File::Spec->catdir( @d[ 0 .. $_ ] );
+
+		# Check for Dist::Zilla support
+		my $dist_ini = File::Spec->catpath( $v, $dir, 'dist.ini' );
+		if ( -f $dist_ini ) {
+			require Padre::Project::Perl::DZ;
+			return Padre::Project::Perl::DZ->new(
+				root     => File::Spec->catpath( $v, $dir, '' ),
+				dist_ini => $dist_ini,
+			);
+		}
+
+		# Check for Module::Build support
+		my $build_pl = File::Spec->catpath( $v, $dir, 'Build.PL' );
+		if ( -f $build_pl ) {
+			require Padre::Project::Perl::MB;
+			return Padre::Project::Perl::MB->new(
+				root     => File::Spec->catpath( $v, $dir, '' ),
+				build_pl => $build_pl,
+			);
+		}
+
+		# Check for ExtUtils::MakeMaker and Module::Install support
+		my $makefile_pl = File::Spec->catpath( $v, $dir, 'Makefile.PL' );
+		if ( -f $makefile_pl ) {
+
+			# Differentiate between Module::Install and ExtUtils::MakeMaker
+			if (0) {
+				require Padre::Project::Perl::MI;
+				return Padre::Project::Perl::MI->new(
+					root        => File::Spec->catpath( $v, $dir, '' ),
+					makefile_pl => $makefile_pl,
+				);
+			} else {
+				require Padre::Project::Perl::EUMM;
+				return Padre::Project::Perl::EUMM->new(
+					root        => File::Spec->catpath( $v, $dir, '' ),
+					makefile_pl => $makefile_pl,
+				);
+			}
+		}
+
+		# Fall back to looking for null projects
+		my $padre_yml = File::Spec->catpath( $v, $dir, 'padre.yml' );
+		if ( -f $padre_yml ) {
+			return Padre::Project->new(
+				root      => File::Spec->catpath( $v, $dir, '' ),
+				padre_yml => $padre_yml,
+			);
+		}
+	}
+
+	# This document is part of the null project
+	require Padre::Project::Null;
+	return Padre::Project::Null->new(
+		root => File::Spec->catpath(
+			$v,
+			File::Spec->catdir(@d),
+			'',
+		),
+	);
 }
 
 
@@ -151,6 +224,19 @@ sub ignore_rule {
 		}
 	};
 }
+
+sub name {
+	my $self = shift;
+
+	my $name = ( reverse( File::Spec->splitdir( $self->root ) ) )[0];
+	if ( ( !defined($name) ) or ( $name eq '' ) ) { # Fallback
+		$name = $self->root;
+		$name =~ s/^.*[\/\\]//;
+	}
+
+	return $name;
+}
+
 
 1;
 

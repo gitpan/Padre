@@ -18,12 +18,12 @@ use Padre::DB::Migrate::Patch ();
 
 use vars qw{@ISA};
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 
 BEGIN {
-	
-	@ISA     = 'ORLite';
+
+	@ISA = 'ORLite';
 }
 
 sub import {

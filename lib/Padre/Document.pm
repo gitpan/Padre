@@ -136,7 +136,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 
 
@@ -283,6 +283,10 @@ sub rebless {
 	return;
 }
 
+sub current {
+	Padre::Current->new( document => $_[0] );
+}
+
 
 
 
@@ -306,7 +310,6 @@ sub colourize {
 
 sub colorize {
 	my $self = shift;
-
 	TRACE("colorize called") if DEBUG;
 
 	my $module = $self->get_highlighter;
@@ -342,7 +345,7 @@ sub colorize {
 }
 
 sub last_sync {
-	return $_[0]->{_timestamp};
+	$_[0]->{_timestamp};
 }
 
 # For ts without a newline type
@@ -1053,40 +1056,34 @@ sub project {
 
 sub project_dir {
 	my $self = shift;
-	$self->{project_dir}
-		or $self->{project_dir} = $self->project_find;
+	unless ( $self->{project_dir} ) {
+
+		# Load the project object and project_dir in one step
+		my $project = $self->project_find;
+		return unless defined($project);
+		my $project_dir = $project->root;
+		my $ide         = $self->current->ide;
+		$self->{project_dir} = $project_dir;
+		$ide->{project}->{$project_dir} = $project;
+		unless ( $project->isa('Padre::Project::Null') ) {
+			$self->{is_project} = 1;
+		}
+	}
+	return $self->{project_dir};
 }
 
 sub project_find {
 	my $self = shift;
 
 	# Anonymous files don't have a project
-	unless ( defined $self->file ) {
-		return;
-	}
+	return unless defined $self->file;
 
-	# Currently no project support for remote files:
-	if ( $self->{file}->{protocol} ne 'local' ) { return; }
+	# Currently no project support for remote files
+	return unless $self->{file}->{protocol} eq 'local';
 
 	# Search upwards from the file to find the project root
-	my ( $v, $d, $f ) = File::Spec->splitpath( $self->{file}->filename );
-	my @d = File::Spec->splitdir($d);
-	pop @d if defined( $d[-1] ) and ( $d[-1] eq '' );
-	my $dirs = List::Util::first {
-		       -f File::Spec->catpath( $v, $_, 'Makefile.PL' )
-			or -f File::Spec->catpath( $v, $_, 'Build.PL' )
-			or -f File::Spec->catpath( $v, $_, 'dist.ini' )
-			or -f File::Spec->catpath( $v, $_, 'padre.yml' );
-	}
-	map { File::Spec->catdir( @d[ 0 .. $_ ] ) } reverse( 0 .. $#d );
-
-	unless ( defined $dirs ) {
-
-		# This document is part of the null project
-		return File::Spec->catpath( $v, File::Spec->catdir(@d), '' );
-	}
-	$self->{is_project} = 1;
-	return File::Spec->catpath( $v, $dirs, '' );
+	require Padre::Project;
+	Padre::Project->from_file( $self->{file}->{filename} );
 }
 
 

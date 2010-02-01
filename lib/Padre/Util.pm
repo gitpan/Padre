@@ -34,11 +34,11 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.55';
+our $VERSION   = '0.56';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
-
+my %project_dir_cache;
 
 
 
@@ -291,9 +291,12 @@ sub svn_directory_revision {
 
 sub share {
 	if ( $ENV{PADRE_DEV} ) {
-		return File::Spec->catdir(
-			$FindBin::Bin,
-			File::Spec->updir, 'share'
+		return File::Spec->rel2abs(
+			File::Spec->catdir(
+				$FindBin::Bin,
+				File::Spec->updir,
+				'share',
+			),
 		);
 	}
 
@@ -313,9 +316,9 @@ sub share {
 	#        return $path if -d $path;
 	#    }
 
-	# rely on automatic handling of everything
+	# Rely on automatic handling of everything
 	require File::ShareDir;
-	return File::ShareDir::dist_dir('Padre');
+	return File::Spec->rel2abs( File::ShareDir::dist_dir('Padre') );
 }
 
 sub sharedir {
@@ -399,17 +402,29 @@ support but it is used by some (C<SVK>) plug-ins.
 sub get_project_dir {
 	my $filename = shift or return;
 
+	if ( defined( $project_dir_cache{$filename} ) and ( $project_dir_cache{$filename}->{timeout} >= time ) ) {
+		return $project_dir_cache{$filename}->{dir};
+	}
+
 	# Check for potential relative path on filename
 	if ( $filename =~ m{\.\.} ) {
 		$filename = Cwd::realpath($filename);
 	}
 
+
 	my $olddir = File::Basename::dirname($filename);
 	my $dir    = $olddir;
 	while (1) {
-		return $dir if -e File::Spec->catfile( $dir, 'Makefile.PL' );
-		return $dir if -e File::Spec->catfile( $dir, 'Build.PL' );
-		return $dir if -e File::Spec->catfile( $dir, 'dist.ini' );
+		for my $testfilename ( 'Makefile.PL', 'Build.PL', 'dist.ini', 'padre.yml' ) {
+			next unless -e File::Spec->catfile( $dir, $testfilename );
+
+			$project_dir_cache{$filename} = {
+				timeout => time + 60,
+				dir     => $dir,
+			};
+
+			return $dir;
+		}
 		$olddir = $dir;
 		$dir    = File::Basename::dirname($dir);
 		last if $olddir eq $dir;

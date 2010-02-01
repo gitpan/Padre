@@ -23,7 +23,7 @@ use File::Basename ();
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 #####################################################################
 # Document Registration
@@ -41,10 +41,10 @@ sub _initialize {
 	return if %EXT_BINARY; # call it only once
 
 	%EXT_BINARY = map { $_ => 1 } qw{
-		aiff  au    avi  bmp  cache  dat   doc  gif  gz   icns
+		aiff  au    avi  bmp  cache  dat   doc  docx gif  gz   icns
 		jar   jpeg  jpg  m4a  mov    mp3   mpg  ogg  pdf  png
 		pnt   ppt   qt   ra   svg    svgz  svn  swf  tar  tgz
-		tif   tiff  wav  xls  xlw    zip
+		tif   tiff  wav  xls  xlw    xlsx  zip
 	};
 
 	# This is the primary file extension to mime-type mapping
@@ -145,12 +145,12 @@ sub _initialize {
 		},
 
 		'text/x-c' => {
-			name  => 'c',
+			name  => 'C',
 			lexer => Wx::wxSTC_LEX_CPP,
 		},
 
 		'text/x-c++src' => {
-			name  => 'c++',
+			name  => 'C++',
 			lexer => Wx::wxSTC_LEX_CPP,   # CONFIRMED
 		},
 		'text/css' => {
@@ -608,11 +608,14 @@ sub guess_mimetype {
 	# Hardcode this for now for the cases that we care about and
 	# are obvious.
 	if ( defined $text ) {
-		if ( $text =~ /\A#!/m ) {
 
-			# Found a hash bang line
+		# Is this a script of some kind?
+		if ( $text =~ /\A#!/m ) {
 			if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
 				return $self->perl_mime_type($text);
+			}
+			if ( $text =~ /\A#![^\n]*\b(?:z|k|ba)?sh\b/ ) {
+				return 'application/x-shellscript';
 			}
 		}
 
@@ -711,7 +714,14 @@ sub is_perl6 {
 
 
 sub menu_view_mimes {
-	return map { $MIME_TYPES{$_}{name} => $_ } keys %MIME_TYPES;
+	my %menu_view_mimes = ();
+	for my $mime_type ( keys %MIME_TYPES ) {
+		my $mime_type_name = $MIME_TYPES{$mime_type}{name};
+		if ($mime_type_name) {
+			$menu_view_mimes{$mime_type_name} = $mime_type;
+		}
+	}
+	return %menu_view_mimes;
 }
 
 1;

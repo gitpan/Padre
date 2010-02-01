@@ -68,6 +68,7 @@ requires 'Devel::Dumpvar'        => '0.04';
 requires 'Devel::Refactor'       => '0.05';
 requires 'Digest::MD5'           => 0;
 requires 'Encode'                => '2.26';
+requires 'ExtUtils::MakeMaker'   => '6.56';
 requires 'File::Basename'        => 0;
 requires 'File::Glob'            => 0;
 requires 'File::Glob::Windows'   => '0.1.3' if win32;
@@ -79,7 +80,7 @@ requires 'File::Path'            => '2.07';
 requires 'File::Remove'          => '1.42';
 requires 'File::ShareDir'        => '1.00';
 
-#requires      'File::ShareDir::PAR'      => '0.04';
+#requires 'File::ShareDir::PAR'   => '0.04';
 requires 'File::Spec'            => '3.2701';
 requires 'File::Spec::Functions' => '3.2701';
 requires 'File::Temp'            => 0;
@@ -98,14 +99,15 @@ requires 'IPC::Open2'      => 0;
 requires 'IPC::Open3'      => 0;
 requires 'List::Util'      => '1.18';
 requires 'List::MoreUtils' => '0.22';
+requires 'Module::Build'   => '0.3603';
 requires 'Module::Refresh' => '0.13';
 requires 'Module::Starter' => '1.50';
-requires 'ORLite'          => '1.30';
+requires 'ORLite'          => '1.38';
 
 # Temporarily disabled as we have cloned a private copy
 # requires 'ORLite::Migrate' => '1.06';
 
-#requires      'PAR'                      => '0.989';
+#requires 'PAR'                      => '0.989';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.11';
 requires 'Parse::ExuberantCTags'    => '1.00';
@@ -116,26 +118,28 @@ requires 'Pod::Simple::XHTML'       => '3.04';
 requires 'Pod::Abstract'            => '0.16';
 requires 'Pod::Perldoc'             => '3.15';
 
-#requires       'Portable'                 => '0.12' if win32;
-requires 'POSIX'                   => 0;
-requires 'PPI'                     => '1.205';
-requires 'PPIx::EditorTools'       => '0.09';
-requires 'Probe::Perl'             => '0.01';
+#requires 'Portable'                => '0.12' if win32;
+requires 'POSIX'             => 0;
+requires 'PPI'               => '1.205';
+requires 'PPIx::EditorTools' => '0.09';
+
+#requires 'Probe::Perl'             => '0.01';
 requires 'Storable'                => '2.15';
 requires 'Template::Tiny'          => '0.03';
 requires 'Term::ReadLine'          => 0;
-requires 'Text::Balanced'          => 0;
+requires 'Text::Balanced'          => '2.01';
 requires 'Text::Diff'              => '0.35';
 requires 'Text::FindIndent'        => '0.06';
 requires 'Thread::Queue'           => '2.11';
 requires 'threads'                 => '1.71';
 requires 'threads::shared'         => '1.26';
 requires 'URI'                     => '0';
-requires 'version'                 => 0;
+requires 'version'                 => '0.80';
 requires 'Win32'                   => '0.31' if win32;
 requires 'Win32::API'              => '0.58' if win32;
 requires 'Win32::Shortcut'         => '0.07' if win32;
-requires 'Wx'                      => '0.91';
+requires 'Win32::TieRegistry'      => '0.26' if win32;
+requires 'Wx'                      => ( win32 and $] >= 5.01 ) ? '0.94' : '0.91';
 requires 'Wx::Perl::ProcessStream' => '0.24';
 requires 'YAML::Tiny'              => '1.32';
 requires 'ExtUtils::Manifest'      => '1.56';
@@ -143,7 +147,7 @@ requires 'Pod::Functions'          => 0;
 requires 'Module::CoreList'        => 0;
 test_requires 'Capture::Tiny'      => '0.06';
 test_requires 'Test::More'         => '0.88';
-test_requires 'Test::Script'       => '1.05';
+test_requires 'Test::Script'       => '1.07';
 test_requires 'Test::Exception'    => '0.27';
 test_requires 'Test::NoWarnings'   => '0.084';
 
@@ -197,29 +201,9 @@ keywords(
 );
 
 install_script 'script/padre';
-if (win32) {
 
-	#--------------- Build Padre.exe --------------
-	print "Building padre.exe\n";
+build_padre_exe if win32;
 
-	# Create the blib/bin folder
-	system $^X , qw[-MExtUtils::Command -e mkpath --], qw[ blib/bin ];
-
-	# Step 1: Make sure we do not have old files
-	unlink "padre-rc.o" if -f "padre-rc.o";
-	unlink "padre.exe"  if -f "blib/bin/padre.exe";
-
-	# Step 2: Build Padre's win32 resource using windres
-	system qw[cd bin && windres padre-rc.rc padre-rc.o];
-
-	# Step 3: Build padre.exe using gcc
-	system "cd bin && gcc -Wall -Os -mwin32 -mwindows -Wl,-s padre.c padre-rc.o -o ../blib/bin/padre.exe";
-
-	# Step 4: Install XP manifest to get a themed Padre
-	system $^X , qw[-MExtUtils::Command -e cp --], qw[ bin/wperl.exe.manifest blib/bin/wperl.exe.manifest ];
-
-	#--------------- End of Padre.exe's Build --------------
-}
 install_share_with_mofiles;
 
 

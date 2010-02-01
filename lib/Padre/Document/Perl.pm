@@ -17,7 +17,7 @@ use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
 use Padre::Logger;
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 our @ISA     = 'Padre::Document';
 
 
@@ -261,10 +261,10 @@ Accepts one optional argument: a debug flag.
 =cut
 
 sub get_command {
-	my $self  = shift;
-	my $debug = shift;
-
-	my $config = Padre->ide->config;
+	my $self    = shift;
+	my $debug   = shift;
+	my $current = Padre::Current->new( document => $self );
+	my $config  = $current->config;
 
 	# Use a temporary file if run_save is set to 'unsaved'
 	my $filename =
@@ -288,7 +288,7 @@ sub get_command {
 				),
 				Wx::gettext('Run'),
 				Wx::wxYES_NO | Wx::wxCENTRE,
-				Padre->ide->wx->main,
+				$current->main,
 			);
 			if ( $ret == Wx::wxYES ) {
 				$perl = Padre::Perl::cperl();
@@ -924,9 +924,12 @@ EOC
 sub perltags_parser {
 	my $self = shift;
 
-	require Parse::ExuberantCTags;
-	my $config        = Padre->ide->config;
+	# Don't scan on every char if there is no file
+	return if $self->{_perltags_file_none};
 	my $perltags_file = $self->{_perltags_file};
+
+	require Parse::ExuberantCTags;
+	my $config = Padre->ide->config;
 
 	# Use the configured file (if any) or the old default, reset on config change
 	if (   not defined $perltags_file
@@ -983,8 +986,16 @@ sub perltags_parser {
 
 		$perltags_file = $self->{_perltags_file};
 
+		# Remember that we don't have a file if we don't have one
+		if ( defined($perltags_file) ) {
+			$self->{_perltags_file_none} = 0;
+		} else {
+			$self->{_perltags_file_none} = 1;
+		}
+
 		# Reset timer for new file
 		delete $self->{_perltags_parser_time};
+
 	}
 
 	# If we don't have a file (none specified in config, for example), return undef
@@ -1056,6 +1067,7 @@ sub autocomplete {
 
 	# Remove any ident from the beginning of the prefix
 	$prefix =~ s/^[\r\t]+//;
+	return if length($prefix) == 0;
 
 	# One char may be added by the current event
 	return if length($prefix) < ( $min_chars - 1 );
@@ -1065,7 +1077,7 @@ sub autocomplete {
 
 	# The second parameter may be a reference to the current event or the next
 	# char which will be added to the editor:
-	my $nextchar;
+	my $nextchar = '';                   # Use empty instead of undef
 	if ( defined($event) and ( ref($event) eq 'Wx::KeyEvent' ) ) {
 		my $key = $event->GetUnicodeKey;
 		$nextchar = chr($key);
@@ -1465,23 +1477,11 @@ sub event_on_right_down {
 	my $menu   = shift;
 	my $event  = shift;
 
-	my $pos;
-	if ( $event->isa("Wx::MouseEvent") ) {
-		my $point = $event->GetPosition();
-		if ( $point != Wx::wxDefaultPosition ) {
-
-			# Then it is really a mouse event...
-			# On Windows, context menu is faked
-			# as a Mouse event
-			$pos = $editor->PositionFromPoint($point);
-		}
-	}
-
-	unless ($pos) {
-
-		# Fall back to the cursor position
-		$pos = $editor->GetCurrentPos();
-	}
+	# Use the editor's current cursor position
+	# PLEASE DO NOT use the mouse event position
+	# You will get inconsistent results regarding refactor tools
+	# when pressing Windows context "right click" key
+	my $pos = $editor->GetCurrentPos();
 
 	my $introduced_separator = 0;
 

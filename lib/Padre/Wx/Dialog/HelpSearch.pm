@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -270,6 +270,7 @@ sub show {
 		Wx::Event::EVT_IDLE(
 			$self,
 			sub {
+				return if $self->{canceled};
 				if ( $self->_search ) {
 					$self->_update_list_box;
 				}
@@ -306,8 +307,10 @@ sub _search {
 				return;
 			}
 			if ( not $self->_help_provider ) {
+				$self->{canceled} = 1;
 				$self->_main->error( Wx::gettext("Could not find a help provider for ")
 						. Padre::MimeTypes->get_mime_type_name( $doc->get_mimetype ) );
+				exit if ++$self->{errorcount} > 5;
 				return;
 			}
 		} else {
@@ -351,6 +354,9 @@ sub find_help_topic {
 				$editor->WordEndPosition( $pos, 1 )
 			);
 		}
+
+		# trim whitespace
+		$topic =~ s/^\s*(.*?)\s*$/$1/;
 	}
 
 	return $topic;

@@ -25,23 +25,57 @@ use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
+
+=pod
+
+=head3 C<find_padre_exe>
+
+Note: this only works under WIN32
+
+Returns Padre's executable path and parent folder as (padre_exe, padre_exe_dir). 
+Returns undef if not found.
+
+=cut
+
+sub find_padre_exe {
+	return unless Padre::Constant::WXWIN32;
+
+	my $self = shift;
+	require File::Which;
+	require File::Basename;
+	my $padre_exe = File::Which::which('padre.exe');
+
+	#exit if we could not find Padre's executable in PATH
+	if ($padre_exe) {
+		my $padre_exe_dir = File::Basename::dirname($padre_exe);
+		return ( $padre_exe, $padre_exe_dir );
+	} else {
+		return;
+	}
+}
 
 sub desktop {
 	if (Padre::Constant::WXWIN32) {
 
-		# NOTE: Convert this to use Win32::TieRegistry
-		#		require File::Temp;
-		#		my ( $reg, $regfile ) = File::Temp::tempfile( SUFFIX => '.reg' );
-		#		print $reg <<'REG';
-		#Windows Registry Editor Version 5.00
-		#
-		#[HKEY_CLASSES_ROOT\*\shell\Edit with Padre]
-		#
-		#[HKEY_CLASSES_ROOT\*\shell\Edit with Padre\Command]
-		#@="c:\\strawberry\\perl\\bin\\padre.exe \"%1\""
-		#REG
-		#		close $reg;
+		# Find Padre's executable
+		my ( $padre_exe, $padre_exe_dir ) = find_padre_exe();
+		return 0 unless $padre_exe;
+
+		# Write to the registry to get the "Edit with Padre" in the
+		# right-click-shell-context menu
+		require Win32::TieRegistry;
+		my $Registry;
+		Win32::TieRegistry->import(
+			TiedRef => \$Registry, Delimiter => "/", ArrayValues => 1,
+		);
+		$Registry->Delimiter('/');
+		$Registry->{'HKEY_CLASSES_ROOT/*/shell/'} = {
+			'Edit with Padre/' => {
+				'Command/' => { "" => 'c:\\strawberry\\perl\\bin\\padre.exe "%1"' },
+			}
+			}
+			or return 0;
 
 		# Create Padre's Desktop Shortcut
 		require File::HomeDir;
@@ -55,34 +89,10 @@ sub desktop {
 		require Win32::Shortcut;
 		my $link = Win32::Shortcut->new;
 		$link->{Description}      = "Padre - The Perl IDE";
-		$link->{Path}             = "C:\\strawberry\\perl\\bin\\padre.exe";
-		$link->{WorkingDirectory} = "C:\\strawberry\\perl\\bin";
+		$link->{Path}             = $padre_exe;
+		$link->{WorkingDirectory} = $padre_exe_dir;
 		$link->Save($padre_lnk);
 		$link->Close;
-
-		return 1;
-	}
-
-	if (Padre::Constant::WXGTK) {
-
-		# Create Padre.desktop launcher on KDE/gnome
-		require Padre::Util;
-		my $filename = "$ENV{HOME}/Desktop/Padre.desktop";
-		my $logo     = Padre::Util::sharedir('icons/padre/64x64/logo.png');
-		my $content  = <<"DESKTOP";
-[Desktop Entry]
-Name=Padre
-Comment=Padre - The Perl IDE
-Exec=/usr/local/bin/padre
-Icon=$logo
-Terminal=false
-Type=Application
-Categories=Development;Utility;
-MimeType=text/plain;application/x-perl;application/x-perl6;
-DESKTOP
-		open my $fh, ">", $filename or die "Cannot create $filename: $!\n";
-		print $fh $content;
-		close $fh;
 
 		return 1;
 	}
@@ -92,6 +102,10 @@ DESKTOP
 
 sub quicklaunch {
 	if (Padre::Constant::WXWIN32) {
+
+		# Find Padre's executable
+		my ( $padre_exe, $padre_exe_dir ) = find_padre_exe();
+		return 0 unless $padre_exe;
 
 		# Code stolen and modified from File::HomeDir, which doesn't
 		# natively support the non-local APPDATA folder.
@@ -111,8 +125,8 @@ sub quicklaunch {
 		# NOTE: Use Padre::Perl to make this distribution agnostic
 		require Win32::Shortcut;
 		my $link = Win32::Shortcut->new;
-		$link->{Path}             = "C:\\strawberry\\perl\\bin\\padre.exe";
-		$link->{WorkingDirectory} = "C:\\strawberry\\perl\\bin";
+		$link->{Path}             = $padre_exe;
+		$link->{WorkingDirectory} = $padre_exe_dir;
 		$link->Save($padre_lnk);
 		$link->Close;
 

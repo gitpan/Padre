@@ -60,7 +60,7 @@ use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Logger;
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -222,6 +222,7 @@ sub new {
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
 	# so we don't accidentally trigger any configuration writes.
+	$self->_show_todo( $self->config->main_todo );
 	$self->_show_functions( $self->config->main_functions );
 	$self->_show_outline( $self->config->main_outline );
 	$self->_show_directory( $self->config->main_directory );
@@ -292,6 +293,8 @@ Accessors to GUI elements:
 
 =item * C<functions>
 
+=item * C<todo>
+
 =item * C<outline>
 
 =item * C<directory>
@@ -336,6 +339,7 @@ use Class::XSAccessor {
 		has_ack       => 'ack',
 		has_syntax    => 'syntax',
 		has_functions => 'functions',
+		has_todo      => 'todo',
 		has_debugger  => 'debugger',
 		has_find      => 'find',
 		has_replace   => 'replace',
@@ -414,6 +418,15 @@ sub functions {
 		$self->{functions} = Padre::Wx::FunctionList->new($self);
 	}
 	return $self->{functions};
+}
+
+sub todo {
+	my $self = shift;
+	unless ( defined $self->{todo} ) {
+		require Padre::Wx::TodoList;
+		$self->{todo} = Padre::Wx::TodoList->new($self);
+	}
+	return $self->{todo};
 }
 
 sub syntax {
@@ -560,7 +573,7 @@ sub load_files {
 	my $self    = shift;
 	my $ide     = $self->ide;
 	my $config  = $self->config;
-	my $startup = $config->main_startup;
+	my $startup = $config->startup_files;
 
 	# explicit session on command line takes precedence
 	if ( defined $ide->opts->{session} ) {
@@ -629,6 +642,19 @@ sub load_files {
 	return;
 }
 
+sub _xy_on_screen {
+
+	# Returns true if the initial xy coordinate is on the screen
+	# See ticket #822
+	my $self   = shift;
+	my $config = $self->config;
+	if ( $config->main_top < 0 or $config->main_left < 0 ) {
+		return 0;
+	}
+
+	return 1;
+}
+
 sub _timer_post_init {
 	my $self    = shift;
 	my $config  = $self->config;
@@ -646,7 +672,7 @@ sub _timer_post_init {
 	# size, reposition to the defaults).
 	# This must happen AFTER the initial ->Show(1) because otherwise
 	# ->IsShownOnScreen returns a false-negative result.
-	unless ( $self->IsShownOnScreen ) {
+	unless ( $self->IsShownOnScreen and $self->_xy_on_screen ) {
 		$self->SetSize(
 			Wx::Size->new(
 				$config->default('main_width'),
@@ -895,7 +921,7 @@ sub single_instance_connect {
 			while ( $_[0]->Read( $buffer, 128 ) ) {
 				$command .= $buffer;
 				while ( $command =~ s/^(.*?)[\012\015]+//s ) {
-					$_[1]->single_instance_command("$1");
+					$_[1]->single_instance_command( "$1", $_[0] );
 				}
 			}
 			return 1;
@@ -924,8 +950,9 @@ $file> and C<focus>.
 =cut
 
 sub single_instance_command {
-	my $self = shift;
-	my $line = shift;
+	my $self   = shift;
+	my $line   = shift;
+	my $socket = shift;
 
 	# $line should be defined
 	return 1 unless defined $line && length $line;
@@ -956,6 +983,30 @@ sub single_instance_command {
 			$self->notebook->show_file($line)
 				or $self->setup_editors($line);
 		}
+
+	} elsif ( $1 eq 'open-sync' ) {
+
+		# XXX: This should be two commands, 'open'+'wait-for-close'
+		my $editor;
+		if ( -f $line ) {
+
+			# If a file is already loaded switch to it instead
+			$editor = $self->notebook->show_file($line);
+			$editor ||= $self->setup_editors($line);
+		}
+
+		# Notify the client when we close
+		# this window
+		$self->{on_close_watchers} ||= {};
+		$self->{on_close_watchers}->{$line} ||= [];
+		push @{ $self->{on_close_watchers}->{$line} }, sub {
+
+			#warn "Closing $line / " . $_[0]->filename;
+			my $buf = "closed:$line\r\n"
+				; # XXX Should we worry about encoding things as utf-8 or do we rely on both client and server speaking the same filesystem encoding?
+			$socket->Write( $buf, length($buf) ); # XXX length is encoding-sensitive!
+			return 1;                             # signal that we want to be removed
+		};
 
 	} else {
 
@@ -1051,12 +1102,26 @@ sub refresh {
 	my $lock    = $self->lock('UPDATE');
 	my $current = $self->current;
 
+	# Refresh the highest and quickest things first,
+	# and work downwards and slower from there.
+	# Humans tend to look at the top of the screen first.
+	$self->refresh_title($current);
 	$self->refresh_menubar($current);
 	$self->refresh_toolbar($current);
-	$self->refresh_status($current);
 	$self->refresh_functions($current);
 	$self->refresh_directory($current);
-	$self->refresh_title;
+	$self->refresh_status($current);
+
+	# Now signal the refresh to all remaining listeners
+	# weed out expired weak references
+	@{ $self->{refresh_listeners} } = grep { ; defined } @{ $self->{refresh_listeners} };
+	for ( @{ $self->{refresh_listeners} } ) {
+		if ( my $refresh = $_->can('refresh') ) {
+			$_->refresh($current);
+		} else {
+			$_->($current);
+		}
+	}
 
 	my $notebook = $self->notebook;
 	if ( $notebook->GetPageCount ) {
@@ -1071,6 +1136,34 @@ sub refresh {
 	}
 
 	return;
+}
+
+=pod
+
+=head3 C<add_refresh_listener>
+
+Adds an object which will have its C<< ->refresh() >> method
+called whenever the main refresh event is triggered. The
+refresh listener is stored as a weak reference so make sure
+that you keep the listener alive elsewhere.
+
+If your object does not have a C<< ->refresh() >> method, pass in
+a code reference - it will be called instead.
+
+Note that this method must return really quick. If you plan to
+do work that takes longer, launch it via the L<Action::Queue> mechanism
+and perform it in the background.
+
+=cut
+
+sub add_refresh_listener {
+	my ( $self, @listeners ) = @_;
+	for my $l (@listeners) {
+		if ( !grep { $_ eq $l } @{ $self->{refresh_listeners} } ) {
+			Scalar::Util::weaken($l);
+			push @{ $self->{refresh_listeners} }, $l;
+		}
+	}
 }
 
 =pod
@@ -1121,11 +1214,11 @@ sub refresh_title {
 		my ($session) = Padre::DB::Session->select(
 			'where id = ?', $self->ide->{session},
 		);
-		$variable_data{'p'} = $session->{name};
+		$variable_data{'p'} = $session->name;
 	}
 
 	# Keep it for later usage
-	$self->{title} = $config->window_title;
+	$self->{title} = $config->main_title;
 
 	my $Vars = join( '', keys(%variable_data) );
 
@@ -1296,6 +1389,18 @@ sub refresh_functions {
 	return;
 }
 
+# TO DO now on every ui change (move of the mouse) we refresh
+# this even though that should not be necessary can that be
+# eliminated ?
+sub refresh_todo {
+	my $self = shift;
+	return unless $self->has_todo;
+	return if $self->locked('REFRESH');
+	return unless $self->menu->view->{todo}->IsChecked;
+	$self->todo->refresh(@_);
+	return;
+}
+
 =pod
 
 =head3 C<refresh_directory>
@@ -1309,6 +1414,22 @@ sub refresh_directory {
 	return unless $self->has_directory;
 	return if $self->locked('REFRESH');
 	$self->directory->refresh(@_);
+	return;
+}
+
+=pod
+
+=head2 C<refresh_aui>
+
+This is a refresh method wrapper around the AUI C<Update> method so
+that it can be lock-managed by the existing locking system.
+
+=cut
+
+sub refresh_aui {
+	my $self = shift;
+	return if $self->locked('refresh_aui');
+	$self->aui->Update;
 	return;
 }
 
@@ -1480,6 +1601,7 @@ sub reconfig {
 	# Show or hide all the main gui elements
 	# TO DO - Move this into the config ->apply logic
 	$self->show_functions( $config->main_functions );
+	$self->show_todo( $config->main_todo );
 	$self->show_outline( $config->main_outline );
 	$self->show_directory( $config->main_directory );
 	$self->show_output( $config->main_output );
@@ -1540,15 +1662,14 @@ the panel.
 
 sub show_functions {
 	my $self = shift;
-	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'refresh_functions' );
 	unless ( $on == $self->menu->view->{functions}->IsChecked ) {
 		$self->menu->view->{functions}->Check($on);
 	}
+
 	$self->config->set( main_functions => $on );
-	$self->config->write;
-
 	$self->_show_functions($on);
-
 	$self->aui->Update;
 	$self->ide->save_config;
 
@@ -1562,6 +1683,44 @@ sub _show_functions {
 	} elsif ( $self->has_functions ) {
 		$self->right->hide( $self->functions );
 		delete $self->{functions};
+	}
+}
+
+=head3 C<show_todo>
+
+    $main->show_todo( $visible );
+
+Show the todo panel on the right if C<$visible> is true. Hide it
+otherwise. If C<$visible> is not provided, the method defaults to show
+the panel.
+
+=cut
+
+sub show_todo {
+	my $self = shift;
+	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	unless ( $on == $self->menu->view->{todo}->IsChecked ) {
+		$self->menu->view->{todo}->Check($on);
+	}
+	$self->config->set( main_todo => $on );
+	$self->config->write;
+
+	$self->_show_todo($on);
+
+	$self->aui->Update;
+	$self->ide->save_config;
+
+	return;
+}
+
+# XXX This should be merged with _show_functions again
+sub _show_todo {
+	my $self = shift;
+	if ( $_[0] ) {
+		$self->right->show( $self->todo );
+	} elsif ( $self->has_todo ) {
+		$self->right->hide( $self->todo );
+		delete $self->{todo};
 	}
 }
 
@@ -1874,11 +2033,11 @@ Note: it probably needs to be combined with C<run_command()> itself.
 =cut
 
 sub on_run_command {
-	my $main = shift;
+	my $self = shift;
 
 	require Padre::Wx::History::TextEntryDialog;
 	my $dialog = Padre::Wx::History::TextEntryDialog->new(
-		$main,
+		$self,
 		Wx::gettext("Command line"),
 		Wx::gettext("Run setup"),
 		"run_command",
@@ -1891,7 +2050,7 @@ sub on_run_command {
 	unless ( defined $command and $command ne '' ) {
 		return;
 	}
-	$main->run_command($command);
+	$self->run_command($command);
 	return;
 }
 
@@ -2161,7 +2320,7 @@ sub run_command {
 		$self->error( sprintf( Wx::gettext("Failed to start '%s' command"), $cmd ) );
 		$self->menu->run->enable;
 	}
-
+	$self->current->editor->SetFocus();
 	return;
 }
 
@@ -2211,7 +2370,11 @@ sub run_document {
 	}
 	if ($cmd) {
 		if ( $document->pre_process ) {
-			$self->run_command($cmd);
+			SCOPE: {
+				require File::pushd;
+				my $pushd = File::pushd::pushd( $document->project_dir );
+				$self->run_command($cmd);
+			}
 		} else {
 			my $styles = Wx::wxCENTRE | Wx::wxICON_HAND | Wx::wxYES_NO;
 			my $ret    = Wx::MessageBox(
@@ -2221,7 +2384,11 @@ sub run_document {
 				$self,
 			);
 			if ( $ret == Wx::wxYES ) {
-				$self->run_command($cmd);
+				SCOPE: {
+					require File::pushd;
+					my $pushd = File::pushd::pushd( $document->project_dir );
+					$self->run_command($cmd);
+				}
 			}
 		}
 	}
@@ -2329,7 +2496,7 @@ sub open_session {
 	$progress->update( $#files + 1, Wx::gettext('Restore focus...') );
 	$self->on_nth_pane($focus) if defined $focus;
 
-	$self->ide->{session}          = $session->{id};
+	$self->ide->{session}          = $session->id;
 	$self->ide->{session_autosave} = $autosave;
 
 	# now we can redraw
@@ -2358,7 +2525,7 @@ sub save_session {
 
 	my $transaction = $self->lock('DB');
 	foreach my $file (@session) {
-		$file->{session} = $session->id;
+		$file->set( session => $session->id );
 		$file->insert;
 	}
 
@@ -2799,18 +2966,8 @@ Prompt user for a line, and jump to this line in current document.
 sub on_goto {
 	my $self = shift;
 
-	my $editor      = $self->current->editor;
-	my $max         = $editor->GetLineCount;
-	my $line_number = $self->prompt(
-		sprintf( Wx::gettext("Line number between (1-%s):"), $max ),
-		Wx::gettext("Go to line number"),
-		"GOTO_LINE_NUMBER"
-	);
-	return if not defined $line_number or $line_number !~ /^\d+$/;
-
-	$line_number = $max if $line_number > $max;
-	$line_number--;
-	$editor->goto_line_centerize($line_number);
+	require Padre::Wx::Dialog::GotoLine;
+	Padre::Wx::Dialog::GotoLine->modal;
 
 	return;
 }
@@ -2855,7 +3012,7 @@ sub on_close_window {
 
 	# Check that all files have been saved
 	if ( $event->CanVeto ) {
-		if ( $config->main_startup eq 'same' ) {
+		if ( $config->startup_files eq 'same' ) {
 
 			# Save the files, but don't close
 			my $saved = $self->on_save_all;
@@ -2959,8 +3116,8 @@ sub update_last_session {
 	my $self = shift;
 
 	# Only save if the user cares about sessions
-	my $main_startup = $self->config->main_startup;
-	unless ( $main_startup eq 'last' or $main_startup eq 'session' ) {
+	my $startup_files = $self->config->startup_files;
+	unless ( $startup_files eq 'last' or $startup_files eq 'session' ) {
 		return;
 	}
 
@@ -3163,7 +3320,9 @@ sub setup_editor {
 	# $editor->padre_setup;
 	Wx::Event::EVT_MOTION( $editor, \&Padre::Wx::Editor::on_mouse_motion );
 
-	$document->restore_cursor_position;
+	if ( $config->feature_cursormemory ) {
+		$document->restore_cursor_position;
+	}
 
 	# Update and refresh immediately if not locked
 	$self->lock( 'update_last_session', 'refresh_menu' );
@@ -3540,10 +3699,11 @@ sub reload_file {
 		$editor = $document->editor;
 	}
 
-	$document->store_cursor_position;
+	my $pos = $self->config->feature_cursormemory;
+	$document->store_cursor_position if $pos;
 	if ( $document->reload ) {
 		$document->editor->configure_editor($document);
-		$document->restore_cursor_position;
+		$document->restore_cursor_position if $pos;
 	} else {
 		$self->error(
 			sprintf(
@@ -3969,7 +4129,8 @@ sub close {
 
 	my $editor = $notebook->GetPage($id) or return;
 	my $doc    = $editor->{Document}     or return;
-	my $lock = $self->lock( 'REFRESH', 'refresh_directory', 'refresh_menu' );
+	my $lock = $self->lock( 'REFRESH', 'DB', 'refresh_directory', 'refresh_menu' );
+	TRACE( join ' ', "Closing ", ref $doc, $doc->filename ) if DEBUG;
 
 	if ( $doc->is_modified and not $doc->is_unused ) {
 		my $ret = Wx::MessageBox(
@@ -3990,11 +4151,35 @@ sub close {
 		}
 	}
 
-	$doc->store_cursor_position;
-	$doc->remove_tempfile if $doc->tempfile;
+	# Ticket #828 - ordering is probably important here
+	#   when should plugins be notified ?
+	$self->ide->plugin_manager->editor_disable($editor);
+
+	# Also, if any padre-client or other listeners to this file exist,
+	# notify it that we're done with it:
+	my $fn = $doc->filename;
+	if ($fn) {
+		@{ $self->{on_close_watchers}->{$fn} } = map {
+			warn "Calling on_close() callback";
+			my $remove = $_->($doc);
+			$remove ? () : $_
+		} @{ $self->{on_close_watchers}->{$fn} };
+	}
+
+	if ( $self->config->feature_cursormemory ) {
+		$doc->store_cursor_position;
+	}
+	if ( $doc->tempfile ) {
+		$doc->remove_tempfile;
+	}
+
+	# Now we are past the confirmation, apply an update lock as well
+	my $lock2 = $self->lock('UPDATE');
 
 	$self->notebook->DeletePage($id);
 
+	# NOTE: Why are we doing an explicit clear?
+	# Wouldn't a refresh to them clear if needed anyway?
 	if ( $self->has_syntax ) {
 		$self->syntax->clear;
 	}
@@ -4058,6 +4243,65 @@ sub close_all {
 
 =pod
 
+=head3 C<close_some>
+
+    my $success = $main->close_some(@pages_to_close);
+
+Try to close all documents. Return true upon success, false otherwise.
+
+=cut
+
+sub on_close_some {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+
+	require Padre::Wx::Dialog::WindowList;
+	Padre::Wx::Dialog::WindowList->new(
+		$self,
+		title      => Wx::gettext('Close some files'),
+		list_title => Wx::gettext('Select files to close:'),
+		buttons    => [ [ 'Close selected', sub { Padre->ide->wx->main->close_some(@_); } ] ],
+	)->show;
+}
+
+sub close_some {
+	my $self        = shift;
+	my @close_pages = @_;
+
+	my $notebook = $self->notebook;
+
+	my $manager = $self->{ide}->plugin_manager;
+
+	require Padre::Wx::Progress;
+	my $progress = Padre::Wx::Progress->new(
+		$self, Wx::gettext('Close some'), $#close_pages,
+		lazy => 1
+	);
+
+	SCOPE: {
+		my $lock = $self->lock('refresh');
+		for my $close_page_no ( 0 .. $#close_pages ) {
+			$progress->update( $close_page_no, ( $close_page_no + 1 ) . '/' . scalar(@close_pages) );
+
+			foreach my $pageid ( $self->pageids ) {
+				my $page = $notebook->GetPage($pageid);
+				next unless defined($page);
+				next unless $page eq $close_pages[$close_page_no];
+				$self->close($pageid) or return 0;
+			}
+		}
+	}
+
+	# Recalculate window title
+	$self->refresh_title;
+
+	$manager->plugin_event('editor_changed');
+
+	return 1;
+}
+
+=pod
+
 =head3 C<close_where>
 
     # Close all files in current project
@@ -4079,13 +4323,16 @@ sub close_where {
 	my $self     = shift;
 	my $where    = shift;
 	my $notebook = $self->notebook;
-	my $lock     = $self->lock('UPDATE');
-	foreach my $id ( reverse $self->pageids ) {
-		if ( $where->( $notebook->GetPage($id)->{Document} ) ) {
+
+	# Generate the list of ids to close before we go to the
+	# expensive of taking any locks.
+	my @close = grep { $where->( $notebook->GetPage($_)->{Document} ) } reverse $self->pageids;
+	if (@close) {
+		my $lock = $self->lock( 'UPDATE', 'DB', 'refresh' );
+		foreach my $id (@close) {
 			$self->close($id) or return 0;
 		}
 	}
-	$self->refresh;
 	return 1;
 }
 

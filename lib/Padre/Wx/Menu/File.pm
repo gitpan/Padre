@@ -10,7 +10,7 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Logger;
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 our @ISA     = 'Padre::Wx::Menu';
 
 #####################################################################
@@ -172,11 +172,11 @@ sub new {
 		'file.save_all',
 	);
 
-	if ( $config->func_session ) {
+	if ( $config->feature_session ) {
 
 		$self->AppendSeparator;
 
-		# Specialised open and close functions
+		# Session operations
 		$self->{open_session} = $self->add_menu_action(
 			$self,
 			'file.open_session',

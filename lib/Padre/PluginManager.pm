@@ -41,7 +41,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 
 
@@ -573,12 +573,12 @@ sub _load_plugin {
 
 	# Should we try to enable the plug-in
 	my $config = $self->plugin_db( $plugin->class );
-	unless ( defined $config->{enabled} ) {
+	unless ( defined $config->enabled ) {
 
 		# Do not enable by default
-		$config->{enabled} = 0;
+		$config->set( enabled => 0 );
 	}
-	unless ( $config->{enabled} ) {
+	unless ( $config->enabled ) {
 		$plugin->status('disabled');
 		return;
 	}
@@ -809,6 +809,12 @@ sub editor_enable {
 	#	return;
 
 	return $self->plugin_event( 'editor_enable', $editor, $editor->{Document} );
+}
+
+sub editor_disable {
+	my $self   = shift;
+	my $editor = shift;
+	return $self->plugin_event( 'editor_disable', $editor, $editor->{Document} );
 }
 
 sub enable_editors_for_all {

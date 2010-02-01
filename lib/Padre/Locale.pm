@@ -48,9 +48,9 @@ use Padre::Wx       ();
 use Padre::Logger;
 
 use constant DEFAULT  => 'en-gb';
-use constant SHAREDIR => File::Spec->rel2abs( Padre::Util::sharedir('locale') );
+use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -582,6 +582,11 @@ sub encoding_system_default {
 
 sub encoding_from_string {
 	my $content = shift;
+
+	# Because Encode::Guess is slow and expensive, do an initial fast
+	# regexp scan for the simplest and most common "ascii" encoding.
+	# Check for POSIX printable characters, plus the two newline characters.
+	return 'ascii' unless $content =~ /[^[:print:]\015\012]/;
 
 	# FIX ME
 	# This is a just heuristic approach. Maybe there is a better way. :)

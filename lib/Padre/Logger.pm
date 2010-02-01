@@ -4,7 +4,7 @@ package Padre::Logger;
 
 =head1 NAME
 
-Padre::Logger - Compile-time loggin library for Padre
+Padre::Logger - Compile-time logging library for Padre
 
 =head1 SYNOPSIS
 
@@ -37,7 +37,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 sub import {
 	my $pkg = ( caller() )[0];

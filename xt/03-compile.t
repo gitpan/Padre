@@ -5,6 +5,11 @@ use warnings;
 use Test::More;
 
 BEGIN {
+	# Don't run tests for installs
+	unless ( $ENV{AUTOMATED_TESTING} or $ENV{RELEASE_TESTING} ) {
+		plan( skip_all => "Author tests not required for installation" );
+	}
+
 	unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
 		plan skip_all => 'Needs DISPLAY';
 		exit 0;
@@ -44,7 +49,7 @@ foreach my $file (@files) {
 	is( $out_data, 'ok', "STDOUT of $file" );
 }
 
-script_compiles_ok('script/padre');
+script_compiles('script/padre');
 
 # Bail out if any of the tests failed
 BAIL_OUT("Aborting test suite") if scalar grep { not $_->{ok} } Test::More->builder->details;

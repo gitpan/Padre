@@ -14,7 +14,7 @@ use warnings;
 use Padre::Lock ();
 use Padre::DB   ();
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 sub new {
 	my $class = shift;
@@ -92,6 +92,14 @@ sub db_increment {
 	my $self = shift;
 	unless ( $self->{db_depth}++ ) {
 		Padre::DB->begin;
+
+		# Database operations we lock on are the most likely to
+		# involve writes. So opportunistically prevent blocking
+		# on filesystem sync confirmation. This should make
+		# database write operations faster, at the risk of config.db
+		# corruption if (and only if) there is a power outage,
+		# operating system crash, or catastrophic hardware failure.
+		Padre::DB->pragma( 'synchronous' => 0 );
 	}
 	return;
 }

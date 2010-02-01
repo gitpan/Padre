@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.55';
+our $VERSION = '0.56';
 
 sub new {
 	my $class  = shift;
@@ -50,7 +50,7 @@ sub new {
 
 # Disable locking on destruction
 sub DESTROY {
-	my $locker = shift @{ $_[0] };
+	my $locker = shift @{ $_[0] } or return;
 	foreach ( @{ $_[0] } ) {
 		if ( $_ eq 'UPDATE' ) {
 			$locker->update_decrement;

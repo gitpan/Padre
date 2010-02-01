@@ -1,3 +1,4 @@
+.gitignore
 Artistic
 bin/padre-rc.h
 bin/padre-rc.rc
@@ -57,6 +58,7 @@ lib/Padre/Action/Search.pm
 lib/Padre/Action/View.pm
 lib/Padre/Action/Window.pm
 lib/Padre/Autosave.pm
+lib/Padre/Command.pm
 lib/Padre/Config.pm
 lib/Padre/Config/Host.pm
 lib/Padre/Config/Human.pm
@@ -123,10 +125,14 @@ lib/Padre/PPI.pm
 lib/Padre/Project.pm
 lib/Padre/Project/Null.pm
 lib/Padre/Project/Perl.pm
+lib/Padre/Project/Perl/DZ.pm
+lib/Padre/Project/Perl/EUMM.pm
+lib/Padre/Project/Perl/MB.pm
+lib/Padre/Project/Perl/MI.pm
 lib/Padre/QuickFixProvider.pm
 lib/Padre/Search.pm
 lib/Padre/Service.pm
-lib/Padre/Splash.pm
+lib/Padre/Startup.pm
 lib/Padre/Task.pm
 lib/Padre/Task/Debug/Crashing.pm
 lib/Padre/Task/DocBrowser.pm
@@ -169,6 +175,7 @@ lib/Padre/Wx/Dialog/Encode.pm
 lib/Padre/Wx/Dialog/FilterTool.pm
 lib/Padre/Wx/Dialog/Find.pm
 lib/Padre/Wx/Dialog/Form.pm
+lib/Padre/Wx/Dialog/GotoLine.pm
 lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
@@ -191,6 +198,7 @@ lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/SpecialValues.pm
 lib/Padre/Wx/Dialog/Text.pm
 lib/Padre/Wx/Dialog/Warning.pm
+lib/Padre/Wx/Dialog/WindowList.pm
 lib/Padre/Wx/Directory.pm
 lib/Padre/Wx/Directory/OpenInFileBrowserAction.pm
 lib/Padre/Wx/Directory/SearchCtrl.pm
@@ -229,10 +237,11 @@ lib/Padre/Wx/Popup.pm
 lib/Padre/Wx/Printout.pm
 lib/Padre/Wx/Progress.pm
 lib/Padre/Wx/Right.pm
-lib/Padre/Wx/RightClick.pm
 lib/Padre/Wx/Role/MainChild.pm
+lib/Padre/Wx/Role/View.pm
 lib/Padre/Wx/StatusBar.pm
 lib/Padre/Wx/Syntax.pm
+lib/Padre/Wx/TodoList.pm
 lib/Padre/Wx/ToolBar.pm
 lib/Wx/Perl/Dialog.pm
 lib/Wx/Perl/Dialog/Frame.pm
@@ -245,6 +254,7 @@ padre.yml
 privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
+script/padre-client
 share/doc/perlopref/Artistic
 share/doc/perlopref/Copying
 share/doc/perlopref/perlopref.pod
