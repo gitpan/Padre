@@ -12,7 +12,7 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -118,9 +118,7 @@ sub new {
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&Help');
+	Wx::gettext('&Help');
 }
 
 sub refresh {
@@ -133,7 +131,6 @@ sub refresh {
 
 	return 1;
 }
-
 
 1;
 

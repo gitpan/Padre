@@ -10,7 +10,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Dialog';
 
 our %PANELS = (
@@ -796,7 +796,7 @@ sub dialog {
 
 	# TO DO: Convert the internal panels to use this
 
-	for my $module ( sort { Wx::gettext( $PANELS{$a} ) cmp Wx::gettext( $PANELS{$b} ); } ( keys(%PANELS) ) ) {
+	foreach my $module ( sort { Wx::gettext( $PANELS{$a} ) cmp Wx::gettext( $PANELS{$b} ); } ( keys(%PANELS) ) ) {
 
 		# A plugin or panel should not crash Padre on error
 		eval {
@@ -838,6 +838,17 @@ sub dialog {
 	);
 	$button_row_sizer->Add( $save, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL, 5 );
 	$save->SetDefault;
+
+	# Advanced settings (Firefox about:config style)
+	my $advanced = Wx::Button->new( $dialog, -1, Wx::gettext('&Advanced...') );
+	$button_row_sizer->Add( $advanced, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL, 5 );
+
+	# Advanced settings button action
+	Wx::Event::EVT_BUTTON(
+		$dialog,
+		$advanced,
+		sub { $self->_show_advanced_settings; },
+	);
 
 	my $cancel = Wx::Button->new(
 		$dialog,
@@ -1122,7 +1133,7 @@ sub run {
 	# clearing them:
 	if ( $config->feature_config ) {
 
-		for my $feature (@Func_List) {
+		foreach my $feature (@Func_List) {
 			$config->set(
 				'feature_' . $feature->[0],
 				$data->{ 'feature_' . $feature->[0] } ? 1 : 0
@@ -1160,13 +1171,31 @@ sub run {
 		$editor_currentline_color
 	);
 
-	for my $module ( keys(%PANELS) ) {
+	foreach my $module ( keys(%PANELS) ) {
 		my $preferences_page = $module->new();
 		$preferences_page->save($data);
 	}
 
 	$config->write;
 	return 1;
+}
+
+#
+# Shows advanced settings dialog which should be a bit like Firefox's
+# about:config tab
+#
+sub _show_advanced_settings {
+	my $self = shift;
+
+	#Cancel the preferences dialog since it is not needed
+	$self->{dialog}->EndModal(Wx::wxID_CANCEL);
+
+	#show the advanced settings dialog instead
+	require Padre::Wx::Dialog::Advanced;
+	my $advanced = Padre::Wx::Dialog::Advanced->new( Padre->ide->{wx}->main );
+	$advanced->show;
+
+	return;
 }
 
 1;

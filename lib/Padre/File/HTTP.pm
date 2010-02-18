@@ -5,8 +5,9 @@ use strict;
 use warnings;
 
 use Padre::File;
+use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::File';
 
 sub new {
@@ -43,6 +44,8 @@ sub _request {
 	my $self   = shift;
 	my $method = shift || 'GET';
 	my $URL    = shift || $self->{filename};
+
+	TRACE( sprintf( Wx::gettext('Sending HTTP request %s...'), $URL ) ) if DEBUG;
 
 	my $HTTP_Req = HTTP::Request->new( $method, $URL );
 

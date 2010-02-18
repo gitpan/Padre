@@ -14,8 +14,12 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
+
+
+
+
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -99,9 +103,7 @@ sub new {
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&Perl');
+	Wx::gettext('&Perl');
 }
 
 sub refresh {
@@ -126,9 +128,6 @@ sub refresh {
 
 	return;
 }
-
-
-
 
 1;
 

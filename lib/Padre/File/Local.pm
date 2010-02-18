@@ -8,7 +8,7 @@ use File::Spec      ();
 use Padre::Constant ();
 use Padre::File     ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::File';
 
 sub _reformat_filename {
@@ -44,6 +44,9 @@ sub new {
 	my $self = bless { filename => $_[0] }, $class;
 	$self->{protocol} = 'local'; # Should not be overridden
 
+	$self->{filename} = File::Spec->rel2abs( $self->{filename} )
+		unless File::Spec->file_name_is_absolute( $self->{filename} );
+
 	$self->_reformat_filename;
 
 	return $self;
@@ -66,7 +69,7 @@ sub stat {
 
 sub size {
 	my $self = shift;
-	return -s $self->{filename};
+	return -s $self->{filename} || 0;
 }
 
 sub dev {
@@ -106,27 +109,27 @@ sub rdev {
 
 sub atime {
 	my $self = shift;
-	return ( CORE::stat( $self->{filename} ) )[8];
+	return ( CORE::stat( $self->{filename} ) )[8] || 0;
 }
 
 sub mtime {
 	my $self = shift;
-	return ( CORE::stat( $self->{filename} ) )[9];
+	return ( CORE::stat( $self->{filename} ) )[9] || 0;
 }
 
 sub ctime {
 	my $self = shift;
-	return ( CORE::stat( $self->{filename} ) )[10];
+	return ( CORE::stat( $self->{filename} ) )[10] || 0;
 }
 
 sub blksize {
 	my $self = shift;
-	return ( CORE::stat( $self->{filename} ) )[11];
+	return ( CORE::stat( $self->{filename} ) )[11] || 0;
 }
 
 sub blocks {
 	my $self = shift;
-	return ( CORE::stat( $self->{filename} ) )[12];
+	return ( CORE::stat( $self->{filename} ) )[12] || 0;
 }
 
 sub exists {
@@ -166,7 +169,7 @@ sub write {
 	}
 
 	$self->{error} = $!;
-	return ();
+	return;
 }
 
 sub basename {
@@ -177,6 +180,20 @@ sub basename {
 sub dirname {
 	my $self = shift;
 	return File::Basename::dirname( $self->{filename} );
+}
+
+sub splitvdir {
+	my ( $v, $d, $f ) = File::Spec->splitpath( $_[0]->{filename} );
+	my @d = File::Spec->splitdir($d);
+	pop @d if $d[-1] eq '';
+	return $v, @d;
+}
+
+sub splitall {
+	my ( $v, $d, $f ) = File::Spec->splitpath( $_[0]->{filename} );
+	my @d = File::Spec->splitdir($d);
+	pop @d if $d[-1] eq '';
+	return $v, @d, $f;
 }
 
 sub readonly {

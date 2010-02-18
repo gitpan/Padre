@@ -1,4 +1,4 @@
-package Padre::Wx::Dialog::GotoLine;
+package Padre::Wx::Dialog::Goto;
 
 use 5.008;
 use strict;
@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -16,9 +16,15 @@ our @ISA     = qw{
 
 =head1 NAME
 
-Padre::Wx::Dialog::GotoLine - a dialog to jump to a user-specifed line/position
+Padre::Wx::Dialog::Goto - a dialog to jump to a user-specifed line/position
 
 =head1 PUBLIC API
+
+=head2 C<new>
+
+  my $goto = Padre::Wx::Dialog::Goto->new($main);
+
+Returns a new C<Padre::Wx::Dialog::Goto> instance
 
 =cut
 
@@ -30,11 +36,14 @@ sub new {
 	my $self = $class->SUPER::new(
 		$main,
 		-1,
-		Wx::gettext('Go to a line number or position'),
+		Wx::gettext('Goto'),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxCAPTION | Wx::wxCLOSE_BOX | Wx::wxSYSTEM_MENU
+		Wx::wxRESIZE_BORDER | Wx::wxSYSTEM_MENU | Wx::wxCAPTION | Wx::wxCLOSE_BOX
 	);
+
+	# Minimum dialog size
+	$self->SetMinSize( [ 270, 180 ] );
 
 	# create sizer that will host all controls
 	my $sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
@@ -46,7 +55,8 @@ sub new {
 	$self->_bind_events;
 
 	# wrap everything in a vbox to add some padding
-	$self->SetSizerAndFit($sizer);
+	$self->SetSizer($sizer);
+	$self->Fit;
 	$self->CentreOnParent;
 
 	return $self;
@@ -59,32 +69,23 @@ sub _create_controls {
 	my ( $self, $sizer ) = @_;
 
 
-	# Line or position checkbox
-	$self->{line_or_position_checkbox} = Wx::CheckBox->new(
-		$self, -1, Wx::gettext('&Is it a line number or a position?'),
-	);
-	$self->{line_or_position_checkbox}->SetValue(1);
+	# a label to display current line/position
+	$self->{current} = Wx::StaticText->new( $self, -1, '' );
 
 	# Goto line label
-	$self->{gotoline_label} = Wx::StaticText->new(
-		$self, -1, '', Wx::wxDefaultPosition, [ 250, -1 ],
+	$self->{goto_label} = Wx::StaticText->new( $self, -1, '' );
+
+	# Text field for the line number/position
+	$self->{goto_text} = Wx::TextCtrl->new( $self, -1, '' );
+
+	# Status label
+	$self->{status_line} = Wx::StaticText->new( $self, -1, '' );
+
+	# Line or position checkbox
+	$self->{line_mode} = Wx::CheckBox->new(
+		$self, -1, Wx::gettext('&Line number or character position?'),
 	);
-
-	# Input text control for the line number/position
-	$self->{gotoline_text} = Wx::TextCtrl->new(
-		$self, -1, '', Wx::wxDefaultPosition, Wx::wxDefaultSize,
-	);
-	$self->{gotoline_text}->MoveBeforeInTabOrder( $self->{line_or_position_checkbox} );
-
-	unless (Padre::Constant::WIN32) {
-
-		#non-win32: Have the text field grab the focus so we can just start typing.
-		$self->{gotoline_text}->SetFocus();
-	}
-
-	$self->{status_line} = Wx::StaticText->new(
-		$self, -1, '', Wx::wxDefaultPosition, Wx::wxDefaultSize,
-	);
+	$self->{line_mode}->SetValue(1);
 
 	# OK button (obviously)
 	$self->{button_ok} = Wx::Button->new(
@@ -108,16 +109,17 @@ sub _create_controls {
 
 	# Create the main vertical sizer
 	my $vsizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	$vsizer->Add( $self->{line_or_position_checkbox}, 0, Wx::wxALL | Wx::wxEXPAND, 3 );
-	$vsizer->Add( $self->{gotoline_label},            0, Wx::wxALL | Wx::wxEXPAND, 3 );
-	$vsizer->Add( $self->{gotoline_text},             0, Wx::wxALL | Wx::wxEXPAND, 3 );
-	$vsizer->Add( $self->{status_line},               0, Wx::wxALL | Wx::wxEXPAND, 2 );
+	$vsizer->Add( $self->{line_mode},   0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $self->{current},     0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $self->{goto_label},  0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $self->{goto_text},   0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $self->{status_line}, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
 	$vsizer->AddSpacer(5);
 	$vsizer->Add( $button_sizer, 0, Wx::wxALIGN_RIGHT, 5 );
 	$vsizer->AddSpacer(5);
 
 	# Wrap with a horizontal sizer to get left/right padding
-	$sizer->Add( $vsizer, 0, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$sizer->Add( $vsizer, 1, Wx::wxALL | Wx::wxEXPAND, 5 );
 
 	return;
 
@@ -128,9 +130,21 @@ sub _create_controls {
 #
 sub _bind_events {
 	my $self = shift;
+
+	Wx::Event::EVT_ACTIVATE(
+		$self,
+		sub {
+			my $self = shift;
+			$self->_update_from_editor;
+			$self->_update_label;
+			$self->_validate;
+			return;
+		}
+	);
+
 	Wx::Event::EVT_TEXT(
 		$self,
-		$self->{gotoline_text},
+		$self->{goto_text},
 		sub {
 			$_[0]->_validate;
 			return;
@@ -139,7 +153,7 @@ sub _bind_events {
 
 	Wx::Event::EVT_CHECKBOX(
 		$self,
-		$self->{line_or_position_checkbox},
+		$self->{line_mode},
 		sub {
 			my $self = shift;
 			$self->_update_label;
@@ -152,7 +166,7 @@ sub _bind_events {
 		$self,
 		$self->{button_cancel},
 		sub {
-			$_[0]->Destroy;
+			$_[0]->Hide;
 			return;
 		}
 	);
@@ -175,8 +189,8 @@ sub _on_ok_button {
 	my $self = shift;
 
 	# Fetch values
-	my $line_mode = $self->{line_or_position_checkbox}->IsChecked;
-	my $value     = $self->{gotoline_text}->GetValue;
+	my $line_mode = $self->{line_mode}->IsChecked;
+	my $value     = $self->{goto_text}->GetValue;
 	my $editor    = $self->current->editor;
 
 	# Bounds checking
@@ -185,7 +199,7 @@ sub _on_ok_button {
 	$value--;
 
 	# Destroy the dialog
-	$self->Destroy;
+	$self->Hide;
 
 	# And then goto to the line or position
 	# keeping it in the center of the editor
@@ -204,12 +218,18 @@ sub _on_ok_button {
 #
 sub _update_label {
 	my $self      = shift;
-	my $line_mode = $self->{line_or_position_checkbox}->IsChecked;
-	$self->{gotoline_label}->SetLabel(
+	my $line_mode = $self->{line_mode}->IsChecked;
+	$self->{goto_label}->SetLabel(
 		$line_mode
 		? sprintf( Wx::gettext("&Enter a line number between 1 and %s:"), $self->{max_line_number} )
 		: sprintf( Wx::gettext("&Enter a position between 1 and %s:"),    $self->{max_position} )
 	);
+	$self->{current}->SetLabel(
+		$line_mode
+		? sprintf( Wx::gettext("Current line number: %s"), $self->{current_line_number} )
+		: sprintf( Wx::gettext("Current position: %s"),    $self->{current_position} )
+	);
+
 }
 
 #
@@ -218,8 +238,8 @@ sub _update_label {
 sub _validate {
 	my $self = shift;
 
-	my $line_mode = $self->{line_or_position_checkbox}->IsChecked;
-	my $value     = $self->{gotoline_text}->GetValue;
+	my $line_mode = $self->{line_mode}->IsChecked;
+	my $value     = $self->{goto_text}->GetValue;
 
 	# If it is empty, do not warn about it but disable it though
 	if ( $value eq '' ) {
@@ -250,40 +270,62 @@ sub _validate {
 	$self->{status_line}->SetLabel('');
 }
 
-=pod
-
-=head2 C<modal>
-
-  Padre::Wx::Dialog::GotoLine->modal($main);
-
-Single-shot modal dialog call to set the line number from the user.
-Returns C<undef>.
-
-=cut
-
-sub modal {
-	my $class = shift;
-
-	# Instantiate a new object of myself :)
-	my $self = $class->new(@_);
+#
+# Private method to update statistics from the current editor
+#
+sub _update_from_editor {
+	my $self = shift;
 
 	# Get the current editor
 	my $editor = $self->current->editor;
 	unless ($editor) {
-		$self->Destroy;
-		return;
+		$self->Hide;
+		return 0;
 	}
 
 	# Update max line number and position fields
-	$self->{max_line_number} = $editor->GetLineCount;
-	$self->{max_position}    = $editor->GetLength + 1;
+	$self->{max_line_number}     = $editor->GetLineCount;
+	$self->{max_position}        = $editor->GetLength + 1;
+	$self->{current_line_number} = $editor->GetCurrentLine + 1;
+	$self->{current_position}    = $editor->GetCurrentPos + 1;
+
+	return 1;
+}
 
 
-	# Update Goto line number label
+=pod
+
+=head2 C<show>
+
+  $goto->show($main);
+
+Show the dialog that the user can use to goto to a line number or character 
+position. Returns C<undef>.
+
+=cut
+
+sub show {
+	my $self = shift;
+
+	# Update current, and max bounds from the current editor
+	return unless $self->_update_from_editor;
+
+	# Update Goto labels
 	$self->_update_label;
 
-	# Go modal!
-	my $ok = $self->ShowModal;
+	# Select all of the line number/position so the user can overwrite
+	# it quickly if he wants it
+	$self->{goto_text}->SetSelection( -1, -1 );
+
+	unless ( $self->IsShown ) {
+
+		# If it is not shown, show the dialog
+		$self->Show;
+	}
+
+	# Win32 tip: Always focus on wxwidgets controls only after
+	# showing the dialog, otherwise you will lose the focus
+	$self->{goto_text}->SetFocus;
 
 	return;
 }

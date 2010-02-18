@@ -10,8 +10,12 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
+
+
+
+
 
 #####################################################################
 # Padre::Wx::Menu Methods
@@ -98,6 +102,21 @@ sub new {
 		'file.open_selection',
 	);
 
+	$self->{open_in_file_browser} = $self->add_menu_action(
+		$file_open,
+		'file.open_in_file_browser',
+	);
+
+	$self->{open_with_default_system_editor} = $self->add_menu_action(
+		$file_open,
+		'file.open_with_default_system_editor',
+	);
+
+	$self->{open_in_command_line} = $self->add_menu_action(
+		$file_open,
+		'file.open_in_command_line',
+	);
+
 	$self->{open_example} = $self->add_menu_action(
 		$file_open,
 		'file.open_example',
@@ -139,15 +158,39 @@ sub new {
 		'file.close_all_but_current',
 	);
 
+	$file_close->AppendSeparator;
+
+	$self->{close_some} = $self->add_menu_action(
+		$file_close,
+		'file.close_some',
+	);
+
+	### End of close submenu
+
+	# Reload file(s)
+	my $file_reload = Wx::Menu->new;
+	$self->Append(
+		-1,
+		Wx::gettext("Reload..."),
+		$file_reload,
+	);
+
 	$self->{reload_file} = $self->add_menu_action(
-		$self,
+		$file_reload,
 		'file.reload_file',
 	);
 
 	$self->{reload_all} = $self->add_menu_action(
-		$self,
+		$file_reload,
 		'file.reload_all',
 	);
+
+	$self->{reload_all} = $self->add_menu_action(
+		$file_reload,
+		'file.reload_some',
+	);
+
+	### End of reload submenu
 
 	$self->AppendSeparator;
 
@@ -217,7 +260,9 @@ sub new {
 
 	$self->{recentfiles}->AppendSeparator;
 
-	$self->update_recentfiles;
+	# NOTE: Do NOT do an initial fill during the constructor
+	# We'll do one later anyway, and the list is premature at this point.
+	# $self->refresh_recent;
 
 	$self->AppendSeparator;
 
@@ -239,35 +284,44 @@ sub new {
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&File');
+	Wx::gettext('&File');
 }
 
-
-
 sub refresh {
-	my $self    = shift;
-	my $current = _CURRENT(@_);
-	my $doc     = $current->document ? 1 : 0;
+	my $self     = shift;
+	my $current  = _CURRENT(@_);
+	my $document = $current->document ? 1 : 0;
 
-	$self->{close}->Enable($doc);
-	$self->{close_all}->Enable($doc);
-	$self->{close_all_but_current}->Enable($doc);
-	$self->{reload_file}->Enable($doc);
-	$self->{reload_all}->Enable($doc);
-	$self->{save}->Enable($doc);
-	$self->{save_as}->Enable($doc);
-	$self->{save_all}->Enable($doc);
-	$self->{print}->Enable($doc);
-	defined( $self->{open_session} ) and $self->{open_selection}->Enable($doc);
-	defined( $self->{save_session} ) and $self->{save_session}->Enable($doc);
-	$self->{docstat}->Enable($doc);
+	$self->{open_in_file_browser}->Enable($document);
+	if (Padre::Constant::WIN32) {
+
+		#Win32
+		$self->{open_with_default_system_editor}->Enable($document);
+		$self->{open_in_command_line}->Enable($document);
+	} else {
+
+		#Disabled until a unix implementation is actually working
+		#TODO remove once the unix implementation is done (see Padre::Util::FileBrowser)
+		$self->{open_with_default_system_editor}->Enable(0);
+		$self->{open_in_command_line}->Enable(0);
+	}
+	$self->{close}->Enable($document);
+	$self->{close_all}->Enable($document);
+	$self->{close_all_but_current}->Enable($document);
+	$self->{reload_file}->Enable($document);
+	$self->{reload_all}->Enable($document);
+	$self->{save}->Enable($document);
+	$self->{save_as}->Enable($document);
+	$self->{save_all}->Enable($document);
+	$self->{print}->Enable($document);
+	defined( $self->{open_session} ) and $self->{open_selection}->Enable($document);
+	defined( $self->{save_session} ) and $self->{save_session}->Enable($document);
+	$self->{docstat}->Enable($document);
 
 	return 1;
 }
 
-sub update_recentfiles {
+sub refresh_recent {
 	my $self = shift;
 
 	# menu entry count starts at 0
@@ -292,8 +346,11 @@ sub update_recentfiles {
 				} else {
 
 					# Handle "File not found" situation
-					Padre::DB::History->delete( 'where name = ? and type = ?', $file, 'files' );
-					$self->update_recentfiles;
+					Padre::Current->main->lock( 'UPDATE', 'DB', 'refresh_recent' );
+					Padre::DB::History->delete(
+						'where name = ? and type = ?',
+						$file, 'files',
+					);
 					Wx::MessageBox(
 						sprintf( Wx::gettext("File %s not found."), $file ),
 						Wx::gettext("Open cancelled"),

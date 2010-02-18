@@ -23,7 +23,7 @@ use File::Basename ();
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 #####################################################################
 # Document Registration
@@ -640,6 +640,34 @@ sub guess_mimetype {
 			return $self->perl_mime_type($text) if $score >= 3;
 		}
 
+		# Look for Template::Toolkit syntax
+		#  - traditional syntax:
+		return 'text/x-perltt'
+			if $text =~ /\[\%[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\%\]/;
+
+		#  - default alternate styles (match 2 tags)
+		return 'text/x-perltt'
+			if $text
+				=~ /(\%\%[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\%\%.*){2}/s;
+		return 'text/x-perltt'
+			if $text
+				=~ /(\[\*[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\*\].*){2}/s;
+
+		#  - other languages defaults (match 3 tags)
+		return 'text/x-perltt'
+			if $text
+				=~ /(\<([\?\%])[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\1\>.*){3}/s;
+		return 'text/x-perltt'
+			if $text =~ /(\<\%[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\>.*){3}/s;
+		return 'text/x-perltt'
+			if $text
+				=~ /(\<\!\-\-[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\-\-\>.*){3}/s;
+
+		#  - traditional, but lowercase syntax (3 tags)
+		return 'text/x-perltt'
+			if $text
+				=~ /(\[\%[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\%\].*){3}/si;
+
 		# Look for HTML (now we can be relatively confident it's not HTML inside Perl)
 		if ( $text =~ /\<\/(?:html|body|div|p|table)\>/ ) {
 
@@ -651,6 +679,22 @@ sub guess_mimetype {
 
 			return 'text/html';
 		}
+
+		# Try to detect plain CSS without HTML around it
+		return 'text/css'
+			if ( $text !~ /\<\w+\/?\>/ )
+			and ( $text =~ /^([\.\#]?\w+( [\.\#]?\w+)*)(\,[\s\t\r\n]*([\.\#]?\w+( [\.\#]?\w+)*))*[\s\t\r\n]*\{/ );
+
+		# LUA detection
+		my $lua_score = 0;
+		for ( 'end', 'it', 'in', 'nil', 'repeat', '...', '~=' ) {
+			$lua_score += 1.1 if $text =~ /[\s\t]$_[\s\t]/;
+		}
+		$lua_score += 2.01 if $text =~ /^[\s\t]?function[\s\t]+\w+[\s\t]*\([\w\,]*\)[\s\t\r\n]+[^\{]/;
+		$lua_score -= 5.02 if $text =~ /[\{\}]/; # Not used in lua
+		$lua_score += 3.04 if $text =~ /\-\-\[.+?\]\]\-\-/s; # Comment
+		return 'text/x-lua' if $lua_score >= 5;
+
 	}
 
 	# Fallback mime-type of new files, should be configurable in the GUI
@@ -715,7 +759,7 @@ sub is_perl6 {
 
 sub menu_view_mimes {
 	my %menu_view_mimes = ();
-	for my $mime_type ( keys %MIME_TYPES ) {
+	foreach my $mime_type ( keys %MIME_TYPES ) {
 		my $mime_type_name = $MIME_TYPES{$mime_type}{name};
 		if ($mime_type_name) {
 			$menu_view_mimes{$mime_type_name} = $mime_type;

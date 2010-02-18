@@ -113,11 +113,16 @@ use IO::String   ();
 use Scalar::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
+
+# set up the stdout/stderr printing events => initialized during run time
+our $STDOUT_EVENT : shared;
+our $STDERR_EVENT : shared;
 
 # TO DO: Why are there require?
 require Padre;
 require Padre::Wx;
+require Wx;
 
 BEGIN {
 
@@ -127,14 +132,6 @@ BEGIN {
 	}
 }
 
-use Class::XSAccessor {
-	constructor => 'new',
-};
-
-# set up the stdout/stderr printing events
-our $STDOUT_EVENT : shared = Wx::NewEventType();
-our $STDERR_EVENT : shared = Wx::NewEventType();
-
 =pod
 
 =head2 new
@@ -142,6 +139,19 @@ our $STDERR_EVENT : shared = Wx::NewEventType();
 C<Padre::Task> provides a basic constructor for you to
 inherit. It simply stores all provided data in the internal
 hash reference.
+
+=cut
+
+
+sub new {
+	my $class = shift;
+	my $self = bless {@_} => $class;
+	if ( not defined $STDOUT_EVENT ) {
+		$STDOUT_EVENT = Wx::NewEventType();
+		$STDERR_EVENT = Wx::NewEventType();
+	}
+	return $self;
+}
 
 =head2 schedule
 
@@ -154,12 +164,13 @@ Calling this multiple times will submit multiple jobs.
 =cut
 
 SCOPE: {
-	my $events_initialized = 0;
+	my $event_hooks_initialized = 0;
 
 	sub schedule {
 		my $self = shift;
-		if ( !$events_initialized ) {
-			my $main = Padre->ide->wx->main;
+		if ( not $event_hooks_initialized ) {
+			$event_hooks_initialized = 1;
+			my $main = Padre->ide->wx;
 			Wx::Event::EVT_COMMAND(
 				$main,
 				-1,
@@ -172,7 +183,6 @@ SCOPE: {
 				$STDERR_EVENT,
 				\&_on_stderr,
 			);
-			$events_initialized = 1;
 		}
 		Padre->ide->task_manager->schedule($self);
 	}
@@ -416,9 +426,10 @@ sub _deserialize {
 
 # The main-thread stdout hook
 sub _on_stdout {
-	my ( $main, $event ) = @_;
+	my ( $wx, $event ) = @_;
 	@_ = (); # hack to avoid "Scalars leaked"
-	my $out = $main->output();
+	my $main = $wx->main;
+	my $out  = $main->output();
 	$main->show_output(1);
 	$out->style_neutral();
 	$out->AppendText( $event->GetData );
@@ -427,9 +438,10 @@ sub _on_stdout {
 
 # The main-thread stderr hook
 sub _on_stderr {
-	my ( $main, $event ) = @_;
+	my ( $wx, $event ) = @_;
 	@_ = (); # hack to avoid "Scalars leaked"
-	my $out = $main->output();
+	my $main = $wx->main;
+	my $out  = $main->output();
 	$main->show_output(1);
 	$out->style_bad();
 	$out->AppendText( $event->GetData );
@@ -485,7 +497,8 @@ C<Padre::Task::Example::WxEvent>.
 You can set up a new event ID in your Padre::Task subclass
 like this:
 
-  our $FUN_EVENT_TYPE =  : shared = Wx::NewEventType();
+  our $FUN_EVENT_TYPE : shared;
+  BEGIN { $FUN_EVENT_TYPE = Wx::NewEventType(); }
 
 Then you have to setup the event handler (for example in the
 C<prepare()> method. This should happen in the main thread!
@@ -522,7 +535,7 @@ sub post_event {
 		unless ( defined $data and length($data) );
 
 	Wx::PostEvent(
-		$Padre::TaskManager::_main,
+		Padre->ide->wx,
 		Wx::PlThreadEvent->new( -1, $eventid, $data ),
 	);
 	return ();

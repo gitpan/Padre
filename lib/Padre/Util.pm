@@ -34,7 +34,7 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.56';
+our $VERSION   = '0.57';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
@@ -415,7 +415,7 @@ sub get_project_dir {
 	my $olddir = File::Basename::dirname($filename);
 	my $dir    = $olddir;
 	while (1) {
-		for my $testfilename ( 'Makefile.PL', 'Build.PL', 'dist.ini', 'padre.yml' ) {
+		foreach my $testfilename ( 'Makefile.PL', 'Build.PL', 'dist.ini', 'padre.yml' ) {
 			next unless -e File::Spec->catfile( $dir, $testfilename );
 
 			$project_dir_cache{$filename} = {
@@ -530,19 +530,6 @@ sub process_memory {
 	} elsif (Padre::Constant::WIN32) {
 		require Padre::Util::Win32;
 		return Padre::Util::Win32::GetCurrentProcessMemorySize();
-	}
-	return;
-}
-
-# TODO: A much better variant would be a constant set by svn.
-sub revision {
-	if ( $0 =~ /padre$/ ) {
-		my $dir = $0;
-		$dir =~ s/padre$//;
-		my $revision = Padre::Util::svn_directory_revision($dir);
-		if ( -d "$dir.svn" ) {
-			return 'r' . $revision;
-		}
 	}
 	return;
 }

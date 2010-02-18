@@ -8,7 +8,7 @@ use Padre::Wx      ();
 use Padre::Current ();
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::TreeCtrl';
 
 use Class::XSAccessor {
@@ -112,6 +112,12 @@ sub stop {
 	# TO DO: GUI on-stop cleanup here
 
 	return ();
+}
+
+sub refresh {
+	my $self = shift;
+	$self->clear;
+	$self->force_next(1);
 }
 
 sub running {

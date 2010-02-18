@@ -21,7 +21,7 @@ use Padre::DocBrowser       ();
 use Padre::Util qw( _T );
 use Wx::Perl::Dialog::Simple ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -377,7 +377,7 @@ sub NewPage {
 sub padre2docbrowser {
 	my ( $class, $padredoc ) = @_;
 	my $doc = Padre::DocBrowser::document->new(
-		mimetype => $padredoc->get_mimetype,
+		mimetype => $padredoc->mimetype,
 		title    => $padredoc->get_title,
 		filename => $padredoc->filename,
 	);

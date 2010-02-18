@@ -65,7 +65,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 use Params::Util qw{_INSTANCE};
 
@@ -81,6 +81,7 @@ use Padre::Task    ();
 use Padre::Service ();
 use Padre::Wx      ();
 use Padre::Logger;
+require Padre::SlaveDriver;
 
 use Class::XSAccessor {
 	getters => {
@@ -91,17 +92,10 @@ use Class::XSAccessor {
 	}
 };
 
-# This event is triggered by the worker thread main loop after
-# finishing a task.
-our $TASK_DONE_EVENT : shared = Wx::NewEventType;
-
-# This event is triggered by the worker thread main loop before
-# running a task.
-our $TASK_START_EVENT : shared = Wx::NewEventType;
-
 # This event is triggered by a worker thread DURING ->run to incrementally
 # communicate to the main thread over the life of a service.
-our $SERVICE_POLL_EVENT : shared = Wx::NewEventType;
+our $SERVICE_POLL_EVENT : shared;
+BEGIN { $SERVICE_POLL_EVENT = Wx::NewEventType; }
 
 # remember whether the event handlers were initialized...
 our $EVENTS_INITIALIZED = 0;
@@ -111,9 +105,6 @@ our $REAP_TIMER;
 
 # You can instantiate this class only once.
 our $SINGLETON;
-
-# This is set in the worker threads only!
-our $_main;
 
 sub new {
 	my $class = shift;
@@ -126,8 +117,10 @@ sub new {
 		use_threads    => 1,    # can be explicitly disabled
 		reap_interval  => 15000,
 		@_,
-		workers       => [],
-		task_queue    => undef,
+		workers => [],
+
+		# grab a copy of the task_queue that's now handled by the slave driver
+		task_queue    => Padre::SlaveDriver->new()->task_queue,
 		running_tasks => {},
 	}, $class;
 
@@ -136,10 +129,11 @@ sub new {
 		$self->{use_threads} = 0;
 	}
 
-	my $main = Padre->ide->wx->main;
+	my $main = Padre->ide->wx;
 	_init_events($main);
 
-	$self->{task_queue} = Thread::Queue->new;
+	# To be removed: Old task queue instantiation => Padre::SlaveDriver
+	#$self->{task_queue} = Thread::Queue->new;
 
 	# Set up a regular action for reaping dead workers
 	# and setting up new workers
@@ -170,14 +164,15 @@ sub _init_events {
 	my $main = shift;
 	@_ = ();
 	unless ($EVENTS_INITIALIZED) {
+		no warnings 'once';
 		Wx::Event::EVT_COMMAND(
 			$main, -1,
-			$TASK_DONE_EVENT,
+			$Padre::SlaveDriver::TASK_DONE_EVENT,
 			\&on_task_done_event,
 		);
 		Wx::Event::EVT_COMMAND(
 			$main, -1,
-			$TASK_START_EVENT,
+			$Padre::SlaveDriver::TASK_START_EVENT,
 			\&on_task_start_event,
 		);
 		Wx::Event::EVT_COMMAND(
@@ -245,7 +240,12 @@ sub schedule {
 		# as a non-threading, non-queued, fake worker loop
 		$self->task_queue->enqueue($string);
 		$self->task_queue->enqueue("STOP");
-		worker_loop( Padre->ide->wx->main, $self->task_queue );
+		require Padre::SlaveDriver;
+		no warnings 'once';
+		if ( not defined $Padre::SlaveDriver::TASK_DONE_EVENT ) {
+			Padre::SlaveDriver->_init_events();
+		}
+		Padre::SlaveDriver::_worker_loop( $self->task_queue );
 	}
 
 	return 1;
@@ -292,11 +292,15 @@ sub _make_worker_thread {
 	my $main = shift;
 	return unless $self->use_threads;
 
-	@_ = (); # avoid "Scalars leaked"
-	my $worker = threads->create(
-		{ 'exit' => 'thread_only' }, \&worker_loop,
-		$main, $self->task_queue
-	);
+
+	# To be removed: Old worker thread cration. => Padre::SlaveDriver
+	#	@_ = (); # avoid "Scalars leaked"
+	#	my $worker = threads->create(
+	#		{ 'exit' => 'thread_only' }, \&worker_loop,
+	#		$main, $self->task_queue
+	#	);
+	my $worker = Padre::SlaveDriver->new->spawn($self);
+	die if not ref $worker;
 	push @{ $self->{workers} }, $worker;
 }
 
@@ -409,7 +413,7 @@ sub cleanup {
 	TRACE('Tell all tasks to stop') if DEBUG;
 	my @workers = $self->workers;
 	$self->task_queue->insert( 0, ("STOP") x scalar(@workers) );
-	while ( threads->list(threads::running) >= 1 ) {
+	while ( threads->list(threads::running) >= 2 ) {
 		$_->join for threads->list(threads::joinable);
 	}
 	foreach my $thread ( threads->list(threads::joinable) ) {
@@ -417,12 +421,15 @@ sub cleanup {
 		$thread->join;
 	}
 
+	# cleanup master thread, too
+	Padre::SlaveDriver->new->cleanup();
+
 	# didn't work the nice way?
 	while ( threads->list(threads::running) >= 1 ) {
 		TRACE( 'Killing thread ' . $_->tid ) if DEBUG;
 		foreach ( threads->list(threads::running) ) {
 			$_->detach;
-			$_->kill;
+			$_->kill('TERM');
 		}
 	}
 
@@ -546,10 +553,11 @@ It simply increments the running task counter.
 =cut
 
 sub on_task_start_event {
-	my ( $main, $event ) = @_; @_ = (); # hack to avoid "Scalars leaked"
-	                                    # TO DO/FIXME:
-	                                    # This should somehow get at the specific TaskManager object
-	                                    # instead of going through the Padre globals!
+	my ( $wx, $event ) = @_; @_ = (); # hack to avoid "Scalars leaked"
+	                                  # TO DO/FIXME:
+	                                  # This should somehow get at the specific TaskManager object
+	                                  # instead of going through the Padre globals!
+	my $main              = $wx->main;
 	my $manager           = Padre->ide->task_manager;
 	my $tid_and_task_type = $event->GetData();
 	my ( $tid, $task_type ) = split /;/, $tid_and_task_type, 2;
@@ -624,47 +632,6 @@ sub on_dump_running_tasks {
 	}
 }
 
-##########################
-# Worker thread main loop
-sub worker_loop {
-	my ( $main, $queue ) = @_; @_ = (); # hack to avoid "Scalars leaked"
-	require Storable;
-
-	# Set the thread-specific main-window pointer
-	$_main = $main;
-
-	#warn threads->tid() . " -- Hi, I'm a thread.";
-
-	while ( my $frozen_task = $queue->dequeue ) {
-
-		#warn threads->tid() . " -- got task.";
-
-		#warn("THREAD TERMINATING"), return 1 if not ref($task) and $task eq 'STOP';
-		return 1 if not ref($frozen_task) and $frozen_task eq 'STOP';
-
-		my $task = Padre::Task->deserialize( \$frozen_task );
-		$task->{__thread_id} = threads->tid();
-
-		my $thread_start_event =
-			Wx::PlThreadEvent->new( -1, $TASK_START_EVENT, $task->{__thread_id} . ";" . ref($task) );
-		Wx::PostEvent( $main, $thread_start_event );
-
-		# RUN
-		$task->run;
-
-		# FREEZE THE PROCESS AND PASS IT BACK
-		undef $frozen_task;
-		$task->serialize( \$frozen_task );
-
-		my $thread_done_event = Wx::PlThreadEvent->new( -1, $TASK_DONE_EVENT, $frozen_task );
-		Wx::PostEvent( $main, $thread_done_event );
-
-		#warn threads->tid() . " -- done with task.";
-	}
-
-	# clean up
-	undef $_main;
-}
 
 1;
 

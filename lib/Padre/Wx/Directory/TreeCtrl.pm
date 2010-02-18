@@ -11,7 +11,7 @@ use Padre::Util     ();
 use Padre::Wx       ();
 use Padre::Constant ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::TreeCtrl';
 
 # Creates a new Directory Browser object
@@ -350,7 +350,7 @@ sub _update_subdirs {
 	my $cookie;
 
 	# Loops thought the node's total children
-	for my $item ( 1 .. $self->GetChildrenCount($root) ) {
+	foreach my $item ( 1 .. $self->GetChildrenCount($root) ) {
 
 		( my $node, $cookie ) = $item == 1 ? $self->GetFirstChild($root) : $self->GetNextChild( $root, $cookie );
 		next if not $node->IsOk;
@@ -735,12 +735,9 @@ sub _on_tree_item_menu {
 
 	Wx::Event::EVT_MENU(
 		$self,
-		$menu->Append( -1, Wx::gettext('Open In File Browser') ),
+		$menu->Append( -1, Wx::gettext('Open in File Browser') ),
 		sub {
-
-			#Open the current node in file browser
-			require Padre::Wx::Directory::OpenInFileBrowserAction;
-			Padre::Wx::Directory::OpenInFileBrowserAction->new->open_in_file_browser($selected_path);
+			$_[0]->main->on_open_in_file_browser($selected_path);
 		}
 	);
 

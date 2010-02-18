@@ -41,7 +41,7 @@ use Padre::PluginHandle      ();
 use Padre::Wx                ();
 use Padre::Wx::Menu::Plugins ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 
 
@@ -121,6 +121,16 @@ use Class::XSAccessor {
 	},
 };
 
+=head2 C<main>
+
+A convenience method to get to the main window.
+
+=cut
+
+sub main {
+	$_[0]->parent->wx->main;
+}
+
 # Get the prefered plugin order.
 # The order calculation cost is higher than we might like,
 # so cache the result.
@@ -160,7 +170,7 @@ sub plugin_objects {
 #
 sub relocale {
 	my $self   = shift;
-	my $locale = Padre::Current->main->{locale};
+	my $locale = $self->main->{locale};
 
 	foreach my $plugin ( $self->plugin_objects ) {
 
@@ -225,7 +235,7 @@ sub reset_my_plugin {
 sub shutdown {
 	my $self = shift;
 
-	my $transaction = Padre::Current->main->lock('DB');
+	my $transaction = $self->main->lock('DB');
 	foreach my $module ( $self->plugin_order ) {
 		my $plugin = $self->_plugin($module);
 		if ( $plugin->enabled ) {
@@ -264,6 +274,7 @@ plug-in has changed while Padre was running.
 
 sub load_plugins {
 	my $self = shift;
+	my $lock = $self->main->lock( 'UPDATE', 'DB', 'refresh_menu_plugins' );
 
 	# Put the plug-in directory first in the load order
 	my $plugin_dir = $self->plugin_dir;
@@ -316,8 +327,6 @@ sub load_plugins {
 
 	# Disabled until someone other than tsee wants to use PAR plug-ins :)
 	# $self->_load_plugins_from_par;
-
-	$self->_refresh_plugin_menu;
 	if ( my @failed = $self->failed ) {
 
 		# Until such time as we can show an error message
@@ -347,17 +356,17 @@ and then reload them.
 =cut
 
 sub reload_plugins {
-	my $self    = shift;
-	my $plugins = $self->plugins;
+	my $self = shift;
+	my $lock = $self->main->lock( 'UPDATE', 'DB', 'refresh_menu_plugins' );
 
 	# Do not use the reload_plugin method since that
 	# refreshes the menu every time.
+	my $plugins = $self->plugins;
 	foreach my $module ( sort keys %$plugins ) {
 		$self->_unload_plugin($module);
 		$self->_load_plugin($module);
 		$self->enable_editors($module);
 	}
-	$self->_refresh_plugin_menu;
 
 	return 1;
 }
@@ -486,9 +495,8 @@ menu, etc.
 
 sub load_plugin {
 	my $self = shift;
-	my $rv   = $self->_load_plugin(@_);
-	$self->_refresh_plugin_menu;
-	return $rv;
+	my $lock = $self->main->lock('refresh_menu_plugins');
+	$self->_load_plugin(@_);
 }
 
 # This method implements the actual mechanics of loading a plug-in,
@@ -587,7 +595,7 @@ sub _load_plugin {
 	if ( $object->can('plugin_directory_locale') ) {
 		my $dir = $object->plugin_directory_locale;
 		if ( defined $dir and -d $dir ) {
-			my $locale = Padre::Current->main->{locale};
+			my $locale = $self->main->{locale};
 			$locale->AddCatalogLookupPathPrefix($dir);
 		}
 	}
@@ -610,9 +618,8 @@ menu, etc.
 
 sub unload_plugin {
 	my $self = shift;
-	my $ret  = $self->_unload_plugin(@_);
-	$self->_refresh_plugin_menu;
-	return $ret;
+	my $lock = $self->main->lock('refresh_menu_plugins');
+	$self->_unload_plugin(@_);
 }
 
 # the guts of unload_plugin which don't refresh the menu
@@ -659,9 +666,10 @@ is passed in as first argument.
 
 sub reload_plugin {
 	my $self   = shift;
+	my $lock   = $self->main->lock( 'UPDATE', 'DB', 'refresh_menu_plugins' );
 	my $module = shift;
 	$self->_unload_plugin($module);
-	$self->load_plugin($module)    or return;
+	$self->_load_plugin($module)   or return;
 	$self->enable_editors($module) or return;
 	return 1;
 }
@@ -732,7 +740,7 @@ sub plugin_event {
 	my $self  = shift;
 	my $event = shift;
 
-	for my $module ( keys %{ $self->{plugins} } ) {
+	foreach my $module ( keys %{ $self->{plugins} } ) {
 
 		# TODO: Re-enable the commented out error messages when the failing modules
 		#       are fixed.
@@ -759,7 +767,7 @@ sub plugin_event {
 			$object->$event(@_);
 		};
 		if ($@) {
-			$self->_error( $plugin, sprintf( Wx::gettext( 'Plugin error on event %s: %s', $event, $@ ) ) );
+			$self->_error( $plugin, sprintf( Wx::gettext('Plugin error on event %s: %s'), $event, $@ ) );
 			next;
 		}
 	}
@@ -782,8 +790,7 @@ sub _error {
 		' in ' . $callerinfo[0] . '::' . $callerinfo1[3], ': ' . $text . "\n";
 
 	# Report to user
-	my $main = Padre->ide->wx->main;
-	$main->error( sprintf( Wx::gettext('Plugin %s'), $plugin ) . ': ' . $text );
+	$self->main->error( sprintf( Wx::gettext('Plugin %s'), $plugin ) . ': ' . $text );
 }
 
 # enable all the plug-ins for a single editor
@@ -832,7 +839,7 @@ sub enable_editors {
 	my $plugin = $self->plugins->{$module} or return;
 	my $object = $plugin->{object} or return;
 	return unless ( $plugin->{status} and $plugin->{status} eq 'enabled' );
-	foreach my $editor ( $self->parent->wx->main->editors ) {
+	foreach my $editor ( $self->main->editors ) {
 		if ( $object->can('editor_enable') ) {
 			$object->editor_enable( $editor, $editor->{Document} );
 		}
@@ -890,7 +897,7 @@ This call and the appropriate menu option should be able to load
 
 sub reload_current_plugin {
 	my $self    = shift;
-	my $main    = $self->parent->wx->main;
+	my $main    = $self->main;
 	my $config  = $self->parent->config;
 	my $plugins = $self->plugins;
 
@@ -963,7 +970,7 @@ sub on_context_menu {
 # TO DO: make it also reload the file?
 sub test_a_plugin {
 	my $self    = shift;
-	my $main    = $self->parent->wx->main;
+	my $main    = $self->main;
 	my $config  = $self->parent->config;
 	my $plugins = $self->plugins;
 
@@ -1026,11 +1033,6 @@ sub test_a_plugin {
 	}
 
 	return;
-}
-
-# Refresh the Plug-ins menu
-sub _refresh_plugin_menu {
-	$_[0]->parent->wx->main->menu->plugins->refresh;
 }
 
 

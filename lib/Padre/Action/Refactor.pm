@@ -7,7 +7,7 @@ package Padre::Action::Refactor;
 =head1 NAME
 
 Padre::Action::Refactor is a outsourced module. It creates Actions for
-various helper function for refactoring.
+various helper functions for refactoring.
 
 =cut
 
@@ -24,7 +24,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 #####################################################################
 # Methods
@@ -47,7 +47,7 @@ sub new {
 		name        => 'refactor.rename_variable',
 		need_editor => 1,
 		label       => Wx::gettext('Lexically Rename Variable'),
-		comment    => Wx::gettext('Prompt for a replacement variable name and replace all occurrance of this variable'),
+		comment => Wx::gettext('Prompt for a replacement variable name and replace all occurrences of this variable'),
 		menu_event => sub {
 			my $doc = $_[0]->current->document or return;
 			return unless $doc->can('lexical_variable_replacement');

@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
 
 sub new {
@@ -52,12 +52,16 @@ sub new {
 			$self,
 			'file.open_selection',
 		);
-		$self->AppendSeparator;
 	}
 
-	$self->{select_all} = $self->add_menu_action(
+	$self->{open_in_file_browser} = $self->add_menu_action(
 		$self,
-		'edit.select_all',
+		'file.open_in_file_browser',
+	);
+
+	$self->{find_in_files} = $self->add_menu_action(
+		$self,
+		'search.find_in_files',
 	);
 
 	$self->AppendSeparator;
@@ -86,6 +90,11 @@ sub new {
 		$self->{paste}->Enable(0);
 	}
 
+	$self->{select_all} = $self->add_menu_action(
+		$self,
+		'edit.select_all',
+	);
+
 	$self->AppendSeparator;
 
 	$self->{comment_toggle} = $self->add_menu_action(
@@ -107,8 +116,6 @@ sub new {
 	if (    $event->isa('Wx::MouseEvent')
 		and $editor->main->ide->config->editor_folding )
 	{
-		$self->AppendSeparator;
-
 		my $mousePos         = $event->GetPosition;
 		my $line             = $editor->LineFromPosition( $editor->PositionFromPoint($mousePos) );
 		my $firstPointInLine = $editor->PointFromPosition( $editor->PositionFromLine($line) );
@@ -116,6 +123,8 @@ sub new {
 		if (   $mousePos->x < $firstPointInLine->x
 			&& $mousePos->x > ( $firstPointInLine->x - 18 ) )
 		{
+			$self->AppendSeparator;
+
 			$self->{fold_all} = $self->add_menu_action(
 				$self,
 				'view.fold_all',

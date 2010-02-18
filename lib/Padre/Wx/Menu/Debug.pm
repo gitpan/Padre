@@ -9,8 +9,11 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
+
+
+
 
 
 #####################################################################
@@ -110,9 +113,7 @@ sub new {
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&Debug');
+	Wx::gettext('&Debug');
 }
 
 sub refresh {
@@ -137,7 +138,6 @@ sub refresh {
 }
 
 1;
-
 
 # Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE

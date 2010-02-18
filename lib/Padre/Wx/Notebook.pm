@@ -3,14 +3,19 @@ package Padre::Wx::Notebook;
 use 5.008;
 use strict;
 use warnings;
+use Params::Util               ();
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook
 };
+
+
+
+
 
 ######################################################################
 # Constructor and Accessors
@@ -67,6 +72,10 @@ sub new {
 	return $self;
 }
 
+
+
+
+
 ######################################################################
 # Main Methods
 
@@ -87,13 +96,19 @@ sub show_file {
 	return;
 }
 
+
+
+
+
 ######################################################################
 # Event Handlers
 
 sub on_auinotebook_page_changed {
 	my $self   = shift;
 	my $main   = $self->main;
+	my $lock   = $main->lock( 'UPDATE', 'refresh', 'refresh_outline' );
 	my $editor = $self->current->editor;
+
 	if ($editor) {
 		my $history = $main->{page_history};
 		my $current = Scalar::Util::refaddr($editor);
@@ -103,16 +118,89 @@ sub on_auinotebook_page_changed {
 		# Update indentation in case auto-update is on
 		# TO DO: Violates encapsulation
 		$editor->{Document}->set_indentation_style;
+	}
 
-		# make sure the outline is refreshed for the new doc
-		# TO DO: Violates encapsulation
-		if ( $main->has_outline ) {
-			$main->outline->clear;
-			$main->outline->force_next(1);
+	$main->{ide}->plugin_manager->plugin_event('editor_changed');
+}
+
+
+
+
+
+######################################################################
+# Introspection and Convenience
+
+# Find the common root path for saved files
+sub prefix {
+	my $self   = shift;
+	my $found  = 0;
+	my @prefix = ();
+	foreach my $i ( 0 .. $self->GetPageCount - 1 ) {
+		my $document = $self->GetPage($i)->{Document} or next;
+		my $file = $document->file or next;
+		$file->isa('Padre::File::Local') or next;
+		unless ( $found++ ) {
+			@prefix = $file->splitvdir;
+			next;
+		}
+
+		# How deep do the paths match
+		my @path = $file->splitvdir;
+		if ( @prefix > @path ) {
+			foreach ( 0 .. $#path ) {
+				unless ( $prefix[$_] eq $path[$_] ) {
+					@path = @path[ 0 .. $_ - 1 ];
+					last;
+				}
+			}
+			@prefix = @path;
+		} else {
+			foreach ( 0 .. $#prefix ) {
+				unless ( $prefix[$_] eq $path[$_] ) {
+					@prefix = @prefix[ 0 .. $_ - 1 ];
+					last;
+				}
+			}
 		}
 	}
-	$main->refresh;
-	$main->{ide}->plugin_manager->plugin_event('editor_changed');
+
+	return @prefix;
+}
+
+# Build a page id to label map
+sub labels {
+	my $self   = shift;
+	my @prefix = $self->prefix;
+	my @labels = ();
+	foreach my $i ( 0 .. $self->GetPageCount - 1 ) {
+		my $document = $self->GetPage($i)->{Document};
+		unless ($document) {
+			push @labels, undef;
+			next;
+		}
+
+		# "Untitled N" files
+		my $file = $document->file;
+		unless ($file) {
+			my $title = $self->GetPageText($i);
+			$title =~ s/[ *]+//;
+			push @labels, $title;
+			next;
+		}
+
+		# Show local files relative to the common prefix
+		if ( $file->isa('Padre::File::Local') ) {
+			my @path = $file->splitall;
+			@path = @path[ scalar(@prefix) .. $#path ];
+			push @labels, File::Spec->catfile(@path);
+			next;
+		}
+
+		# Show the full path to non-local files
+		push @labels, $file->{filename};
+	}
+
+	return @labels;
 }
 
 1;

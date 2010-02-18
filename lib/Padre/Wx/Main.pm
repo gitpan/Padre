@@ -60,7 +60,7 @@ use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -113,6 +113,9 @@ sub new {
 		[ $config->main_width, $config->main_height, ], $style,
 	);
 
+	# Start with a simple placeholder title
+	$self->SetTitle('Padre');
+
 	# Save a reference back to the parent IDE
 	$self->{ide} = $ide;
 
@@ -123,9 +126,6 @@ sub new {
 	# Create the lock manager before any gui operations,
 	# so that we can do locking operations during startup.
 	$self->{locker} = Padre::Locker->new($self);
-
-	# Determine the window title (needs ide & config)
-	$self->refresh_title;
 
 	# Remember where the editor started from,
 	# this could be handy later.
@@ -245,7 +245,7 @@ sub new {
 		$self,
 		Padre::Wx::ID_TIMER_POSTINIT,
 		sub {
-			$_[0]->_timer_post_init;
+			$_[0]->timer_post_init;
 		},
 	);
 	$timer->Start( 1, 1 );
@@ -655,7 +655,7 @@ sub _xy_on_screen {
 	return 1;
 }
 
-sub _timer_post_init {
+sub timer_post_init {
 	my $self    = shift;
 	my $config  = $self->config;
 	my $manager = $self->ide->plugin_manager;
@@ -1158,7 +1158,7 @@ and perform it in the background.
 
 sub add_refresh_listener {
 	my ( $self, @listeners ) = @_;
-	for my $l (@listeners) {
+	foreach my $l (@listeners) {
 		if ( !grep { $_ eq $l } @{ $self->{refresh_listeners} } ) {
 			Scalar::Util::weaken($l);
 			push @{ $self->{refresh_listeners} }, $l;
@@ -1175,18 +1175,17 @@ Sets or updates the Window title.
 =cut
 
 sub refresh_title {
-	my $self    = shift;
-	my $config  = $self->{config};
-	my $current = $self->current;
-
-	my %variable_data = (
+	my $self     = shift;
+	my $config   = $self->{config};
+	my $current  = $self->current;
+	my %variable = (
 		'%' => '%',
 		'v' => $Padre::VERSION,
-		'f' => '',             # Initlize space for filename
-		'b' => '',             # Initlize space for filename - basename
-		'd' => '',             # Initlize space for filename - dirname
-		'F' => '',             # Initlize space for filename relative to project dir
-		'p' => '',             # Initlize space for project name
+		'f' => '',             # Initialize space for filename
+		'b' => '',             # Initialize space for filename - basename
+		'd' => '',             # Initialize space for filename - dirname
+		'F' => '',             # Initialize space for filename relative to project dir
+		'p' => '',             # Initialize space for project name
 	);
 
 	# We may run within window start-up, there may be no "current" or
@@ -1197,15 +1196,14 @@ sub refresh_title {
 	{
 		my $document = $current->document;
 		my $file     = $document->file;
-		$variable_data{'f'} = $file->{filename};
-		$variable_data{'b'} = $file->basename;
-		$variable_data{'d'} = $file->dirname;
-
-		$variable_data{'F'} = $file->{filename};
+		$variable{'f'} = $file->{filename};
+		$variable{'b'} = $file->basename;
+		$variable{'d'} = $file->dirname;
+		$variable{'F'} = $file->{filename};
 		my $project_dir = $document->project_dir;
 		if ( defined $project_dir ) {
 			$project_dir = quotemeta $project_dir;
-			$variable_data{'F'} =~ s/^$project_dir//;
+			$variable{'F'} =~ s/^$project_dir//;
 		}
 	}
 
@@ -1214,22 +1212,25 @@ sub refresh_title {
 		my ($session) = Padre::DB::Session->select(
 			'where id = ?', $self->ide->{session},
 		);
-		$variable_data{'p'} = $session->name;
+		$variable{'p'} = $session->name;
 	}
 
 	# Keep it for later usage
 	$self->{title} = $config->main_title;
 
-	my $Vars = join( '', keys(%variable_data) );
+	my $variables = join '', keys %variable;
 
-	$self->{title} =~ s/\%([$Vars])/$variable_data{$1}/g;
+	$self->{title} =~ s/\%([$variables])/$variable{$1}/g if $variables;
 
-	$self->{title} = 'Padre ' . $Padre::VERSION
-		if !defined( $self->{title} );
+	unless ( defined $self->{title} ) {
+		$self->{title} = "Padre $Padre::VERSION";
+	}
 
-	my $revision = Padre::Constant::PADRE_REVISION;
-	$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)"
-		if defined($revision);
+	require Padre::Util::SVN;
+	my $revision = Padre::Util::SVN::padre_revision();
+	if ( defined $revision ) {
+		$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
+	}
 
 	if ( $self->GetTitle ne $self->{title} ) {
 
@@ -1265,6 +1266,25 @@ sub refresh_syntaxcheck {
 
 =pod
 
+=head2 C<refresh_outline>
+
+    $main->refresh_outline;
+
+Force a refresh of the outline panel.
+
+=cut
+
+sub refresh_outline {
+	my $self = shift;
+	return unless $self->has_outline;
+	return if $self->locked('REFRESH');
+	return unless $self->menu->view->{outline}->IsChecked;
+	$self->outline->refresh;
+	return;
+}
+
+=pod
+
 =head3 C<refresh_menu>
 
     $main->refresh_menu;
@@ -1278,6 +1298,34 @@ sub refresh_menu {
 	my $self = shift;
 	return if $self->locked('REFRESH');
 	$self->menu->refresh;
+}
+
+=head3 C<refresh_menu_plugins>
+
+    $main->refresh_menu_plugins;
+
+Force a refresh of the plugin menus.
+
+=cut
+
+sub refresh_menu_plugins {
+	my $self = shift;
+	return if $self->locked('REFRESH');
+	$self->menu->plugins->refresh($self);
+}
+
+=head3 C<refresh_menu_window>
+
+    $main->refresh_menu_window
+
+Force a refresh of the window menu
+
+=cut
+
+sub refresh_menu_window {
+	my $self = shift;
+	return if $self->locked('REFRESH');
+	$self->menu->window->refresh($self);
 }
 
 =pod
@@ -1307,7 +1355,7 @@ Specifically refresh the Recent Files entries in the File dialog
 sub refresh_recent {
 	my $self = shift;
 	return if $self->locked('REFRESH');
-	$self->menu->file->update_recentfiles;
+	$self->menu->file->refresh_recent;
 }
 
 =pod
@@ -1678,6 +1726,7 @@ sub show_functions {
 
 sub _show_functions {
 	my $self = shift;
+	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		$self->right->show( $self->functions );
 	} elsif ( $self->has_functions ) {
@@ -1716,6 +1765,7 @@ sub show_todo {
 # XXX This should be merged with _show_functions again
 sub _show_todo {
 	my $self = shift;
+	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		$self->right->show( $self->todo );
 	} elsif ( $self->has_todo ) {
@@ -1756,6 +1806,7 @@ sub show_outline {
 
 sub _show_outline {
 	my $self = shift;
+	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		my $outline = $self->outline;
 		$self->right->show($outline);
@@ -1778,7 +1829,6 @@ sub _show_outline {
 
 sub show_debugger {
 	my $self = shift;
-
 	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
 
 	#	unless ( $on == $self->menu->view->{debugger}->IsChecked ) {
@@ -1834,6 +1884,7 @@ sub show_directory {
 
 sub _show_directory {
 	my $self = shift;
+	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		$self->directory_panel->show( $self->directory );
 	} elsif ( $self->has_directory ) {
@@ -1873,6 +1924,7 @@ sub show_output {
 
 sub _show_output {
 	my $self = shift;
+	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		$self->bottom->show(
 			$self->output,
@@ -1914,6 +1966,7 @@ sub show_syntax {
 
 sub _show_syntax {
 	my $self = shift;
+	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		my $syntax = $self->syntax;
 		$self->bottom->show(
@@ -2216,6 +2269,23 @@ sub on_run_this_test {
 
 =pod
 
+=head3 C<on_open_in_file_browser>
+
+    $main->on_open_in_file_browser( $filename );
+
+Opens the current C<$filename> using the operating system's file browser
+
+=cut
+
+sub on_open_in_file_browser {
+	my ( $self, $filename ) = @_;
+
+	require Padre::Util::FileBrowser;
+	Padre::Util::FileBrowser->open_in_file_browser($filename);
+}
+
+=pod
+
 =head3 C<run_command>
 
     $main->run_command( $command );
@@ -2372,7 +2442,13 @@ sub run_document {
 		if ( $document->pre_process ) {
 			SCOPE: {
 				require File::pushd;
-				my $pushd = File::pushd::pushd( $document->project_dir );
+
+				# Ticket #845 this project_dir is created in correctly when you do padre somedir/script.pl and run F5 on that
+				# real stupid think so we don't crash
+				# to fix this $document->get_command needs to recognize which folder it is in
+				# The other part of this fix is in lib/Padre/Document/Perl.pm in get_command
+				# Please feel free to fix this
+				File::pushd::pushd( $document->project_dir ) if -e $document->project_dir;
 				$self->run_command($cmd);
 			}
 		} else {
@@ -2386,7 +2462,7 @@ sub run_document {
 			if ( $ret == Wx::wxYES ) {
 				SCOPE: {
 					require File::pushd;
-					my $pushd = File::pushd::pushd( $document->project_dir );
+					File::pushd::pushd( $document->project_dir ) if -e $document->project_dir;
 					$self->run_command($cmd);
 				}
 			}
@@ -2449,17 +2525,17 @@ C<$session> (a C<Padre::DB::Session> object). No return value.
 =cut
 
 sub open_session {
-	my ( $self, $session, $autosave ) = @_;
+	my $self     = shift;
+	my $session  = shift;
+	my $autosave = shift || 0;
 
-	$autosave ||= 0; # Initilize if it isn't
+	# Are there any files in the session?
+	my @files = $session->files or return;
 
-	# get list of files in the session
-	my @files = $session->files;
-	return unless @files;
+	# Prevent redrawing until we're done
+	my $lock = $self->lock( 'UPDATE', 'DB', 'refresh' );
 
-	# prevent redrawing until we're done
-	$self->Freeze;
-
+	# Progress dialog for the session changes
 	require Padre::Wx::Progress;
 	my $progress = Padre::Wx::Progress->new(
 		$self,
@@ -2499,13 +2575,7 @@ sub open_session {
 	$self->ide->{session}          = $session->id;
 	$self->ide->{session_autosave} = $autosave;
 
-	# now we can redraw
-	$self->Thaw;
-
-	# This could run in non-blocking space:
-	my $editor = $self->current->editor;
-	$self->update_directory;
-	$self->refresh_title;
+	return 1;
 }
 
 =pod
@@ -2563,21 +2633,6 @@ sub save_current_session {
 	$self->save_session( $session, @session );
 
 }
-
-
-
-sub update_directory {
-	my $self = shift;
-
-	# update the directory listing
-	if ( $self->has_directory ) {
-		if ( $self->menu->view->{directory}->IsChecked ) {
-			$self->directory->refresh;
-		}
-	}
-
-}
-
 
 =pod
 
@@ -2883,7 +2938,7 @@ sub on_comment_block {
 		$self->error(
 			sprintf(
 				Wx::gettext("Could not determine the comment character for %s document type"),
-				Padre::MimeTypes->get_mime_type_name( $document->get_mimetype )
+				Padre::MimeTypes->get_mime_type_name( $document->mimetype )
 			)
 		);
 		return;
@@ -2959,15 +3014,19 @@ sub on_autocompletion {
 
     $main->on_goto;
 
-Prompt user for a line, and jump to this line in current document.
+Prompt user for a line or character position, and jump to this line 
+or character position in current document.
 
 =cut
 
 sub on_goto {
 	my $self = shift;
 
-	require Padre::Wx::Dialog::GotoLine;
-	Padre::Wx::Dialog::GotoLine->modal;
+	unless ( defined $self->{goto} ) {
+		require Padre::Wx::Dialog::Goto;
+		$self->{goto} = Padre::Wx::Dialog::Goto->new($self);
+	}
+	$self->{goto}->show;
 
 	return;
 }
@@ -3190,10 +3249,8 @@ Create a new empty tab. No return value.
 
 sub on_new {
 	my $self = shift;
-	$self->Freeze;
+	my $lock = $self->lock( 'UPDATE', 'refresh' );
 	$self->setup_editor;
-	$self->Thaw;
-	$self->refresh;
 	return;
 }
 
@@ -3344,13 +3401,15 @@ Create a new tab in the notebook, and return its id (an integer).
 =cut
 
 sub create_tab {
-	my ( $self, $editor, $title ) = @_;
+	my $self   = shift;
+	my $editor = shift;
+	my $title  = shift;
 	$title ||= '(' . Wx::gettext('Unknown') . ')';
+
+	my $lock = $self->lock('refresh');
 	$self->notebook->AddPage( $editor, $title, 1 );
 	$editor->SetFocus;
-	my $id = $self->notebook->GetSelection;
-	$self->refresh;
-	return $id;
+	return $self->notebook->GetSelection;
 }
 
 =pod
@@ -3587,7 +3646,7 @@ sub open_file_dialog {
 	}
 
 	my @files;
-	for my $filename (@filenames) {
+	foreach my $filename (@filenames) {
 
 		if ( $filename =~ /[\*\?]/ ) {
 
@@ -3636,6 +3695,51 @@ sub open_file_dialog {
 	return;
 }
 
+=pod
+
+=head3 C<on_open_with_default_system_editor>
+
+    $main->on_open_with_default_system_editor($filename);
+
+Opens C<$filename> in the default system editor
+
+=cut
+
+sub on_open_with_default_system_editor {
+	my ( $self, $filename ) = @_;
+
+	require Padre::Util::FileBrowser;
+	Padre::Util::FileBrowser->open_with_default_system_editor($filename);
+}
+
+=pod
+
+=head3 C<on_open_in_command_line>
+
+    $main->on_open_in_command_line($filename);
+
+Opens a command line/shell using the working directory of C<$filename>
+
+=cut
+
+sub on_open_in_command_line {
+	my ( $self, $filename ) = @_;
+
+	require Padre::Util::FileBrowser;
+	Padre::Util::FileBrowser->open_in_command_line($filename);
+}
+
+
+=pod
+
+=head3 C<on_open_example>
+
+    $main->on_open_example;
+
+Opens the examples file dialog
+
+=cut
+
 sub on_open_example {
 	$_[0]->open_file_dialog( Padre::Util::sharedir('examples') );
 }
@@ -3644,7 +3748,7 @@ sub on_open_example {
 
 =head3 C<reload_all>
 
-    my $success = $main->reload_all();
+    my $success = $main->reload_all;
 
 Reload all open files from disk.
 
@@ -3671,6 +3775,66 @@ sub reload_all {
 
 	return 1;
 }
+
+=pod
+
+=head3 C<reload_some>
+
+    my $success = $main->reload_some(@pages_to_reload);
+
+Reloads the given documents. Return true upon success, false otherwise.
+
+=cut
+
+sub on_reload_some {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+
+	require Padre::Wx::Dialog::WindowList;
+	Padre::Wx::Dialog::WindowList->new(
+		$self,
+		title      => Wx::gettext('Reload some files'),
+		list_title => Wx::gettext('Select files to reload:'),
+		buttons    => [ [ 'Reload selected', sub { $_[0]->main->reload_some(@_); } ] ],
+	)->show;
+}
+
+sub reload_some {
+	my $self         = shift;
+	my @reload_pages = @_;
+
+	my $notebook = $self->notebook;
+
+	my $manager = $self->{ide}->plugin_manager;
+
+	require Padre::Wx::Progress;
+	my $progress = Padre::Wx::Progress->new(
+		$self, Wx::gettext('Reload some'), $#reload_pages,
+		lazy => 1
+	);
+
+	SCOPE: {
+		my $lock = $self->lock('refresh');
+		foreach my $reload_page_no ( 0 .. $#reload_pages ) {
+			$progress->update( $reload_page_no, ( $reload_page_no + 1 ) . '/' . scalar(@reload_pages) );
+
+			foreach my $pageid ( $self->pageids ) {
+				my $page = $notebook->GetPage($pageid);
+				next unless defined($page);
+				next unless $page eq $reload_pages[$reload_page_no];
+				$self->reload_file($pageid) or return 0;
+			}
+		}
+	}
+
+	# Recalculate window title
+	$self->refresh_title;
+
+	$manager->plugin_event('editor_changed');
+
+	return 1;
+}
+
 
 =head3 C<reload_file>
 
@@ -4129,8 +4293,13 @@ sub close {
 
 	my $editor = $notebook->GetPage($id) or return;
 	my $doc    = $editor->{Document}     or return;
-	my $lock = $self->lock( 'REFRESH', 'DB', 'refresh_directory', 'refresh_menu' );
-	TRACE( join ' ', "Closing ", ref $doc, $doc->filename ) if DEBUG;
+	my $lock   = $self->lock(
+		qw{
+			REFRESH DB
+			refresh_directory refresh_menu refresh_menu_window
+			}
+	);
+	TRACE( join ' ', "Closing ", ref $doc, $doc->filename || 'Unknown' ) if DEBUG;
 
 	if ( $doc->is_modified and not $doc->is_unused ) {
 		my $ret = Wx::MessageBox(
@@ -4260,7 +4429,7 @@ sub on_close_some {
 		$self,
 		title      => Wx::gettext('Close some files'),
 		list_title => Wx::gettext('Select files to close:'),
-		buttons    => [ [ 'Close selected', sub { Padre->ide->wx->main->close_some(@_); } ] ],
+		buttons    => [ [ 'Close selected', sub { $_[0]->main->close_some(@_); } ] ],
 	)->show;
 }
 
@@ -4280,7 +4449,7 @@ sub close_some {
 
 	SCOPE: {
 		my $lock = $self->lock('refresh');
-		for my $close_page_no ( 0 .. $#close_pages ) {
+		foreach my $close_page_no ( 0 .. $#close_pages ) {
 			$progress->update( $close_page_no, ( $close_page_no + 1 ) . '/' . scalar(@close_pages) );
 
 			foreach my $pageid ( $self->pageids ) {
@@ -4546,9 +4715,11 @@ Open Padre's regular expression editor. No return value.
 sub open_regex_editor {
 	my $self = shift;
 
-	require Padre::Wx::Dialog::RegexEditor;
-	my $regex = Padre::Wx::Dialog::RegexEditor->new($self);
-	$regex->show();
+	unless ( defined $self->{regex_editor} ) {
+		require Padre::Wx::Dialog::RegexEditor;
+		$self->{regex_editor} = Padre::Wx::Dialog::RegexEditor->new($self);
+	}
+	$self->{regex_editor}->show;
 
 	return;
 }
@@ -4576,7 +4747,7 @@ sub on_preferences {
 		my %mime_types; # all the mime-types of currently open files
 		foreach my $editor ( $self->editors ) {
 			$editor->set_preferences;
-			$mime_types{ $editor->{Document}->get_mimetype } = 1;
+			$mime_types{ $editor->{Document}->mimetype } = 1;
 		}
 
 		my %new_highlighters = Padre::MimeTypes->get_current_highlighters;
@@ -5011,9 +5182,9 @@ sub convert_to {
 	my $editor  = $current->editor;
 
 	# Convert and Set the EOL mode for pastes to work correctly
-	my $eol_mode = $Padre::Wx::Editor::mode{$newline};
-	$editor->ConvertEOLs($eol_mode);
-	$editor->SetEOLMode($eol_mode);
+	my $mode = $Padre::Wx::Editor::mode{$newline};
+	$editor->ConvertEOLs($mode);
+	$editor->SetEOLMode($mode);
 
 	# TO DO: include the changing of file type in the undo/redo actions
 	# or better yet somehow fetch it from the document when it is needed.
@@ -5482,33 +5653,36 @@ sub timer_check_overwrite {
 
 	$doc->{_already_popup_file_changed} = 1;
 
-	my $Text;
-	if ( $file_state == -1 ) {
-		$Text = Wx::gettext('File has been deleted on disk, do you want to CLEAR the editor window?');
-	} else {
-		$Text = Wx::gettext("File changed on disk since last saved. Do you want to reload it?");
-	}
+	#	my $Text;
+	#	if ( $file_state == -1 ) {
+	#		$Text = Wx::gettext('File has been deleted on disk, do you want to CLEAR the editor window?');
+	#	} else {
+	#		$Text = Wx::gettext("File changed on disk since last saved. Do you want to reload it?");
+	#	}
+	#
+	#	my $ret = Wx::MessageBox(
+	#		$Text,
+	#		$doc->filename || Wx::gettext("File not in sync"),
+	#		Wx::wxYES_NO | Wx::wxCENTRE, $self,
+	#	);
+	#
+	#	if ( $ret == Wx::wxYES ) {
+	#		unless ( $doc->reload ) {
+	#			$self->error(
+	#				sprintf(
+	#					Wx::gettext("Could not reload file: %s"),
+	#					$doc->errstr
+	#				)
+	#			);
+	#		} else {
+	#			$doc->editor->configure_editor($doc);
+	#		}
+	#	} else {
+	#		$doc->{timestamp} = $doc->timestamp_now;
+	#	}
 
-	my $ret = Wx::MessageBox(
-		$Text,
-		$doc->filename || Wx::gettext("File not in sync"),
-		Wx::wxYES_NO | Wx::wxCENTRE, $self,
-	);
+	$self->on_reload_some; # Show dialog for file reload selection
 
-	if ( $ret == Wx::wxYES ) {
-		unless ( $doc->reload ) {
-			$self->error(
-				sprintf(
-					Wx::gettext("Could not reload file: %s"),
-					$doc->errstr
-				)
-			);
-		} else {
-			$doc->editor->configure_editor($doc);
-		}
-	} else {
-		$doc->{_timestamp} = $doc->time_on_file;
-	}
 	$doc->{_already_popup_file_changed} = 0;
 
 	return;
@@ -5701,7 +5875,7 @@ sub change_highlighter {
 	my $focused = $self->current->editor;
 	foreach my $editor ( $self->editors ) {
 		my $document = $editor->{Document};
-		next if $document->get_mimetype ne $mime_type;
+		next if $document->mimetype ne $mime_type;
 		$document->set_highlighter($module);
 		my $filename = defined( $document->{file} ) ? $document->{file}->filename : undef;
 		TRACE( "Set highlighter to to $module for $document in file " . ( $filename || '' ) ) if DEBUG;

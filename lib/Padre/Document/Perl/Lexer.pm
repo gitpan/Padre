@@ -8,7 +8,7 @@ use PPI::Dumper    ();
 use Text::Balanced ();
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 sub class_to_color {
 	my $class  = shift;
@@ -360,7 +360,7 @@ sub clear_style {
 	my $doc    = Padre::Current->document;
 	my $editor = $doc->editor;
 
-	for my $i ( 0 .. 31 ) {
+	foreach my $i ( 0 .. 31 ) {
 		$editor->StartStyling( $styling_start_pos, $i );
 		$editor->SetStyling( $styling_end_pos - $styling_start_pos, 0 );
 	}

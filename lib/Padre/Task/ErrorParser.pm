@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Task';
 
 use Class::XSAccessor {
@@ -34,12 +34,13 @@ sub run {
 }
 
 sub finish {
-	my $self      = shift;
-	my $main      = shift;
-	my $errorlist = $main->errorlist;
+	my $self = shift;
+	my $main = shift;
+	return if !$main;
+	my $errorlist = $main->errorlist if $main;
 	my $data      = $self->data;
 	my $parser    = $self->parser;
-	$errorlist->{parser} = $parser;
+	$errorlist->{parser} = $parser if $errorlist;
 
 	my @errors = defined $data && $data ne '' ? $parser->parse_string($data) : ();
 

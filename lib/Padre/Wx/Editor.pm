@@ -11,7 +11,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -45,14 +45,22 @@ my $width;
 my $Clipboard_Old = '';
 
 sub new {
-	my $class    = shift;
-	my $notebook = shift;
+	my $class  = shift;
+	my $parent = shift;
+
+	# NOTE: This hack is only here because the Preferences dialog uses
+	# an editor object for their style preview thingy.
+	my $main = $parent;
+	while ( not $main->isa('Padre::Wx::Main') ) {
+		$main = $main->GetParent;
+	}
 
 	# Create the underlying Wx object
-	my $self   = $class->SUPER::new($notebook);
-	my $config = $self->main->ide->config;
+	my $lock = $main->lock( 'UPDATE', 'refresh_menu_window' );
+	my $self = $class->SUPER::new($parent);
 
 	# TO DO: Make this suck less
+	my $config = $main->config;
 	$data = data( $config->editor_style );
 
 	# Set the code margins a little larger than the default.
@@ -73,7 +81,6 @@ sub new {
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
 	Wx::Event::EVT_MIDDLE_UP( $self, \&on_middle_up );
-
 
 	# Smart highlighting:
 	# Selecting a word or small block of text causes all other occurrences to be highlighted
@@ -138,7 +145,7 @@ sub new {
 }
 
 sub main {
-	return $_[0]->GetGrandParent;
+	$_[0]->GetGrandParent;
 }
 
 sub data {
@@ -167,17 +174,19 @@ sub data {
 	return $data;
 }
 
-sub error { # Error Message
+# Error Message
+sub error {
 	my $self = shift;
 	my $text = shift;
 	Wx::MessageBox(
-		$text,    Wx::gettext("Error"),
-		Wx::wxOK, $self->main
+		$text,
+		Wx::gettext("Error"),
+		Wx::wxOK,
+		$self->main
 	);
-
 }
 
-# most of this should be read from some external files
+# Most of this should be read from some external files
 # but for now we use this if statement
 sub padre_setup {
 	my $self = shift;
@@ -193,9 +202,10 @@ sub padre_setup {
 	# and Wx::wxUNICODE or wxUSE_UNICODE should be on
 	$self->SetCodePage(65001);
 
-	my $mimetype = $self->{Document}->get_mimetype || 'text/plain';
+	my $mimetype = $self->{Document}->mimetype || 'text/plain';
 	if ( $MIME_STYLE{$mimetype} ) {
 		$self->padre_setup_style( $MIME_STYLE{$mimetype} );
+
 	} elsif ( $mimetype eq 'text/plain' ) {
 		$self->padre_setup_plain;
 		my $filename = $self->{Document}->filename || q{};
@@ -205,6 +215,7 @@ sub padre_setup {
 			# re-setup if file extension is .conf
 			$self->padre_setup_style('conf') if $ext eq 'conf';
 		}
+
 	} elsif ($mimetype) {
 
 		# setup some default coloring
@@ -220,9 +231,7 @@ sub padre_setup {
 	return;
 }
 
-#
 # Called a key is released in the editor
-#
 sub on_key_up {
 	my ( $self, $event ) = @_;
 
@@ -739,36 +748,29 @@ sub unfold_all {
 	return;
 }
 
-# when the focus is received by the editor
+# When the focus is received by the editor
 sub on_focus {
-	my ( $self, $event ) = @_;
-	my $doc = Padre::Current->document;
+	my $self     = shift;
+	my $event    = shift;
+	my $main     = $self->main;
+	my $document = $main->current->document;
+	TRACE( "Focus received file: " . ( $document->filename || '' ) ) if DEBUG;
 
-	TRACE( "Focus received file: " . ( $doc->filename || '' ) ) if DEBUG;
-
-	my $main = $self->main;
-
-	# to show/hide the document specific Perl menu
+	# To show/hide the document specific Perl menu
 	# don't refresh on each focus event
-	$main->refresh_menu
-		if ( !defined( $main->{last_refresh_editor} ) )
-		or ( $main->{last_refresh_editor} ne $self );
-	$main->{last_refresh_editor} = $self;
-
-	$main->update_directory;
+	my $lock = $main->lock( 'UPDATE', 'refresh_menu', 'refresh_directory' );
 
 	# TO DO
 	# this is called even if the mouse is moved away from padre and back again
 	# we should restrict some of the updates to cases when we switch from one file to
 	# another
-
 	if ( $self->needs_manual_colorize ) {
 		TRACE("needs_manual_colorize") if DEBUG;
 		my $lexer = $self->GetLexer;
 		if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
-			$doc->colorize;
+			$document->colorize;
 		} else {
-			$doc->remove_color;
+			$document->remove_color;
 			$self->Colourise( 0, $self->GetLength );
 		}
 		$self->needs_manual_colorize(0);
@@ -1202,7 +1204,7 @@ sub comment_lines {
 		if ( $is_first_column && $end > $begin ) {
 			$end--;
 		}
-		for my $line ( $begin .. $end ) {
+		foreach my $line ( $begin .. $end ) {
 
 			# insert $str (# or //)
 			my $pos = $self->PositionFromLine($line);
@@ -1243,7 +1245,7 @@ sub uncomment_lines {
 		if ( $is_first_column && $end > $begin ) {
 			$end--;
 		}
-		for my $line ( $begin .. $end ) {
+		foreach my $line ( $begin .. $end ) {
 			my $first = $self->PositionFromLine($line);
 			my $last  = $first + $length;
 			my $text  = $self->GetTextRange( $first, $last );

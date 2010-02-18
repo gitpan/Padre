@@ -10,7 +10,7 @@ use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 # Convenience constants for the operating system
 use constant WIN32 => !!( ( $^O eq 'MSWin32' ) or ( $^O eq 'cygwin' ) );
@@ -108,12 +108,21 @@ use constant CONFIG_HOST    => File::Spec->catfile( CONFIG_DIR, 'config.db' );
 use constant CONFIG_HUMAN   => File::Spec->catfile( CONFIG_DIR, 'config.yml' );
 use constant CONFIG_STARTUP => File::Spec->catfile( CONFIG_DIR, 'startup.yml' );
 
-# Check and create the directories that need to exist
-unless ( -e CONFIG_DIR or File::Path::mkpath(CONFIG_DIR) ) {
-	Carp::croak( "Cannot create config directory '" . CONFIG_DIR . "': $!" );
+# Do the initialisation in a function,
+# so we can run it again later if needed.
+sub init {
+
+	# Check and create the directories that need to exist
+	unless ( -e CONFIG_DIR or File::Path::mkpath(CONFIG_DIR) ) {
+		Carp::croak( "Cannot create config directory '" . CONFIG_DIR . "': $!" );
+	}
+	unless ( -e PLUGIN_LIB or File::Path::mkpath(PLUGIN_LIB) ) {
+		Carp::croak( "Cannot create plug-ins directory '" . PLUGIN_LIB . "': $!" );
+	}
 }
-unless ( -e PLUGIN_LIB or File::Path::mkpath(PLUGIN_LIB) ) {
-	Carp::croak( "Cannot create plug-ins directory '" . PLUGIN_LIB . "': $!" );
+
+BEGIN {
+	init();
 }
 
 
@@ -134,28 +143,6 @@ unless ( -e PLUGIN_LIB or File::Path::mkpath(PLUGIN_LIB) ) {
 use constant DEFAULT_SINGLEINSTANCE => ( WIN32 and not( $ENV{HARNESS_ACTIVE} or $^P ) ) ? 1 : 0;
 
 use constant DEFAULT_SINGLEINSTANCE_PORT => 4444;
-
-
-
-
-
-#####################################################################
-# Pseudo Constants
-
-my $revision;
-
-# Get the svn revision of the currently running Padre once:
-# eval 'use constant PADRE_REVISION => Padre::Util::revision;';
-# This needs to be a pseudo constant as it requires Padre::Util which
-# requires Padre::Constant (this module).
-sub PADRE_REVISION () {
-
-	# Get and keep the revision at the first call of this pseudo-constant
-	# (usually at Padre start)
-	require Padre::Util;
-	$revision ||= Padre::Util::revision();
-	return $revision;
-}
 
 1;
 

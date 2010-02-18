@@ -9,7 +9,7 @@ use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
 use Padre::Constant();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::ToolBar';
 
 # NOTE: Something is wrong with dockable toolbars on Windows
@@ -52,7 +52,7 @@ sub new {
 	# anyone wants to change the toolbar, it needs to be done manuelly
 	# within config.yml.
 
-	for my $item ( split( /\;/, $config->main_toolbar_items ) ) {
+	foreach my $item ( split( /\;/, $config->main_toolbar_items ) ) {
 
 		if ( $item eq '|' ) {
 			$self->AddSeparator;
@@ -138,7 +138,7 @@ sub refresh {
 	my $text      = $current->text;
 	my $selection = ( defined $text and $text ne '' ) ? 1 : 0;
 
-	for my $item ( keys( %{ $self->{item_list} } ) ) {
+	foreach my $item ( keys( %{ $self->{item_list} } ) ) {
 
 		my $action = $self->{item_list}->{$item};
 

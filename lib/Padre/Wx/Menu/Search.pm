@@ -11,7 +11,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -101,9 +101,7 @@ sub new {
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&Search');
+	Wx::gettext('&Search');
 }
 
 sub refresh {

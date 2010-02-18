@@ -9,7 +9,7 @@ use Padre::Constant            ();
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook
@@ -18,7 +18,6 @@ our @ISA     = qw{
 sub new {
 	my $class = shift;
 	my $main  = shift;
-	my $aui   = $main->aui;
 
 	# Create the basic object
 	my $self = $class->SUPER::new(
@@ -30,6 +29,7 @@ sub new {
 	);
 
 	# Add ourself to the window manager
+	my $aui = $main->aui;
 	$aui->AddPane(
 		$self,
 		Padre::Wx->aui_pane_info(

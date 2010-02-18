@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Locale   ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
 
 my @GUI_ELEMENTS = (
@@ -50,7 +50,7 @@ sub new {
 	$self->AppendSeparator;
 
 	# Show or hide GUI elements
-	for my $element (@GUI_ELEMENTS) {
+	foreach my $element (@GUI_ELEMENTS) {
 
 		next unless defined($element);
 
@@ -142,8 +142,24 @@ sub new {
 		'view.word_wrap',
 	);
 
-	$self->AppendSeparator;
+	if ( $config->feature_bookmark ) {
 
+		$self->AppendSeparator;
+
+		# Bookmark Support
+		$self->{bookmark_set} = $self->add_menu_action(
+			$self,
+			'view.bookmark_set',
+		);
+
+		$self->{bookmark_goto} = $self->add_menu_action(
+			$self,
+			'view.bookmark_goto',
+		);
+
+		$self->AppendSeparator;
+
+	}
 
 	# Font Size
 	$self->{font_size} = Wx::Menu->new;
@@ -166,25 +182,6 @@ sub new {
 		$self->{font_size},
 		'view.font_reset',
 	);
-
-	if ( $config->feature_bookmark ) {
-
-		$self->AppendSeparator;
-
-		# Bookmark Support
-		$self->{bookmark_set} = $self->add_menu_action(
-			$self,
-			'view.bookmark_set',
-		);
-
-		$self->{bookmark_goto} = $self->add_menu_action(
-			$self,
-			'view.bookmark_goto',
-		);
-
-		$self->AppendSeparator;
-
-	}
 
 	# Editor Look and Feel
 	$self->{style} = Wx::Menu->new;
@@ -319,9 +316,7 @@ sub new {
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&View');
+	Wx::gettext('&View');
 }
 
 sub refresh {
@@ -365,12 +360,12 @@ sub refresh {
 
 		# Set mimetype
 		my $has_checked = 0;
-		if ( $document->get_mimetype ) {
+		if ( $document->mimetype ) {
 			my %mimes = Padre::MimeTypes::menu_view_mimes();
 			my @mimes = sort keys %mimes;
 			foreach my $pos ( 0 .. scalar @mimes - 1 ) {
 				my $radio = $self->{view_as_highlighting}->FindItemByPosition($pos);
-				if ( $document->get_mimetype eq $mimes{ $mimes[$pos] } ) {
+				if ( $document->mimetype eq $mimes{ $mimes[$pos] } ) {
 					$radio->Check(1);
 					$has_checked = 1;
 				}

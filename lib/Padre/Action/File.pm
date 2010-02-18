@@ -10,18 +10,16 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 #####################################################################
 # Padre::Wx::Menu Methods
 
 sub new {
-	my $class = shift;
-	my $main  = shift;
-
+	my $class  = shift;
+	my $main   = shift;
 	my $config = Padre->ide->config;
-
-	my $self = bless {}, $class;
+	my $self   = bless {}, $class;
 
 	# Add additional properties
 	$self->{main} = $main;
@@ -116,6 +114,42 @@ sub new {
 	);
 
 	Padre::Action->new(
+		name        => 'file.open_in_file_browser',
+		need_editor => 1,
+		need_file   => 1,
+		label       => Wx::gettext('Open In File Browser'),
+		comment     => Wx::gettext('Opens the current document using the file browser'),
+		menu_event  => sub {
+			my $document = $_[0]->current->document or return;
+			$_[0]->on_open_in_file_browser( $document->filename );
+		},
+	);
+
+	Padre::Action->new(
+		name        => 'file.open_with_default_system_editor',
+		label       => Wx::gettext('Open With Default System Editor'),
+		need_editor => 1,
+		need_file   => 1,
+		comment     => Wx::gettext('Opens the file with the default system editor'),
+		menu_event  => sub {
+			my $document = $_[0]->current->document or return;
+			$_[0]->on_open_with_default_system_editor( $document->filename );
+		},
+	);
+
+	Padre::Action->new(
+		name        => 'file.open_in_command_line',
+		need_editor => 1,
+		need_file   => 1,
+		label       => Wx::gettext('Open In Command Line'),
+		comment     => Wx::gettext('Opens a command line using the current document folder'),
+		menu_event  => sub {
+			my $document = $_[0]->current->document or return;
+			$_[0]->on_open_in_command_line( $document->filename );
+		},
+	);
+
+	Padre::Action->new(
 		name       => 'file.open_example',
 		label      => Wx::gettext('Open Example'),
 		comment    => Wx::gettext('Browse the directory of the installed examples to open one file'),
@@ -205,7 +239,7 @@ sub new {
 	Padre::Action->new(
 		name        => 'file.close_some',
 		need_editor => 1,
-		label       => Wx::gettext('Close some Files'),
+		label       => Wx::gettext('Close Files Dialog...'),
 		comment     => Wx::gettext('Select some open files for closing'),
 		menu_event  => sub {
 			$_[0]->on_close_some;
@@ -225,10 +259,20 @@ sub new {
 	Padre::Action->new(
 		name        => 'file.reload_all',
 		need_editor => 1,
-		label       => Wx::gettext('Reload all files'),
+		label       => Wx::gettext('Reload All'),
 		comment     => Wx::gettext('Reload all files currently open'),
 		menu_event  => sub {
 			$_[0]->on_reload_all;
+		},
+	);
+
+	Padre::Action->new(
+		name        => 'file.reload_some',
+		need_editor => 1,
+		label       => Wx::gettext('Reload Some Dialog...'),
+		comment     => Wx::gettext('Select some open files for reload'),
+		menu_event  => sub {
+			$_[0]->on_reload_some;
 		},
 	);
 
@@ -355,8 +399,8 @@ sub new {
 		label      => Wx::gettext('Clean Recent Files List'),
 		comment    => Wx::gettext('Remove the entries from the recent files list'),
 		menu_event => sub {
+			my $lock = Padre::Current->main->lock( 'UPDATE', 'DB', 'refresh_recent' );
 			Padre::DB::History->delete( 'where type = ?', 'files' );
-			$self->update_recentfiles;
 		},
 	);
 

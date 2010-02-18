@@ -11,9 +11,10 @@ build_requires:
   Test::NoWarnings: 0.084
   Test::Script: 1.07
 configure_requires:
+  Alien::wxWidgets: 0.46
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.91'
+generated_by: 'Module::Install version 0.93'
 keywords:
   - auto-completion
   - code
@@ -86,7 +87,7 @@ requires:
   File::Temp: 0
   File::Which: 1.08
   FindBin: 0
-  Format::Human::Bytes: 0
+  Format::Human::Bytes: 0.04
   Getopt::Long: 0
   HTML::Entities: 3.57
   HTML::Parser: 3.58
@@ -105,6 +106,7 @@ requires:
   POSIX: 0
   PPI: 1.205
   PPIx::EditorTools: 0.09
+  PPIx::Regexp: 0.005
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
   Parse::ExuberantCTags: 1.00
@@ -114,6 +116,7 @@ requires:
   Pod::Perldoc: 3.15
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
+  Readonly::XS: 1.05
   Storable: 2.15
   Template::Tiny: 0.03
   Term::ReadLine: 0
@@ -135,4 +138,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.56
+version: 0.57

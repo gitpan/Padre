@@ -10,7 +10,7 @@ use Padre::Wx::Icon ();
 use Padre::Logger;
 
 # package exports and version
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -24,7 +24,6 @@ use Class::XSAccessor {
 		_list            => '_list',            # matching items list
 		_status_text     => '_status_text',     # status label
 		_matched_results => '_matched_results', # matched results
-		_ok_button       => '_ok_button'        # OK button
 	}
 };
 
@@ -147,10 +146,21 @@ sub _create_buttons {
 	my ($self) = @_;
 	my $sizer = $self->_sizer;
 
-	my $butsizer = $self->CreateStdDialogButtonSizer( Wx::wxOK | Wx::wxCANCEL );
-	$sizer->Add( $butsizer, 0, Wx::wxALL | Wx::wxEXPAND | Wx::wxALIGN_CENTER, 5 );
+	$self->{ok_button} = Wx::Button->new(
+		$self, Wx::wxID_OK, Wx::gettext('&OK'),
+	);
+	$self->{ok_button}->SetDefault;
+	$self->{cancel_button} = Wx::Button->new(
+		$self, Wx::wxID_CANCEL, Wx::gettext('&Cancel'),
+	);
+
+	my $buttons = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
+	$buttons->AddStretchSpacer;
+	$buttons->Add( $self->{ok_button},     0, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$buttons->Add( $self->{cancel_button}, 0, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$sizer->Add( $buttons, 0, Wx::wxALL | Wx::wxEXPAND | Wx::wxALIGN_CENTER, 5 );
+
 	Wx::Event::EVT_BUTTON( $self, Wx::wxID_OK, \&_on_ok_button_clicked );
-	$self->_ok_button( Wx::Window::FindWindowById( Wx::wxID_OK, $self ) );
 }
 
 #
@@ -215,9 +225,10 @@ sub _setup_events {
 			my $event = shift;
 			my $code  = $event->GetKeyCode;
 
-			if ( $code == Wx::WXK_DOWN ) {
-				$self->_list->SetFocus;
-			}
+			$self->_list->SetFocus
+				if ( $code == Wx::WXK_DOWN )
+				or ( $code == Wx::WXK_NUMPAD_PAGEDOWN )
+				or ( $code == Wx::WXK_PAGEDOWN );
 
 			$event->Skip(1);
 		}
@@ -408,12 +419,12 @@ sub _update_list_box {
 		$self->_status_text->SetPage($first_label);
 		$self->_list->Enable(1);
 		$self->_status_text->Enable(1);
-		$self->_ok_button->Enable(1);
+		$self->{ok_button}->Enable(1);
 	} else {
 		$self->_status_text->SetPage('');
 		$self->_list->Enable(0);
 		$self->_status_text->Enable(0);
-		$self->_ok_button->Enable(0);
+		$self->{ok_button}->Enable(0);
 	}
 
 	return;

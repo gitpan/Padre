@@ -8,7 +8,7 @@ use Padre::Wx       ();
 use Padre::Wx::Icon ();
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -109,7 +109,7 @@ sub _get_title {
 sub relocale {
 	my $self = shift;
 
-	for my $i ( 0 .. 1 ) {
+	foreach my $i ( 0 .. 1 ) {
 		my $col = $self->GetColumn($i);
 		$col->SetText( _get_title($i) );
 		$self->SetColumn( $i, $col );

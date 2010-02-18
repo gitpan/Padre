@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -309,7 +309,7 @@ sub _search {
 			if ( not $self->_help_provider ) {
 				$self->{canceled} = 1;
 				$self->_main->error( Wx::gettext("Could not find a help provider for ")
-						. Padre::MimeTypes->get_mime_type_name( $doc->get_mimetype ) );
+						. Padre::MimeTypes->get_mime_type_name( $doc->mimetype ) );
 				exit if ++$self->{errorcount} > 5;
 				return;
 			}
@@ -424,6 +424,8 @@ sub on_link_clicked {
 
 __END__
 
+=pod
+
 =head1 NAME
 
 Padre::Wx::Dialog::HelpSearch - Padre Shiny Help Search Dialog
@@ -435,7 +437,7 @@ This opens a dialog where you can search for help topics...
 Note: This used to be Perl 6 Help Dialog (in C<Padre::Plugin::Perl6>) and but it
 has been moved to Padre core.
 
-In order to setup a help system see L<Padre::HelpProvider>.
+In order to setup a help system see L<Padre::Help>.
 
 =head1 AUTHOR
 

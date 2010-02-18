@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -34,7 +34,7 @@ use Padre::DB       ();
 use Padre::Action::Queue;
 
 # Generate faster accessors
-use Class::XSAccessor {
+use Class::XSAccessor 1.05 {
 	getters => {
 		original_cwd   => 'original_cwd',
 		opts           => 'opts',
@@ -226,7 +226,7 @@ sub run {
 
 	# Process the action queue
 	if ( defined $self->opts->{actionqueue} ) {
-		for my $action ( split( /\,/, $self->opts->{actionqueue} ) ) {
+		foreach my $action ( split( /\,/, $self->opts->{actionqueue} ) ) {
 			next if $action eq ''; # Skip empty action names
 			unless ( defined $self->actions->{$action} ) {
 				warn 'Action "$action" queued from command line but does not exist';

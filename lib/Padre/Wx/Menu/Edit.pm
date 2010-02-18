@@ -9,8 +9,11 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Wx::Menu';
+
+
+
 
 
 #####################################################################
@@ -336,21 +339,11 @@ sub new {
 		'edit.show_as_decimal',
 	);
 
-	$self->AppendSeparator;
-
-	# User Preferences
-	$self->add_menu_action(
-		$self,
-		'edit.preferences',
-	);
-
 	return $self;
 }
 
 sub title {
-	my $self = shift;
-
-	return Wx::gettext('&Edit');
+	Wx::gettext('&Edit');
 }
 
 sub refresh {
@@ -360,7 +353,7 @@ sub refresh {
 	my $text     = $current->text;
 	my $document = $current->document;
 	my $hasdoc   = $document ? 1 : 0;
-	my $newline  = $hasdoc ? $document->get_newline_type : '';
+	my $newline  = $hasdoc ? $document->newline_type : '';
 
 	# Handle the simple cases
 	$self->{goto}->Enable($hasdoc);

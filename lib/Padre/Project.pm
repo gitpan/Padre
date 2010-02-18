@@ -6,11 +6,12 @@ use 5.008;
 use strict;
 use warnings;
 use File::Spec     ();
+use File::Path     ();
+use File::Basename ();
 use Padre::Config  ();
 use Padre::Current ();
-use File::Spec     ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 
 use Class::XSAccessor {
 	getters => {
@@ -173,7 +174,20 @@ sub from_file {
 
 
 ######################################################################
-# Configuration Support
+# Navigation Convenience Methods
+
+sub documents {
+	my $self = shift;
+	my $root = $self->root;
+	return grep { $_->project_dir eq $root } Padre::Current->main->documents;
+}
+
+
+
+
+
+######################################################################
+# Configuration and Intuition
 
 sub config {
 	my $self = shift;
@@ -202,12 +216,57 @@ sub config {
 	return $self->{config};
 }
 
+# Locate the "primary" file, if the project has one
+sub headline {
+	return undef;
+}
+
 
 
 
 
 ######################################################################
-# Directory Integration
+# Process Execution Resources
+
+sub temp {
+	$_[0]->{temp} or $_[0]->{temp} = $_[0]->_temp;
+}
+
+sub _temp {
+	require Padre::Project::Temp;
+	Padre::Project::Temp->new;
+}
+
+# Synchronise all content from unsaved files in a project to the
+# project-specific temporary directory.
+sub temp_sync {
+	my $self = shift;
+
+	# What files do we need to save
+	my @changed = grep { !$_->is_new and $_->is_modified } $self->documents or return 0;
+
+	# Save the files to the temporary directory
+	my $temp  = $self->temp;
+	my $root  = $temp->root;
+	my $files = 0;
+	foreach my $document (@changed) {
+		my $relative = $document->filename_relative;
+		my $tempfile = File::Spec->rel2abs( $relative, $root );
+		my $tempdir  = File::Basename::basedir($tempfile);
+		File::Path::mkpath($tempdir);
+		my $file = Padre::File->new($tempfile);
+		$document->write($file) and $files++;
+	}
+
+	return $files;
+}
+
+
+
+
+
+######################################################################
+# Directory Tree Integration
 
 # A file/directory pattern to support the directory browser.
 # The function takes three parameters of the full file path,
@@ -227,16 +286,15 @@ sub ignore_rule {
 
 sub name {
 	my $self = shift;
-
 	my $name = ( reverse( File::Spec->splitdir( $self->root ) ) )[0];
-	if ( ( !defined($name) ) or ( $name eq '' ) ) { # Fallback
+
+	if ( !defined $name or $name eq '' ) { # Fallback
 		$name = $self->root;
 		$name =~ s/^.*[\/\\]//;
 	}
 
 	return $name;
 }
-
 
 1;
 

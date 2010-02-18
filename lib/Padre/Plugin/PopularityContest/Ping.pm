@@ -9,7 +9,7 @@ use URI              ();
 use HTTP::Request    ();
 use Padre::Task::LWP ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Task::LWP';
 
 sub new {
@@ -24,10 +24,9 @@ sub new {
 	if ( $0 =~ /padre$/ ) {
 		my $dir = $0;
 		$dir =~ s/padre$//;
-		my $revision = Padre::Util::svn_directory_revision($dir);
-		if ( -d "$dir.svn" ) {
-			$data{svn} = $revision;
-		}
+		require Padre::Util::SVN;
+		my $revision = Padre::Util::SVN::directory_revision($dir);
+		$data{svn} = $revision if -d "$dir.svn";
 	}
 
 	# Generate the request URL

@@ -21,7 +21,7 @@ use Padre::Wx;
 use Wx::Event qw( EVT_BUTTON );
 
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::ListView';
 my $LineCount; # Global fid count so it can be used in the label
 
@@ -194,7 +194,7 @@ Reset the column headings if locales are changed.
 sub relocale {
 	my $self = shift;
 
-	for my $i ( 0 .. 1 ) {
+	foreach my $i ( 0 .. 1 ) {
 		my $col = $self->GetColumn($i);
 		$col->SetText( _get_title($i) );
 		$self->SetColumn( $i, $col );

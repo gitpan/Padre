@@ -9,7 +9,7 @@ use POSIX qw{ strftime };
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -64,9 +64,11 @@ sub new {
 sub show {
 	my $self = shift;
 
+	$self->{visible} = 1;
+
 	$self->_refresh_list;
 	$self->_select_first_item;
-	$self->Show;
+	$self->ShowModal;
 }
 
 # -- gui handlers
@@ -79,6 +81,7 @@ sub show {
 sub _on_butclose_clicked {
 	my $self = shift;
 	$self->Destroy;
+	$self->{visible} = 0;
 }
 
 sub _on_button_clicked {
@@ -87,7 +90,7 @@ sub _on_button_clicked {
 
 	my @pages;
 
-	for my $listitem ( 0 .. ( $self->_list->GetItemCount - 1 ) ) {
+	foreach my $listitem ( 0 .. ( $self->_list->GetItemCount - 1 ) ) {
 		my $item = $self->{items}->[ $self->_list->GetItem($listitem)->GetData ];
 		next unless $item->{selected};
 		push @pages, $item->{page};
@@ -102,6 +105,7 @@ sub _on_button_clicked {
 	}
 
 	$self->Destroy;
+	$self->{visible} = 0;
 }
 
 #
@@ -210,6 +214,8 @@ sub _create_list {
 	);
 	$list->InsertColumn( 0, Wx::gettext('Project') );
 	$list->InsertColumn( 1, Wx::gettext('File') );
+	$list->InsertColumn( 2, Wx::gettext('Editor') );
+	$list->InsertColumn( 3, Wx::gettext('Disk') );
 	$self->_list($list);
 
 	# install event handler
@@ -266,7 +272,7 @@ sub _create_buttons {
 	my $bc = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('Close') );
 	Wx::Event::EVT_BUTTON( $self, $bc, \&_on_butclose_clicked );
 
-	for my $button_no ( 0 .. $#{ $self->{buttons} || [] } ) {
+	foreach my $button_no ( 0 .. $#{ $self->{buttons} || [] } ) {
 		if ( !defined( $self->{button_clicks}->[$button_no] ) ) {
 			warn 'Too many buttons defined!';
 			last;
@@ -305,17 +311,35 @@ sub _refresh_list {
 
 		my $filename    = $document->file->filename;
 		my $project_dir = $document->project_dir;
-		$filename =~ s/^\Q$project_dir\E//;
+		$filename =~ s/^\Q$project_dir\E// if defined($project_dir);
+
+		# Apply filter (if any)
+		if ( defined( $self->{filter} ) ) {
+			next unless &{ $self->{filter} }( $page, $project_dir, $filename, $document );
+		}
 
 		# inserting the file in the list
 		my $item = Wx::ListItem->new;
 		$item->SetId(0);
 		$item->SetColumn(0);
-		$item->SetText( $document->project->name );
-		push @{ $self->{items} }, { page => $page };
+		$item->SetText( defined( $document->project ) ? $document->project->name : '' );
 		$item->SetData( $#{ $self->{items} } );
 		my $idx = $list->InsertItem($item);
+		splice @{ $self->{items} }, $idx, 0, { page => $page };
+
 		$list->SetItem( $idx, 1, $filename );
+		$list->SetItem( $idx, 2, Wx::gettext( $document->is_modified ? 'CHANGED' : 'fresh' ) );
+
+		my $disk_state = $document->has_changed_on_disk;
+		my $disk_text;
+		if ( $disk_state == 0 ) {
+			$disk_text = 'fresh';
+		} elsif ( $disk_state == -1 ) {
+			$disk_text = 'DELETED';
+		} else {
+			$disk_text = 'CHANGED';
+		}
+		$list->SetItem( $idx, 3, Wx::gettext($disk_text) );
 	}
 
 	# auto-resize columns
@@ -365,13 +389,13 @@ sub _update_buttons_state {
 	my ($self) = @_;
 
 	my $count;
-	for my $item ( @{ $self->{items} } ) {
+	foreach my $item ( @{ $self->{items} } ) {
 		++$count if $item->{selected};
 	}
 
 	my $method = $count ? 'Enable' : 'Disable';
 
-	for my $button ( @{ $self->{buttons} || [] } ) {
+	foreach my $button ( @{ $self->{buttons} || [] } ) {
 		$button->[2]->$method if defined( $button->[2] );
 	}
 

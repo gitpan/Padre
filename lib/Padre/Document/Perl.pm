@@ -17,7 +17,7 @@ use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
 use Padre::Logger;
 
-our $VERSION = '0.56';
+our $VERSION = '0.57';
 our @ISA     = 'Padre::Document';
 
 
@@ -318,6 +318,7 @@ sub get_command {
 
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
+
 	return $debug
 		? qq{"$perl" -Mdiagnostics(-traceonly) $run_args{interpreter} "$filename"$Script_Args}
 		: qq{"$perl" $run_args{interpreter} "$filename"$Script_Args};
@@ -344,17 +345,11 @@ sub pre_process {
 # Documented in Padre::Document!
 # Implemented as a task. See Padre::Task::SyntaxChecker::Perl
 sub check_syntax {
-	my $self = shift;
-	my %args = @_;
-	$args{background} = 0;
-	return $self->_check_syntax_internals( \%args );
+	shift->_check_syntax_internals( { @_, background => 0 } );
 }
 
 sub check_syntax_in_background {
-	my $self = shift;
-	my %args = @_;
-	$args{background} = 1;
-	return $self->_check_syntax_internals( \%args );
+	shift->_check_syntax_internals( { @_, background => 1 } );
 }
 
 sub _check_syntax_internals {
@@ -726,7 +721,7 @@ sub goto_sub {
 	my @lines = split /\n/, $text;
 
 	#print "Name '$name'\n";
-	for my $i ( 0 .. @lines - 1 ) {
+	foreach my $i ( 0 .. @lines - 1 ) {
 
 		#print "L: $lines[$i]\n";
 		if ( $lines[$i] =~ /sub \s+ $name\b/x ) {
@@ -937,7 +932,7 @@ sub perltags_parser {
 		or $self->{_perltags_config} ne $config->perl_tags_file )
 	{
 
-		for my $candidate (
+		foreach my $candidate (
 			$self->project_tagsfile, $config->perl_tags_file,
 			File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' )
 			)
@@ -1574,6 +1569,19 @@ sub event_on_right_down {
 				$doc->introduce_temporary_variable($replacement);
 			},
 		);
+
+		my $edit_regex = $menu->Append( -1, Wx::gettext("Edit with Regex Editor") );
+		Wx::Event::EVT_MENU(
+			$editor,
+			$edit_regex,
+			sub {
+				my $editor = shift;
+				my $doc    = $self;
+				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+				$editor->main->open_regex_editor;
+			},
+		);
+
 	} # end if something's selected
 }
 
