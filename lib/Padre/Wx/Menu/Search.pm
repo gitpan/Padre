@@ -11,7 +11,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -94,8 +94,6 @@ sub new {
 		$self,
 		'search.quick_menu_access',
 	);
-
-	$self->refresh;
 
 	return $self;
 }

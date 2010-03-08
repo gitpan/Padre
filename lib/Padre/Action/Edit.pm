@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 
 
 #####################################################################
@@ -235,7 +235,7 @@ sub new {
 		comment     => Wx::gettext('Jumpt to the code that triggered the next error'),
 		shortcut    => 'Ctrl-.',
 		menu_event  => sub {
-			$main->{syntax}->select_next_problem;
+			$main->{syntax}->select_next_problem if $main->{syntax};
 		},
 	);
 

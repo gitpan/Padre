@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -1120,6 +1120,8 @@ Adam Kennedy (ADAMK) E<lt>adamk@cpan.orgE<gt>
 Breno G. de Oliveira (GARU)
 
 Brian Cassidy (BRICAS)
+
+Burak Gürsoy (BURAK) E<lt>burak@cpan.orgE<gt>
 
 Cezary Morga (THEREK) E<lt>cm@therek.netE<gt>
 

@@ -14,7 +14,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -54,12 +54,11 @@ sub new {
 		'refactor.introduce_temporary',
 	);
 
-
 	return $self;
 }
 
 sub title {
-	Wx::gettext('Refac&tor');
+	Wx::gettext('Ref&actor');
 }
 
 sub refresh {

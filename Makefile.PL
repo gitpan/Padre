@@ -5,7 +5,7 @@
 use 5.008005;
 use strict;
 use lib 'privinc';
-use inc::Module::Install 0.91;
+use inc::Module::Install 0.94;
 use POSIX qw(locale_h);
 
 # Workaround for the fact that Module::Install loads the modules
@@ -142,7 +142,7 @@ requires 'Readonly::XS' => '1.05';
 
 requires 'PPIx::Regexp'            => '0.005';
 requires 'Storable'                => '2.15';
-requires 'Template::Tiny'          => '0.03';
+requires 'Template::Tiny'          => '0.11';
 requires 'Term::ReadLine'          => 0;
 requires 'Text::Balanced'          => '2.01';
 requires 'Text::Diff'              => '0.35';
@@ -157,7 +157,7 @@ requires 'Win32::API'              => '0.58' if win32;
 requires 'Win32::Shortcut'         => '0.07' if win32;
 requires 'Win32::TieRegistry'      => '0.26' if win32;
 requires 'Wx'                      => ( win32 and $] >= 5.01 ) ? '0.94' : '0.91';
-requires 'Wx::Perl::ProcessStream' => '0.24';
+requires 'Wx::Perl::ProcessStream' => '0.25';
 requires 'YAML::Tiny'              => '1.32';
 requires 'ExtUtils::Manifest'      => '1.56';
 requires 'Pod::Functions'          => 0;

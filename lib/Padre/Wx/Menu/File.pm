@@ -10,7 +10,7 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Logger;
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -21,13 +21,8 @@ our @ISA     = 'Padre::Wx::Menu';
 # Padre::Wx::Menu Methods
 
 sub new {
-
-	# TO DO: Convert this to Padre::Action::File
-
 	my $class = shift;
 	my $main  = shift;
-
-	my $config = Padre->ide->config;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
@@ -215,7 +210,7 @@ sub new {
 		'file.save_all',
 	);
 
-	if ( $config->feature_session ) {
+	if ( $main->config->feature_session ) {
 
 		$self->AppendSeparator;
 
@@ -262,6 +257,7 @@ sub new {
 
 	# NOTE: Do NOT do an initial fill during the constructor
 	# We'll do one later anyway, and the list is premature at this point.
+	# NOTE: Do not ignore the above note. I mean it --ADAMK
 	# $self->refresh_recent;
 
 	$self->AppendSeparator;

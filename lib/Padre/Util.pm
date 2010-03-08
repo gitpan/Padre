@@ -34,7 +34,7 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.57';
+our $VERSION   = '0.58';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
@@ -72,7 +72,7 @@ my %project_dir_cache;
 
 
 #####################################################################
-# Miscellaneous Functions
+# Idioms and Miscellaneous Functions
 
 =pod
 
@@ -289,15 +289,37 @@ sub svn_directory_revision {
 #####################################################################
 # Shared Resources
 
+=head2 C<share>
+
+If called without a paramter returns the share directory of Padre. 
+If called with a parameter (e.g. 'Perl6') returns the share directory 
+of Padre::Plugin::Perl6
+
+=cut
+
 sub share {
+	my $plugin = shift;
+
 	if ( $ENV{PADRE_DEV} ) {
-		return File::Spec->rel2abs(
+		my $root = File::Spec->rel2abs(
 			File::Spec->catdir(
 				$FindBin::Bin,
 				File::Spec->updir,
-				'share',
-			),
+				File::Spec->updir
+			)
 		);
+		if ( not $plugin ) {
+			return File::Spec->catdir( $root, 'Padre', 'share' );
+		}
+
+		# two cases: share in the Padre-Plugin-Name/share
+		# or share in the Padre-Plugin-Name/lib/Padre/Plugin/Name/share directory
+		my $plugin_dir = File::Spec->catdir( $root, "Padre-Plugin-$plugin", 'share' );
+		if ( -d $plugin_dir ) {
+			return $plugin_dir;
+		}
+		$plugin_dir = File::Spec->catdir( $root, "Padre-Plugin-$plugin", 'lib', 'Padre', 'Plugin', $plugin, 'share' );
+		return $plugin_dir;
 	}
 
 	#    if ( defined $ENV{PADRE_PAR_PATH} ) {
@@ -318,7 +340,11 @@ sub share {
 
 	# Rely on automatic handling of everything
 	require File::ShareDir;
-	return File::Spec->rel2abs( File::ShareDir::dist_dir('Padre') );
+	if ($plugin) {
+		return File::Spec->rel2abs( File::ShareDir::dist_dir("Padre-Plugin-$plugin") );
+	} else {
+		return File::Spec->rel2abs( File::ShareDir::dist_dir('Padre') );
+	}
 }
 
 sub sharedir {

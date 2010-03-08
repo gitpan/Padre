@@ -177,6 +177,7 @@ lib/Padre/Wx/Dialog/Form.pm
 lib/Padre/Wx/Dialog/Goto.pm
 lib/Padre/Wx/Dialog/HelpSearch.pm
 lib/Padre/Wx/Dialog/HTML.pm
+lib/Padre/Wx/Dialog/KeyBindings.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/OpenResource.pm
 lib/Padre/Wx/Dialog/OpenURL.pm
@@ -345,6 +346,7 @@ share/locale/no.po
 share/locale/pl.po
 share/locale/pt-br.po
 share/locale/ru.po
+share/locale/tr.po
 share/locale/zh-cn.po
 share/locale/zh-tw.po
 share/padre-splash-ccnc.bmp

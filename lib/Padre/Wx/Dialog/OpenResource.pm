@@ -9,7 +9,7 @@ use Padre::Wx        ();
 use Padre::Wx::Icon  ();
 use Padre::MimeTypes ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -571,7 +571,7 @@ __END__
 
 =head1 NAME
 
-Padre::Wx::Dialog::OpenResource - Ecliptic's Open Resource dialog
+Padre::Wx::Dialog::OpenResource - Open Resource dialog
 
 =head1 DESCRIPTION
 

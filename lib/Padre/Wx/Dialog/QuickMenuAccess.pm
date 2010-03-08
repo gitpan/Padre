@@ -10,7 +10,7 @@ use Padre::Wx::Icon ();
 use Padre::Logger;
 
 # package exports and version
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -450,7 +450,7 @@ __END__
 
 =head1 NAME
 
-Padre::Wx::Dialog::QuickMenuAccess - Ecliptic's Quick Menu Access dialog
+Padre::Wx::Dialog::QuickMenuAccess - Quick Menu Access dialog
 
 =head1 DESCRIPTION
 

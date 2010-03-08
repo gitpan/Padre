@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -183,12 +183,15 @@ sub _create_fields {
 
 	my $Current_Session;
 	if ( defined( Padre->ide->{session} ) ) {
-		$Current_Session = (
-			Padre::DB::Session->select(
-				'name where id = ?',
-				Padre->ide->{session}
-			)
-		)[0]->{name};
+		my $CS = Padre::DB::Session->select(
+			'name where id = ?',
+			Padre->ide->{session}
+		);
+
+		# was $CS->[0]->{name};
+		# but it crashed
+		# print Data::Dumper::Dumper $CS->[0];
+		$Current_Session = $CS->[0]->[1];
 	}
 	$Current_Session ||= ''; # Empty value for combo box, better than undef
 
@@ -265,9 +268,11 @@ sub _refresh_combo {
 	$self->_names( \@names );
 
 	# clear list & fill it again
-	my $combo = $self->_combo;
+	my $combo        = $self->_combo;
+	my $preselection = $combo->GetValue;
 	$combo->Clear;
 	$combo->Append($_) foreach @names;
+	$combo->SetStringSelection($preselection);
 }
 
 1;

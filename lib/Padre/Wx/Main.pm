@@ -60,7 +60,7 @@ use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Logger;
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -245,7 +245,7 @@ sub new {
 		$self,
 		Padre::Wx::ID_TIMER_POSTINIT,
 		sub {
-			$_[0]->timer_post_init;
+			$_[0]->timer_start;
 		},
 	);
 	$timer->Start( 1, 1 );
@@ -253,10 +253,99 @@ sub new {
 	return $self;
 }
 
-# When the $Padre::INVISIBLE variable is set (during testing) never show
-# the main window.
+# HACK: When the $Padre::INVISIBLE variable is set (during testing) never
+# show the main window. This exists because people tend to get annoyed when
+# you flicker a bunch of windows on and off the screen during testing.
 sub Show {
 	return shift->SUPER::Show( $Padre::Test::VERSION ? 0 : @_ );
+}
+
+# This is effectively the second half of the constructor, which is delayed
+# until after the window has been shown and the main loop has been started.
+# All loading and initialisation which is expensive or needs a running
+# application (with gui tools and threads and so on) go here.
+sub timer_start {
+	my $self    = shift;
+	my $config  = $self->config;
+	my $manager = $self->ide->plugin_manager;
+
+	# Do an initial Show/paint of the complete-looking main window
+	# without any files loaded. We'll then immediately start an Update lock
+	# so that loading of the files is done in a single render pass.
+	# This gives us an optimum compromise between being PERCEIVED
+	# to start-up quickly, and ACTUALLY starting up quickly.
+	$self->Show(1);
+
+	# If the position mandated by the configuration is now
+	# off the screen (typically because we've changed the screen
+	# size, reposition to the defaults).
+	# This must happen AFTER the initial ->Show(1) because otherwise
+	# ->IsShownOnScreen returns a false-negative result.
+	unless ( $self->IsShownOnScreen and $self->_xy_on_screen ) {
+		$self->SetSize(
+			Wx::Size->new(
+				$config->default('main_width'),
+				$config->default('main_height'),
+			)
+		);
+		$self->CentreOnScreen;
+	}
+
+	# Lock everything during the initial opening of files.
+	# Run a whole bunch of refresh methods when this is done,
+	# as we will be in our final startup editor state and can be
+	# sure it won't change on us in the future.
+	# Anything else that needs to have it's refresh method called
+	# as part of initialisation should be added to the list here.
+	SCOPE: {
+		my $lock = $self->lock(
+			qw{
+				UPDATE DB
+				refresh
+				refresh_recent
+				refresh_windowlist
+				}
+		);
+
+		# Load all files and refresh the application so that it
+		# represents the loaded state.
+		$self->load_files;
+
+		# Cannot use the toggle sub here as that one reads from the Menu and
+		# on some machines the Menu is not configured yet at this point.
+		if ( $config->main_statusbar ) {
+			$self->GetStatusBar->Show;
+		} else {
+			$self->GetStatusBar->Hide;
+		}
+		$manager->enable_editors_for_all;
+
+		$self->show_syntax( $config->main_syntaxcheck );
+		if ( $config->main_errorlist ) {
+			$self->errorlist->enable;
+		}
+	}
+
+	# Start the single instance server
+	if ( $config->main_singleinstance ) {
+		$self->single_instance_start;
+	}
+
+	# Check for new plug-ins and alert the user to them
+	$manager->alert_new;
+
+	# Start the change detection timer
+	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_FILECHECK );
+	Wx::Event::EVT_TIMER(
+		$self,
+		Padre::Wx::ID_TIMER_FILECHECK,
+		sub {
+			$_[0]->timer_check_overwrite;
+		},
+	);
+	$timer->Start( $config->update_file_from_disk_interval * SECONDS, 0 );
+
+	return;
 }
 
 
@@ -653,81 +742,6 @@ sub _xy_on_screen {
 	}
 
 	return 1;
-}
-
-sub timer_post_init {
-	my $self    = shift;
-	my $config  = $self->config;
-	my $manager = $self->ide->plugin_manager;
-
-	# Do an initial Show/paint of the complete-looking main window
-	# without any files loaded. We'll then immediately start an Update lock
-	# so that loading of the files is done in a single render pass.
-	# This gives us an optimum compromise between being PERCEIVED
-	# to start-up quickly, and ACTUALLY starting up quickly.
-	$self->Show(1);
-
-	# If the position mandated by the configuration is now
-	# off the screen (typically because we've changed the screen
-	# size, reposition to the defaults).
-	# This must happen AFTER the initial ->Show(1) because otherwise
-	# ->IsShownOnScreen returns a false-negative result.
-	unless ( $self->IsShownOnScreen and $self->_xy_on_screen ) {
-		$self->SetSize(
-			Wx::Size->new(
-				$config->default('main_width'),
-				$config->default('main_height'),
-			)
-		);
-		$self->CentreOnScreen;
-	}
-
-	# Lock everything during the initial opening of files
-	SCOPE: {
-		my $lock = $self->lock( 'UPDATE', 'DB', 'refresh' );
-
-		# Load all files and refresh the application so that it
-		# represents the loaded state.
-		$self->load_files;
-
-		# Cannot use the toggle sub here as that one reads from the Menu and
-		# on some machines the Menu is not configured yet at this point.
-		if ( $config->main_statusbar ) {
-			$self->GetStatusBar->Show;
-		} else {
-			$self->GetStatusBar->Hide;
-		}
-		$manager->enable_editors_for_all;
-
-		$self->show_syntax( $config->main_syntaxcheck );
-		if ( $config->main_errorlist ) {
-			$self->errorlist->enable;
-		}
-	}
-
-	# Start the single instance server
-	if ( $config->main_singleinstance ) {
-		$self->single_instance_start;
-	}
-
-	# Check for new plug-ins and alert the user to them
-	$manager->alert_new;
-
-	# Start the change detection timer
-	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_FILECHECK );
-	Wx::Event::EVT_TIMER(
-		$self,
-		Padre::Wx::ID_TIMER_FILECHECK,
-		sub {
-			$_[0]->timer_check_overwrite;
-		},
-	);
-	$timer->Start(
-		$self->ide->config->update_file_from_disk_interval * SECONDS,
-		0
-	);
-
-	return;
 }
 
 =pod
@@ -1314,18 +1328,18 @@ sub refresh_menu_plugins {
 	$self->menu->plugins->refresh($self);
 }
 
-=head3 C<refresh_menu_window>
+=head3 C<refresh_windowlist>
 
-    $main->refresh_menu_window
+    $main->refresh_windowlist
 
-Force a refresh of the window menu
+Force a refresh of the list of windows in the window menu
 
 =cut
 
-sub refresh_menu_window {
+sub refresh_windowlist {
 	my $self = shift;
 	return if $self->locked('REFRESH');
-	$self->menu->window->refresh($self);
+	$self->menu->window->refresh_windowlist($self);
 }
 
 =pod
@@ -1433,7 +1447,9 @@ sub refresh_functions {
 	return unless $self->has_functions;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{functions}->IsChecked;
-	$self->functions->refresh(@_);
+	my @windows = @_;
+	push @windows, $self->current unless @windows;
+	$self->functions->refresh(@windows);
 	return;
 }
 
@@ -2330,7 +2346,7 @@ sub run_command {
 	# set up the ProcessStream bindings.
 	unless ($Wx::Perl::ProcessStream::VERSION) {
 		require Wx::Perl::ProcessStream;
-		if ( $Wx::Perl::ProcessStream::VERSION < .20 ) {
+		if ( $Wx::Perl::ProcessStream::VERSION < .25 ) {
 			$self->error(
 				sprintf(
 					Wx::gettext(
@@ -2343,6 +2359,12 @@ sub run_command {
 			);
 			return 1;
 		}
+
+		# This is needed to avoid Padre from freezing/hanging when
+		# running print-intensive scripts like the following:
+		# 		while(1) { warn "FREEZE"; };
+		# See ticket:863 "Continous warnings or prints kill Padre"
+		Wx::Perl::ProcessStream->SetDefaultMaxLines(100);
 
 		Wx::Perl::ProcessStream::EVT_WXP_PROCESS_STREAM_STDOUT(
 			$self,
@@ -3794,8 +3816,8 @@ sub on_reload_some {
 	Padre::Wx::Dialog::WindowList->new(
 		$self,
 		title      => Wx::gettext('Reload some files'),
-		list_title => Wx::gettext('Select files to reload:'),
-		buttons    => [ [ 'Reload selected', sub { $_[0]->main->reload_some(@_); } ] ],
+		list_title => Wx::gettext('&Select files to reload:'),
+		buttons    => [ [ '&Reload selected', sub { $_[0]->main->reload_some(@_); } ] ],
 	)->show;
 }
 
@@ -4296,7 +4318,9 @@ sub close {
 	my $lock   = $self->lock(
 		qw{
 			REFRESH DB
-			refresh_directory refresh_menu refresh_menu_window
+			refresh_directory
+			refresh_menu
+			refresh_windowlist
 			}
 	);
 	TRACE( join ' ', "Closing ", ref $doc, $doc->filename || 'Unknown' ) if DEBUG;
@@ -4763,6 +4787,27 @@ sub on_preferences {
 		$self->refresh_functions( $self->current );
 	}
 	$self->ide->save_config;
+
+	return;
+}
+
+=pod
+
+=head3 C<on_key_bindings>
+
+    $main->on_key_bindings;
+
+Opens the key bindings dialog
+
+=cut
+
+sub on_key_bindings {
+	my $self = shift;
+
+	# Show the key bindings dialog
+	require Padre::Wx::Dialog::KeyBindings;
+	my $key_bindings = Padre::Wx::Dialog::KeyBindings->new($self);
+	$key_bindings->show;
 
 	return;
 }
@@ -5331,6 +5376,9 @@ Handler called on every movement of the cursor. No return value.
 
 =cut
 
+# NOTE: Any blocking here is HIGHLY visible to the user
+# so you should be extremely cautious in here. Everything
+# in this sub should be super super fast.
 sub on_stc_update_ui {
 	my $self = shift;
 
@@ -5350,13 +5398,13 @@ sub on_stc_update_ui {
 	# $self->refresh_menu;
 	$self->refresh_toolbar($current);
 
-	#	$self->refresh_status($current);
+	# $self->refresh_status($current);
 	$self->refresh_cursorpos($current);
 
-	$self->refresh_rdstatus($current);
-
-	# $self->refresh_functions;
-	# $self->refresh_syntaxcheck;
+	# This call makes live filesystem calls every time the cursor moves
+	# Clearly this is incredibly evil, commenting out till whoever wrote
+	# this works out what they meant to do and does it better.
+	# $self->refresh_rdstatus($current);
 
 	return;
 }
@@ -5798,9 +5846,11 @@ sub on_new_from_template {
 
 	# Generate the full file content
 	require Template::Tiny;
-	my $output = Template::Tiny->new->process(
+	my $output = '';
+	Template::Tiny->new->process(
 		$template,
 		$self->current,
+		\$output,
 	);
 
 	# Create the file from the content

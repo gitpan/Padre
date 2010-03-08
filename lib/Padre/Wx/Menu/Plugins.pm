@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -36,6 +36,12 @@ sub new {
 	$self->add_menu_action(
 		$self,
 		'edit.preferences',
+	);
+
+	# Key bindings
+	$self->add_menu_action(
+		$self,
+		'tools.key_bindings',
 	);
 
 	$self->AppendSeparator;
@@ -124,13 +130,6 @@ sub new {
 		$tools,
 		'plugins.reload_current_plugin',
 	);
-
-	# $self->add_menu_action(
-	#     $tools,
-	#     'plugins.test_a_plugin',
-	# );
-
-	$self->add($main);
 
 	return $self;
 }

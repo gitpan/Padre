@@ -32,7 +32,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 
 my $SPLASH = undef;
 
@@ -89,8 +89,8 @@ sub startup {
 
 				# Got the single instance PID
 				$pid =~ s/\s+\s//;
-				require Win32::API;
 				if (Padre::Constant::WIN32) {
+					require Win32::API;
 					Win32::API->new(
 						user32 => AllowSetForeground,
 					)->Call($pid);

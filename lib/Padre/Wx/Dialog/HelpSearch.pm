@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -58,6 +58,11 @@ sub new {
 	return $self;
 }
 
+# Display a message in the help html window in big bold letters
+sub _display_msg {
+	my ( $self, $text ) = @_;
+	$self->_help_viewer->SetPage(qq{<b><font size="+2">$text</font></b>});
+}
 
 #
 # Fetches the current selection's help HTML
@@ -73,7 +78,7 @@ sub _display_help_in_viewer {
 		if ( $topic && $self->_help_provider ) {
 			eval { ( $html, $location ) = $self->_help_provider->help_render($topic); };
 			if ($@) {
-				$self->_main->error( sprintf( Wx::gettext('Error while calling %s'), 'help_render', $@ ) );
+				$self->_display_msg( sprintf( Wx::gettext('Error while calling %s %s'), 'help_render', $@ ) );
 				return;
 			}
 		}
@@ -265,19 +270,19 @@ sub show {
 		$self->_search_text->Enable(0);
 		$self->_topic_selector->Enable(0);
 		$self->_list->Enable(0);
-		$self->_help_viewer->SetPage(
-			'<b><font size="+2">' . Wx::gettext('Reading items. Please wait') . '</font></b>' );
+		$self->_display_msg( Wx::gettext('Reading items. Please wait') );
 		Wx::Event::EVT_IDLE(
 			$self,
 			sub {
-				return if $self->{canceled};
-				if ( $self->_search ) {
-					$self->_update_list_box;
+				$self->_index(undef);
+				if ( $self->_update_list_box ) {
+					$self->_search_text->Enable(1);
+					$self->_topic_selector->Enable(1);
+					$self->_list->Enable(1);
+					$self->_search_text->SetFocus();
+				} else {
+					$self->_search_text->ChangeValue('');
 				}
-				$self->_search_text->Enable(1);
-				$self->_topic_selector->Enable(1);
-				$self->_list->Enable(1);
-				$self->_search_text->SetFocus();
 				Wx::Event::EVT_IDLE( $self, undef );
 			}
 		);
@@ -293,24 +298,18 @@ sub show {
 sub _search {
 	my $self = shift;
 
-	# a default..
-	my @empty = ();
-	$self->_index( \@empty );
-
 	# Generate a sorted file-list based on filename
 	if ( not $self->_help_provider ) {
 		my $doc = Padre::Current->document;
 		if ($doc) {
 			eval { $self->_help_provider( $doc->get_help_provider ); };
 			if ($@) {
-				$self->_main->error( sprintf( Wx::gettext('Error while calling %s'), 'get_help_provider', $@ ) );
+				$self->_display_msg( sprintf( Wx::gettext('Error while calling %s %s'), 'get_help_provider', $@ ) );
 				return;
 			}
 			if ( not $self->_help_provider ) {
-				$self->{canceled} = 1;
-				$self->_main->error( Wx::gettext("Could not find a help provider for ")
+				$self->_display_msg( Wx::gettext("Could not find a help provider for ")
 						. Padre::MimeTypes->get_mime_type_name( $doc->mimetype ) );
-				exit if ++$self->{errorcount} > 5;
 				return;
 			}
 		} else {
@@ -320,10 +319,10 @@ sub _search {
 			$self->_help_provider( Padre::Document::Perl::Help->new );
 		}
 	}
-	return if not $self->_help_provider;
+	return unless $self->_help_provider;
 	eval { $self->_index( $self->_help_provider->help_list ); };
 	if ($@) {
-		$self->_main->error( sprintf( Wx::gettext('Error while calling %s'), 'help_list', $@ ) );
+		$self->_display_msg( sprintf( Wx::gettext('Error while calling %s %s'), 'help_list', $@ ) );
 		return;
 	}
 
@@ -337,7 +336,7 @@ sub find_help_topic {
 	my $self = shift;
 
 	my $doc = Padre::Current->document;
-	return '' if not $doc;
+	return '' unless $doc;
 
 	my $topic = $doc->find_help_topic;
 
@@ -368,15 +367,18 @@ sub find_help_topic {
 sub _update_list_box {
 	my $self = shift;
 
-	if ( not $self->_index ) {
-		$self->_search;
-	}
+	# Clear the list and status
+	$self->_list->Clear();
+	$self->_status->SetLabel('');
+
+	# Try to fetch a help index and return nothing if otherwise
+	$self->_search unless $self->_index;
+	return unless $self->_index;
 
 	my $search_expr = $self->_search_text->GetValue();
 	$search_expr = quotemeta $search_expr;
 
 	#Populate the list box now
-	$self->_list->Clear();
 	my $pos = 0;
 	foreach my $target ( @{ $self->_index } ) {
 		if ( $target =~ /^$search_expr$/i ) {
@@ -393,7 +395,7 @@ sub _update_list_box {
 	$self->_status->SetLabel("Found $pos help topic(s)\n");
 	$self->_display_help_in_viewer;
 
-	return;
+	return 1;
 }
 
 #

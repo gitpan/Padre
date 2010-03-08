@@ -22,7 +22,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -376,12 +376,12 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 'new',
-	options => [
+	options => {
 		'last'    => _T('Previous open files'),
 		'new'     => _T('A new empty file'),
 		'nothing' => _T('No open files'),
 		'session' => _T('Open session'),
-	],
+	},
 );
 
 
@@ -467,11 +467,11 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 'alphabetical',
-	options => [
+	options => {
 		'original'                  => _T('Code Order'),
 		'alphabetical'              => _T('Alphabetical Order'),
 		'alphabetical_private_last' => _T('Alphabetical Order (Private Last)'),
-	],
+	},
 );
 setting(
 	name    => 'main_outline',
@@ -490,10 +490,10 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 'left',
-	options => [
+	options => {
 		'left'  => _T('Project Tools (Left)'),
 		'right' => _T('Document Tools (Right)'),
-	],
+	},
 	apply => sub {
 		my $main  = shift;
 		my $value = shift;
@@ -598,32 +598,6 @@ setting(
 );
 
 setting(
-	name  => 'main_menubar_items',
-	type  => Padre::Constant::ASCII,
-	store => Padre::Constant::HUMAN,
-
-	# This lives here until a better place is found:
-	# This is a list of menubar items, seperated by ;
-	# The following items are supported:
-	#   menu.MenuName
-	#     Insert the (sub-)menu MenuName
-	#   some.other_action
-	#     Insert an action
-	#   |
-	#     Insert a seperator
-	default => 'menu.File;'
-		. 'menu.Edit;'
-		. 'menu.Search;'
-		. 'menu.View;'
-		. 'menu._document;'
-		. 'menu.Run;'
-		. 'menu.Debug;'
-		. 'menu.Plugins;'
-		. 'menu.Window;'
-		. 'menu.Help',
-);
-
-setting(
 	name    => 'swap_ctrl_tab_alt_right',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -680,11 +654,11 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 'deep',
-	options => [
+	options => {
 		'no'   => _T('No Autoindent'),
 		'same' => _T('Indent to Same Depth'),
 		'deep' => _T('Indent Deeply'),
-	],
+	},
 );
 setting(
 	name    => 'editor_folding',
@@ -849,6 +823,12 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 3,
+);
+setting(
+	name    => 'perl_ppi_lexer_limit',
+	type    => Padre::Constant::POSINT,
+	store   => Padre::Constant::HUMAN,
+	default => 4000,
 );
 
 # Behaviour Tuning

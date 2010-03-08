@@ -1,6 +1,51 @@
 Changes for Perl Application Development and Refactoring Environment
+NOTE: Do not "tidy" or change the indenting here, or we break svn annotate
 
-0.58 To Be Released
+0.59 To Be Released
+
+
+0.58 2010.03.08
+    - Fixed "Open File In Existing Padre" for non-win32 (PDONELAN)
+    - In advanced preferences, display the storage backend name when it is
+      default and 'User' is now called 'Overriden' (AZAWAWI)
+    - In advanced preferences, display preferences options for non-boolean
+      settings (AZAWAWI) 
+    - In advanced preferences, display a True/False radio button for boolean
+      settings (AZAWAWI)
+    - Fixed an incorrect default value display bug in advanced preferences
+      when it is toggled (AZAWAWI)
+    - In advanced preferences, hide bottom controls at startup (AZAWAWI)
+    - In advanced preferences, Set button is hidden when it is a boolean. 
+      True/false radio buttons handle the switch instead (AZAWAWI)
+    - Fixed ticket #858 Recent files does not display anything on Padre startup
+      (AZAWAWI)
+    - Refresh all menus at startup. This prevents "nothing" open mode (i.e. no
+      document) from incorrectly showing an enabled menubar (AZAWAWI)
+    - Padre::Util::share() can now get the name of a plugin (e.g. 'Perl6') and
+      return the share directory of that plugin (SZABGAB)
+    - Removed the unused concept of user-configurable menus, which was slowing
+      down a ton of different operations that needed a menu refresh (ADAMK)
+    - Removed ->refresh calls during the initial menu construction, as we
+      will be refresh'ing again anyway at the end of the startup, and thus
+      any work done in the menus is completely wasted CPU (ADAMK)
+    - Removed the very expensive window list refresh code from the main menu
+      refresh method into it's own dedicated refresh method. We can fire
+      this directly in the limited number of situations that the notebook
+      adds, removed, or renamed documents (ADAMK)
+    - Speed up status bar updates (ADAMK, SEWI)
+    - Warning editor markers are now actually orange on win32 (AZAWAWI)
+    - Landed new and much much faster refresh_windowlist (ADAMK)
+    - Fixed ticket #860: Configurable key bindings dialog (AZAWAWI)
+    - Added Browse Buttons to External Tools Preference Dialog (PLAVEN)
+    - Fixed ticket #863: Continous warnings or prints kill Padre
+      (AZAWAWI, KTHAKORE)
+    - Bumped Wx::Perl::ProcessStream version requirement to 0.25 (AZAWAWI)
+    - Added promised PPI lexer configurable max-length limit for azawawi (ADAMK)
+    - Fixed ticket #867: Padre dies when hitting Ctrl-. (AZAWAWI)
+    - Fixed ticket #807: F2 is broken (AZAWAWI)
+    - Fixed ticket #835: Function list not populated on initial panel showing
+      (karl.forner)
+    - Added Turkish translation.
 
 0.57 2010.02.18 - **WARNING Contains new threading code**
     - Spawn a master thread very early in the startup process. Use that

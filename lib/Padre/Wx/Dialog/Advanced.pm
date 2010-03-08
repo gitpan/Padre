@@ -8,7 +8,7 @@ use Padre::Config              ();
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -90,7 +90,7 @@ sub _create_controls {
 	my ( $self, $sizer ) = @_;
 
 	# Filter label
-	my $filter_label = Wx::StaticText->new( $self, -1, '&Filter:' );
+	my $filter_label = Wx::StaticText->new( $self, -1, Wx::gettext('&Filter:') );
 
 	# Filter text field
 	$self->{filter} = Wx::TextCtrl->new( $self, -1, '' );
@@ -121,6 +121,12 @@ sub _create_controls {
 	$self->{value} = Wx::TextCtrl->new( $self, -1, '' );
 	$self->{value}->Enable(0);
 
+	# Boolean value radio button fields
+	$self->{true}  = Wx::RadioButton->new( $self, -1, Wx::gettext('True') );
+	$self->{false} = Wx::RadioButton->new( $self, -1, Wx::gettext('False') );
+	$self->{true}->Hide;
+	$self->{false}->Hide;
+
 	# System default
 	my $default_label = Wx::StaticText->new( $self, -1, Wx::gettext('Default value:') );
 	$self->{default_value} = Wx::TextCtrl->new(
@@ -132,6 +138,18 @@ sub _create_controls {
 		Wx::wxTE_READONLY
 	);
 	$self->{default_value}->Enable(0);
+
+	# preference options
+	my $options_label = Wx::StaticText->new( $self, -1, Wx::gettext('Options:') );
+	$self->{options} = Wx::TextCtrl->new(
+		$self,
+		-1,
+		'',
+		Wx::wxDefaultPosition,
+		Wx::wxDefaultSize,
+		Wx::wxTE_READONLY
+	);
+	$self->{options}->Enable(0);
 
 	# Set preference value button
 	$self->{button_set} = Wx::Button->new(
@@ -160,38 +178,59 @@ sub _create_controls {
 	#----- Dialog Layout -------
 	#
 
-	# Top filter sizer
+	# Filter sizer
 	my $filter_sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
 	$filter_sizer->Add( $filter_label,   0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
 	$filter_sizer->Add( $self->{filter}, 1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
 
-	# Bottom preference value setter sizer
+	# Boolean sizer
+	my $boolean_sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
+	$boolean_sizer->AddStretchSpacer;
+	$boolean_sizer->Add( $self->{true},  1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	$boolean_sizer->Add( $self->{false}, 1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	$boolean_sizer->AddStretchSpacer;
+
+	# Store boolean sizer reference for later usage
+	$self->{boolean} = $boolean_sizer;
+
+	# Value setter sizer
 	my $value_sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$value_sizer->Add( $value_label,          0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
-	$value_sizer->Add( $self->{value},        1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
-	$value_sizer->Add( $self->{button_set},   0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
-	$value_sizer->Add( $self->{button_reset}, 0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	$value_sizer->Add( $value_label,          0, Wx::wxALIGN_CENTER_VERTICAL,                5 );
+	$value_sizer->Add( $self->{value},        1, Wx::wxALIGN_CENTER_VERTICAL,                5 );
+	$value_sizer->Add( $boolean_sizer,        1, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxEXPAND, 5 );
+	$value_sizer->Add( $self->{button_set},   0, Wx::wxALIGN_CENTER_VERTICAL,                5 );
+	$value_sizer->Add( $self->{button_reset}, 0, Wx::wxALIGN_CENTER_VERTICAL,                5 );
 
-	# Sizer for default value
-	my $default_sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$default_sizer->Add( $default_label,         0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
-	$default_sizer->Add( $self->{default_value}, 1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	# Default value and options sizer
+	my $info_sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
+	$info_sizer->Add( $default_label,         0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	$info_sizer->Add( $self->{default_value}, 1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	$info_sizer->AddSpacer(5);
+	$info_sizer->Add( $options_label,   0, Wx::wxALIGN_CENTER_VERTICAL, 5 );
+	$info_sizer->Add( $self->{options}, 1, Wx::wxALIGN_CENTER_VERTICAL, 5 );
 
-	# button sizer
+	# Button sizer
 	my $button_sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
 	$button_sizer->Add( $self->{button_save},   1, 0,          0 );
 	$button_sizer->Add( $self->{button_cancel}, 1, Wx::wxLEFT, 5 );
 	$button_sizer->AddSpacer(5);
 
-	# Create the main vertical sizer
+	# Main vertical sizer
 	my $vsizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	$vsizer->Add( $filter_sizer,  0, Wx::wxALL | Wx::wxEXPAND, 3 );
-	$vsizer->Add( $self->{list},  1, Wx::wxALL | Wx::wxEXPAND, 3 );
-	$vsizer->Add( $value_sizer,   0, Wx::wxALL | Wx::wxEXPAND, 3 );
-	$vsizer->Add( $default_sizer, 0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $filter_sizer, 0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $self->{list}, 1, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $value_sizer,  0, Wx::wxALL | Wx::wxEXPAND, 3 );
+	$vsizer->Add( $info_sizer,   0, Wx::wxALL | Wx::wxEXPAND, 3 );
 	$vsizer->AddSpacer(5);
 	$vsizer->Add( $button_sizer, 0, Wx::wxALIGN_RIGHT, 5 );
 	$vsizer->AddSpacer(5);
+
+	# Hide value and info sizer at startup
+	$vsizer->Show( 2, 0 );
+	$vsizer->Show( 3, 0 );
+
+	# Store vertical sizer reference for later usage
+	$self->{vsizer} = $vsizer;
 
 	# Wrap with a horizontal sizer to get left/right padding
 	$sizer->Add( $vsizer, 1, Wx::wxALL | Wx::wxEXPAND, 5 );
@@ -238,12 +277,28 @@ sub _bind_events {
 		}
 	);
 
-	# When an right click is pressed, let us show a popup menu
+	# When a list right click event is fired, let us show a popup menu
 	Wx::Event::EVT_LIST_ITEM_RIGHT_CLICK(
 		$self,
 		$self->{list},
 		sub {
 			shift->_on_list_item_right_click(@_);
+		}
+	);
+
+	# Handle boolean radio buttons state change
+	Wx::Event::EVT_RADIOBUTTON(
+		$self,
+		$self->{true},
+		sub {
+			shift->_on_radiobutton(@_);
+		}
+	);
+	Wx::Event::EVT_RADIOBUTTON(
+		$self,
+		$self->{false},
+		sub {
+			shift->_on_radiobutton(@_);
 		}
 	);
 
@@ -323,11 +378,7 @@ sub _on_copy_to_clipboard {
 
 	my $text;
 	if ( $action == COPY_ALL ) {
-		$text =
-			  $name . ";"
-			. ( $pref->{is_default} ? Wx::gettext('Default') : Wx::gettext('User') ) . ";"
-			. $pref->{type_name} . ";"
-			. $pref->{value};
+		$text = $name . ";" . $self->_status_name($pref) . ";" . $pref->{type_name} . ";" . $pref->{value};
 	} elsif ( $action == COPY_NAME ) {
 		$text = $name;
 	} elsif ( $action == COPY_VALUE ) {
@@ -339,6 +390,14 @@ sub _on_copy_to_clipboard {
 	}
 
 	return;
+}
+
+# Private method to retrieve the correct value for the preference status column
+sub _status_name {
+	my ( $self, $pref ) = @_;
+	return $pref->{is_default}
+		? Wx::gettext('Default')
+		: $pref->{store_name};
 }
 
 # Private method to show a popup menu when a list item is right-clicked
@@ -378,13 +437,61 @@ sub _on_list_item_selected {
 	my $pref  = $self->{preferences}->{ $event->GetLabel };
 	my $type  = $pref->{type};
 
-	$self->{value}->SetValue( $self->_displayed_value( $type, $pref->{value} ) );
+	my $is_boolean = ( $pref->{type} == Padre::Constant::BOOLEAN ) ? 1 : 0;
+	if ($is_boolean) {
+		$self->{true}->SetValue( $pref->{value} );
+		$self->{false}->SetValue( not $pref->{value} );
+	} else {
+		$self->{value}->SetValue( $self->_displayed_value( $type, $pref->{value} ) );
+		$self->{options}->SetValue( $pref->{options} );
+	}
+
+	# Show value and info sizers
+	$self->{vsizer}->Show( 2, 1 );
+	$self->{vsizer}->Show( 3, 1 );
+
+	# Toggle visibility of fields depending on preference type
+	$self->{value}->Show( not $is_boolean );
+	$self->{true}->Show($is_boolean);
+	$self->{false}->Show($is_boolean);
+
+	# Hide spaces infront of true/false radiobuttons
+	$self->{boolean}->Show( 0, $is_boolean );
+	$self->{boolean}->Show( 3, $is_boolean );
+
+	# Set button is not needed when it is a boolean
+	$self->{button_set}->Show( not $is_boolean );
+
+	# Recalculate sizers
+	$self->Layout;
+
 	$self->{default_value}->SetLabel( $self->_displayed_value( $type, $pref->{default} ) );
 
 	$self->{value}->Enable(1);
 	$self->{default_value}->Enable(1);
+	$self->{options}->Enable(1);
 	$self->{button_reset}->Enable( not $pref->{is_default} );
 	$self->{button_set}->Enable(1);
+
+	return;
+}
+
+# Private method to handle the radio button selection
+sub _on_radiobutton {
+	my $self  = shift;
+	my $event = shift;
+	my $list  = $self->{list};
+	my $name  = $list->GetItemText( $list->GetFirstSelected );
+	my $pref  = $self->{preferences}->{$name};
+
+	# Reverse boolean
+	my $value = $pref->{value} ? 0 : 1;
+	my $is_default = not $pref->{is_default};
+	$pref->{is_default} = $is_default;
+	$pref->{value}      = $value;
+
+	# and update the fields/list items accordingly
+	$self->_update_ui($pref);
 
 	return;
 }
@@ -429,10 +536,16 @@ sub _update_ui {
 	my $type       = $pref->{type};
 	my $is_default = $pref->{is_default};
 
-	$self->{value}->SetValue( $self->_displayed_value( $type, $value ) );
-	$self->{default_value}->SetLabel( $self->_displayed_value( $type, $value ) );
+	if ( $type == Padre::Constant::BOOLEAN ) {
+		$self->{true}->SetValue($value);
+		$self->{false}->SetValue( not $value );
+	} else {
+		$self->{value}->SetValue( $self->_displayed_value( $type, $value ) );
+		$self->{options}->SetValue( $pref->{options} );
+	}
+	$self->{default_value}->SetLabel( $self->_displayed_value( $type, $pref->{default} ) );
 	$self->{button_reset}->Enable( not $is_default );
-	$list->SetItem( $index, 1, $is_default ? Wx::gettext('Default') : Wx::gettext('User') );
+	$list->SetItem( $index, 1, $self->_status_name($pref) );
 	$list->SetItem( $index, 3, $self->_displayed_value( $type, $value ) );
 	$self->_set_item_bold_font( $index, not $is_default );
 
@@ -471,13 +584,14 @@ sub _on_set_button {
 	my $name  = $list->GetItemText($index);
 	my $pref  = $self->{preferences}->{$name};
 
-	#TODO Implement some validation based on the preference type
-
-	#Reset the value to the default setting
-	my $type          = $pref->{type};
-	my $value         = $self->{value}->GetValue;
+	#Set the value to the user input
+	my $type = $pref->{type};
+	my $value =
+		( $type == Padre::Constant::BOOLEAN )
+		? $self->{true}->GetValue
+		: $self->{value}->GetValue;
 	my $default_value = $pref->{default};
-	my $is_default    = $self->_is_default( $type, $value, $default_value );
+	my $is_default = $self->_is_default( $type, $value, $default_value );
 
 	$pref->{value}      = $value;
 	$pref->{is_default} = $is_default;
@@ -556,17 +670,13 @@ sub _update_list {
 		next if $name !~ /$filter/i;
 
 		# Add the setting to the list control
-		my $setting    = $preferences->{$name};
-		my $is_default = $setting->{is_default};
+		my $pref       = $preferences->{$name};
+		my $is_default = $pref->{is_default};
 
 		$list->InsertStringItem( ++$index, $name );
-		if ($is_default) {
-			$list->SetItem( $index, 1, Wx::gettext('Default') );
-		} else {
-			$list->SetItem( $index, 1, Wx::gettext('User') );
-		}
-		$list->SetItem( $index, 2, $setting->{type_name} );
-		$list->SetItem( $index, 3, $self->_displayed_value( $setting->{type}, $setting->{value} ) );
+		$list->SetItem( $index, 1, $self->_status_name($pref) );
+		$list->SetItem( $index, 2, $pref->{type_name} );
+		$list->SetItem( $index, 3, $self->_displayed_value( $pref->{type}, $pref->{value} ) );
 
 		# Alternating table colors
 		$list->SetItemBackgroundColour( $index, $alternateColor ) unless $index % 2;
@@ -603,6 +713,7 @@ sub _init_preferences {
 		my $setting = Padre::Config->meta($name);
 
 		# Skip PROJECT settings
+		my $store = $setting->store;
 		next if $setting->store == Padre::Constant::PROJECT;
 
 		my $type      = $setting->type;
@@ -612,17 +723,24 @@ sub _init_preferences {
 			next;
 		}
 
+		my $options =
+			( $setting->options )
+			? join( ',', keys %{ $setting->options } )
+			: '';
+
 		my $value      = $config->$name;
 		my $default    = $setting->default;
 		my $is_default = $self->_is_default( $type, $value, $default );
-
+		my $store_name = ( $store == Padre::Constant::HUMAN ) ? Wx::gettext('User') : Wx::gettext('Host');
 		$self->{preferences}->{$name} = {
 			'is_default' => $is_default,
 			'default'    => $default,
 			'type'       => $type,
 			'type_name'  => $type_name,
+			'store_name' => $store_name,
 			'value'      => $value,
 			'original'   => $value,
+			'options'    => $options,
 		};
 	}
 

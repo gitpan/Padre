@@ -13,7 +13,7 @@ use Class::Adapter::Builder
 	NEW      => 'Wx::Menu',
 	AUTOLOAD => 'PUBLIC';
 
-our $VERSION = '0.57';
+our $VERSION = '0.58';
 
 use Class::XSAccessor {
 	getters => {
@@ -131,7 +131,6 @@ sub _add_menu_item {
 
 	return $item;
 }
-
 
 sub build_menu_from_actions {
 	my $self    = shift;
