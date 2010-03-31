@@ -1,10 +1,11 @@
-package Padre::Action::Plugins;
+package Padre::Action::Tools;
 
 # Fully encapsulated Run menu
 
 use 5.008;
 use strict;
 use warnings;
+use File::Spec      ();
 use Params::Util    ();
 use Padre::Constant ();
 use Padre::Config   ();
@@ -12,14 +13,14 @@ use Padre::Wx       ();
 use Padre::Action   ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 
 
 
 
 #####################################################################
-# Padre::Action::Plugins Methods
+# Padre::Action::Tools Methods
 
 sub new {
 	my $class = shift;
@@ -184,6 +185,10 @@ sub new {
 	return $self;
 }
 
+
+
+
+
 #####################################################################
 # Module Tools
 
@@ -211,7 +216,7 @@ sub install_file {
 		return;
 	}
 
-	$self->install_pip( $main, $string );
+	$self->install_cpanm( $main, $string );
 	return;
 }
 
@@ -236,30 +241,44 @@ sub install_url {
 		return;
 	}
 
-	$self->install_pip( $main, $string );
+	$self->install_cpanm( $main, $string );
 	return;
 }
 
-sub install_pip {
+sub install_cpanm {
 	my $self   = shift;
 	my $main   = shift;
 	my $module = shift;
 
-	# Find 'pip', used to install modules
-	require File::Which;
-	my $pip = scalar File::Which::which('pip');
-	unless ( -f $pip ) {
-		$main->error( Wx::gettext("pip is unexpectedly not installed") );
+	# Find 'cpanm', used to install modules
+	require Config;
+	my %seen = ();
+	my @where = grep { defined $_ and length $_ and not $seen{$_}++ } map { $Config::Config{$_} } qw{
+		sitescriptexp
+		sitebinexp
+		vendorscriptexp
+		vendorbinexp
+		scriptdirexp
+		binexp
+	};
+	my $cpanm = '';
+
+	foreach my $dir (@where) {
+		my $path = File::Spec->catfile( $dir, 'cpanm' );
+		if ( -f $path ) {
+			$cpanm = $path;
+			last;
+		}
+	}
+	unless ($cpanm) {
+		$main->error( Wx::gettext("cpanm is unexpectedly not installed") );
 		return;
 	}
 
-	$main->setup_bindings;
-
-	# Run with console Perl to prevent unexpected results under wperl
+	# Create the command
 	my $perl = Padre::Perl::cperl();
-	my $cmd  = qq{"$perl" "$pip" "$module"};
-	local $ENV{AUTOMATED_TESTING} = 1;
-	Wx::Perl::ProcessStream::Process->new->Run( $cmd, 'CPAN_mod', $main );
+	my $cmd  = qq{"$perl" "$cpanm" "$module"};
+	$main->run_command($cmd);
 
 	return;
 }

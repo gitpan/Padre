@@ -1,10 +1,53 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do not "tidy" or change the indenting here, or we break svn annotate
 
-0.59 To Be Released
+0.60 To Be Released
 
 
-0.58 2010.03.08
+
+0.59 2010.03.31 
+    - Don't crash open file list dialog on unsaved files or without
+      files (SEWI)
+    - Added a small survey for new Padre installation (SEWI)
+    - Resolved the clash between threads and SQLite by temporarily
+      disconnecting from SQLite during a thread spawn (ADAMK)
+    - Slave master quick-spawning in Padre::Startup, so that
+      we get smaller thread spawn memory penalty from the
+      interpreter copy. On Win32 the per-thread cost drops from
+      34.1meg to 20meg with a reduction in total memory use for a
+      typical user of about 20% (ADAMK)
+    - Add language names/translated texts to select_language list (SEWI)
+    - Fixed ticket #865 Wrong document type in View Document As (PLAVEN)
+    - New Padre::Wx::Display screen geometry library for handling multiple
+      screens, weird geometry setups and other weird stuff that coders
+      have on their development setups. Padre's main window uses this to
+      calculate an elegant golden-ratio uniform-margin default position
+      and size (ADAMK)
+    - When showing a toolbar panel for the first time, make sure it's lock
+      state is consistent with the main_lockinterface config setting (ADAMK)
+    - Local file and remote file installation switched from pip to
+      cpanm (ADAMK)
+    - Completed the 'Insert Special Value' functionality (Zeno Gantner)
+    - Updated German translation (Zeno Gantner)
+    - When refresh_windowlist was sped up, sorting regressed. Fixed (ADAMK)
+    - Fixed ticket #889: Padre saves non-ASCII characters as \x{XXXX} (AZAWAWI)
+    - New Win32 launcher #677: the Padre process is now named "padre.exe"
+      in the Task Manager (instead of wperl.exe) and it embeds the Perl
+      interpreter instead of being just a launcher (DOLMEN)
+    - On Win32 the manifest file (which tells Windows to use new Vista/7
+      styles on such systems) is now embedded as a resource in the binary, so
+      any wperl.exe.manifest containing the string 'name="Padre"' is obsolete
+      and must be removed (DOLMEN)
+    - Fixed ticket #904: Win32 taskbar icon is only 16x16 (Windows 7 may uses
+      48x48) (AZAWAWI)
+    - Small improvements/fixes to some dialogs: Refactoring, Open URL, Goto,
+      Save as, Preferences, Insert File, New Perl Distribution (Zeno Gantner)
+    - New document statistics dialog, faster computation of document statistics
+      (Zeno Gantner)
+    - Added missing File::pushd Padre dependency (AZAWAWI)
+    - Fixed ticket #894: search for non-ASCII characters (Zeno Gantner)
+
+0.58 2010.03.08  **WARNING Still not stable**
     - Fixed "Open File In Existing Padre" for non-win32 (PDONELAN)
     - In advanced preferences, display the storage backend name when it is
       default and 'User' is now called 'Overriden' (AZAWAWI)

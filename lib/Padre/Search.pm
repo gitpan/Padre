@@ -32,7 +32,7 @@ use Encode     ();
 use List::Util ();
 use Params::Util '_INSTANCE';
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 use Class::XSAccessor {
 	getters => {
@@ -190,7 +190,7 @@ sub count_all {
 	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
 		return $self->editor_count_all(@_);
 	}
-	die("Missing or invalid ccontent object to search in");
+	die("Missing or invalid content object to search in");
 }
 
 
@@ -363,7 +363,8 @@ sub matches {
 	my $text = Encode::encode( 'utf-8', shift );
 
 	# Find all matches for the regex
-	my $regex   = shift;
+	my $regex = shift;
+	$regex = Encode::encode( 'utf-8', $regex );
 	my @matches = ();
 	while ( $text =~ /$regex/g ) {
 		push @matches, [ $-[0], $+[0] ];

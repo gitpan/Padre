@@ -9,7 +9,7 @@ use Padre::Wx        ();
 use Padre::Wx::Icon  ();
 use Padre::MimeTypes ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -260,7 +260,8 @@ sub _create_controls {
 		)
 	);
 	$self->_popup_menu( Wx::Menu->new );
-	$self->_skip_vcs_files( $self->_popup_menu->AppendCheckItem( -1, Wx::gettext("Skip VCS files") ) );
+	$self->_skip_vcs_files(
+		$self->_popup_menu->AppendCheckItem( -1, Wx::gettext("Skip version control system files") ) );
 	$self->_skip_using_manifest_skip(
 		$self->_popup_menu->AppendCheckItem( -1, Wx::gettext("Skip using MANIFEST.SKIP") ) );
 

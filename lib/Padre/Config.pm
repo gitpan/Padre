@@ -22,7 +22,7 @@ use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -672,6 +672,14 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 );
+
+setting(
+	name    => 'editor_brace_expression_highlighting',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
 setting(
 	name    => 'save_autoclean',
 	type    => Padre::Constant::BOOLEAN,
@@ -918,6 +926,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	startup => 1,
 );
 setting(
 	name    => 'locale',
@@ -1190,6 +1199,14 @@ setting(
 	type    => Padre::Constant::PATH,
 	store   => Padre::Constant::PROJECT,
 	default => '',
+);
+
+# Save if feedback has been send or not
+setting(
+	name    => 'feedback_done',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
 );
 
 1;

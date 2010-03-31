@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -148,7 +148,7 @@ sub new {
 
 	# Create the main window
 	require Padre::Wx::App;
-	$self->{wx} = Padre::Wx::App->new($self);
+	$self->{wx} = Padre::Wx::App->create($self);
 
 	# Create the task manager
 	require Padre::TaskManager;
@@ -157,7 +157,7 @@ sub new {
 	);
 
 	# Create the action queue
-	$self->{actionqueue} = Padre::Action::Queue->new();
+	$self->{actionqueue} = Padre::Action::Queue->new;
 
 	# Startup completed, let go of the database
 	Padre::DB->commit;
@@ -972,7 +972,7 @@ know about Wx, but currently it still does.
 
 =item L<Padre::Wx::Ack>
 
-Implementation of the L<ack> integration in Edit/Ack menu item.
+Implementation of the L<ack> integration in C<Edit/Ack> menu item.
 It probably should be either under Dialog or moved out to be a
 plug-in.
 
@@ -1145,7 +1145,11 @@ Keedi Kim - 김도형 (KEEDI)
 
 Kenichi Ishigaki - 石垣憲一 (ISHIGAKI) E<lt>ishigaki@cpan.orgE<gt>
 
+Mark Grimes E<lt>mgrimes@cpan.orgE<gt>
+
 Max Maischein (CORION)
+
+Olivier MenguE<eacute> (DOLMEN)
 
 Patrick Donelan (PDONELAN) E<lt>pat@patspam.comE<gt>
 
@@ -1159,7 +1163,7 @@ Sebastian Willing (SEWI)
 
 Steffen Müller (TSEE) E<lt>smueller@cpan.orgE<gt>
 
-Mark Grimes E<lt>mgrimes@cpan.orgE<gt>
+Zeno Gantner
 
 =head2 Translators
 
@@ -1187,10 +1191,13 @@ Everyone on the team
 
 Jérôme Quelin (JQUELIN)
 
+Olivier MenguE<eacute> (DOLMEN)
+
 =head3 German
 
 Heiko Jansen (HJANSEN)
 Sebastian Willing (SEWI)
+Zeno Gantner
 
 =head3 Hebrew
 

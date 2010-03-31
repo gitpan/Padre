@@ -9,15 +9,17 @@ use Padre::Constant            ();
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook
 };
 
 sub new {
-	my $class = shift;
-	my $main  = shift;
+	my $class  = shift;
+	my $main   = shift;
+	my $aui    = $main->aui;
+	my $unlock = $main->config->main_lockinterface ? 0 : 1;
 
 	# Create the basic object
 	my $self = $class->SUPER::new(
@@ -29,25 +31,26 @@ sub new {
 	);
 
 	# Add ourself to the window manager
-	my $aui = $main->aui;
 	$aui->AddPane(
 		$self,
 		Padre::Wx->aui_pane_info(
 			Name           => 'bottom',
 			Resizable      => 1,
 			PaneBorder     => 0,
-			Movable        => 1,
-			CaptionVisible => 1,
 			CloseButton    => 0,
 			DestroyOnClose => 0,
 			MaximizeButton => 1,
-			Floatable      => 1,
-			Dockable       => 1,
 			Position       => 2,
 			Layer          => 4,
+			CaptionVisible => $unlock,
+			Floatable      => $unlock,
+			Dockable       => $unlock,
+			Movable        => $unlock,
 			)->Bottom->Hide,
 	);
-	$aui->caption( 'bottom' => Wx::gettext('Output View') );
+	$aui->caption(
+		bottom => Wx::gettext('Output View'),
+	);
 
 	return $self;
 }

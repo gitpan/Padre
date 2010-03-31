@@ -12,7 +12,7 @@ use Padre::Wx::Role::MainChild ();
 # RichTextCtrl
 use Wx::RichText ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -81,7 +81,7 @@ sub _regex_groups {
 			label => Wx::gettext('&POSIX Character classes'),
 			value => {
 				'00[:alpha:]'  => Wx::gettext('Alphabetic characters'),
-				'01[:alnum:])' => Wx::gettext('Alphanumeric characters'),
+				'01[:alnum:]'  => Wx::gettext('Alphanumeric characters'),
 				'02[:ascii:]'  => Wx::gettext('7-bit US-ASCII character'),
 				'03[:blank:]'  => Wx::gettext('Space and tab'),
 				'04[:cntrl:]'  => Wx::gettext('Control characters'),
@@ -102,9 +102,9 @@ sub _regex_groups {
 				'00*'     => Wx::gettext('Match 0 or more times'),
 				'01+'     => Wx::gettext('Match 1 or more times'),
 				'02?'     => Wx::gettext('Match 1 or 0 times'),
-				'03{m}'   => Wx::gettext('Match exactly n times'),
+				'03{m}'   => Wx::gettext('Match exactly m times'),
 				'05{n,}'  => Wx::gettext('Match at least n times'),
-				'05{m,n}' => Wx::gettext('Match at least n but not more than m times'),
+				'05{m,n}' => Wx::gettext('Match at least m but not more than n times'),
 			}
 		},
 		'03' => {

@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Task';
 
 use Class::XSAccessor {
@@ -41,7 +41,7 @@ sub finish {
 	# not Padre::Wx::Main, however a reference to main is held in Padre::Wx::App
 	my $main = shift->{main};
 	return if !$main;
-	my $errorlist = $main->errorlist if $main;
+	my $errorlist = $main ? $main->errorlist : undef;
 	my $data      = $self->data;
 	my $parser    = $self->parser;
 	$errorlist->{parser} = $parser if $errorlist;

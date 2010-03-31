@@ -22,7 +22,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 my $iter;
 my %opts;
@@ -244,6 +244,20 @@ sub find_clicked {
 		$opts{l} = $opts{v} = 1;
 	}
 
+	# karl: borrowed this from ack hoping that will fix the ignore-case bug
+	my $file_matching = $opts{f} || $opts{lines};
+	if ( !$file_matching ) {
+		$opts{regex} = App::Ack::build_regex( $opts{regex}, \%opts );
+	}
+
+	# check that all regexes do compile fine
+	eval { App::Ack::check_regex( $opts{regex} ) };
+	if ($@) {
+		$main->error( "Find in Files: error in regex " . $opts{regex} );
+		return;
+	}
+
+
 	my $what = App::Ack::get_starting_points( [ $search->{dir} ], \%opts );
 	$iter = App::Ack::get_iterator( $what, \%opts );
 	App::Ack::filetype_setup();
@@ -321,7 +335,7 @@ sub create_ack_pane {
 		Wx::wxLC_SINGLE_SEL | Wx::wxLC_NO_HEADER | Wx::wxLC_REPORT
 	);
 
-	$main->{ack}->InsertColumn( 0, Wx::gettext('Ack') );
+	$main->{ack}->InsertColumn( 0, Wx::gettext('Find in Files') );
 	$main->{ack}->SetColumnWidth( 0, Wx::wxLIST_AUTOSIZE );
 
 	Wx::Event::EVT_LIST_ITEM_ACTIVATED(
@@ -345,7 +359,7 @@ sub show_ack_output {
 		${$bp}->InsertPage(
 			0,
 			${$op},
-			Wx::gettext("Ack"),
+			Wx::gettext('Find in Files'),
 			1,
 		);
 		${$op}->Show;
@@ -411,19 +425,17 @@ sub on_ack_thread {
 
 		# summary
 		_send_text( '-' x 39 . "\n" ) if ( $stats{cnt_files} );
-		_send_text( Wx::gettext( sprintf( "Found %d files\n", $stats{cnt_files} ) ) );
+		_send_text( sprintf( Wx::gettext("Found %d files\n"), $stats{cnt_files} ) );
 	} else {
 		App::Ack::print_matches( $iter, \%opts );
 
 		# summary
 		_send_text( '-' x 39 . "\n" ) if ( $stats{cnt_files} );
 		_send_text(
-			Wx::gettext(
-				sprintf(
-					"Found %d files and %d matches\n",
-					$stats{cnt_files},
-					$stats{cnt_matches},
-				)
+			sprintf(
+				Wx::gettext("Found %d files and %d matches\n"),
+				$stats{cnt_files},
+				$stats{cnt_matches}
 			)
 		);
 	}
@@ -458,12 +470,10 @@ sub print_results {
 
 		# list only file names
 		if ( $opts{l} ) {
-			$text = Wx::gettext(
-				sprintf(
-					"'%s' missing in file '%s'\n",
-					$opts{regex},
-					$text,
-				)
+			$text = sprintf(
+				Wx::gettext("'%s' missing in file '%s'\n"),
+				$opts{regex},
+				$text
 			);
 		}
 
@@ -472,12 +482,10 @@ sub print_results {
 
 			# chop last ':', add \n after $filename
 			chop($text);
-			$text = Wx::gettext(
-				sprintf(
-					"Found '%s' in '%s':\n",
-					$opts{regex},
-					$text,
-				)
+			$text = sprintf(
+				Wx::gettext("Found '%s' in '%s':\n"),
+				$opts{regex},
+				$text,
 			);
 		}
 

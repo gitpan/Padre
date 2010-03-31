@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -117,6 +117,24 @@ sub new {
 		'edit.paste',
 	);
 
+	my $submenu = Wx::Menu->new;
+	$self->{insert_submenu} = $self->AppendSubMenu( $submenu, Wx::gettext('Insert') );
+
+	$self->{insert_special} = $self->add_menu_action(
+		$submenu,
+		'edit.insert.insert_special',
+	);
+
+	$self->{snippets} = $self->add_menu_action(
+		$submenu,
+		'edit.insert.snippets',
+	);
+
+	$self->{insert_from_file} = $self->add_menu_action(
+		$submenu,
+		'edit.insert.from_file',
+	);
+
 	$self->AppendSeparator;
 
 	# Miscellaneous Actions
@@ -145,27 +163,14 @@ sub new {
 		'edit.brace_match',
 	);
 
+	$self->{brace_match_select} = $self->add_menu_action(
+		$self,
+		'edit.brace_match_select',
+	);
+
 	$self->{join_lines} = $self->add_menu_action(
 		$self,
 		'edit.join_lines',
-	);
-
-	my $submenu = Wx::Menu->new;
-	$self->{insert_submenu} = $self->AppendSubMenu( $submenu, Wx::gettext('Insert') );
-
-	$self->{insert_special} = $self->add_menu_action(
-		$submenu,
-		'edit.insert.insert_special',
-	);
-
-	$self->{snippets} = $self->add_menu_action(
-		$submenu,
-		'edit.insert.snippets',
-	);
-
-	$self->{insert_from_file} = $self->add_menu_action(
-		$submenu,
-		'edit.insert.from_file',
 	);
 
 	$self->AppendSeparator;
@@ -315,13 +320,6 @@ sub new {
 
 	$self->AppendSeparator;
 
-	$self->add_menu_action(
-		$self,
-		'edit.regex',
-	);
-
-	$self->AppendSeparator;
-
 	$self->{show_as_number} = Wx::Menu->new;
 	$self->Append(
 		-1,
@@ -361,6 +359,7 @@ sub refresh {
 	$self->{quick_fix}->Enable($hasdoc);
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
+	$self->{brace_match_select}->Enable($hasdoc);
 	$self->{join_lines}->Enable($hasdoc);
 
 	$self->{insert_special}->Enable($hasdoc);

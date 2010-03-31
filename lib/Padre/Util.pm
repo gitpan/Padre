@@ -34,7 +34,7 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.58';
+our $VERSION   = '0.59';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
@@ -89,7 +89,7 @@ This is a simple slurp implementation, provided as a convenience for
 internal Padre use when loading trivial unimportant files for which
 we don't need anything more robust.
 
-All file reading is done with binmode enabled, and data is returned by
+All file reading is done with C<binmode> enabled, and data is returned by
 reference to avoid needless copying.
 
 Returns the content of the file as a SCALAR reference if the file exists
@@ -172,10 +172,11 @@ backward match must end before this.
 
 sub get_matches {
 	my ( $text, $regex, $from, $to, $backward ) = @_;
-	die "missing parameters" if @_ < 4;
+	die 'missing parameters' if @_ < 4;
 
 	use Encode;
-	$text = Encode::encode( 'utf-8', $text );
+	$text  = Encode::encode( 'utf-8', $text );
+	$regex = Encode::encode( 'utf-8', $regex );
 
 	my @matches;
 	while ( $text =~ /$regex/mg ) {
@@ -291,9 +292,9 @@ sub svn_directory_revision {
 
 =head2 C<share>
 
-If called without a paramter returns the share directory of Padre. 
-If called with a parameter (e.g. 'Perl6') returns the share directory 
-of Padre::Plugin::Perl6
+If called without a parameter returns the share directory of Padre.
+If called with a parameter (e.g. C<Perl6>) returns the share directory
+of L<Padre::Plugin::Perl6>
 
 =cut
 

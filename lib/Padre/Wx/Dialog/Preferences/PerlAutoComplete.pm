@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Wx::Dialog::Preferences ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Wx::Dialog::Preferences';
 
 sub panel {
@@ -114,11 +114,11 @@ __END__
 =head1 NAME
 
 Padre::Wx::Dialog::Preferences::PerlAutoComplete
- - L<Padre> config options for the Perl autocomplete feature
+ - L<Padre> configuration options for the Perl auto complete feature
 
 =head1 DESCRIPTION
 
-Show user-configurable options for autocomplete in Perl scripts.
+Show user-configurable options for auto complete in Perl scripts.
 
 It uses the Padre preferences panel.
 

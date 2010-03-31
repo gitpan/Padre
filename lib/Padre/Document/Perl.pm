@@ -17,7 +17,7 @@ use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
 use Padre::Logger;
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Document';
 
 
@@ -253,7 +253,7 @@ sub get_function_regex {
 
 =head2 get_command
 
-Returns the full command (interpreter, filename (maybe temporary) and arguments
+Returns the full command (interpreter, file name (maybe temporary) and arguments
 for both of them) for running the current document.
 
 Accepts one optional argument: a debug flag.
@@ -345,11 +345,23 @@ sub pre_process {
 # Documented in Padre::Document!
 # Implemented as a task. See Padre::Task::SyntaxChecker::Perl
 sub check_syntax {
-	shift->_check_syntax_internals( { @_, background => 0 } );
+	shift->_check_syntax_internals(
+
+		# Passing all arguments is ok, but critic complains
+		{   @_, ## no critic (ProhibitCommaSeparatedStatements)
+			background => 0
+		}
+	);
 }
 
 sub check_syntax_in_background {
-	shift->_check_syntax_internals( { @_, background => 1 } );
+	shift->_check_syntax_internals(
+
+		# Passing all arguments is ok, but critic complains
+		{   @_, ## no critic (ProhibitCommaSeparatedStatements)
+			background => 1
+		}
+	);
 }
 
 sub _check_syntax_internals {
@@ -406,9 +418,9 @@ sub _check_syntax_internals {
 
 =head2 beginner_check
 
-Run the beginer error checks on the current document.
+Run the beginner error checks on the current document.
 
-Shows a popup message for the first error.
+Shows a pop-up message for the first error.
 
 Always returns 1 (true).
 
@@ -1023,18 +1035,22 @@ sub perltags_parser {
 
 =pod
 
-=head2 autocomplete
+=head2 C<autocomplete>
 
 This method is called on two events:
- - Manually using the autocomplete-action (via menu, toolbar, hotkey)
- - on every char typed by the user if the "autocomplete-always" config option
-   is active
 
-Arguments:
- - The event object (optional)
+=over
 
-Returns the prefix length and an array of suggestions. prefix_length is the
-number of chars left to the cursor position which need to be replaced if
+=item Manually using the C<autocomplete-action> (via menu, toolbar, hot key)
+
+=item on every char typed by the user if the C<autocomplete-always> configuration option is active
+
+=back
+
+Arguments: The event object (optional)
+
+Returns the prefix length and an array of suggestions. C<prefix_length> is the
+number of characters left to the cursor position which need to be replaced if
 a suggestion is accepted.
 
 WARNING: This method runs very often (on each keypress), keep it as efficient
@@ -1286,22 +1302,15 @@ sub newline_keep_column {
 	my $pos    = $editor->GetCurrentPos;
 	my $line   = $editor->LineFromPosition($pos);
 	my $first  = $editor->PositionFromLine($line);
-	my $col    = $pos - $editor->PositionFromLine( $editor->LineFromPosition($pos) );
-	my $text   = $editor->GetTextRange( $first, ( $pos - $first ) );
+	my $col    = $pos - $first;
+	my $text   = $editor->GetTextRange( $first, $pos );
 
 	$editor->AddText( $self->newline );
 
-	$pos   = $editor->GetCurrentPos;
-	$first = $editor->PositionFromLine( $editor->LineFromPosition($pos) );
-
-	#	my $col2 = $pos - $first;
-	#	$editor->AddText( ' ' x ( $col - $col2 ) );
-
-	# TO DO: Remove the part made by auto-ident before addtext:
-	$text =~ s/[^\s\t\r\n]/ /g;
+	$text =~ s/\S/ /g;
 	$editor->AddText($text);
 
-	$editor->SetCurrentPos( $first + $col );
+	$editor->SetCurrentPos( $pos + $col + 1 );
 
 	return 1;
 }
@@ -1319,7 +1328,7 @@ Arguments: Current editor object, current event object
 Returns nothing useful.
 
 Notice: The char being typed has not been inserted into the editor at the run
-        time of this method. It could be read using $event->GetUnicodeKey
+        time of this method. It could be read using C<< $event->GetUnicodeKey >>
 
 WARNING: This method runs very often (on each keypress), keep it as efficient
          and fast as possible!
@@ -1666,11 +1675,11 @@ sub menu {
 
 =pod
 
-=head2 project_tagsfile
+=head2 C<project_tagsfile>
 
 No arguments.
 
-Returns the full path and filename of the (perl))tagsfile for the current
+Returns the full path and file name of the Perl tags file for the current
 document.
 
 =cut
@@ -1687,10 +1696,10 @@ sub project_tagsfile {
 
 =pod
 
-=head2 project_create_tagsfile
+=head2 C<project_create_tagsfile>
 
-Creates a tagsfile for the project of the current document. Includes all Perl
-source files within the project excluding blib.
+Creates a tags file for the project of the current document. Includes all Perl
+source files within the project excluding F<blib>.
 
 =cut
 

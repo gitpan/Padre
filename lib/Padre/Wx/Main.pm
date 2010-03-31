@@ -60,7 +60,7 @@ use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Logger;
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -99,18 +99,35 @@ sub new {
 	Wx::Log::SetActiveTarget( Wx::LogStderr->new );
 	Wx::InitAllImageHandlers();
 
-	# Determine the initial frame style
-	my $config = $ide->config;
-	my $style  = Wx::wxDEFAULT_FRAME_STYLE;
+	# Initialise the style and position
+	my $config   = $ide->config;
+	my $size     = [ $config->main_width, $config->main_height ];
+	my $position = [ $config->main_left, $config->main_top ];
+	my $style    = Wx::wxDEFAULT_FRAME_STYLE;
+
+	# If we closed while maximized on the previous run,
+	# the previous size is completely suspect.
 	if ( $config->main_maximized ) {
 		$style |= Wx::wxMAXIMIZE;
+		$size     = [ -1, -1 ];
+		$position = [ -1, -1 ];
+	}
+
+	# Generate a smarter default size than Wx does
+	if ( $size->[0] == -1 ) {
+		require Padre::Wx::Display;
+		my $rect = Padre::Wx::Display::primary_default();
+		$size     = $rect->GetSize;
+		$position = $rect->GetPosition;
 	}
 
 	# Create the underlying Wx frame
 	my $self = $class->SUPER::new(
-		undef, -1, 'Padre: New window',
-		[ $config->main_left, $config->main_top, ],
-		[ $config->main_width, $config->main_height, ], $style,
+		undef, -1,
+		'Padre',
+		$position,
+		$size,
+		$style,
 	);
 
 	# Start with a simple placeholder title
@@ -217,7 +234,14 @@ sub new {
 	Wx::Event::EVT_STC_DWELLSTART( $self, -1, \&on_stc_dwell_start );
 
 	# Use Padre's icon
-	$self->SetIcon(Padre::Wx::Icon::PADRE);
+	if (Padre::Constant::WIN32) {
+
+		# Windows needs its ICOn file for Padre to look cooler in the
+		# task bar, task switch bar and task manager
+		$self->SetIcons(Padre::Wx::Icon::PADRE_ICON_FILE);
+	} else {
+		$self->SetIcon(Padre::Wx::Icon::PADRE);
+	}
 
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
@@ -333,6 +357,11 @@ sub timer_start {
 
 	# Check for new plug-ins and alert the user to them
 	$manager->alert_new;
+
+	unless ($Padre::Test::VERSION) {
+		require Padre::Wx::Dialog::WhereFrom;
+		Padre::Wx::Dialog::WhereFrom->new($self);
+	}
 
 	# Start the change detection timer
 	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_FILECHECK );
@@ -796,7 +825,7 @@ This should make operations with a high GUI intensity both simpler and
 faster.
 
 The name of the lowercase MUST be the name of a Padre::Wx::Main method,
-which will be fired (with no params) when the method lock expires.
+which will be fired (with no parameters) when the method lock expires.
 
 =cut
 
@@ -1120,7 +1149,7 @@ sub refresh {
 	# and work downwards and slower from there.
 	# Humans tend to look at the top of the screen first.
 	$self->refresh_title($current);
-	$self->refresh_menubar($current);
+	$self->refresh_menu($current);
 	$self->refresh_toolbar($current);
 	$self->refresh_functions($current);
 	$self->refresh_directory($current);
@@ -1318,7 +1347,7 @@ sub refresh_menu {
 
     $main->refresh_menu_plugins;
 
-Force a refresh of the plugin menus.
+Force a refresh of just the plug-in menus.
 
 =cut
 
@@ -1340,22 +1369,6 @@ sub refresh_windowlist {
 	my $self = shift;
 	return if $self->locked('REFRESH');
 	$self->menu->window->refresh_windowlist($self);
-}
-
-=pod
-
-=head3 C<refresh_menubar>
-
-    $main->refresh_menubar;
-
-Force a refresh of Padre's menu bar.
-
-=cut
-
-sub refresh_menubar {
-	my $self = shift;
-	return if $self->locked('REFRESH');
-	$self->menu->refresh_top;
 }
 
 =pod
@@ -1485,7 +1498,7 @@ sub refresh_directory {
 
 =head2 C<refresh_aui>
 
-This is a refresh method wrapper around the AUI C<Update> method so
+This is a refresh method wrapper around the C<AUI> C<Update> method so
 that it can be lock-managed by the existing locking system.
 
 =cut
@@ -1755,7 +1768,7 @@ sub _show_functions {
 
     $main->show_todo( $visible );
 
-Show the todo panel on the right if C<$visible> is true. Hide it
+Show the I<to do> panel on the right if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
 the panel.
 
@@ -2724,6 +2737,7 @@ button. No return value.
 
 sub error {
 	my ( $self, $message ) = @_;
+	$message ||= Wx::gettext('Unknown error from ') . caller;
 	my $styles = Wx::wxOK | Wx::wxCENTRE | Wx::wxICON_HAND;
 	Wx::MessageBox( $message, Wx::gettext('Error'), $styles, $self );
 }
@@ -2905,24 +2919,7 @@ Jump to brace matching current the one at current position.
 =cut
 
 sub on_brace_matching {
-	my $self = shift;
-	my $page = $self->current->editor;
-	my $pos1 = $page->GetCurrentPos;
-	my $pos2 = $page->BraceMatch($pos1);
-	if ( $pos2 == -1 ) { #Wx::wxSTC_INVALID_POSITION
-		if ( $pos1 > 0 ) {
-			$pos1--;
-			$pos2 = $page->BraceMatch($pos1);
-		}
-	}
-
-	if ( $pos2 != -1 ) { #Wx::wxSTC_INVALID_POSITION
-		$page->GotoPos($pos2);
-	}
-
-	# TO DO: or any nearby position.
-
-	return;
+	shift->current->editor->goto_matching_brace;
 }
 
 =pod
@@ -2991,7 +2988,7 @@ sub on_comment_block {
 
     $main->on_autocompletion;
 
-Try to auto-complete current word being typed, depending on
+Try to auto complete current word being typed, depending on
 document type.
 
 =cut
@@ -3036,7 +3033,7 @@ sub on_autocompletion {
 
     $main->on_goto;
 
-Prompt user for a line or character position, and jump to this line 
+Prompt user for a line or character position, and jump to this line
 or character position in current document.
 
 =cut
@@ -3513,7 +3510,10 @@ sub on_open_selection {
 	@files = grep { !$seen{$_}++ } @files;
 
 	require Wx::Perl::Dialog::Simple;
-	my $file = Wx::Perl::Dialog::Simple::single_choice( choices => \@files );
+	my $file = Wx::Perl::Dialog::Simple::single_choice(
+		title   => Wx::gettext('Choose File'),
+		choices => \@files
+	);
 
 	if ($file) {
 		$self->setup_editors($file);
@@ -3628,7 +3628,7 @@ sub open_file_dialog {
 		Wx::gettext("Ruby Files"),
 		"*.rb;*.RB",
 		Wx::gettext("SQL Files"),
-		"*.slq;*.SQL",
+		"*.sql;*.SQL",
 		Wx::gettext("Text Files"),
 		"*.txt;*.TXT;*.yml;*.conf;*.ini;*.INI",
 		Wx::gettext("Web Files"),
@@ -3817,7 +3817,7 @@ sub on_reload_some {
 		$self,
 		title      => Wx::gettext('Reload some files'),
 		list_title => Wx::gettext('&Select files to reload:'),
-		buttons    => [ [ '&Reload selected', sub { $_[0]->main->reload_some(@_); } ] ],
+		buttons    => [ [ Wx::gettext('&Reload selected'), sub { $_[0]->main->reload_some(@_); } ] ],
 	)->show;
 }
 
@@ -4006,10 +4006,10 @@ sub on_save_as {
 
 	while (1) {
 		my $dialog = Wx::FileDialog->new(
-			$self, Wx::gettext("Save file as..."),
+			$self, Wx::gettext('Save file as...'),
 			$self->{cwd},
 			$filename,
-			"*.*",
+			Wx::gettext('All Files') . ( Padre::Constant::WIN32 ? '|*.*|' : '|*|' ),
 			Wx::wxFD_SAVE,
 		);
 		if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
@@ -4684,6 +4684,10 @@ sub on_join_lines {
 	# find positions
 	my $pos1 = $page->GetCurrentPos;
 	my $line = $page->LineFromPosition($pos1);
+
+	# Don't crash if cursor at the last line
+	return if ( $line > 0 ) and ( $line + 1 == $page->GetLineCount );
+
 	my $pos2 = $page->PositionFromLine( $line + 1 );
 
 	# Remove leading spaces/tabs from the second line
@@ -5191,12 +5195,11 @@ sub on_insert_from_file {
 		$self->{cwd} = File::Basename::dirname($last_filename);
 	}
 	my $dialog = Wx::FileDialog->new(
-		$self, Wx::gettext('Open file'),
-		$self->cwd, '', '*.*', Wx::wxFD_OPEN,
+		$self,      Wx::gettext('Open file'),
+		$self->cwd, '',
+		Wx::gettext('All Files') . ( Padre::Constant::WIN32 ? '|*.*|' : '|*|' ),
+		Wx::wxFD_OPEN,
 	);
-	unless (Padre::Constant::WIN32) {
-		$dialog->SetWildcard("*");
-	}
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 		return;
 	}
@@ -5504,45 +5507,12 @@ sub on_doc_stats {
 
 	my $doc = $self->current->document;
 	if ( not $doc ) {
-		$self->message( 'No file is open', 'Stats' );
+		$self->message( Wx::gettext('No file is open'), Wx::gettext('Stats') );
 		return;
 	}
 
-	my ($lines,    $chars_with_space, $chars_without_space, $words, $is_readonly,
-		$filename, $newline_type,     $encoding
-	) = $doc->stats;
-
-	my $disksize = '';
-	if ( defined($doc) and defined( $doc->{file} ) ) {
-		$disksize = Padre::Util::humanbytes( $doc->{file}->size );
-	} else {
-		$disksize = Wx::gettext('(Document not on disk)');
-	}
-
-	my @messages = (
-		sprintf( Wx::gettext("Words: %s"),                $words ),
-		sprintf( Wx::gettext("Lines: %d"),                $lines ),
-		sprintf( Wx::gettext("Chars without spaces: %s"), $chars_without_space ),
-		sprintf( Wx::gettext("Chars with spaces: %d"),    $chars_with_space ),
-		sprintf( Wx::gettext("Newline type: %s"),         $newline_type ),
-		sprintf( Wx::gettext('Size on disk: %s'),         $disksize ),
-		sprintf( Wx::gettext("Encoding: %s"),             $encoding ),
-		sprintf(
-			Wx::gettext("Document type: %s"),
-			( defined ref($doc) ? ref($doc) : Wx::gettext("none") )
-		),
-		defined $filename
-		? sprintf( Wx::gettext("Filename: %s"), $filename )
-		: Wx::gettext("No filename"),
-	);
-	my $message = join $/, @messages;
-
-	if ($is_readonly) {
-		$message .= "File is read-only.\n";
-	}
-
-	$self->message( $message, 'Stats' );
-	return;
+	require Padre::Wx::Dialog::DocStats;
+	Padre::Wx::Dialog::DocStats->new($self)->Show;
 }
 
 =pod

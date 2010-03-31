@@ -7,7 +7,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 # TO DO - Don't store run-time data in package lexicals
@@ -172,8 +172,8 @@ sub goto_bookmark {
 	}
 
 	# Is the file already open
-	my $file   = $bookmark->{file};
-	my $line   = $bookmark->{line};
+	my $file   = $bookmark->file;
+	my $line   = $bookmark->line;
 	my $pageid = $main->find_editor_of_file($file);
 
 	unless ( defined $pageid ) {

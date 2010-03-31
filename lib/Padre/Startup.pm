@@ -4,13 +4,13 @@ package Padre::Startup;
 
 =head1 NAME
 
-Padre::Startup::Config - Padre startup-related config settings
+Padre::Startup::Config - Padre start-up related configuration settings
 
 =head1 DESCRIPTION
 
 Padre stores host-related data in a combination of an easily transportable
 YAML file for personal settings and a powerful and robust SQLite-based
-config database for host settings and state data.
+configuration database for host settings and state data.
 
 Unfortunately, fully loading and validating these configurations can be
 relatively expensive and may take some time. A limited number of these
@@ -18,9 +18,9 @@ settings need to be available extremely early in the Padre bootstrapping
 process.
 
 The F<startup.yml> file is automatically written at the same time as the
-regular config files, and is read without validating during early startup.
+regular configuration files, and is read without validating during early start-up.
 
-B<Padre::Startup::Config> is a small convenience module for reading and
+L<Padre::Startup::Config> is a small convenience module for reading and
 writing the F<startup.yml> file.
 
 =head1 FUNCTIONS
@@ -32,7 +32,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 my $SPLASH = undef;
 
@@ -59,6 +59,7 @@ sub startup {
 		main_singleinstance      => Padre::Constant::DEFAULT_SINGLEINSTANCE,
 		main_singleinstance_port => Padre::Constant::DEFAULT_SINGLEINSTANCE_PORT,
 		startup_splash           => 1,
+		threads                  => 1,
 	);
 
 	# Load and overlay the startup.yml file
@@ -97,6 +98,7 @@ sub startup {
 				}
 			}
 			foreach my $file (@ARGV) {
+				require File::Spec;
 				my $path = File::Spec->rel2abs($file);
 				$socket->print("open $path\n");
 			}
@@ -104,6 +106,18 @@ sub startup {
 			$socket->close;
 			return 0;
 		}
+	}
+
+	# NOTE: Replace the following with if ( 0 ) will disable the
+	# slave master quick-spawn optimisation.
+
+	# If we are going to use threading, spawn off the slave
+	# driver as early as we possibly can so we reduce the amount of
+	# wasted memory copying to a minimum.
+	if ( $setting{threads} ) {
+		require Padre::SlaveDriver;
+
+		# Padre::SlaveDriver->new;
 	}
 
 	# Show the splash image now we are starting a new instance

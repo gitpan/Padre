@@ -64,10 +64,9 @@ worker threads. Default: 15000ms
 use 5.008;
 use strict;
 use warnings;
+use Params::Util ();
 
-our $VERSION = '0.58';
-
-use Params::Util qw{_INSTANCE};
+our $VERSION = '0.59';
 
 # According to Wx docs,
 # this MUST be loaded before Wx,
@@ -75,6 +74,7 @@ use Params::Util qw{_INSTANCE};
 use threads;
 use threads::shared;
 use Thread::Queue 2.11;
+use Time::HiRes qw(gettimeofday tv_interval);
 
 require Padre;
 use Padre::Task    ();
@@ -95,7 +95,10 @@ use Class::XSAccessor {
 # This event is triggered by a worker thread DURING ->run to incrementally
 # communicate to the main thread over the life of a service.
 our $SERVICE_POLL_EVENT : shared;
-BEGIN { $SERVICE_POLL_EVENT = Wx::NewEventType; }
+
+BEGIN {
+	$SERVICE_POLL_EVENT = Wx::NewEventType;
+}
 
 # remember whether the event handlers were initialized...
 our $EVENTS_INITIALIZED = 0;
@@ -111,16 +114,18 @@ sub new {
 
 	return $SINGLETON if defined $SINGLETON;
 
+	my $driver = Padre::SlaveDriver->new;
+
 	my $self = $SINGLETON = bless {
 		min_no_workers => 2,    # there were config settings for
-		max_no_workers => 6,    #  these long ago?
+		max_no_workers => 6,    # these long ago?
 		use_threads    => 1,    # can be explicitly disabled
 		reap_interval  => 15000,
 		@_,
 		workers => [],
 
-		# grab a copy of the task_queue that's now handled by the slave driver
-		task_queue    => Padre::SlaveDriver->new()->task_queue,
+		# Grab a copy of the task_queue that's now handled by the slave driver
+		task_queue    => $driver->task_queue,
 		running_tasks => {},
 	}, $class;
 
@@ -143,9 +148,15 @@ sub new {
 		my $timerid = Wx::NewId();
 		$REAP_TIMER = Wx::Timer->new( $main, $timerid );
 		Wx::Event::EVT_TIMER(
-			$main, $timerid, sub { $SINGLETON->reap(); },
+			$main, $timerid,
+			sub {
+				$SINGLETON->reap;
+			},
 		);
-		$REAP_TIMER->Start( $self->reap_interval, Wx::wxTIMER_CONTINUOUS );
+		$REAP_TIMER->Start(
+			$self->reap_interval,
+			Wx::wxTIMER_CONTINUOUS,
+		);
 	}
 
 	#	if ( not defined $SERVICE_TIMER and $self->use_threads ) {
@@ -199,10 +210,10 @@ proxy to this method for convenience.
 
 sub schedule {
 	my $self = shift;
-	my $task = _INSTANCE( shift, 'Padre::Task' )
+	my $task = Params::Util::_INSTANCE( shift, 'Padre::Task' )
 		or die "Invalid task scheduled!"; # TO DO: grace
 
-	if ( _INSTANCE( $task, 'Padre::Service' ) ) {
+	if ( Params::Util::_INSTANCE( $task, 'Padre::Service' ) ) {
 		$self->{running_services}{$task} = $task;
 	}
 
@@ -413,16 +424,30 @@ sub cleanup {
 	TRACE('Tell all tasks to stop') if DEBUG;
 	my @workers = $self->workers;
 	$self->task_queue->insert( 0, ("STOP") x scalar(@workers) );
-	while ( threads->list(threads::running) >= 2 ) {
-		$_->join for threads->list(threads::joinable);
+
+	my $waitstart = [ gettimeofday() ];
+
+	# Changing the selection seems to solve the endless-loop problem
+	#	while ( threads->list(threads::running) >= 2 ) {
+	while ( threads->list(threads::joinable) > 0 ) {
+		for ( threads->list(threads::joinable) ) {
+			$_->join;
+		}
+
+		# Wait no more than two minutes
+		last if ( tv_interval($waitstart) >= ( 2 * 60 ) );
+
+		# Pass time slices to the threads for finishing
+		threads->yield();
 	}
+
 	foreach my $thread ( threads->list(threads::joinable) ) {
 		TRACE( 'Joining thread ' . $thread->tid ) if DEBUG;
 		$thread->join;
 	}
 
 	# cleanup master thread, too
-	Padre::SlaveDriver->new->cleanup();
+	Padre::SlaveDriver->new->cleanup;
 
 	# didn't work the nice way?
 	while ( threads->list(threads::running) >= 1 ) {
@@ -502,8 +527,7 @@ Returns B<a list> of the worker threads.
 =cut
 
 sub workers {
-	my $self = shift;
-	return @{ $self->{workers} };
+	$_[0]->{workers};
 }
 
 =pod
@@ -521,7 +545,8 @@ because C<finish> most likely updates the GUI.)
 =cut
 
 sub on_task_done_event {
-	my ( $main, $event ) = @_; @_ = (); # hack to avoid "Scalars leaked"
+	my ( $main, $event ) = @_;
+	@_ = (); # hack to avoid "Scalars leaked"
 	my $frozen = $event->GetData;
 
 	# FIXME - can we know the _real_ class so the an extender

@@ -59,6 +59,7 @@ no_index:
     - xt
 requires:
   App::Ack: 1.86
+  App::cpanminus: 0.9923
   Class::Adapter: 1.05
   Class::Unload: 0.03
   Class::XSAccessor: 1.05
@@ -86,6 +87,7 @@ requires:
   File::Spec::Functions: 3.2701
   File::Temp: 0
   File::Which: 1.08
+  File::pushd: 1.00
   FindBin: 0
   Format::Human::Bytes: 0.04
   Getopt::Long: 0
@@ -102,7 +104,7 @@ requires:
   Module::CoreList: 0
   Module::Refresh: 0.13
   Module::Starter: 1.50
-  ORLite: 1.38
+  ORLite: 1.41
   POSIX: 0
   PPI: 1.205
   PPIx::EditorTools: 0.09
@@ -129,7 +131,6 @@ requires:
   Wx::Perl::ProcessStream: 0.25
   YAML::Tiny: 1.32
   perl: 5.008005
-  pip: 0.13
   threads: 1.71
   threads::shared: 1.26
   version: 0.80
@@ -138,4 +139,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.58
+version: 0.59

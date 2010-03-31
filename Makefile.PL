@@ -45,7 +45,7 @@ configure_requires 'ExtUtils::MakeMaker' => '6.52';
 configure_requires 'Alien::wxWidgets' => '0.46';
 
 my $wxw = eval { use Alien::wxWidgets; 1; };
-if ( $@ || !$wxw ) {
+if ( $@ or not $wxw ) {
 	print STDERR "Warning: prerequisite Alien::wxWidgets not found.\n";
 	exit 0;
 }
@@ -70,6 +70,7 @@ author 'Gabor Szabo';
 all_from 'lib/Padre.pm';
 requires 'perl'                  => '5.008005';
 requires 'App::Ack'              => '1.86';
+requires 'App::cpanminus'        => '0.9923';
 requires 'Class::Adapter'        => '1.05';
 requires 'Class::Unload'         => '0.03';
 requires 'Class::XSAccessor'     => '1.05';
@@ -97,6 +98,7 @@ requires 'File::Spec'            => '3.2701';
 requires 'File::Spec::Functions' => '3.2701';
 requires 'File::Temp'            => 0;
 requires 'File::Which'           => '1.08';
+requires 'File::pushd'           => '1.00';
 requires 'FindBin'               => 0;
 requires 'Format::Human::Bytes'  => '0.04';
 requires 'Getopt::Long'          => 0;
@@ -115,7 +117,7 @@ requires 'List::MoreUtils' => '0.22';
 requires 'Module::Build'   => '0.3603';
 requires 'Module::Refresh' => '0.13';
 requires 'Module::Starter' => '1.50';
-requires 'ORLite'          => '1.38';
+requires 'ORLite'          => '1.41';
 
 # Temporarily disabled as we have cloned a private copy
 # requires 'ORLite::Migrate' => '1.06';
@@ -123,7 +125,6 @@ requires 'ORLite'          => '1.38';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.11';
 requires 'Parse::ExuberantCTags'    => '1.00';
-requires 'pip'                      => '0.13';
 requires 'Pod::POM'                 => '0.17';
 requires 'Pod::Simple'              => '3.07';
 requires 'Pod::Simple::XHTML'       => '3.04';
@@ -226,6 +227,8 @@ install_script 'script/padre';
 build_padre_exe if win32;
 
 install_share_with_mofiles;
+
+auto_provides if -f 'MANIFEST';
 
 
 

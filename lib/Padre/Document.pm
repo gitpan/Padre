@@ -136,7 +136,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 
 
@@ -1246,14 +1246,14 @@ sub guess_filename {
   my $subpath = $document->guess_subpath;
 
 When called on a new unsaved file, this method attempts to guess what the
-subpath of the file should be inside of the current project, based purely
+sub-path of the file should be inside of the current project, based purely
 on the content of the file.
 
 In the base implementation, this returns a null list to indicate that the
 method cannot make a reasonable guess at the name of the file.
 
 Your MIME type specific document subclass should implement any file name
-detection as it sees fit, returning the project-rooted subpath as a list
+detection as it sees fit, returning the project-rooted sub-path as a list
 of directory names.
 
 These directory names do not need to exist, they only represent intent.
@@ -1298,51 +1298,57 @@ sub is_readonly {
 	return $self->{readonly};
 }
 
+sub selection_stats {
+	my ($self) = @_;
+
+	my $text = $self->editor->GetSelectedText;
+
+	my $words   = 0;
+	my $newline = $self->newline;
+	my $lines   = 1;
+	$lines++ while ( $text =~ /$newline/g );
+	$words++ while ( $text =~ /\s+/g );
+
+	my $chars_with_space    = length $text;
+	my $whitespace          = "\n\r\t ";
+	my $chars_without_space = $chars_with_space - ( $text =~ tr/$whitespace// );
+
+	return ( $lines, $chars_with_space, $chars_without_space, $words );
+}
+
 sub stats {
 	my ($self) = @_;
 
-	my ( $lines, $chars_with_space, $chars_without_space, $words, $is_readonly ) = (0) x 5;
+	my ( $chars_without_space, $words ) = (0) x 2;
 
 	my $editor = $self->editor;
-	my $src    = $editor->GetSelectedText;
-	my $code;
-	if ($src) {
-		$code = $src;
+	my $text   = $self->text_get;
 
-		my $code2 = $code; # it's ugly, need improvement
-		$code2 =~ s/\r\n/\n/g;
-		$lines = 1;        # by default
-		$lines++ while ( $code2 =~ /[\r\n]/g );
-		$chars_with_space = length($code);
+	my $lines            = $editor->GetLineCount();
+	my $chars_with_space = $editor->GetTextLength();
+
+	# TODO: Remove this limit? Right now, it is greater than the default file size limit.
+	if ( length $text < 2_500_000 ) {
+		$words++ while ( $text =~ /\s+/g );
+
+		my $whitespace = "\n\r\t ";
+
+		# TODO: make this depend on the current character set
+		#       see http://en.wikipedia.org/wiki/Whitespace_character
+		$chars_without_space = $chars_with_space - ( $text =~ tr/$whitespace// );
 	} else {
-		$code = $self->text_get;
-
-		# I trust editor more
-		$lines            = $editor->GetLineCount();
-		$chars_with_space = $editor->GetTextLength();
-		$is_readonly      = $editor->GetReadOnly();
+		$words               = Wx::gettext('Skipped for large files');
+		$chars_without_space = Wx::gettext('Skipped for large files');
 	}
-
-	# avoid slow calculation on large files
-	# TO DO or improve them ?
-	if ( length($code) < 100_000 ) {
-		$words++               while ( $code =~ /\b\w+\b/g );
-		$chars_without_space++ while ( $code =~ /\S/g );
-	} else {
-		$words               = Wx::gettext("Skipped for large files");
-		$chars_without_space = Wx::gettext("Skipped for large files");
-	}
-
-	my $filename = defined( $self->{file} ) ? $self->{file}->filename : undef;
 
 	# not set when first time to save
 	# allow the upgread of ascii to utf-8
 	require Padre::Locale;
 	if ( not $self->{encoding} or $self->{encoding} eq 'ascii' ) {
-		$self->{encoding} = Padre::Locale::encoding_from_string($src);
+		$self->{encoding} = Padre::Locale::encoding_from_string($text);
 	}
 	return (
-		$lines, $chars_with_space, $chars_without_space, $words, $is_readonly, $filename, $self->{newline_type},
+		$lines, $chars_with_space, $chars_without_space, $words, $self->{newline_type},
 		$self->{encoding}
 	);
 }

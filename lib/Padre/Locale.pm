@@ -50,7 +50,7 @@ use Padre::Logger;
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -58,6 +58,17 @@ our $VERSION = '0.58';
 # According to the RFC all identifiers are case-insensitive, but for
 # simplicity (for now) we list them all as lower-case.
 my %RFC4646;
+
+# The utf8text could/should be taken from gettext translations of the iso-codes package
+# file:///usr/share/locale/*/LC_MESSAGES/iso_639.mo
+# file:///usr/share/xml/iso-codes/iso_639.xml
+# http://pkg-isocodes.alioth.debian.org/
+
+sub label {
+	my $name = shift;
+	require Encode;
+	return $RFC4646{$name}{utf8text} ? Encode::decode( 'utf8', $RFC4646{$name}{utf8text} ) : $name;
+}
 
 BEGIN {
 	%RFC4646 = (
@@ -110,8 +121,8 @@ BEGIN {
 		# Example entry for an language which is not supported directly,
 		# but which Padre is aware of.
 		'en-au' => {
-			gettext  => _T('English (Australian)'),
-			utf8text => 'English (Australian)',
+			gettext  => _T('English (Australia)'),
+			utf8text => 'English (Australia)',
 			iso639   => 'en',
 			iso3166  => 'AU',
 			wxid     => Wx::wxLANGUAGE_ENGLISH_AUSTRALIA,
@@ -244,7 +255,7 @@ BEGIN {
 		},
 
 		'fr-ca' => {
-			gettext   => _T('French (France)'),
+			gettext   => _T('French (Canada)'),
 			utf8text  => 'Français (Canada)',
 			iso639    => 'fr',
 			iso3166   => 'CA',
@@ -323,7 +334,7 @@ BEGIN {
 
 		'nl-nl' => {
 
-			# Simplify until there's another Italian
+			# Simplify until there's another Dutch
 			# gettext   => 'Dutch (Netherlands)',
 			# utf8text  => 'Nederlands (Nederlands)',
 			gettext   => _T('Dutch'),
@@ -346,8 +357,8 @@ BEGIN {
 		},
 
 		'no' => {
-			gettext   => _T('Norwegian (Norway)'),
-			utf8text  => 'Norsk (Norge)',
+			gettext   => _T('Norwegian'),
+			utf8text  => 'Norsk',
 			iso639    => 'no',
 			iso3166   => 'NO',
 			wxid      => Wx::wxLANGUAGE_NORWEGIAN_BOKMAL,
@@ -474,7 +485,7 @@ grep { defined $RFC4646{$_}->{wxid} } sort keys %RFC4646;
 # Find the rfc4646 to use by default
 sub rfc4646 {
 	my $config = Padre::Config->read;
-	my $locale = $config->locale;
+	my $locale = $#_ >= 1 ? $_[1] : $config->locale;
 
 	if ( $locale and not $RFC4646{$locale} ) {
 
@@ -506,7 +517,9 @@ sub system_iso639 {
 # Given a rfc4646 identifier, sets the language globally
 # and returns the relevant Wx::Locale object.
 sub object {
-	my $id     = rfc4646();
+	my $langcode = shift;
+	undef $langcode if ref($langcode);
+	my $id     = rfc4646($langcode);
 	my $lang   = $RFC4646{$id}->{wxid};
 	my $locale = Wx::Locale->new($lang);
 	$locale->AddCatalogLookupPathPrefix( Padre::Util::sharedir('locale') );
@@ -585,8 +598,7 @@ sub encoding_from_string {
 
 	# Because Encode::Guess is slow and expensive, do an initial fast
 	# regexp scan for the simplest and most common "ascii" encoding.
-	# Check for POSIX printable characters, plus the two newline characters.
-	return 'ascii' unless $content =~ /[^[:print:]\015\012]/;
+	return 'ascii' unless $content =~ /[^[:ascii:]]/;
 
 	# FIX ME
 	# This is a just heuristic approach. Maybe there is a better way. :)

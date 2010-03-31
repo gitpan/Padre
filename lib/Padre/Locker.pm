@@ -14,7 +14,7 @@ use warnings;
 use Padre::Lock ();
 use Padre::DB   ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 sub new {
 	my $class = shift;
@@ -196,7 +196,7 @@ sub method_trim {
 	my $self    = shift;
 	my $pending = $self->{method_pending};
 	if ( defined $pending->{refresh} ) {
-		delete $pending->{refresh_menubar};
+		delete $pending->{refresh_menu};
 		delete $pending->{refresh_toolbar};
 		delete $pending->{refresh_status};
 		delete $pending->{refresh_functions};

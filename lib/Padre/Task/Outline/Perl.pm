@@ -37,7 +37,7 @@ use warnings;
 use version;
 use Padre::Task::Outline ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Task::Outline';
 
 sub run {
@@ -261,11 +261,24 @@ sub _update_treectrl {
 sub _add_subtree {
 	my ( $outlinebar, $pkg, $type, $root ) = @_;
 
+	my %type_caption = (
+		pragmata => Wx::gettext('Pragmata'),
+		modules  => Wx::gettext('Modules'),
+		methods  => Wx::gettext('Methods'),
+	);
+
 	my $type_elem = undef;
 	if ( defined( $pkg->{$type} ) && scalar( @{ $pkg->{$type} } ) > 0 ) {
+		my $type_caption = ucfirst($type);
+		if ( exists $type_caption{$type} ) {
+			$type_caption = $type_caption{$type};
+		} else {
+			warn "Type not translated: $type_caption\n";
+		}
+
 		$type_elem = $outlinebar->AppendItem(
 			$root,
-			ucfirst($type),
+			$type_caption,
 			-1,
 			-1,
 			Wx::TreeItemData->new()

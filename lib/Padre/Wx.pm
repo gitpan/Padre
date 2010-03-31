@@ -8,6 +8,11 @@ use warnings;
 use FindBin;
 use File::Spec ();
 
+# Threading must be loaded before Wx loads
+use threads;
+use threads::shared;
+use Thread::Queue 2.11;
+
 # Load every exportable constant into here, so that they come into
 # existence in the Wx:: packages, allowing everywhere else in the code to
 # use them without braces.
@@ -20,14 +25,12 @@ use Wx::AUI     ();
 use Wx::Locale  ();
 use Padre::Util ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
-# Hard version lock on a new enough Wx.pm
+# Hard version lock on a new-enough Wx.pm
 BEGIN {
-	unless ($Wx::VERSION
-		and $Wx::VERSION >= 0.91 )
-	{
-		die("You Wx.pm is not new enough (need 0.91, found $Wx::VERSION)");
+	unless ( $Wx::VERSION and $Wx::VERSION >= 0.91 ) {
+		die("Your Wx.pm is not new enough (need 0.91, found $Wx::VERSION)");
 	}
 }
 

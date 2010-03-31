@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -61,12 +61,12 @@ sub menu_plugins_simple {
 
 		'---' => undef,
 
-		Wx::gettext('Dump Expression')       => 'dump_expression',
+		Wx::gettext('Dump Expression...')    => 'dump_expression',
 		Wx::gettext('Dump Current Document') => 'dump_document',
 		Wx::gettext('Dump Top IDE Object')   => 'dump_padre',
 		Wx::gettext('Dump Current PPI Tree') => 'dump_ppi',
 		Wx::gettext('Dump %INC and @INC')    => 'dump_inc',
-		Wx::gettext('Dump Display Data')     => 'dump_display',
+		Wx::gettext('Dump Display Geometry') => 'dump_display',
 		Wx::gettext('Start/Stop sub trace')  => 'trace_sub_startstop',
 
 		'---' => undef,
@@ -131,7 +131,6 @@ sub eval_selection {
 	return $self->_dump_eval( $self->current->text );
 }
 
-
 sub dump_document {
 	my $self     = shift;
 	my $current  = $self->current;
@@ -182,15 +181,19 @@ sub dump_inc {
 
 sub dump_display {
 	my $self     = shift;
-	my $count    = Wx::Display->GetCount;
 	my @displays = ();
-	foreach ( 0 .. $count ) {
+
+	# Due to the way it is mapped into Wx.pm
+	# this must NOT be called as a method.
+	my $count = Wx::Display::GetCount();
+
+	foreach ( 0 .. $count - 1 ) {
 		my $display = Wx::Display->new($_);
 		push @displays,
 			{
 			IsPrimary     => $display->IsPrimary,
-			GetGeometry   => $display->GetGeometry,
-			GetClientArea => $display->GetClientArea,
+			GetGeometry   => $self->_rect( $display->GetGeometry ),
+			GetClientArea => $self->_rect( $display->GetClientArea ),
 			};
 	}
 	$self->_dump(
@@ -198,6 +201,21 @@ sub dump_display {
 			DisplayList => \@displays,
 		}
 	);
+}
+
+sub _rect {
+	my $self = shift;
+	my $rect = shift;
+	my %hash = map { $_ => $rect->$_() } qw{
+		GetTop
+		GetBottom
+		GetLeft
+		GetRight
+		GetHeight
+		GetWidth
+	};
+	$hash{wx} = $rect;
+	return \%hash;
 }
 
 sub trace_sub_startstop {
@@ -264,7 +282,7 @@ sub load_everything {
 		grep { defined( $_->[1] ) and $_->[1] eq $VERSION }
 		map { [ $_, ExtUtils::MM_Unix->parse_version( File::Spec->catfile( $parent, $_ ) ) ] }
 		File::Find::Rule->name('*.pm')->file->relative->in($parent);
-	$main->message( "Found " . scalar(@children) . " unloaded modules" );
+	$main->message( sprintf( Wx::gettext('Found %s unloaded modules'), scalar @children ) );
 	return unless @children;
 
 	# Load all of them (ignoring errors)
@@ -276,7 +294,7 @@ sub load_everything {
 	}
 
 	# Say how many classes we loaded
-	$main->message("Loaded $loaded modules");
+	$main->message( sprintf( Wx::gettext('Loaded %s modules'), $loaded ) );
 }
 
 # Takes a string, which it evals and then dumps to Output

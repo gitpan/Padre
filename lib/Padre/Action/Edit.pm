@@ -9,7 +9,7 @@ use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 
 #####################################################################
@@ -220,7 +220,7 @@ sub new {
 	# Miscellaneous Actions
 	Padre::Action->new(
 		name       => 'edit.goto',
-		label      => Wx::gettext('&Goto'),
+		label      => Wx::gettext('&Goto...'),
 		comment    => Wx::gettext('Ask the user for a line number or a character position and jump there'),
 		shortcut   => 'Ctrl-G',
 		menu_event => sub {
@@ -232,7 +232,7 @@ sub new {
 		name        => 'edit.next_problem',
 		need_editor => 1,
 		label       => Wx::gettext('&Next Problem'),
-		comment     => Wx::gettext('Jumpt to the code that triggered the next error'),
+		comment     => Wx::gettext('Jump to the code that triggered the next error'),
 		shortcut    => 'Ctrl-.',
 		menu_event  => sub {
 			$main->{syntax}->select_next_problem if $main->{syntax};
@@ -312,11 +312,20 @@ sub new {
 		name        => 'edit.brace_match',
 		need_editor => 1,
 		label       => Wx::gettext('&Brace matching'),
-		comment     => Wx::gettext('Jump to the matching opening or closing brace: {, }, (, )'),
+		comment     => Wx::gettext('Jump to the matching opening or closing brace: { }, ( ), [ ], < >'),
 		shortcut    => 'Ctrl-1',
 		menu_event  => sub {
 			Padre::Wx::Main::on_brace_matching(@_);
 		},
+	);
+
+	Padre::Action->new(
+		name        => 'edit.brace_match_select',
+		need_editor => 1,
+		label       => Wx::gettext('&Select to matching brace'),
+		comment     => Wx::gettext('Select to the matching opening or closing brace'),
+		shortcut    => 'Ctrl-4',
+		menu_event  => sub { shift->current->editor->select_to_matching_brace }
 	);
 
 	Padre::Action->new(
@@ -334,8 +343,8 @@ sub new {
 	Padre::Action->new(
 		name        => 'edit.insert.insert_special',
 		need_editor => 1,
-		label       => Wx::gettext('Insert Special Value'),
-		comment     => Wx::gettext('Select a Date, Filename or other value and insert at the current location'),
+		label       => Wx::gettext('Special Value...'),
+		comment     => Wx::gettext('Select a date, filename or other value and insert at the current location'),
 		shortcut    => 'Ctrl-Shift-I',
 		menu_event  => sub {
 			require Padre::Wx::Dialog::SpecialValues;
@@ -347,7 +356,7 @@ sub new {
 	Padre::Action->new(
 		name        => 'edit.insert.snippets',
 		need_editor => 1,
-		label       => Wx::gettext('Snippets'),
+		label       => Wx::gettext('Snippets...'),
 		comment     => Wx::gettext('Select and insert a snippet at the current location'),
 		shortcut    => 'Ctrl-Shift-A',
 		menu_event  => sub {
@@ -359,7 +368,7 @@ sub new {
 	Padre::Action->new(
 		name        => 'edit.insert.from_file',
 		need_editor => 1,
-		label       => Wx::gettext('Insert From File...'),
+		label       => Wx::gettext('File...'),
 		comment     => Wx::gettext('Select a file and insert its content at the current location'),
 		menu_event  => sub {
 			Padre::Wx::Main::on_insert_from_file(@_);
@@ -568,7 +577,7 @@ sub new {
 	Padre::Action->new(
 		name        => 'edit.filter_tool',
 		need_editor => 1,
-		label       => Wx::gettext('Filter through external tool'),
+		label       => Wx::gettext('Filter through external tool...'),
 		comment     => Wx::gettext('Filters the selection (or the whole document) through any external command.'),
 		menu_event  => sub {
 			Padre::Wx::Main::on_filter_tool(@_);

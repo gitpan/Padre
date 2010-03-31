@@ -7,7 +7,7 @@ use Params::Util               ();
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::AuiNotebook
@@ -58,7 +58,7 @@ sub new {
 	Wx::Event::EVT_AUINOTEBOOK_PAGE_CHANGED(
 		$self, $self,
 		sub {
-			$_[0]->on_auinotebook_page_changed( $_[1] );
+			shift->on_auinotebook_page_changed(@_);
 		},
 	);
 

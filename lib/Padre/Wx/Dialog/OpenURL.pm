@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx                  ();
 use Padre::Wx::Role::MainChild ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -53,19 +53,13 @@ sub new {
 		Wx::wxCB_DROPDOWN
 	);
 	$self->{openurl_text}->SetSelection(-1);
+	$self->{openurl_text}->SetFocus;
 
 	# OK button (obviously)
 	$self->{button_ok} = Wx::Button->new(
 		$self,
 		Wx::wxID_OK,
 		Wx::gettext("&OK"),
-	);
-	Wx::Event::EVT_BUTTON(
-		$self,
-		$self->{button_ok},
-		sub {
-			$_[0]->ok_button;
-		},
 	);
 	$self->{button_ok}->SetDefault;
 
@@ -75,13 +69,6 @@ sub new {
 		Wx::wxID_CANCEL,
 		Wx::gettext("&Cancel"),
 	);
-	Wx::Event::EVT_BUTTON(
-		$self,
-		$self->{button_cancel},
-		sub {
-			$_[0]->cancel_button;
-		}
-	);
 
 	# Form Layout
 
@@ -89,7 +76,7 @@ sub new {
 	my $openurl_label = Wx::StaticText->new(
 		$self,
 		-1,
-		"http://svn.perlide.org/padre/trunk/Padre/Makefile.PL",
+		Wx::gettext('e.g.') . ' http://svn.perlide.org/padre/trunk/Padre/Makefile.PL',
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 	);
@@ -155,34 +142,6 @@ sub modal {
 		: undef;
 	$self->Destroy;
 	return $rv;
-}
-
-=pod
-
-=head2 C<ok_button>
-
-  $self->ok_button
-
-Attempt to open the specified URL
-
-=cut
-
-sub ok_button {
-	$_[0]->EndModal(Wx::wxID_OK);
-}
-
-=pod
-
-=head2 C<cancel_button>
-
-  $self->cancel_button
-
-Hide dialog when pressed cancel button.
-
-=cut
-
-sub cancel_button {
-	$_[0]->EndModal(Wx::wxID_CANCEL);
 }
 
 1;

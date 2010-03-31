@@ -53,7 +53,7 @@ use Class::XSAccessor {
 	}
 };
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::StatusBar
@@ -220,7 +220,7 @@ sub refresh {
 		( length($mime_type_name) + 2 ) * $width,
 		( length($newline) + 2 ) * $width,
 		( $length + 2 ) * $width,
-		length($rdstatus) * $width,
+		( length($rdstatus) + 2 ) * $width,
 	);
 
 	# Move the static bitmap holding the task load status

@@ -24,7 +24,7 @@ use Padre::Wx                    ();
 use Padre::Wx::Role::MainChild   ();
 use Padre::Wx::History::ComboBox ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -569,14 +569,18 @@ sub replace_all {
 	}
 
 	# Apply the search to the current editor
-	my $changes = $main->replace_all($search);
-	if ($changes) {
-		$main->message(
-			sprintf( Wx::gettext('Replaced %d matches'), $changes ),
+	my $number_of_changes = $main->replace_all($search);
+	if ($number_of_changes) {
+		my $message_text =
+			$number_of_changes == 1 ? Wx::gettext('Replaced %d match') : Wx::gettext('Replaced %d matches');
+
+		# remark: It would be better to use gettext for plural handling, but wxperl does not seem to support this at the moment.
+		$main->info(
+			sprintf( $message_text, $number_of_changes ),
 			Wx::gettext('Search and Replace')
 		);
 	} else {
-		$main->message(
+		$main->info(
 			Wx::gettext('No matches found'),
 			Wx::gettext('Search and Replace'),
 		);

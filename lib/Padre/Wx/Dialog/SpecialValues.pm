@@ -9,20 +9,29 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Padre::Current    ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 my $categories = {
-	'Dates' => [
-		{ label => 'Now',       action => _get_date_info('now') },
-		{ label => 'Yesterday', action => _get_date_info('epoch') },
-		{ label => 'Tomorrow',  action => _get_date_info('epoch') },
+	Wx::gettext('Date/Time') => [
+		{ label => Wx::gettext('Now'),   action => _get_date_info('now') },
+		{ label => Wx::gettext('Today'), action => _get_date_info('today') },
+		{ label => Wx::gettext('Year'),  action => _get_date_info('year') },
+		{ label => Wx::gettext('Epoch'), action => _get_date_info('epoch') },
 	],
-	'File' => [
-		{ label => 'Size', action => _get_file_info('size') },
-		{ label => 'Name', action => _get_file_info('name') },
-	],
-	'Line' => [
-		{ label => 'Number', action => _get_line_info('number') },
+	Wx::gettext('File') => [
+		{   label  => Wx::gettext('Size'),
+			action => sub { _get_file_info('size') }
+		},
+		{   label  => Wx::gettext('Name'),
+			action => sub {
+				_get_file_info('name');
+				}
+		},
+		{   label  => Wx::gettext('Number of lines'),
+			action => sub {
+				_get_file_info('number of lines');
+				}
+		},
 	],
 };
 
@@ -51,7 +60,7 @@ sub dialog {
 	my $layout = get_layout($config);
 	my $dialog = Padre::Wx::Dialog->new(
 		parent => $parent,
-		title  => Wx::gettext("Insert Special Values"),
+		title  => Wx::gettext('Insert Special Values'),
 		layout => $layout,
 		width  => [ 150, 200 ],
 	);
@@ -92,7 +101,6 @@ sub get_value {
 	my $cat_name  = _get_cat_name($dialog);
 	my $value_ind = $data->{_find_specialvalue_};
 	my $text      = &{ $categories->{$cat_name}[$value_ind]{action} };
-	warn "cat : $cat_name, value $value_ind, text : $text\n";
 
 	my $editor = Padre::Current->editor;
 	$editor->ReplaceSelection('');
@@ -124,6 +132,20 @@ sub _get_date_info {
 		return sub {
 			return scalar localtime;
 			}
+	} elsif ( $type eq 'today' ) {
+		return sub {
+			my @localtime = localtime(time);
+			return sprintf "%s-%02s-%02s", $localtime[5] + 1900, $localtime[4], $localtime[3];
+			}
+	} elsif ( $type eq 'year' ) {
+		return sub {
+			my @localtime = localtime(time);
+			return $localtime[5] + 1900;
+			}
+	} elsif ( $type eq 'epoch' ) {
+		return sub {
+			return time;
+			}
 	} else {
 		return sub {
 			warn "date info $type not implemented yet\n";
@@ -134,33 +156,23 @@ sub _get_date_info {
 
 sub _get_file_info {
 	my $type = shift;
+	my $doc  = Padre::Current->document;
+	my ($lines, $chars_with_space, $chars_without_space, $words, $newline_type,
+		$encoding
+	) = $doc->stats;
+
 	if ( $type eq 'name' ) {
-		return sub {
-			my $document = Padre::Current->document;
-			my $filename = $document->filename || $document->tempfile;
-			warn "doc : $document $filename \n";
-			return $filename;
-		};
+		return defined $doc->file ? $doc->{file}->filename : $doc->get_title;
+	} elsif ( $type eq 'size' ) {
+		my $filename = $doc->filename || $doc->tempfile;
+		return ($filename) ? -s $filename : 0;
+	} elsif ( $type eq 'number of lines' ) {
+		return $lines;
 	} else {
-		return sub {
-			my $document = Padre::Current->document;
-			my $filename = $document->filename || $document->tempfile;
-			warn "doc : $document $filename \n";
-			return ($filename) ? -s $filename : 0;
-		};
+		warn "file info $type not implemented yet\n";
+		return '';
 	}
 }
-
-sub _get_line_info {
-	my $type = shift;
-	return sub {
-		my $editor = Padre::Current->editor;
-		my $pos    = $editor->GetCurrentPos;
-		my $line   = $editor->GetCurrentLine;
-		return $line + 1;
-	};
-}
-
 
 1;
 

@@ -22,7 +22,7 @@ use Padre::Util ();
 use Padre::Wx   ();
 use Params::Util qw( _HASH );
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -53,6 +53,12 @@ sub PADRE {
 	return icon('logo');
 }
 
+# On windows, you actually need to provide it with a native icon file that
+# contains multiple sizes so it can choose from it.
+sub PADRE_ICON_FILE {
+	my $ico = File::Spec->catfile( ICONS, 'padre', 'all', 'padre.ico' );
+	return Wx::IconBundle->new($ico);
+}
 
 
 

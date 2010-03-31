@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -22,7 +22,7 @@ sub new {
 	my $self  = $class->SUPER::new(
 		undef,
 		-1,
-		Wx::gettext('About'),
+		Wx::gettext('About Padre'),
 		Wx::wxDefaultPosition,
 		[ 700, 530 ],
 	);
@@ -71,7 +71,7 @@ sub new {
 	);
 	$self->{notebook}->AddPage(
 		$self->{info},
-		'  ' . Wx::gettext('Info') . '  ',
+		'  ' . Wx::gettext('System Info') . '  ',
 		1,
 	);
 	$self->{notebook}->SetSelection(0);
@@ -97,8 +97,12 @@ sub new {
 sub _content_about {
 
 	# Create the content for the About window
-	my $self   = shift;
-	my $splash = Padre::Util::splash();
+	my $self               = shift;
+	my $splash             = Padre::Util::splash();
+	my $created_by         = Wx::gettext('Created by');
+	my $padre_dev_team     = Wx::gettext('The Padre Development Team');
+	my $splash_name        = Wx::gettext('Blue butterfly on a green leaf');
+	my $splash_description = Wx::gettext('splash image is based on work by');
 	$self->{about}->SetPage( $self->_rtl(<<"END_HTML") );
 <html>
   <body bgcolor="#EEEEEE">
@@ -106,10 +110,9 @@ sub _content_about {
     <font size="+4">Padre $VERSION</font>
     <font size="+1">&nbsp;&nbsp;Perl Application Development and Refactoring Environment</font>
     </strong>
-    <p>Created by Gábor Szabó</p>
-    <p>Copyright 2008 - 2010 The Padre Development Team</p>
-    <p>"Blue butterfly on a green leaf" splash image is based on work by 
-    Jerry Charlotte (blackbutterfly)</p>
+    <p>$created_by Gábor Szabó</p>
+    <p>Copyright 2008 - 2010 $padre_dev_team</p>
+    <p>"$splash_name" - $splash_description Jerry Charlotte (blackbutterfly)</p>
     <p>
     <center>
         <img src="$splash">
@@ -150,13 +153,13 @@ sub _content_developers {
             Chris Dolan<br>
             <br>
             Claudio Ramirez<br>
+            <br>
+            code4pay (pseudonym only)<br>            
           </p>
         </td>
         <td valign="top">
           <p>
             <br>
-            <br>
-            code4pay (pseudonym only)<br>
             <br>
             Fayland Lam<br>
             <br>
@@ -173,15 +176,17 @@ sub _content_developers {
             Kartik Thakore<br>
             <br>
             Keedi Kim - 김도형<br>
+            <br>
+            Kenichi Ishigaki - 石垣憲一<br>
           </p>
         </td>
         <td valign="top">
           <p>
             <br>
             <br>
-            Kenichi Ishigaki - 石垣憲一<br>
-            <br>
             Max Maischein<br>
+            <br>
+            Olivier Mengué<br>
             <br>
             Patrick Donelan<br>
             <br>
@@ -194,6 +199,8 @@ sub _content_developers {
             Sebastian Willing<br>
             <br>
             Steffen Müller<br>
+            <br>
+            Zeno Gantner<br>
           </p>
         </td>
       </td>
@@ -207,6 +214,7 @@ sub _content_translators {
 	# Create the content for the Translation team
 	my $self                   = shift;
 	my $padre_translation_team = Wx::gettext('The Padre Translation Team');
+	my %language               = Padre::Locale::menu_view_languages();
 	$self->{translators}->SetPage( $self->_rtl(<<"END_HTML") );
 <html>
   <body bgcolor="#EEEEEE">
@@ -215,66 +223,69 @@ sub _content_translators {
       <tr>
         <td valign="top">
           <p>
-            <b>Arabic</b><br>
+            <b>$language{'ar'}</b><br>
             Ahmad Zawawi - أحمد محمد زواوي<br>
             <br>
-            <b>Chinese (Simplified)</b><br>
+            <b>$language{'zh-cn'}</b><br>
             Fayland Lam<br>
+            Chuanren Wu<br>
             <br>
-            <b>Chinese (Traditional)</b><br>
+            <b>$language{'zh-tw'}</b><br>
             Matthew Lien - 練喆明<br>
             <br>
-            <b>Czech</b><br>
+            <b>$language{'cz'}</b><br>
             Marcela Mašláňová<br>
             <br>
-            <b>Dutch</b><br>
+            <b>$language{'nl-nl'}</b><br>
             Dirk De Nijs<br>
             <br>
-            <b>French</b><br>
+            <b>$language{'fr-fr'}</b><br>
             Jérôme Quelin<br>
-            <br>
-            <b>German</b><br>
-            Heiko Jansen<br>
-            Sebastian Willing
+            Olivier Mengué<br>
           </p>
         </td>
         <td valign="top">
           <p>
-            <b>Hebrew</b><br>
+            <b>$language{'de'}</b><br>
+            Heiko Jansen<br>
+            Sebastian Willing<br>
+            Zeno Gantner<br>
+            <br>
+            <b>$language{'he'}</b><br>
             Omer Zak - עומר זק<br>
             Shlomi Fish - שלומי פיש<br>
             Amir E. Aharoni - אמיר א. אהרוני<br>
             <br>
-            <b>Hungarian</b><br>
+            <b>$language{'hu'}</b><br>
             György Pásztor<br>
             <br>
-            <b>Italian</b><br>
+            <b>$language{'it-it'}</b><br>
             Simone Blandino<br>
             <br>
-            <b>Japanese</b><br>
+            <b>$language{'ja'}</b><br>
             Kenichi Ishigaki - 石垣憲一<br>
-            <br>
-            <b>Korean</b><br>
-            Keedi Kim - 김도형
           </p>
         </td>
         <td valign="top">
           <p>
-            <b>Norwegian</b><br>
+            <b>$language{'ko'}</b><br>
+            Keedi Kim - 김도형<br>
+            <br>
+            <b>$language{'no'}</b><br>
             Kjetil Skotheim<br>
             <br>
-            <b>Polish</b><br>
+            <b>$language{'pl'}</b><br>
             Cezary Morga<br>
             <br>
-            <b>Portuguese (Brazil)</b><br>
+            <b>$language{'pt-br'}</b><br>
             Breno G. de Oliveira<br>
             Gabriel Vieira<br>
             <br>
-            <b>Spanish</b><br>
+            <b>$language{'es-es'}</b><br>
             Paco Alguacil<br>
             Enrique Nell<br>
             <br>
-            <b>Russian</b><br>
+            <b>$language{'ru'}</b><br>
             Andrew Shitov
           </p>
         </td>
@@ -289,7 +300,7 @@ END_HTML
 # Create the content for the Info page
 sub _content_info {
 	my $self           = shift;
-	my $padre_info     = Wx::gettext('Info');
+	my $padre_info     = Wx::gettext('System Info');
 	my $wx_widgets     = Wx::wxVERSION_STRING();
 	my $config_dir_txt = Wx::gettext('Config dir:');
 	my $config_dir     = Padre::Constant::CONFIG_DIR;

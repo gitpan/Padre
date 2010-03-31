@@ -1,4 +1,4 @@
-package Padre::Wx::Menu::Plugins;
+package Padre::Wx::Menu::Tools;
 
 # Fully encapsulated Run menu
 
@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -42,6 +42,12 @@ sub new {
 	$self->add_menu_action(
 		$self,
 		'tools.key_bindings',
+	);
+
+	# Regex Editor
+	$self->add_menu_action(
+		$self,
+		'edit.regex',
 	);
 
 	$self->AppendSeparator;

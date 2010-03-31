@@ -21,7 +21,7 @@ use Padre::Wx;
 use Wx::Event qw( EVT_BUTTON );
 
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Wx::ListView';
 my $LineCount; # Global fid count so it can be used in the label
 
@@ -79,7 +79,7 @@ Sets the label of the tab. Called automatically when the object is created.
 =cut
 
 sub gettext_label {
-	Wx::gettext( 'Find Results (' . $LineCount . ')' );
+	sprintf( Wx::gettext('Find Results (%s)'), $LineCount );
 }
 
 

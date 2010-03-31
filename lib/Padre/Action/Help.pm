@@ -11,7 +11,7 @@ use Padre::Constant ();
 use Padre::Current '_CURRENT';
 use Padre::Locale ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 
 
 
@@ -43,7 +43,7 @@ sub new {
 	Padre::Action->new(
 		name       => 'help.context_help',
 		label      => Wx::gettext('Search Help'),
-		comment    => 'Search the Perl help pages (perldoc)',
+		comment    => Wx::gettext('Search the Perl help pages (perldoc)'),
 		shortcut   => 'F1',
 		menu_event => sub {
 			my $focus = Wx::Window::FindFocus();

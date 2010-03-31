@@ -5,7 +5,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Wx::Dialog';
 
 # module imports
@@ -392,7 +392,7 @@ sub _update_list_box {
 	if ( $pos > 0 ) {
 		$self->_list->Select(0);
 	}
-	$self->_status->SetLabel("Found $pos help topic(s)\n");
+	$self->_status->SetLabel( sprintf( Wx::gettext("Found %s help topic(s)\n"), $pos ) );
 	$self->_display_help_in_viewer;
 
 	return 1;

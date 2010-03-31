@@ -9,7 +9,7 @@ use POSIX qw{ strftime };
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.58';
+our $VERSION = '0.59';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -53,8 +53,13 @@ sub new {
 
 	$self->SetIcon(Padre::Wx::Icon::PADRE);
 
-	# create dialog
-	$self->_create;
+	if ( !scalar( Padre->ide->wx->main->pages ) ) {
+		$self->{_empty} = 1;
+	} else {
+
+		# create dialog
+		$self->_create;
+	}
 
 	return $self;
 }
@@ -63,6 +68,11 @@ sub new {
 
 sub show {
 	my $self = shift;
+
+	if ( $self->{_empty} ) {
+		$self->Destroy;
+		return 0;
+	}
 
 	$self->{visible} = 1;
 
@@ -309,13 +319,21 @@ sub _refresh_list {
 
 		my $document = $page->{Document};
 
-		my $filename    = $document->file->filename;
-		my $project_dir = $document->project_dir;
-		$filename =~ s/^\Q$project_dir\E// if defined($project_dir);
+		my $filename;
 
-		# Apply filter (if any)
-		if ( defined( $self->{filter} ) ) {
-			next unless &{ $self->{filter} }( $page, $project_dir, $filename, $document );
+		my $documentfile = $document->file;
+		if ( defined($documentfile) ) {
+
+			$filename = $documentfile->filename;
+			my $project_dir = $document->project_dir;
+			$filename =~ s/^\Q$project_dir\E// if defined($project_dir);
+
+			# Apply filter (if any)
+			if ( defined( $self->{filter} ) ) {
+				next unless &{ $self->{filter} }( $page, $project_dir, $filename, $document );
+			}
+		} else {
+			$filename = $document->get_title;
 		}
 
 		# inserting the file in the list
@@ -328,18 +346,18 @@ sub _refresh_list {
 		splice @{ $self->{items} }, $idx, 0, { page => $page };
 
 		$list->SetItem( $idx, 1, $filename );
-		$list->SetItem( $idx, 2, Wx::gettext( $document->is_modified ? 'CHANGED' : 'fresh' ) );
+		$list->SetItem( $idx, 2, $document->is_modified ? Wx::gettext('CHANGED') : Wx::gettext('fresh') );
 
 		my $disk_state = $document->has_changed_on_disk;
 		my $disk_text;
 		if ( $disk_state == 0 ) {
-			$disk_text = 'fresh';
+			$disk_text = Wx::gettext('fresh');
 		} elsif ( $disk_state == -1 ) {
-			$disk_text = 'DELETED';
+			$disk_text = Wx::gettext('DELETED');
 		} else {
-			$disk_text = 'CHANGED';
+			$disk_text = Wx::gettext('CHANGED');
 		}
-		$list->SetItem( $idx, 3, Wx::gettext($disk_text) );
+		$list->SetItem( $idx, 3, $disk_text );
 	}
 
 	# auto-resize columns
