@@ -12,7 +12,7 @@ use Padre::Wx::Role::MainChild ();
 # RichTextCtrl
 use Wx::RichText ();
 
-our $VERSION = '0.59';
+our $VERSION = '0.60';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -126,7 +126,7 @@ sub _regex_groups {
 				'01(?: )'  => Wx::gettext('Non-capturing group'),
 				'02(?= )'  => Wx::gettext('Positive lookahead assertion'),
 				'03(?! )'  => Wx::gettext('Negative lookahead assertion'),
-				'04(?< )'  => Wx::gettext('Positive lookbehind assertion'),
+				'04(?<=)'  => Wx::gettext('Positive lookbehind assertion'),
 				'05(?<! )' => Wx::gettext('Negative lookbehind assertion'),
 				'06\n'     => Wx::gettext('Backreference to the nth group'),
 			}

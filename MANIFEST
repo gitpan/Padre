@@ -156,6 +156,7 @@ lib/Padre/Transform/Perl/UpdateCopyright.pm
 lib/Padre/Util.pm
 lib/Padre/Util/FileBrowser.pm
 lib/Padre/Util/SVN.pm
+lib/Padre/Util/Template.pm
 lib/Padre/Util/Win32.pm
 lib/Padre/Wx.pm
 lib/Padre/Wx/About.pm
@@ -393,6 +394,8 @@ t/70-document.t
 t/71-perl.t
 t/72-dialog-html.t
 t/73-display.t
+t/74-history-combobox.t
+t/75-autocomplete.t
 t/80-newline.t
 t/81-search.t
 t/82-plugin-manager.t
@@ -428,6 +431,8 @@ t/files/beginner/split2.pl
 t/files/beginner/substitute_in_map.pl
 t/files/beginner/unintented_glob.pl
 t/files/beginner/warning.pl
+t/files/Debugger.pm
+t/files/debugme.pl
 t/files/error_near.pl
 t/files/error_stack.pl
 t/files/find_variable_declaration_1.pm
@@ -469,6 +474,7 @@ xt/critic-core.t
 xt/critic-util.ini
 xt/critic-util.t
 xt/eol.t
+xt/files/broken.bin
 xt/files/lexical_replace_stress_test.pl
 xt/meta.t
 xt/mimetype.t

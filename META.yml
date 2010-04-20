@@ -7,6 +7,7 @@ build_requires:
   ExtUtils::MakeMaker: 6.42
   Locale::Msgfmt: 0.14
   Test::Exception: 0.27
+  Test::MockObject: 1.09
   Test::More: 0.88
   Test::NoWarnings: 0.084
   Test::Script: 1.07
@@ -139,4 +140,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.59
+version: 0.60

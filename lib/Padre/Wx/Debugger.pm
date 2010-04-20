@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.59';
+our $VERSION = '0.60';
 
 use Padre::Wx ();
 use Padre::Logger;
@@ -186,7 +186,12 @@ sub debugger_is_running {
 	my $main = Padre->ide->wx->main;
 
 	if ( not $self->{_debugger_} ) {
-		$main->error( Wx::gettext('Debugger not running') );
+		$main->message(
+			Wx::gettext(
+				"The debugger is not running.\nYou can start the debugger using one of the step commands in the Debug menu."
+			),
+			Wx::gettext('Debugger not running')
+		);
 		return;
 	}
 	my $editor = $main->current->editor;
@@ -439,7 +444,13 @@ sub _debug_get_variable {
 	return unless $current->editor;
 	my $text = $current->text;
 	if ( not $text or $text !~ /^[\$@%\\]/ ) {
-		$main->error( sprintf( Wx::gettext("'%s' does not look like a variable"), $text ) );
+		$main->error(
+			sprintf(
+				Wx::gettext(
+					"'%s' does not look like a variable. First select a variable in the code and then try again."),
+				$text
+			)
+		);
 		return;
 	}
 	return $text;
@@ -494,6 +505,9 @@ sub quit {
 
 1;
 
+# TODO:
+# Keep the debugger window open even after ending the script
+#
 
 # Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE

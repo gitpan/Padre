@@ -17,7 +17,7 @@ use warnings;
 use Padre::Action ();
 use Padre::Current qw{_CURRENT};
 
-our $VERSION = '0.59';
+our $VERSION = '0.60';
 
 #####################################################################
 
@@ -40,7 +40,7 @@ sub new {
 		toolbar      => 'stock/code/stock_macro-stop-after-command',
 		label        => Wx::gettext('Step In') . ' (&s) ',
 		comment      => Wx::gettext(
-			'Execute the next statement, enter subroutine if needed. (Start debugging if it is not yet running)'),
+			'Execute the next statement, enter subroutine if needed. (Start debugger if it is not yet running)'),
 
 		#shortcut     => 'Shift-F5',
 		menu_event => sub {
@@ -56,7 +56,7 @@ sub new {
 		toolbar      => 'stock/code/stock_macro-stop-after-procedure',
 		label        => Wx::gettext('Step Over') . ' (&n) ',
 		comment      => Wx::gettext(
-			'Execute the next statement, If it is a subroutine call, stop only after it returned. (Start debugging if it is not yet running)'
+			'Execute the next statement. If it is a subroutine call, stop only after it returned. (Start debugger if it is not yet running)'
 		),
 
 		#shortcut     => 'Shift-F5',
@@ -73,7 +73,7 @@ sub new {
 		need_file    => 1,
 		toolbar      => 'stock/code/stock_macro-jump-back',
 		label        => Wx::gettext('Step Out') . ' (&r) ',
-		comment      => Wx::gettext('If withing a subroutine, run till return is called and then stop.'),
+		comment      => Wx::gettext('If within a subroutine, run till return is called and then stop.'),
 
 		#shortcut     => 'Shift-F5',
 		menu_event => sub {
@@ -202,8 +202,8 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
-		label        => Wx::gettext('Show Value') . ' (&x) ',
-		comment      => Wx::gettext('Show the value of a variable.'),
+		label        => Wx::gettext('Show Value now') . ' (&x) ',
+		comment      => Wx::gettext('Show the value of a variable now in a pop-up window.'),
 
 		#shortcut     => 'Shift-F5',
 		menu_event => sub {
@@ -216,7 +216,7 @@ sub new {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
-		label        => Wx::gettext('Evaluate Expression'),
+		label        => Wx::gettext('Evaluate Expression...'),
 		comment      => Wx::gettext('Type in any expression and evaluate it in the debugged process'),
 
 		#shortcut     => 'Shift-F5',

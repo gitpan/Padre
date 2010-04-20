@@ -10,7 +10,7 @@ use Padre::Wx::Menu ();
 use Padre::Current  ('_CURRENT');
 use Padre::Logger;
 
-our $VERSION = '0.59';
+our $VERSION = '0.60';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -83,7 +83,7 @@ sub new {
 	my $file_open = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Open'),
+		Wx::gettext('Open...'),
 		$file_open,
 	);
 

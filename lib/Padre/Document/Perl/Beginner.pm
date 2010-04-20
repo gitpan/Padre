@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.59';
+our $VERSION = '0.60';
 
 =head1 NAME
 
@@ -279,7 +279,8 @@ Regular expression starting with a quantifier such as
 	if ( $config->begerror_regexq and $text =~ m/^([\x00-\xff]*?)\=\~  [\s\t\r\n]*  \/ \^?  [\+\*\?\{] /xs ) {
 		$self->_report(
 			"A regular expression starting with a quantifier ( + * ? { ) doesn't make sense, you may want to escape it with a \\.",
-			$1 );
+			$1
+		);
 		return;
 	}
 

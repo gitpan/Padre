@@ -46,6 +46,7 @@ use Padre::Current                ();
 use Padre::Document               ();
 use Padre::DB                     ();
 use Padre::Locker                 ();
+use Padre::Util::Template         ();
 use Padre::Wx                     ();
 use Padre::Wx::Icon               ();
 use Padre::Wx::Debugger           ();
@@ -60,7 +61,7 @@ use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Logger;
 
-our $VERSION = '0.59';
+our $VERSION = '0.60';
 our @ISA     = 'Wx::Frame';
 
 use constant SECONDS => 1000;
@@ -1568,6 +1569,12 @@ sub change_locale {
 	delete $self->{locale};
 	$self->{locale} = Padre::Locale::object();
 
+	if (Padre::Constant::UNIX) { # make WxWidgets translate the default buttons etc.
+		## no critic (RequireLocalizedPunctuationVars)
+		$ENV{LANGUAGE} = $name;
+		## use critic
+	}
+
 	# Run the "relocale" process to update the GUI
 	$self->relocale;
 
@@ -3008,8 +3015,13 @@ sub on_autocompletion {
 		$self->message( $length, Wx::gettext("Autocompletion error") );
 	}
 	if (@words) {
+		my $ide    = $self->ide;
+		my $config = $ide->config;
 		my $editor = $document->editor;
+
+		$editor->AutoCompSetChooseSingle( $config->autocomplete_always ? 0 : 1 );
 		$editor->AutoCompSetSeparator( ord ' ' );
+
 		$editor->AutoCompShow( $length, join " ", @words );
 
 		# Cancel the auto completion list when Padre loses focus
@@ -3617,30 +3629,32 @@ sub open_file_dialog {
 	# But I don't think Wx + Motif is in use nowadays
 	my $wildcards = join(
 		'|',
-		Wx::gettext("JavaScript Files"),
-		"*.js;*.JS",
-		Wx::gettext("Perl Files"),
-		"*.pm;*.PM;*.pl;*.PL",
-		Wx::gettext("PHP Files"),
-		"*.php;*.php5;*.PHP",
-		Wx::gettext("Python Files"),
-		"*.py;*.PY",
-		Wx::gettext("Ruby Files"),
-		"*.rb;*.RB",
-		Wx::gettext("SQL Files"),
-		"*.sql;*.SQL",
-		Wx::gettext("Text Files"),
-		"*.txt;*.TXT;*.yml;*.conf;*.ini;*.INI",
-		Wx::gettext("Web Files"),
-		"*.html;*.HTML;*.htm;*.HTM;*.css;*.CSS",
+		Wx::gettext('JavaScript Files'),
+		'*.js;*.JS',
+		Wx::gettext('Perl Files'),
+		'*.pm;*.PM;*.pl;*.PL',
+		Wx::gettext('PHP Files'),
+		'*.php;*.php5;*.PHP',
+		Wx::gettext('Python Files'),
+		'*.py;*.PY',
+		Wx::gettext('Ruby Files'),
+		'*.rb;*.RB',
+		Wx::gettext('SQL Files'),
+		'*.sql;*.SQL',
+		Wx::gettext('Text Files'),
+		'*.txt;*.TXT;*.yml;*.conf;*.ini;*.INI;.*rc',
+		Wx::gettext('Web Files'),
+		'*.html;*.HTML;*.htm;*.HTM;*.css;*.CSS',
+		Wx::gettext('Script Files'),
+		'*.sh;*.bat;*.BAT',
 	);
 	$wildcards =
 		Padre::Constant::WIN32
-		? Wx::gettext("All Files") . "|*.*|" . $wildcards
-		: Wx::gettext("All Files") . "|*|" . $wildcards;
+		? Wx::gettext('All Files') . '|*.*|' . $wildcards
+		: Wx::gettext('All Files') . '|*|' . $wildcards;
 	my $dialog = Wx::FileDialog->new(
-		$self, Wx::gettext("Open File"),
-		$self->cwd, "", $wildcards, Wx::wxFD_MULTIPLE,
+		$self, Wx::gettext('Open File'),
+		$self->cwd, '', $wildcards, Wx::wxFD_MULTIPLE,
 	);
 	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
 		return;
@@ -5814,12 +5828,17 @@ sub on_new_from_template {
 		$self->error("Failed to find template '$file'");
 	}
 
+	my $data = {
+		config => $self->{config},
+		util   => Padre::Util::Template->new,
+	};
+
 	# Generate the full file content
 	require Template::Tiny;
 	my $output = '';
 	Template::Tiny->new->process(
 		$template,
-		$self->current,
+		$data,
 		\$output,
 	);
 
