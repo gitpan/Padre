@@ -1,7 +1,35 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do not "tidy" or change the indenting here, or we break svn annotate
 
-0.61 To Be Released
+0.62 To Be Released
+
+0.61 2010.05.12
+    - MIME types: added a few C++ file extensions, added LaTeX .sty files
+      (Zeno Gantner)
+    - About dialog: increase height of the window so that the translated
+      licensing terms also fit in without a scrollbar (Zeno Gantner)
+    - Debugger: improved variable detection in the document (Zeno Gantner)
+    - Menu: More consistent capitalization of menu entries (Zeno Gantner)
+    - Updated German translation (Zeno Gantner)
+    - fixed ticket #538: "outline view info takes too long to refresh" by
+      adding an outline cache (Zeno Gantner)
+    - fixed ticket #541: "wrong outline can get displayed for a document"
+      (Zeno Gantner)
+    - fixed ticket #940: "crashes when right clicking in code editing area"
+      (Zeno Gantner)
+    - fixed ticket #878: "Tabs like 'Outline', 'Functions'... should have
+      a close button, just like the documents tabs" (Zeno Gantner)
+    - fixed behaviour of the close button for the bottom tabs (Output,
+      Errors, Syntax Check): closing a tab now toggles the corresponding
+      menu and config items (Zeno Gantner)
+    - Updated German translation (Zeno Gantner)
+    - Updated Chinese translation (Chuanren Wu)
+    - fixed ticket #939: "Padre 'help' depends on POD2-Base on Strawberry
+      Perl on Windows XP" (ADAMK)
+    - Updated Italian translation (SBLANDIN)
+    - Updated Brazilian Portuguese translation (GARU)
+    - Updated Dutch translation (Dirk De Nijs)
+    - Updated Spanish translation (ENELL)
 
 0.60 2010.04.20
     - Add FTP connection caching/sharing (SEWI)

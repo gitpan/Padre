@@ -12,7 +12,7 @@ use Padre::Wx::Role::MainChild ();
 # RichTextCtrl
 use Wx::RichText ();
 
-our $VERSION = '0.60';
+our $VERSION = '0.61';
 our @ISA     = qw{
 	Padre::Wx::Role::MainChild
 	Wx::Dialog
@@ -216,7 +216,7 @@ sub _create_controls {
 		foreach my $element ( sort keys %sub_group_value ) {
 			my $label = $element;
 			$label =~ s/^\d{2}//;
-			my $menu_item = $self->{$menu_name}->Append( -1, $label . "     " . $sub_group_value{$element} );
+			my $menu_item = $self->{$menu_name}->Append( -1, $label . '  ' . $sub_group_value{$element} );
 
 			Wx::Event::EVT_MENU(
 				$self,

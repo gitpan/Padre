@@ -3,10 +3,12 @@ package Module::Install::Share;
 
 use strict;
 use Module::Install::Base ();
+use File::Find ();
+use ExtUtils::Manifest ();
 
 use vars qw{$VERSION @ISA $ISCORE};
 BEGIN {
-	$VERSION = '0.94';
+	$VERSION = '0.95';
 	@ISA     = 'Module::Install::Base';
 	$ISCORE  = 1;
 }
@@ -25,16 +27,13 @@ sub install_share {
 
 	# Split by type
 	my $S = ($^O eq 'MSWin32') ? "\\" : "\/";
+
+	my $root;
 	if ( $type eq 'dist' ) {
 		die "Too many parameters to install_share" if @_;
 
 		# Set up the install
-		$self->postamble(<<"END_MAKEFILE");
-config ::
-\t\$(NOECHO) \$(MOD_INSTALL) \\
-\t\t"$dir" \$(INST_LIB)${S}auto${S}share${S}dist${S}\$(DISTNAME)
-
-END_MAKEFILE
+		$root = "\$(INST_LIB)${S}auto${S}share${S}dist${S}\$(DISTNAME)";
 	} else {
 		my $module = Module::Install::_CLASS($_[0]);
 		unless ( defined $module ) {
@@ -42,14 +41,43 @@ END_MAKEFILE
 		}
 		$module =~ s/::/-/g;
 
-		# Set up the install
-		$self->postamble(<<"END_MAKEFILE");
+		$root = "\$(INST_LIB)${S}auto${S}share${S}module${S}$module";
+	}
+
+	my $manifest = -r 'MANIFEST' ? ExtUtils::Manifest::maniread() : undef;
+	my $skip_checker = $ExtUtils::Manifest::VERSION >= 1.54
+		? ExtUtils::Manifest::maniskip()
+		: ExtUtils::Manifest::_maniskip();
+	my $postamble = '';
+	my $perm_dir = eval($ExtUtils::MakeMaker::VERSION) >= 6.52 ? '$(PERM_DIR)' : 755;
+	File::Find::find({
+		no_chdir => 1,
+		wanted => sub {
+			my $path = File::Spec->abs2rel($_, $dir);
+			if (-d $_) {
+				return if $skip_checker->($File::Find::name);
+				$postamble .=<<"END";
+\t\$(NOECHO) \$(MKPATH) "$root${S}$path"
+\t\$(NOECHO) \$(CHMOD) $perm_dir "$root${S}$path"
+END
+			}
+			else {
+				return if ref $manifest
+						&& !exists $manifest->{$File::Find::name};
+				return if $skip_checker->($File::Find::name);
+				$postamble .=<<"END";
+\t\$(NOECHO) \$(CP) "$dir${S}$path" "$root${S}$path"
+END
+			}
+		},
+	}, $dir);
+
+	# Set up the install
+	$self->postamble(<<"END_MAKEFILE");
 config ::
-\t\$(NOECHO) \$(MOD_INSTALL) \\
-\t\t"$dir" \$(INST_LIB)${S}auto${S}share${S}module${S}$module
+$postamble
 
 END_MAKEFILE
-	}
 
 	# The above appears to behave incorrectly when used with old versions
 	# of ExtUtils::Install (known-bad on RHEL 3, with 5.8.0)
@@ -65,4 +93,4 @@ END_MAKEFILE
 
 __END__
 
-#line 126
+#line 154

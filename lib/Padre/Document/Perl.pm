@@ -17,7 +17,7 @@ use Padre::File                     ();
 use Padre::Document::Perl::Beginner ();
 use Padre::Logger;
 
-our $VERSION = '0.60';
+our $VERSION = '0.61';
 our @ISA     = 'Padre::Document';
 
 
@@ -474,17 +474,18 @@ sub get_outline {
 	}
 	$self->{last_outline_md5} = $md5;
 
-	my %check = (
-		editor => $self->editor,
-		text   => $text,
+	my %arg = (
+		editor   => $self->editor,
+		text     => $text,
+		filename => defined $self->filename ? $self->filename : $self->get_title,
 	);
 	if ( $self->project ) {
-		$check{cwd}      = $self->project->root;
-		$check{perl_cmd} = ['-Ilib'];
+		$arg{cwd}      = $self->project->root;
+		$arg{perl_cmd} = ['-Ilib'];
 	}
 
 	require Padre::Task::Outline::Perl;
-	my $task = Padre::Task::Outline::Perl->new(%check);
+	my $task = Padre::Task::Outline::Perl->new(%arg);
 
 	# asynchronous execution (see on_finish hook)
 	$task->schedule;
@@ -516,9 +517,11 @@ sub find_unmatched_brace {
 # current symbol means in the context something remotely similar
 # to what PPI considers a PPI::Token::Symbol, but since we're doing
 # it the manual, stupid way, this may also work within quotelikes and regexes.
-sub _get_current_symbol {
-	my $editor = shift;
-	my $pos    = shift;
+sub get_current_symbol {
+	my $self = shift;
+	my $pos  = shift;
+
+	my $editor = $self->editor;
 	$pos = $editor->GetCurrentPos if not defined $pos;
 	my $line         = $editor->LineFromPosition($pos);
 	my $line_start   = $editor->PositionFromLine($line);
@@ -556,7 +559,7 @@ sub _get_current_symbol {
 		$token = $1;
 	}
 
-	# remove garbage first charactor from the token in case it's
+	# remove garbage first character from the token in case it's
 	# not a variable (Example: ->foo becomes >foo but should be foo)
 	$token =~ s/^[^\w\$\@\%\*\&:]//;
 
@@ -566,7 +569,7 @@ sub _get_current_symbol {
 sub find_variable_declaration {
 	my ($self) = @_;
 
-	my ( $location, $token ) = _get_current_symbol( $self->editor );
+	my ( $location, $token ) = $self->get_current_symbol;
 	unless ( defined $location ) {
 		Wx::MessageBox(
 			Wx::gettext("Current cursor does not seem to point at a variable"),
@@ -590,7 +593,7 @@ sub find_variable_declaration {
 sub find_method_declaration {
 	my ($self) = @_;
 
-	my ( $location, $token ) = _get_current_symbol( $self->editor );
+	my ( $location, $token ) = $self->get_current_symbol;
 	unless ( defined $location ) {
 		Wx::MessageBox(
 			Wx::gettext("Current cursor does not seem to point at a method"),
@@ -751,7 +754,7 @@ sub goto_sub {
 sub lexical_variable_replacement {
 	my ( $self, $replacement ) = @_;
 
-	my ( $location, $token ) = _get_current_symbol( $self->editor );
+	my ( $location, $token ) = $self->get_current_symbol;
 	if ( not defined $location ) {
 		Wx::MessageBox(
 			Wx::gettext("Current cursor does not seem to point at a variable"),
@@ -1489,7 +1492,7 @@ sub event_on_right_down {
 
 	my $introduced_separator = 0;
 
-	my ( $location, $token ) = _get_current_symbol( $self->editor, $pos );
+	my ( $location, $token ) = $self->get_current_symbol($pos);
 
 	# Append variable specific menu items if it's a variable
 	if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
@@ -1507,7 +1510,7 @@ sub event_on_right_down {
 			},
 		);
 
-		my $lexRepl = $menu->Append( -1, Wx::gettext("Lexically Rename Variable") );
+		my $lexRepl = $menu->Append( -1, Wx::gettext('Rename Variable') );
 		Wx::Event::EVT_MENU(
 			$editor, $lexRepl,
 			sub {

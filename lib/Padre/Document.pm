@@ -136,7 +136,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.60';
+our $VERSION = '0.61';
 
 
 
@@ -157,7 +157,7 @@ my $unsaved_number = 0;
 
 use Class::XSAccessor {
 	getters => {
-		filename    => 'filename',   # TO DO is this read_only or what?
+		filename    => 'filename',   # setter is defined as normal function
 		file        => 'file',       # Padre::File - object
 		editor      => 'editor',
 		timestamp   => 'timestamp',

@@ -21,7 +21,7 @@ use Padre::Wx;
 use Wx::Event qw( EVT_BUTTON );
 
 
-our $VERSION = '0.60';
+our $VERSION = '0.61';
 our @ISA     = 'Wx::ListView';
 my $LineCount; # Global fid count so it can be used in the label
 
@@ -121,7 +121,7 @@ sub on_list_item_activated {
 	#If the user has closed the editor the search was originally performed on
 	if ( !defined $main->find_id_of_editor($editor) ) {
 		$self->DeleteAllItems;
-		my $message_item->[0]->{line} = Wx::gettext('Related Editor Has been Closed');
+		my $message_item->[0]->{line} = Wx::gettext('Related editor has been closed');
 		$message_item->[0]->{lineNumber} = '*';
 		$self->populate_list($message_item);
 		return;

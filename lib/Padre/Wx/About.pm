@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.60';
+our $VERSION = '0.61';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -24,7 +24,7 @@ sub new {
 		-1,
 		Wx::gettext('About Padre'),
 		Wx::wxDefaultPosition,
-		[ 700, 530 ],
+		[ 700, 600 ],
 	);
 
 	# Until we get a real icon use the same one as the others
