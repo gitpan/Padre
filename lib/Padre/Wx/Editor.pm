@@ -11,7 +11,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.61';
+our $VERSION = '0.62';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -89,6 +89,7 @@ sub new {
 	Wx::Event::EVT_CHAR( $self, \&on_char );
 	Wx::Event::EVT_SET_FOCUS( $self, \&on_focus );
 	Wx::Event::EVT_MIDDLE_UP( $self, \&on_middle_up );
+	Wx::Event::EVT_MOTION( $self, \&on_mouse_moving );
 
 	# Smart highlighting:
 	# Selecting a word or small block of text causes all other occurrences to be highlighted
@@ -283,7 +284,13 @@ sub on_key_up {
 		$self->on_smart_highlight_begin($event);
 	}
 
-	$event->Skip(1);     # we need to keep processing this event
+	# Doc specific processing
+	my $doc = $self->{Document};
+	if ( $doc->can('event_key_up') ) {
+		$doc->event_key_up( $self, $event );
+	}
+
+	$event->Skip(1); # we need to keep processing this event
 
 }
 
@@ -1095,6 +1102,23 @@ sub on_left_up {
 
 	$event->Skip;
 	return;
+}
+
+sub on_mouse_moving {
+	my ( $self, $event ) = @_;
+
+	if ( $event->Moving ) {
+		my $doc = $self->{Document};
+		if ( $doc->can('event_mouse_moving') ) {
+			$doc->event_mouse_moving( $self, $event );
+		}
+	} else {
+
+		# For a drag event...
+	}
+
+	$event->Skip;
+
 }
 
 sub on_middle_up {
