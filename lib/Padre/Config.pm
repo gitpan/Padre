@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.65';
+our $VERSION = '0.66';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -968,25 +968,25 @@ setting(
 	name    => 'main_top',
 	type    => Padre::Constant::INTEGER,
 	store   => Padre::Constant::HOST,
-	default => 40,
+	default => -1,
 );
 setting(
 	name    => 'main_left',
 	type    => Padre::Constant::INTEGER,
 	store   => Padre::Constant::HOST,
-	default => 20,
+	default => -1,
 );
 setting(
 	name    => 'main_width',
 	type    => Padre::Constant::POSINT,
 	store   => Padre::Constant::HOST,
-	default => 600,
+	default => -1,
 );
 setting(
 	name    => 'main_height',
 	type    => Padre::Constant::POSINT,
 	store   => Padre::Constant::HOST,
-	default => 400,
+	default => -1,
 );
 
 # Run Parameters

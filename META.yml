@@ -15,7 +15,7 @@ configure_requires:
   Alien::wxWidgets: 0.46
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.99'
+generated_by: 'Module::Install version 1.00'
 keywords:
   - auto-completion
   - code
@@ -143,4 +143,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.65
+version: 0.66

@@ -39,7 +39,7 @@ use threads;
 use threads::shared;
 use Padre::Constant ();
 
-our $VERSION = '0.65';
+our $VERSION = '0.66';
 
 # Handle the PADRE_DEBUG environment variable
 BEGIN {
@@ -109,8 +109,7 @@ sub TRACE {
 sub string {
 	require Devel::Dumpvar;
 	my $object = shift;
-	my $shared =
-		( $INC{'threads/shared.pm'} and threads::shared::is_shared($object) ) ? ' : shared' : '';
+	my $shared = ( $INC{'threads/shared.pm'} and threads::shared::is_shared($object) ) ? ' : shared' : '';
 	my $string =
 		ref($object)
 		? Devel::Dumpvar->_refstring($object)

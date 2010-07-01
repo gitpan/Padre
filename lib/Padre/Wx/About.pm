@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.65';
+our $VERSION = '0.66';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -309,12 +309,16 @@ END_HTML
 sub _content_info {
 	my $self           = shift;
 	my $padre_info     = Wx::gettext('System Info');
-	my $wx_widgets     = Wx::wxVERSION_STRING();
 	my $config_dir_txt = Wx::gettext('Config dir:');
 	my $config_dir     = Padre::Constant::CONFIG_DIR;
-	my $uptime         = time - $^T;
-	my @uptime_parts   = ( 0, 0, 0 );
 
+	# Reformat the native wxWidgets version string slightly
+	my $wx_widgets = Wx::wxVERSION_STRING();
+	$wx_widgets =~ s/^wx\w+\s+//;
+
+	# Calculate the process uptime
+	my $uptime = time - $^T;
+	my @uptime_parts = ( 0, 0, 0 );
 	if ( $uptime > 3600 ) {
 		$uptime_parts[0] = int( $uptime / 3600 );
 		$uptime -= $uptime_parts[0] * 3600;
@@ -327,12 +331,14 @@ sub _content_info {
 	my $uptime_text = Wx::gettext('Uptime');
 	$uptime = sprintf( '%d:%02d:%02d', @uptime_parts );
 
+	# Calculate the current memory in use across all threads
 	my $ram = Padre::Util::humanbytes( Padre::Util::process_memory() ) || '0';
-
 	$ram = '(' . Wx::gettext('unsupported') . ')' if $ram eq '0';
 
 	# Yes, THIS variable should have this upper case char :-)
 	my $Perl_version = $^V || $];
+	$Perl_version = "$Perl_version";
+	$Perl_version =~ s/^v//;
 
 	# How many threads are running
 	my $threads = $INC{'threads.pm'} ? scalar( threads->list ) : 'disabled';
