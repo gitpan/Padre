@@ -21,8 +21,9 @@ use Padre::Config::Human   ();
 use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
+use Padre::Logger;
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -134,6 +135,7 @@ sub read {
 	my $class = shift;
 
 	unless ($SINGLETON) {
+		TRACE("Loading configuration for $class") if DEBUG;
 
 		# Load the host configuration
 		my $host = Padre::Config::Host->read;
@@ -152,6 +154,7 @@ sub read {
 }
 
 sub write {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 
 	# Save the user configuration
@@ -162,12 +165,14 @@ sub write {
 	$self->[Padre::Constant::HOST]->{version} = $REVISION;
 	$self->[Padre::Constant::HOST]->write;
 
-	# Write the startup subset copy of the configuration
+	# Write the startup subset of the configuration.
+	# NOTE: Use a hyper-minimalist listified key/value file format
+	# so that we don't need to load YAML::Tiny before the thread fork.
+	# This should save around 400k of memory per background thread.
 	my %startup = map { $_ => $self->$_() } sort keys %STARTUP;
-	YAML::Tiny::DumpFile(
-		Padre::Constant::CONFIG_STARTUP,
-		\%startup,
-	);
+	open( my $FILE, '>', Padre::Constant::CONFIG_STARTUP ) or return 1;
+	print $FILE map {"$_\n$startup{$_}\n"} sort keys %startup or return 1;
+	close $FILE or return 1;
 
 	return 1;
 }
@@ -193,6 +198,7 @@ sub default {
 }
 
 sub set {
+	TRACE( $_[1] ) if DEBUG;
 	my $self  = shift;
 	my $name  = shift;
 	my $value = shift;
@@ -236,6 +242,7 @@ sub set {
 # Set a value in the configuration and apply the preference change
 # to the application.
 sub apply {
+	TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
 	my $name    = shift;
 	my $value   = shift;
@@ -457,12 +464,6 @@ setting(
 	default => 0,
 );
 setting(
-	name    => 'main_todo',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-);
-setting(
 	name    => 'main_functions_order',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
@@ -475,6 +476,12 @@ setting(
 );
 setting(
 	name    => 'main_outline',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
+	name    => 'main_todo',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,

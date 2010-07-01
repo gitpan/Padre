@@ -8,7 +8,7 @@ use warnings;
 use File::Spec     ();
 use Padre::Project ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = 'Padre::Project';
 
 
@@ -94,6 +94,13 @@ sub ignore_rule {
 		# Everything left, so we show it
 		return 1;
 	};
+}
+
+sub ignore_skip {
+	return [
+		'(?:^|\\/)\\.',
+		'(?:^|\\/)(?:blib|_build|inc|Makefile|pm_to_blib)\z',
+	];
 }
 
 1;

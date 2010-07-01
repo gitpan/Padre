@@ -3,14 +3,14 @@ package Padre::Wx::Dialog::KeyBindings;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Constant            ();
-use Padre::Config              ();
-use Padre::Wx                  ();
-use Padre::Wx::Role::MainChild ();
+use Padre::Constant       ();
+use Padre::Config         ();
+use Padre::Wx             ();
+use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = qw{
-	Padre::Wx::Role::MainChild
+	Padre::Wx::Role::Main
 	Wx::Dialog
 };
 

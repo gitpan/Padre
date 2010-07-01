@@ -50,6 +50,7 @@ use Padre::Util::Template         ();
 use Padre::Wx                     ();
 use Padre::Wx::Icon               ();
 use Padre::Wx::Debugger           ();
+use Padre::Wx::Display            ();
 use Padre::Wx::Editor             ();
 use Padre::Wx::Menubar            ();
 use Padre::Wx::ToolBar            ();
@@ -59,10 +60,14 @@ use Padre::Wx::AuiManager         ();
 use Padre::Wx::FileDropTarget     ();
 use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
+use Padre::Wx::Role::Conduit      ();
 use Padre::Logger;
 
-our $VERSION = '0.64';
-our @ISA     = 'Wx::Frame';
+our $VERSION = '0.65';
+our @ISA     = qw{
+	Padre::Wx::Role::Conduit
+	Wx::Frame
+};
 
 use constant SECONDS => 1000;
 
@@ -116,7 +121,6 @@ sub new {
 
 	# Generate a smarter default size than Wx does
 	if ( $size->[0] == -1 ) {
-		require Padre::Wx::Display;
 		my $rect = Padre::Wx::Display::primary_default();
 		$size     = $rect->GetSize;
 		$position = $rect->GetPosition;
@@ -247,14 +251,16 @@ sub new {
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
 	# so we don't accidentally trigger any configuration writes.
-	$self->_show_todo( $self->config->main_todo );
-	$self->_show_functions( $self->config->main_functions );
-	$self->_show_outline( $self->config->main_outline );
-	$self->_show_directory( $self->config->main_directory );
-	$self->_show_output( $self->config->main_output );
+	$self->_show_todo( $config->main_todo );
+	$self->_show_functions( $config->main_functions );
+	$self->_show_outline( $config->main_outline );
+	$self->_show_directory( $config->main_directory );
+	$self->_show_output( $config->main_output );
+	$self->_show_syntax( $config->main_syntaxcheck );
+	$self->_show_errorlist( $config->main_errorlist );
 
 	# Lock the panels if needed
-	$self->aui->lock_panels( $self->config->main_lockinterface );
+	$self->aui->lock_panels( $config->main_lockinterface );
 
 	$self->{_debugger_} = Padre::Wx::Debugger->new;
 
@@ -306,14 +312,9 @@ sub timer_start {
 	# size, reposition to the defaults).
 	# This must happen AFTER the initial ->Show(1) because otherwise
 	# ->IsShownOnScreen returns a false-negative result.
-	unless ( $self->IsShownOnScreen and $self->_xy_on_screen ) {
-		$self->SetSize(
-			Wx::Size->new(
-				$config->default('main_width'),
-				$config->default('main_height'),
-			)
-		);
-		$self->CentreOnScreen;
+	unless ( Padre::Wx::Display->perfect($self) ) {
+		my $rect = Padre::Wx::Display::primary_default();
+		$self->SetSizeRect($rect);
 	}
 
 	# Lock everything during the initial opening of files.
@@ -344,11 +345,6 @@ sub timer_start {
 			$self->GetStatusBar->Hide;
 		}
 		$manager->enable_editors_for_all;
-
-		$self->show_syntax( $config->main_syntaxcheck );
-		if ( $config->main_errorlist ) {
-			$self->errorlist->enable;
-		}
 	}
 
 	# Start the single instance server
@@ -359,7 +355,7 @@ sub timer_start {
 	# Check for new plug-ins and alert the user to them
 	$manager->alert_new;
 
-	unless ($Padre::Test::VERSION) {
+	unless ( $Padre::Test::VERSION or $config->feedback_done ) {
 		require Padre::Wx::Dialog::WhereFrom;
 		Padre::Wx::Dialog::WhereFrom->new($self);
 	}
@@ -374,6 +370,9 @@ sub timer_start {
 		},
 	);
 	$timer->Start( $config->update_file_from_disk_interval * SECONDS, 0 );
+
+	# Start the second-generation task manager
+	$self->ide->task_manager->start;
 
 	return;
 }
@@ -1155,6 +1154,8 @@ sub refresh {
 	$self->refresh_functions($current);
 	$self->refresh_directory($current);
 	$self->refresh_status($current);
+	$self->refresh_outline($current);
+	$self->refresh_syntaxcheck($current);
 
 	# Now signal the refresh to all remaining listeners
 	# weed out expired weak references
@@ -1172,7 +1173,6 @@ sub refresh {
 		my $id = $notebook->GetSelection;
 		if ( defined $id and $id >= 0 ) {
 			$notebook->GetPage($id)->SetFocus;
-			$self->refresh_syntaxcheck;
 		}
 		$self->aui->GetPane('notebook')->PaneBorder(0);
 	} else {
@@ -1783,15 +1783,14 @@ the panel.
 
 sub show_todo {
 	my $self = shift;
-	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'refresh_todo' );
 	unless ( $on == $self->menu->view->{todo}->IsChecked ) {
 		$self->menu->view->{todo}->Check($on);
 	}
+
 	$self->config->set( main_todo => $on );
-	$self->config->write;
-
 	$self->_show_todo($on);
-
 	$self->aui->Update;
 	$self->ide->save_config;
 
@@ -1824,16 +1823,14 @@ the panel.
 
 sub show_outline {
 	my $self = shift;
-
-	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'refresh_outline' );
 	unless ( $on == $self->menu->view->{outline}->IsChecked ) {
 		$self->menu->view->{outline}->Check($on);
 	}
+
 	$self->config->set( main_outline => $on );
-	$self->config->write;
-
 	$self->_show_outline($on);
-
 	$self->aui->Update;
 	$self->ide->save_config;
 
@@ -1846,11 +1843,11 @@ sub _show_outline {
 	if ( $_[0] ) {
 		my $outline = $self->outline;
 		$self->right->show($outline);
-		$outline->start unless $outline->running;
+		$outline->start;
 	} elsif ( $self->has_outline ) {
 		my $outline = $self->outline;
 		$self->right->hide($outline);
-		$outline->stop if $outline->running;
+		$outline->stop;
 		delete $self->{outline};
 	}
 }
@@ -1902,16 +1899,14 @@ the panel.
 
 sub show_directory {
 	my $self = shift;
-
-	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'refresh_directory' );
 	unless ( $on == $self->menu->view->{directory}->IsChecked ) {
 		$self->menu->view->{directory}->Check($on);
 	}
+
 	$self->config->set( main_directory => $on );
-	$self->config->write;
-
 	$self->_show_directory($on);
-
 	$self->aui->Update;
 	$self->ide->save_config;
 
@@ -1943,15 +1938,14 @@ the panel.
 
 sub show_output {
 	my $self = shift;
-	my $on = @_ ? $_[0] ? 1 : 0 : 1;
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock('UPDATE');
 	unless ( $on == $self->menu->view->{output}->IsChecked ) {
 		$self->menu->view->{output}->Check($on);
 	}
+
 	$self->config->set( main_output => $on );
-	$self->config->write;
-
 	$self->_show_output($on);
-
 	$self->aui->Update;
 	$self->ide->save_config;
 
@@ -1962,10 +1956,7 @@ sub _show_output {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
-		$self->bottom->show(
-			$self->output,
-			sub { $self->show_output(0) },
-		);
+		$self->bottom->show( $self->output );
 	} elsif ( $self->has_output ) {
 		$self->bottom->hide( $self->output );
 		delete $self->{output};
@@ -1986,14 +1977,14 @@ the panel.
 
 sub show_syntax {
 	my $self = shift;
-
-	my $on = @_ ? $_[0] ? 1 : 0 : 1;
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'refresh_syntaxcheck' );
 	unless ( $on == $self->menu->view->{show_syntaxcheck}->IsChecked ) {
 		$self->menu->view->{show_syntaxcheck}->Check($on);
 	}
 
+	$self->config->set( main_syntaxcheck => $on );
 	$self->_show_syntax($on);
-
 	$self->aui->Update;
 	$self->ide->save_config;
 
@@ -2015,6 +2006,33 @@ sub _show_syntax {
 		$self->bottom->hide($syntax);
 		$syntax->stop if $syntax->running;
 		delete $self->{syntax};
+	}
+}
+
+sub show_errorlist {
+	my $self = shift;
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock('UPDATE');
+	unless ( $on == $self->menu->view->{show_errorlist}->IsChecked ) {
+		$self->menu->view->{show_errorlist}->Check($on);
+	}
+
+	$self->config->set( main_errorlist => $on );
+	$self->_show_errorlist($on);
+	$self->aui->Update;
+	$self->ide->save_config;
+
+	return;
+}
+
+sub _show_errorlist {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+	if ( $_[0] ) {
+		$self->bottom->show( $self->errorlist );
+	} elsif ( $self->has_errorlist ) {
+		$self->bottom->hide( $self->errorlist );
+		delete $self->{errorlist};
 	}
 }
 
@@ -3187,10 +3205,9 @@ sub on_close_window {
 	$ide->save_config;
 	$event->Skip;
 
-	TRACE("Tell TaskManager to cleanup") if DEBUG;
-
-	# Stop all Task Manager's worker threads
-	$self->ide->task_manager->cleanup;
+	# Stop the task manager.
+	TRACE("Shutting down TaskManager") if DEBUG;
+	$self->ide->task_manager->stop;
 
 	# Vacuum database on exit so that it does not grow.
 	# Since you can't VACUUM inside a transaction, finish it here.
@@ -4937,49 +4954,6 @@ sub on_toggle_right_margin {
 
 =pod
 
-=head3 C<on_toggle_syntax_check>
-
-    $main->on_toggle_syntax_check;
-
-Toggle visibility of syntax panel. No return value.
-
-=cut
-
-sub on_toggle_syntax_check {
-	my $self  = shift;
-	my $event = shift;
-	$self->config->set( 'main_syntaxcheck', $event->IsChecked ? 1 : 0, );
-	$self->show_syntax( $self->config->main_syntaxcheck );
-	$self->ide->save_config;
-	return;
-}
-
-=pod
-
-=head3 C<on_toggle_errorlist>
-
-    $main->on_toggle_errorlist;
-
-Toggle visibility of error-list panel. No return value.
-
-=cut
-
-sub on_toggle_errorlist {
-	my $self  = shift;
-	my $event = shift;
-
-	$self->config->set( 'main_errorlist', $event->IsChecked ? 1 : 0, );
-	if ( $self->config->main_errorlist ) {
-		$self->errorlist->enable;
-	} else {
-		$self->errorlist->disable;
-	}
-	$self->ide->save_config;
-	return;
-}
-
-=pod
-
 =head3 C<on_toggle_indentation_guide>
 
     $main->on_toggle_indentation_guide;
@@ -5404,7 +5378,7 @@ sub on_stc_update_ui {
 	return if $self->{_in_stc_update_ui};
 	local $self->{_in_stc_update_ui} = 1;
 
-	# Check for brace, on current position, higlight the matching brace
+	# Check for brace, on current position, highlight the matching brace
 	my $current = $self->current;
 	my $editor  = $current->editor;
 	return if not defined $editor;
@@ -6040,13 +6014,13 @@ sub show_as_numbers {
 	return;
 }
 
-# showing the DocBrowser window
+# showing the Browser window
 sub help {
 	my $self  = shift;
 	my $param = shift;
 	unless ( $self->{help} ) {
-		require Padre::Wx::DocBrowser;
-		$self->{help} = Padre::Wx::DocBrowser->new;
+		require Padre::Wx::Browser;
+		$self->{help} = Padre::Wx::Browser->new;
 		Wx::Event::EVT_CLOSE(
 			$self->{help},
 			sub { $self->on_help_close( $_[1] ) },

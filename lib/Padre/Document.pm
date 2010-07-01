@@ -127,6 +127,7 @@ use warnings;
 use Carp             ();
 use File::Spec       ();
 use File::Temp       ();
+use Padre::Cache     ();
 use Padre::Constant  ();
 use Padre::Current   ();
 use Padre::Util      ();
@@ -136,7 +137,26 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
+
+
+
+
+
+#####################################################################
+# Task Integration
+
+sub task_functions {
+	return '';
+}
+
+sub task_outline {
+	return '';
+}
+
+sub task_syntax {
+	return '';
+}
 
 
 
@@ -306,6 +326,19 @@ sub rebless {
 
 sub current {
 	Padre::Current->new( document => $_[0] );
+}
+
+
+
+
+
+######################################################################
+# Padre::Cache Integration
+
+sub DESTROY {
+	if ( defined $_[0]->{filename} ) {
+		Padre::Cache::release( $_[0]->{filename} );
+	}
 }
 
 
@@ -847,6 +880,10 @@ sub remove_tempfile {
 
 sub text_get {
 	$_[0]->editor->GetText;
+}
+
+sub text_length {
+	$_[0]->editor->GetLength;
 }
 
 sub text_set {

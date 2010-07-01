@@ -3,26 +3,35 @@ package Padre::Wx::Directory;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx                        ();
-use Padre::Wx::Directory::TreeCtrl   ();
-use Padre::Wx::Directory::SearchCtrl ();
+use Padre::Cache                   ();
+use Padre::Role::Task              ();
+use Padre::Wx::Role::View          ();
+use Padre::Wx::Role::Main          ();
+use Padre::Wx::Directory::TreeCtrl ();
+use Padre::Wx                      ();
 
-our $VERSION = '0.64';
-our @ISA     = 'Wx::Panel';
+our $VERSION = '0.65';
+our @ISA     = qw{
+	Padre::Role::Task
+	Padre::Wx::Role::View
+	Padre::Wx::Role::Main
+	Wx::Panel
+};
 
 use Class::XSAccessor {
 	getters => {
+		root   => 'root',
 		tree   => 'tree',
 		search => 'search',
 	},
-	accessors => {
-		mode                  => 'mode',
-		project_dir           => 'project_dir',
-		previous_dir          => 'previous_dir',
-		project_dir_original  => 'project_dir_original',
-		previous_dir_original => 'previous_dir_original',
-	},
 };
+
+
+
+
+
+######################################################################
+# Constructor
 
 # Creates the Directory Left Panel with a Search field
 # and the Directory Browser
@@ -38,16 +47,63 @@ sub new {
 		Wx::wxDefaultSize,
 	);
 
-	# Creates the Search Field and the Directory Browser
-	$self->{tree}   = Padre::Wx::Directory::TreeCtrl->new($self);
-	$self->{search} = Padre::Wx::Directory::SearchCtrl->new($self);
+	# Where is the current root directory of the tree
+	$self->{root} = '';
+
+	# The list of all files to build into the tree
+	$self->{files} = [];
+
+	# The directories in the tree that should be expanded
+	$self->{expand} = {};
+
+	# Create the search control
+	my $search = $self->{search} = Wx::SearchCtrl->new(
+		$self,
+		-1,
+		'',
+		Wx::wxDefaultPosition,
+		Wx::wxDefaultSize,
+		Wx::wxTE_PROCESS_ENTER
+	);
+	$search->SetDescriptiveText( Wx::gettext('Search') );
+
+	Wx::Event::EVT_TEXT(
+		$self, $search,
+		sub {
+			shift->on_text(@_);
+		},
+	);
+
+	Wx::Event::EVT_SEARCHCTRL_CANCEL_BTN(
+		$self, $search,
+		sub {
+			shift->{search}->SetValue('');
+		},
+	);
+
+	# Create the search control menu
+	my $menu = Wx::Menu->new;
+	Wx::Event::EVT_MENU(
+		$self,
+		$menu->Append(
+			-1,
+			Wx::gettext('Move to other panel')
+		),
+		sub {
+			shift->move;
+		}
+	);
+	$search->SetMenu($menu);
+
+	# Create the tree control
+	$self->{tree} = Padre::Wx::Directory::TreeCtrl->new($self);
 
 	# Fill the panel
 	my $sizerv = Wx::BoxSizer->new(Wx::wxVERTICAL);
 	my $sizerh = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$sizerv->Add( $self->search, 0, Wx::wxALL | Wx::wxEXPAND, 0 );
-	$sizerv->Add( $self->tree,   1, Wx::wxALL | Wx::wxEXPAND, 0 );
-	$sizerh->Add( $sizerv,       1, Wx::wxALL | Wx::wxEXPAND, 0 );
+	$sizerv->Add( $self->{search}, 0, Wx::wxALL | Wx::wxEXPAND, 0 );
+	$sizerv->Add( $self->{tree},   1, Wx::wxALL | Wx::wxEXPAND, 0 );
+	$sizerh->Add( $sizerv,         1, Wx::wxALL | Wx::wxEXPAND, 0 );
 
 	# Fits panel layout
 	$self->SetSizerAndFit($sizerh);
@@ -56,34 +112,75 @@ sub new {
 	return $self;
 }
 
-# The parent panel
-sub panel {
-	$_[0]->GetParent;
+
+
+
+
+######################################################################
+# Padre::Wx::Role::View Methods
+
+sub view_panel {
+	shift->side(@_);
 }
 
-# Returns the main object reference
-sub main {
-	$_[0]->GetGrandParent;
+sub view_label {
+	shift->gettext_label(@_);
 }
 
-sub current {
-	Padre::Current->new( main => $_[0]->main );
+sub view_close {
+	shift->main->show_directory(0);
 }
+
+
+
+
+
+######################################################################
+# Event Handlers
+
+# If it is a project, caches search field content while it is typed and
+# searchs for files that matchs the type word.
+sub on_text {
+	my $self   = shift;
+	my $search = $self->{search};
+
+	# Show or hide the cancel button
+	$search->ShowCancelButton( $search->IsEmpty ? 0 : 1 );
+
+	# The changed search state requires a rerender
+	$self->render;
+}
+
+
+
+
+
+######################################################################
+# General Methods
 
 # Returns the window label
 sub gettext_label {
-	my $self = shift;
-	if ( defined( $self->mode ) and ( $self->mode eq 'tree' ) ) {
-		return Wx::gettext('Project');
-	} else {
-		return Wx::gettext('Directory');
-	}
+	Wx::gettext('Project');
+}
+
+# The search term if we have one
+sub term {
+	$_[0]->{search}->GetValue;
+}
+
+# Are we in search mode?
+sub searching {
+	$_[0]->{search}->IsEmpty ? 0 : 1;
 }
 
 # Updates the gui, so each compoment can update itself
-# according to the new state
+# according to the new state.
 sub clear {
-	$_[0]->refresh;
+	my $self = shift;
+	my $lock = $self->main->lock('UPDATE');
+	$self->{search}->SetValue('');
+	$self->{search}->ShowCancelButton(0);
+	$self->{tree}->DeleteChildren( $self->{tree}->GetRootItem );
 	return;
 }
 
@@ -91,67 +188,198 @@ sub clear {
 # refresh function.
 # Called outside Directory.pm, on directory browser focus and item dragging
 sub refresh {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $document = $current->document;
+	my $self = shift;
 
-	# Finds project base
-	my $dir;
-	if ( defined($document) ) {
-		$dir = $document->project_dir;
-		$self->{file} = $document->{file};
+	# NOTE: Without a file open, Padre does not consider itself to
+	# have a "current project". We should probably try to find a way
+	# to correct this in future.
+	my $current = $self->current;
+	my $project = $current->project;
+	my $root    = '';
+	my @options = ();
+	if ($project) {
+		$root = $project->root;
+		@options = ( project => $project );
 	} else {
-		$dir = $self->main->config->default_projects_directory;
-		delete $self->{file};
+		$root = $current->config->default_projects_directory;
+		@options = ( root => $root );
 	}
 
-	# Shortcut if there's no directory, or we haven't changed directory
-	return unless $dir;
-	if ( defined $self->project_dir and $self->project_dir eq $dir ) {
-		return;
+	# Before we change anything, store the expansion state
+	unless ( $self->searching ) {
+		$self->{expand} = $self->tree->expanded;
 	}
 
-	$self->{projects}->{$dir}->{dir} ||= $dir;
-	$self->{projects}->{$dir}->{mode} ||=
-		$document->{is_project}
-		? 'tree'
-		: 'navigate';
+	# Switch project states if needed
+	unless ( $self->{root} eq $root ) {
+		my $ide = $current->ide;
 
-	# The currently view mode
-	$self->mode( $self->{projects}->{$dir}->{mode} );
+		# Save the current model data to the cache
+		# if we potentially need it again later.
+		if ( $ide->project_exists( $self->{root} ) ) {
+			my $stash = Padre::Cache::stash(
+				__PACKAGE__,
+				$ide->project( $self->{root} ),
+			);
+			%$stash = (
+				root   => $self->{root},
+				files  => $self->{files},
+				expand => $self->{expand},
+			);
+		}
 
-	# Save the current project path
-	$self->project_dir( $self->{projects}->{$dir}->{dir} );
-	$self->project_dir_original($dir);
+		# Flush the now-unusable state
+		$self->{root}   = $root;
+		$self->{files}  = [];
+		$self->{expand} = {};
 
-	# Calls Searcher and Browser refresh
-	$self->tree->refresh;
-	$self->search->refresh;
+		# Do we have an (out of date) cached state we can use?
+		# If so, display it immediately and update it later.
+		if ($project) {
+			my $stash = Padre::Cache::stash(
+				__PACKAGE__,
+				$project,
+			);
+			if ( $stash->{root} ) {
 
-	# Sets the last project to the current one
-	$self->previous_dir( $self->{projects}->{$dir}->{dir} );
-	$self->previous_dir_original($dir);
+				# We have a cached state
+				$self->{files}  = $stash->{files};
+				$self->{expand} = $stash->{expand};
+			}
+		}
 
-	# Update the panel label
-	$self->panel->refresh;
+		# Flush the search box and rerender the tree
+		$self->{search}->SetValue('');
+		$self->{search}->ShowCancelButton(0);
+		$self->render;
+	}
+
+	# Trigger the refresh task to update the temporary state
+	$self->task_request(
+		task      => 'Padre::Wx::Directory::Task',
+		callback  => 'refresh_response',
+		recursive => 1,
+		@options,
+	);
 
 	return 1;
 }
 
-# When a project folder is changed
-sub _change_project_dir {
-	my $self   = shift;
-	my $dialog = Wx::DirDialog->new(
-		undef,
-		Wx::gettext('Choose a directory'),
-		$self->project_dir,
-	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-		return;
-	}
-	$self->{projects_dirs}->{ $self->project_dir_original } = $dialog->GetPath;
-	$self->refresh;
+sub refresh_response {
+	my $self = shift;
+	my $task = shift;
+	$self->{files} = $task->{model};
+	$self->render;
 }
+
+# This is a primitive first attempt to get familiar with the tree API
+sub render {
+	my $self   = shift;
+	my $tree   = $self->tree;
+	my $root   = $tree->GetRootItem;
+	my $expand = $self->{expand};
+
+	# Prepare search mode if needed
+	my $search = $self->searching;
+	my @files = $search ? $self->filter( $self->term ) : @{ $self->{files} };
+
+	# Flush the old tree contents
+	# TO DO: This is inefficient, upgrade to something that does the
+	# equivalent of a treewise diff application, modifying the tree
+	# to get the result we want instead of rebuilding it entirely.
+	my $lock = $self->main->lock('UPDATE');
+	$tree->DeleteChildren($root);
+
+	# Fill the new tree
+	my @stack = ();
+	while (@files) {
+		my $path = shift @files;
+		my $image = $path->type ? 'folder' : 'package';
+		while (@stack) {
+
+			# If we are not the child of the deepest element in
+			# the stack, move up a level and try again
+			last if $tree->GetPlData( $stack[-1] )->is_parent($path);
+
+			# We have finished filling the directory.
+			# Now it (maybe) has children, we can expand it.
+			my $complete = pop @stack;
+			if ( $search or $expand->{ $tree->GetPlData($complete)->unix } ) {
+				$tree->Expand($complete);
+			}
+		}
+
+		# If there is anything left on the stack it is our parent
+		my $parent = $stack[-1] || $root;
+
+		# Add the next item to that parent
+		my $item = $tree->AppendItem(
+			$parent,                      # Parent node
+			$path->name,                  # Label
+			$tree->{images}->{$image},    # Icon
+			-1,                           # Wx Identifier
+			Wx::TreeItemData->new($path), # Embedded data
+		);
+
+		# If it is a folder, it goes onto the stack
+		if ( $path->type == 1 ) {
+			push @stack, $item;
+		}
+	}
+
+	# Apply the same Expand logic above to any remaining stack elements
+	while (@stack) {
+		my $complete = pop @stack;
+		if ( $search or $expand->{ $tree->GetPlData($complete)->unix } ) {
+			$tree->Expand($complete);
+		}
+	}
+
+	# When in search mode, force the scroll position to the top after
+	# every refresh. It tends to want to scroll to the bottom.
+	if ($search) {
+		my ( $first, $cookie ) = $tree->GetFirstChild($root);
+		$tree->ScrollTo($first) if $first;
+	}
+
+	return 1;
+}
+
+# Filter the file list to remove all files that do not match a search term
+# TO DO: I believe that the two phases shown below can be merged into one.
+sub filter {
+	my $self = shift;
+	my $term = shift;
+
+	# Apply a simple substring match on the file name only
+	my $quote = quotemeta $term;
+	my $regex = qr/$quote/i;
+	my @match =
+		grep { $_->is_directory or $_->name =~ $regex } @{ $self->{files} };
+
+	# Prune empty directories
+	# NOTE: This is tricky and hard to make sense of, but damned fast :)
+	foreach my $i ( reverse 0 .. $#match ) {
+		my $path  = $match[$i];
+		my $after = $match[ $i + 1 ];
+		my $prune = (
+			$path->is_directory and not( defined $after
+				and $after->depth - $path->depth == 1 )
+		);
+		if ($prune) {
+			splice @match, $i, 1;
+		}
+	}
+
+	return @match;
+}
+
+
+
+
+
+######################################################################
+# Panel Migration (Experimental)
 
 # What side of the application are we on
 sub side {
@@ -166,11 +394,18 @@ sub side {
 	die "Bad parent panel";
 }
 
-# Moves the panel to the other side
+# Moves the panel to the other side.
+# To prevent corrupting the layout engine we do this in a specific order.
+# Hide, Reconfigure, Show
+# TO DO: This results in loss of all state, and the need to rescan the tree.
+# Come up with a saner approach to migrating views between arbitrary panels
+# that we can expand out so all views can potentially be moved around.
 sub move {
 	my $self   = shift;
-	my $config = $self->main->config;
+	my $main   = $self->main;
+	my $config = $main->config;
 	my $side   = $config->main_directory_panel;
+	$main->show_directory(0);
 	if ( $side eq 'left' ) {
 		$config->apply( main_directory_panel => 'right' );
 	} elsif ( $side eq 'right' ) {
@@ -178,6 +413,8 @@ sub move {
 	} else {
 		die "Bad main_directory_panel setting '$side'";
 	}
+	$main->show_directory(1);
+	return 1;
 }
 
 1;

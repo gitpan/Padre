@@ -15,7 +15,7 @@ configure_requires:
   Alien::wxWidgets: 0.46
   ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.97'
+generated_by: 'Module::Install version 0.99'
 keywords:
   - auto-completion
   - code
@@ -79,7 +79,7 @@ requires:
   File::Copy::Recursive: 0.37
   File::Find::Rule: 0.30
   File::Glob: 0
-  File::HomeDir: 0.84
+  File::HomeDir: 0.91
   File::Next: 1.06
   File::Path: 2.07
   File::Remove: 1.42
@@ -99,10 +99,12 @@ requires:
   IO::String: 1.08
   IPC::Open2: 0
   IPC::Open3: 0
+  LWP: 5.815
   List::MoreUtils: 0.22
   List::Util: 1.18
   Module::Build: 0.3603
   Module::CoreList: 0
+  Module::Manifest: 0.07
   Module::Refresh: 0.13
   Module::Starter: 1.50
   ORLite: 1.41
@@ -141,4 +143,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.64
+version: 0.65

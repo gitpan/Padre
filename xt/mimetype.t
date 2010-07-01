@@ -5,6 +5,11 @@ use warnings;
 use Test::More;
 use File::Find::Rule;
 
+# Don't run tests for installs
+unless ( $ENV{AUTOMATED_TESTING} or $ENV{RELEASE_TESTING} ) {
+	plan( skip_all => "Author tests not required for installation" );
+}
+
 my %test_texts = (
 	".class { border: 1px solid; } a { text-decoration: none; }"              => 'text/css',
 	'[% PROCESS Padre %]'                                                     => 'text/x-perltt',
@@ -73,7 +78,6 @@ foreach my $file ( sort( keys(%test_files) ) ) {
 # Some files that actually exist on-disk
 foreach my $file ( sort keys %existing_test_files ) {
 	my $text = slurp("xt/files/$file");
-
 	require Padre::Locale;
 	my $encoding = Padre::Locale::encoding_from_string($text);
 	$text = Encode::decode( $encoding, $text );

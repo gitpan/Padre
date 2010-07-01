@@ -6,10 +6,9 @@ use 5.008;
 use strict;
 use warnings;
 use URI              ();
-use HTTP::Request    ();
 use Padre::Task::LWP ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = 'Padre::Task::LWP';
 
 sub new {
@@ -29,12 +28,11 @@ sub new {
 		$data{svn} = $revision if -d "$dir.svn";
 	}
 
-	# Generate the request URL
-	my $url = URI->new('http://perlide.org/popularity/v1/ping.html');
-	$url->query_form( \%data, ';' );
-
 	# Hand off to the parent constructor
-	return $class->SUPER::new( request => HTTP::Request->new( GET => $url->as_string ) );
+	return $class->SUPER::new(
+		url   => 'http://perlide.org/popularity/v1/ping.html',
+		query => \%data,
+	);
 }
 
 1;

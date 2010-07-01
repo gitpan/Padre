@@ -32,7 +32,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 my $SPLASH = undef;
 
@@ -64,12 +64,7 @@ sub startup {
 
 	# Load and overlay the startup.yml file
 	if ( -f Padre::Constant::CONFIG_STARTUP ) {
-		require YAML::Tiny;
-		my $yaml = YAML::Tiny::LoadFile(Padre::Constant::CONFIG_STARTUP);
-		foreach ( sort keys %setting ) {
-			next unless exists $yaml->{$_};
-			$setting{$_} = $yaml->{$_};
-		}
+		%setting = ( %setting, startup_config() );
 	}
 
 	# Attempt to connect to the single instance server
@@ -111,13 +106,12 @@ sub startup {
 	# NOTE: Replace the following with if ( 0 ) will disable the
 	# slave master quick-spawn optimisation.
 
-	# If we are going to use threading, spawn off the slave
-	# driver as early as we possibly can so we reduce the amount of
-	# wasted memory copying to a minimum.
+	# Second-generation version of the threading optimisation.
+	# This one is much safer because we start with zero existing tasks
+	# and no expectation of existing load behaviour.
 	if ( $setting{threads} ) {
-		require Padre::SlaveDriver;
-
-		# Padre::SlaveDriver->new;
+		require Padre::TaskThread;
+		Padre::TaskThread->master;
 	}
 
 	# Show the splash image now we are starting a new instance
@@ -136,6 +130,7 @@ sub startup {
 			my $share = undef;
 			if ( $ENV{PADRE_DEV} ) {
 				require FindBin;
+				no warnings;
 				$share = File::Spec->catdir(
 					$FindBin::Bin,
 					File::Spec->updir,
@@ -175,6 +170,14 @@ sub startup {
 	}
 
 	return 1;
+}
+
+sub startup_config {
+	open( my $FILE, '<', Padre::Constant::CONFIG_STARTUP ) or return ();
+	my @buffer = <$FILE>;
+	close $FILE or return ();
+	chomp @buffer;
+	return @buffer;
 }
 
 # Destroy the splash screen if it exists

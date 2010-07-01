@@ -4,12 +4,12 @@ use 5.008;
 use strict;
 use warnings;
 use File::Basename;
-use Padre::Wx                  ();
-use Padre::Wx::Role::MainChild ();
+use Padre::Wx             ();
+use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = qw{
-	Padre::Wx::Role::MainChild
+	Padre::Wx::Role::Main
 	Wx::Dialog
 };
 

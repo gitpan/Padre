@@ -35,23 +35,44 @@ used in Padre that will compile out of the application when not in use.
 use 5.008;
 use strict;
 use warnings;
+use threads;
+use threads::shared;
 use Padre::Constant ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
+
+# Handle the PADRE_DEBUG environment variable
+BEGIN {
+	if ( $ENV{PADRE_DEBUG} ) {
+		if ( $ENV{PADRE_DEBUG} eq '1' ) {
+
+			# Debug everything
+			$Padre::Logger::DEBUG = 1;
+		} else {
+
+			# Debug a single class
+			eval "\$$ENV{PADRE_DEBUG}::DEBUG = 1;";
+		}
+	}
+}
 
 sub import {
+	if ( $_[1] and $_[1] eq ':ALL' ) {
+		$Padre::Logger::DEBUG = 1;
+	}
 	my $pkg = ( caller() )[0];
 	eval <<"END_PERL";
 package $pkg;
+
 use constant DEBUG => !! (
-	defined(\$${pkg}::DEBUG)     ? \$${pkg}::DEBUG :
-	defined(\$Padre::Logger::DEBUG) ? \$Padre::Logger::DEBUG :
-	\$ENV{PADRE_DEBUG}
+	defined(\$${pkg}::DEBUG) ? \$${pkg}::DEBUG : \$Padre::Logger::DEBUG
 );
+
 BEGIN {
 	*TRACE = *Padre::Logger::TRACE;
 	TRACE('::DEBUG enabled') if DEBUG;
 }
+
 1;
 END_PERL
 	die("Failed to enable debugging for $pkg") if $@;
@@ -61,19 +82,40 @@ END_PERL
 # Global trace function
 sub TRACE {
 	my $time    = scalar localtime time;
-	my $package = ( caller() )[0];
+	my $caller  = ( caller(1) )[3];
 	my $logfile = Padre::Constant::LOG_FILE;
-	open my $fh, '>>', $logfile or return;
-	foreach my $message (@_) {
-		print $fh sprintf(
-			"%s %s%s\n",
+	my $thread =
+		  ( $INC{'threads.pm'} and threads->self->tid )
+		? ( '(Thread ' . threads->self->tid . ') ' )
+		: '';
+
+	# open my $fh, '>>', $logfile or return;
+	foreach (@_) {
+
+		# print $fh sprintf(
+		print sprintf(
+			"# %s %s%s %s\n",
 			$time,
-			$package,
-			$message,
+			$thread,
+			$caller,
+			string($_),
 		);
 	}
-	close $fh;
+
+	# close $fh;
 	return;
+}
+
+sub string {
+	require Devel::Dumpvar;
+	my $object = shift;
+	my $shared =
+		( $INC{'threads/shared.pm'} and threads::shared::is_shared($object) ) ? ' : shared' : '';
+	my $string =
+		ref($object)
+		? Devel::Dumpvar->_refstring($object)
+		: Devel::Dumpvar->_scalar($object);
+	return $string . $shared;
 }
 
 1;

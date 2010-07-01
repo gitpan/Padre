@@ -10,7 +10,7 @@ use File::Path    ();
 use File::Spec    ();
 use File::HomeDir ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 # Convenience constants for the operating system
 use constant WIN32 => !!( ( $^O eq 'MSWin32' ) or ( $^O eq 'cygwin' ) );
@@ -106,7 +106,7 @@ use constant PLUGIN_DIR => File::Spec->catdir( CONFIG_DIR, 'plugins' );
 use constant PLUGIN_LIB => File::Spec->catdir( PLUGIN_DIR, 'Padre', 'Plugin' );
 use constant CONFIG_HOST    => File::Spec->catfile( CONFIG_DIR, 'config.db' );
 use constant CONFIG_HUMAN   => File::Spec->catfile( CONFIG_DIR, 'config.yml' );
-use constant CONFIG_STARTUP => File::Spec->catfile( CONFIG_DIR, 'startup.yml' );
+use constant CONFIG_STARTUP => File::Spec->catfile( CONFIG_DIR, 'startup.txt' );
 
 # Do the initialisation in a function,
 # so we can run it again later if needed.
@@ -141,7 +141,6 @@ BEGIN {
 # NOTE: The only reason this is here is that it is needed both during
 # main configuration, and also during Padre::Startup.
 use constant DEFAULT_SINGLEINSTANCE => ( WIN32 and not( $ENV{HARNESS_ACTIVE} or $^P ) ) ? 1 : 0;
-
 use constant DEFAULT_SINGLEINSTANCE_PORT => 4444;
 
 1;

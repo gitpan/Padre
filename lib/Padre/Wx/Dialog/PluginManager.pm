@@ -5,14 +5,14 @@ package Padre::Wx::Dialog::PluginManager;
 use 5.008;
 use strict;
 use warnings;
-use Carp                       ();
-use Padre::Wx                  ();
-use Padre::Wx::Icon            ();
-use Padre::Wx::Role::MainChild ();
+use Carp                  ();
+use Padre::Wx             ();
+use Padre::Wx::Icon       ();
+use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = qw{
-	Padre::Wx::Role::MainChild
+	Padre::Wx::Role::Main
 	Wx::Dialog
 };
 
@@ -190,6 +190,8 @@ sub new {
 	$self->Fit;
 	$self->CentreOnParent;
 
+	$self->{list}->SetFocus;
+
 	return $self;
 }
 
@@ -233,8 +235,8 @@ sub list_item_selected {
 	$self->{label}->SetLabel( $plugin->plugin_name );
 
 	# Update plug-in documentation
-	require Padre::DocBrowser;
-	my $browser = Padre::DocBrowser->new;
+	require Padre::Browser;
+	my $browser = Padre::Browser->new;
 	my $class   = $plugin->class;
 	my $doc     = $browser->resolve($class);
 	my $output  = eval { $browser->browse($doc) };

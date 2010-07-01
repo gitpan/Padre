@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -153,7 +153,8 @@ sub new {
 	# Create the task manager
 	require Padre::TaskManager;
 	$self->{task_manager} = Padre::TaskManager->new(
-		use_threads => $self->config->threads,
+		threads => 1,
+		conduit => $self->{wx}->{main},
 	);
 
 	# Create the action queue
@@ -268,6 +269,10 @@ sub project {
 		$self->{project}->{$root} = Padre::Project->from_file($nofile);
 	}
 	return $self->{project}->{$root};
+}
+
+sub project_exists {
+	defined $_[0]->{project}->{ $_[1] };
 }
 
 1;

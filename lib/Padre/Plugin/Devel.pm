@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -253,8 +253,8 @@ sub simulate_crash {
 }
 
 sub simulate_task_crash {
-	require Padre::Task::Debug::Crashing;
-	Padre::Task::Debug::Crashing->new->schedule;
+	require Padre::Plugin::Devel::Crash;
+	Padre::Plugin::Devel::Crash->new->schedule;
 }
 
 sub show_about {

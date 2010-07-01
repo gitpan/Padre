@@ -48,11 +48,11 @@ use Cwd        ();
 use Exporter   ();
 use File::Spec ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = 'Exporter';
 
 # I'd change this, but I suspect it's rather breaky
-our @EXPORT = ## no critic (ProhibitAutomaticExportation)
+our @EXPORT = #-# no critic (ProhibitAutomaticExportation)
 	qw(
 	entry
 	password

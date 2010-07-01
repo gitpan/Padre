@@ -10,8 +10,9 @@ use File::Path     ();
 use File::Basename ();
 use Padre::Config  ();
 use Padre::Current ();
+use Padre::Cache   ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 use Class::XSAccessor {
 	getters => {
@@ -284,6 +285,13 @@ sub ignore_rule {
 	};
 }
 
+# Alternate form
+sub ignore_skip {
+	return [
+		'(?:^|\\/)\\.',
+	];
+}
+
 sub name {
 	my $self = shift;
 	my $name = ( reverse( File::Spec->splitdir( $self->root ) ) )[0];
@@ -294,6 +302,19 @@ sub name {
 	}
 
 	return $name;
+}
+
+
+
+
+
+######################################################################
+# Padre::Cache Integration
+
+sub DESTROY {
+	if ( defined $_[0]->{root} ) {
+		Padre::Cache::release( $_[0]->{root} );
+	}
 }
 
 1;

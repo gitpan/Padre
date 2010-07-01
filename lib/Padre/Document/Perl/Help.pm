@@ -9,7 +9,7 @@ use Padre::Util ();
 use Padre::Help ();
 use Padre::Logger;
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 our @ISA     = 'Padre::Help';
 
 # for caching help list (for faster access)
@@ -174,7 +174,7 @@ sub _parse_perlopref {
 
 	# Open perlopref.pod for reading
 	my $perlopref = File::Spec->join( Padre::Util::sharedir('doc'), 'perlopref', 'perlopref.pod' );
-	if ( open my $fh, '<', $perlopref ) { ## no critic (RequireBriefOpen)
+	if ( open my $fh, '<', $perlopref ) { #-# no critic (RequireBriefOpen)
 		                                  # Add PRECEDENCE to index
 		until ( <$fh> =~ /=head1 PRECEDENCE/ ) { }
 
@@ -253,8 +253,8 @@ sub help_render {
 	}
 
 	# Render using perldoc pseudo code package
-	require Padre::DocBrowser::POD;
-	my $pod      = Padre::DocBrowser::POD->new;
+	require Padre::Browser::POD;
+	my $pod      = Padre::Browser::POD->new;
 	my $doc      = $pod->resolve( $topic, $hints );
 	my $pod_html = $pod->render($doc);
 	if ($pod_html) {

@@ -34,7 +34,7 @@ use List::Util      ();
 use POSIX           ();
 use Padre::Constant ();
 
-our $VERSION   = '0.64';
+our $VERSION   = '0.65';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 
@@ -493,7 +493,7 @@ sub parse_version {
 	my $result;
 	local $/ = "\n";
 	local $_;
-	open( my $fh, '<', $parsefile ) ## no critic (RequireBriefOpen)
+	open( my $fh, '<', $parsefile ) #-# no critic (RequireBriefOpen)
 		or die "Could not open '$parsefile': $!";
 	my $inpod = 0;
 	while (<$fh>) {

@@ -5,8 +5,6 @@ package Padre::Wx;
 use 5.008;
 use strict;
 use warnings;
-use FindBin;
-use File::Spec ();
 
 # Threading must be loaded before Wx loads
 use threads;
@@ -16,16 +14,15 @@ use Thread::Queue 2.11;
 # Load every exportable constant into here, so that they come into
 # existence in the Wx:: packages, allowing everywhere else in the code to
 # use them without braces.
-use Wx ':everything';
-use Wx 'wxTheClipboard';
-use Wx::Event ':everything';
-use Wx::DND     ();
-use Wx::STC     ();
-use Wx::AUI     ();
-use Wx::Locale  ();
-use Padre::Util ();
+use Wx         (':everything');
+use Wx         ('wxTheClipboard');
+use Wx::Event  (':everything');
+use Wx::DND    ();
+use Wx::STC    ();
+use Wx::AUI    ();
+use Wx::Locale ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 # Hard version lock on a new-enough Wx.pm
 BEGIN {
@@ -42,24 +39,26 @@ BEGIN {
 # Defines for sidebar marker; others may be needed for breakpoint
 # icons etc.
 
-sub MarkError      {1}
-sub MarkWarn       {2}
-sub MarkLocation   {3} # current location of the debugger
-sub MarkBreakpoint {4} # location of the debugger breakpoint
-
+use constant {
+	MarkError      => 1,
+	MarkWarn       => 2,
+	MarkLocation   => 3, # current location of the debugger
+	MarkBreakpoint => 4, # location of the debugger breakpoint
+};
 
 
 
 #####################################################################
 # Defines for object IDs
 
-sub ID_TIMER_SYNTAX      {30001}
-sub ID_TIMER_FILECHECK   {30002}
-sub ID_TIMER_POSTINIT    {30003}
-sub ID_TIMER_OUTLINE     {30004}
-sub ID_TIMER_ACTIONQUEUE {30005}
-
-
+use constant {
+	ID_TIMER_SYNTAX      => 30001,
+	ID_TIMER_FILECHECK   => 30002,
+	ID_TIMER_POSTINIT    => 30003,
+	ID_TIMER_OUTLINE     => 30004,
+	ID_TIMER_ACTIONQUEUE => 30005,
+	ID_TIMER_LASTRESORT  => 30006,
+};
 
 
 

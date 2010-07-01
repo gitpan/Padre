@@ -14,7 +14,7 @@ use warnings;
 use Padre::Lock ();
 use Padre::DB   ();
 
-our $VERSION = '0.64';
+our $VERSION = '0.65';
 
 sub new {
 	my $class = shift;
@@ -26,6 +26,9 @@ sub new {
 
 		# Padre::DB Transaction lock
 		db_depth => 0,
+
+		# Padre::Config Transaction lock
+		config_depth => 0,
 
 		# Wx ->Update lock
 		update_depth  => 0,
@@ -54,6 +57,8 @@ sub locked {
 		return !!$self->{busy_depth};
 	} elsif ( $asset eq 'REFRESH' ) {
 		return !!$self->{method_depth};
+	} elsif ( $asset eq 'CONFIG' ) {
+		return !!$self->{config_depth};
 	} else {
 		return !!$self->{method_pending}->{$asset};
 	}
@@ -68,7 +73,7 @@ sub locked {
 # might slow the shutdown process.
 sub shutdown {
 	my $self = shift;
-	my $lock = $self->lock( 'UPDATE', 'REFRESH' );
+	my $lock = $self->lock( 'UPDATE', 'REFRESH', 'CONFIG' );
 	$self->{shutdown} = 1;
 
 	# If we have an update lock running, stop it manually now.
@@ -108,6 +113,27 @@ sub db_decrement {
 	my $self = shift;
 	unless ( --$self->{db_depth} ) {
 		Padre::DB->commit;
+	}
+	return;
+}
+
+sub config_increment {
+	my $self = shift;
+	unless ( $self->{config_depth}++ ) {
+
+		# TO DO: Initiate config locking here
+		# NOTE: Pretty sure we don't need to do anything specific
+		# here for the config file stuff.
+	}
+	return;
+}
+
+sub config_decrement {
+	my $self = shift;
+	unless ( $self->{config_depth}-- ) {
+
+		# Write the config file here
+		$self->owner->config->write;
 	}
 	return;
 }

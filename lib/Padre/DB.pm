@@ -39,7 +39,7 @@ use Padre::DB::LastPositionInFile ();
 use Padre::DB::Session            ();
 use Padre::DB::SessionFile        ();
 
-our $VERSION    = '0.64';
+our $VERSION    = '0.65';
 our $COMPATIBLE = '0.26';
 
 
@@ -87,8 +87,10 @@ sub vacuum {
 	TRACE("VACUUM database") if DEBUG;
 	my $page_size = Padre::DB->pragma("page_size");
 	Padre::DB->do("VACUUM");
-	my $diff = Padre::DB->pragma("page_size") - $page_size;
-	TRACE("Page count difference after VACUUM: $diff") if DEBUG;
+	if (DEBUG) {
+		my $diff = Padre::DB->pragma('page_size') - $page_size;
+		TRACE("Page count difference after VACUUM: $diff");
+	}
 	return;
 }
 
