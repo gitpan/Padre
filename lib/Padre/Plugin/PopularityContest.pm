@@ -118,7 +118,7 @@ use Scalar::Util    ();
 use Padre::Plugin   ();
 use Padre::Constant ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Plugin';
 
 # Track the number of times actions are used
@@ -131,12 +131,18 @@ our %ACTION = ();
 ######################################################################
 # Padre::Plugin Methods
 
-sub plugin_name {
-	'Padre Popularity Contest';
+sub padre_interfaces {
+	return (
+		'Padre::Plugin'           => 0.66,
+		'Padre::Task'             => 0.66,
+		'Padre::Task::LWP'        => 0.66,
+		'Padre::Util::SVN'        => 0.66,
+		'Padre::Wx::Dialog::Text' => 0.66,
+	);
 }
 
-sub plugin_interfaces {
-	'Padre::Plugin' => 0.43;
+sub plugin_name {
+	'Padre Popularity Contest';
 }
 
 sub plugin_enable {
@@ -181,8 +187,7 @@ sub plugin_disable {
 	}
 
 	# Make sure our task class is unloaded
-	require Class::Unload;
-	Class::Unload->unload('Padre::Plugin::PopularityContext::Ping');
+	$self->unload('Padre::Plugin::PopularityContext::Ping');
 
 	$self->SUPER::plugin_disable;
 }

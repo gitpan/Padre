@@ -4,10 +4,10 @@ use 5.008;
 use strict;
 use warnings;
 use Carp         ();
-use Params::Util ('_INSTANCE');
+use Params::Util ();
 use Padre::Task  ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Task';
 
 
@@ -23,7 +23,7 @@ sub new {
 	# Just convert the document to text for now.
 	# Later, we'll suck in more data from the project and
 	# other related documents to do syntax checks more awesomely.
-	unless ( _INSTANCE( $self->{document}, 'Padre::Document' ) ) {
+	unless ( Params::Util::_INSTANCE( $self->{document}, 'Padre::Document' ) ) {
 		die "Failed to provide a document to the syntax check task";
 	}
 

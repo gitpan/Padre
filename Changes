@@ -1,6 +1,86 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do not "tidy" or change the indenting here, or we break svn annotate
 
+0.68 2010.07.28 - Unstable - Post Birthday Hackathon Weekend
+    - Fixed rare bug in t/23_task_chain.t (CHORNY)
+    - Refactored the Action subsystem into a simpler model. The old layout
+      artificially broke it up based on menu structure. The new layout
+      also makes it simpler to do further refactorings (ADAMK)
+    - Removed half the usages of Wx::Perl::Dialog (ADAMK)
+    - Use a hyphen to a separate the current vs native names of the languages
+      in the View menu, as the bracing looked weird with the bracing of some
+      of the languages themselves (ADAMK, ZENOG)
+    - Don't show a additional translated string for the language that is
+      currently active (ADAMK, ZENOG)
+    - When the advanced setting "feature_fontsize" is disabled, Padre will
+      remove the Font Size menu, disable Ctrl-+ and Ctrl--, and (most
+      importantly) will not change the font size in an editor on
+      Ctrl-Scroll (ADAMK)
+    - Added integration with the PPI::Transform API for modifying Perl
+      documents, so the transform objects can modify Padre documents (ADAMK)
+    - Added the "Move POD to __END__" refactoring that lets you extract all
+      the POD scattered through a document, merge it together, and move it
+      to the bottom of the file after an __END__ statement (ADAMK)
+    - If the Open Selection expression only matches one file, immediately
+      open it without showing a pointless dialog (ADAMK)
+    - Removed Wx::Perl::Dialog by inlining it into Padre::Wx::Dialog, this
+      will remove the need to import ':everything', saving 50-100k (ADAMK)
+    - Actions now only need to be declared once, and are all declared in one
+      place in advance (ADAMK)
+    - Directory Tree sort order is now (advanced) configurable between
+      directory-first and directory-mixed (ADAMK)
+    - Moved the Padre::Action* classes to Padre::Wx::Action* as they are now
+      much more tightly dependant on Wx (ADAMK)
+    - Plugins will now do full compatibility testing, which means that when we
+      change an internal API we can just update $COMPATIBLE in that package
+      and any impacted plugins will be automatically disabled until they do a
+      new release. That is far better than "They just crash blindly" (ADAMK)
+    - Create a new main_directory_root settting distinct from the existing
+      default_projects_directory one, specifically for setting the default
+      root of the directory tree. It will continue to be pointed to
+      my_documents by default (the original may change) (ADAMK)
+    - Made Padre::Wx::Dialog::ModuleStart configuration translation-safe (ZENOG)
+    - Updated German translation (ZENOG)
+    - Add Java and BibTeX to MIME types (ZENOG)
+    - Ack ("find in files") output is now more 'clickable', but still not
+      perfect (ZENOG)
+    - Fix File::Open3::open3() call to be IPC::Open3::open3() (BRICAS)
+    - Fix #969: crash when switching language after using Ack (ZENOG)
+    - Remove unnecessary Wx::gettext calls from Padre::Wx::Dialog::Preferences
+      that lead to missing translations (ZENOG)
+    - Description field is hidden by default in the regex editor dialog.
+      A checkbox now optionally toggles its visibility (AZAWAWI)
+    - Padre::Wx::FindResult: Get rid of global variable, shorter column
+      titles, both columns now wxLIST_AUTOSIZE (ZENOG)
+    - Call relocale() for all elements of the Bottom panel (ZENOG)
+    - Remember sorting order in session manager (SEWI) 
+    - Nicer workflow for renaming variables: Now we check for some conditions
+      before prompting the user for a name; renamed function
+      'lexical_variable_replacement' to 'rename_variable' (ZENOG)
+    - Simplify the code for the Bottom pane a bit (-1 method), no warnings
+      any more (ZENOG)
+    - Fixed #970: Switching language removes plugin menus (ZENOG)
+    - Padre::MimeTypes: Fixed some Wx::gettext handling problems, switched
+      keys of menu_view_mimes() so that the names (not the MIME types) of
+      file types are shown in the View menu (ZENOG)
+    - Documentation of Padre::Current (SEWI)
+    - Include only changed files in changed-file-list (SEWI)
+    - Added wxwidgets.pod which contains the method documentation of all Wx
+      classes (AZAWAWI)
+    - Padre has wxWidgets method documentation in F2 help search (AZAWAWI)
+    - Added Padre::Wx::Nth to group first/nth-time startup magic (ADAMK)
+    - Fixed #781 : Unicode should not be used for accessing file system on
+      Win32 (CHORNY)
+    - The New Installation Survey now only appears on the third time that
+      Padre starts, so it doesn't confuse people with locale issues (ADAMK)
+    - Split Padre::Wx::Dialog::WhereFrom into main and FBP classes to try
+      out the designer-based approach experimentally (ADAMK)
+    - Tab width is configurable for opened file too (CHORNY)
+
+0.67 2010.07.27
+    - 0.67 never made it to public release.  All changes listed for 0.68 are what 0.67
+      would have had.
+
 0.66 2010.07.01
     - Improved the quality and integration of the default window size (ADAMK)
     - The non-blocking IO upgrade in 0.65 meant that Padre could no longer

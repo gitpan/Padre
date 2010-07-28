@@ -17,12 +17,12 @@ package Padre::Wx::Icon;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec  ();
-use Padre::Util ();
-use Padre::Wx   ();
-use Params::Util qw( _HASH );
+use File::Spec   ();
+use Params::Util ();
+use Padre::Util  ();
+use Padre::Wx    ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -85,7 +85,7 @@ sub find {
 	# prefer size, icons, ext
 	# over the defaults
 	my %pref =
-		_HASH($prefs)
+		Params::Util::_HASH($prefs)
 		? ( %PREFS, %$prefs )
 		: %PREFS;
 

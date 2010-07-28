@@ -13,7 +13,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current  ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -36,21 +36,27 @@ sub new {
 	# Cache the configuration
 	$self->{config} = Padre->ide->config;
 
-
 	# Perl-Specific Refactoring
 	$self->{rename_variable} = $self->add_menu_action(
 		$self,
-		'refactor.rename_variable',
+		'perl.rename_variable',
 	);
 
 	$self->{extract_subroutine} = $self->add_menu_action(
 		$self,
-		'refactor.extract_subroutine',
+		'perl.extract_subroutine',
 	);
 
 	$self->{introduce_temporary} = $self->add_menu_action(
 		$self,
-		'refactor.introduce_temporary',
+		'perl.introduce_temporary',
+	);
+
+	$self->AppendSeparator;
+
+	$self->{endify_pod} = $self->add_menu_action(
+		$self,
+		'perl.endify_pod',
 	);
 
 	return $self;
@@ -65,9 +71,10 @@ sub refresh {
 	my $current  = Padre::Current::_CURRENT(@_);
 	my $document = $current->document;
 
-	$self->{rename_variable}->Enable( $document->can('lexical_variable_replacement')     ? 1 : 0 );
+	$self->{rename_variable}->Enable( $document->can('rename_variable')                  ? 1 : 0 );
 	$self->{introduce_temporary}->Enable( $document->can('introduce_temporary_variable') ? 1 : 0 );
 	$self->{extract_subroutine}->Enable( $document->can('extract_subroutine')            ? 1 : 0 );
+	$self->{endify_pod}->Enable( $document->isa('Padre::Document::Perl')                 ? 1 : 0 );
 
 	return;
 }

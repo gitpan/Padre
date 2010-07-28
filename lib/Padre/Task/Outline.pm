@@ -1,6 +1,6 @@
 package Padre::Task::Outline;
 
-# Function list refresh task, done mainly as a full-feature proof of concept.
+# Outline refresh task, done mainly as a full-feature proof of concept.
 
 use 5.008005;
 use strict;
@@ -8,7 +8,7 @@ use warnings;
 use Params::Util ('_INSTANCE');
 use Padre::Task  ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Task';
 
 

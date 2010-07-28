@@ -17,7 +17,7 @@ use Padre::Wx             ();
 use Padre::Logger;
 use Wx::RichText; # Is this necesary?
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -429,6 +429,11 @@ sub set_font {
 	$style->SetFont($font);
 	$self->SetDefaultStyle($style);
 	return;
+}
+
+sub relocale {
+
+	# do nothing
 }
 
 1;

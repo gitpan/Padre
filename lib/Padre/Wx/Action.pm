@@ -1,37 +1,23 @@
-package Padre::Action;
+package Padre::Wx::Action;
 
 use 5.008;
 use strict;
 use warnings;
+use Padre::Constant ();
+use Padre::Wx       ();
 
-use Padre::Constant         ();
-use Padre::Action::View     ();
-use Padre::Action::File     ();
-use Padre::Action::Help     ();
-use Padre::Action::Edit     ();
-use Padre::Action::Search   ();
-use Padre::Action::Perl     ();
-use Padre::Action::Refactor ();
-use Padre::Action::Run      ();
-use Padre::Action::Debug    ();
-use Padre::Action::Tools    ();
-use Padre::Action::Window   ();
-use Padre::Action::Internal ();
-
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 # Generate faster accessors
 use Class::XSAccessor {
 	getters => {
 		id            => 'id',
-		icon          => 'icon',
-		comment       => 'comment',
 		name          => 'name',
-		label         => 'label',
+		icon          => 'icon',
 		shortcut      => 'shortcut',
 		menu_event    => 'menu_event',
-		toolbar_event => 'toolbar_event',
 		menu_method   => 'menu_method',
+		toolbar_event => 'toolbar_event',
 		toolbar_icon  => 'toolbar',
 	}
 };
@@ -47,19 +33,6 @@ use Class::XSAccessor {
 sub create {
 	my $main = shift;
 
-	Padre::Action::Internal->new($main);
-	Padre::Action::File->new($main);
-	Padre::Action::Edit->new($main);
-	Padre::Action::Search->new($main);
-	Padre::Action::View->new($main);
-	Padre::Action::Perl->new($main);
-	Padre::Action::Refactor->new($main);
-	Padre::Action::Run->new($main);
-	Padre::Action::Debug->new($main);
-	Padre::Action::Tools->new($main);
-	Padre::Action::Window->new($main);
-	Padre::Action::Help->new($main);
-
 	# This is made for usage by the developers to create a complete
 	# list of all actions used in Padre. It outputs some warnings
 	# while dumping, but they're ignored for now as it should never
@@ -67,9 +40,16 @@ sub create {
 	if ( $ENV{PADRE_EXPORT_ACTIONS} ) {
 		require Data::Dumper;
 		require File::Spec;
-		$Data::Dumper::Purity = 1;
-		open my $action_export_fh, '>', File::Spec->catfile( Padre::Constant::CONFIG_DIR, 'actions.dump' );
-		print $action_export_fh Data::Dumper::Dumper( Padre->ide->actions );
+		$Data::Dumper::Purity = $Data::Dumper::Purity = 1;
+		open(
+			my $action_export_fh,
+			'>',
+			File::Spec->catfile(
+				Padre::Constant::CONFIG_DIR,
+				'actions.dump',
+			),
+		);
+		print $action_export_fh Data::Dumper::Dumper( $_[0]->ide->actions );
 		close $action_export_fh;
 	}
 
@@ -81,41 +61,37 @@ sub create {
 # Constructor
 
 sub new {
-	my $class = shift;
-	Carp::confess( Data::Dumper::Dumper \@_ ) if @_ % 2;
-	my $self = bless {@_}, $class;
-	$self->{id} ||= -1;
-
-	if ( ( !defined( $self->{name} ) ) or ( $self->{name} eq '' ) ) {
-		warn join( ',', caller ) . " tried to create an action without name";
-		return;
-	}
-
-	# The menu prefix is dedicated to menus and must not be used by actions
-	if ( $self->{name} =~ /^menu\./ ) {
-		warn join( ',', caller ) . ' tried to create an action with name prefix menu';
-		return;
-	}
-
-	if ( defined( $self->{menu_event} ) ) {
-
-		# Menu events are handled by Padre::Action, the real events
-		# should go to {event}!
-		$self->add_event( $self->{menu_event} );
-		$self->{menu_event} =
-			eval ' return sub { ' . "Padre->ide->actions->{'" . $self->{name} . "'}->_event(\@_);" . '};';
-	}
-
-	$self->{queue_event} ||= $self->{menu_event};
-
+	my $class    = shift;
+	my $ide      = Padre->ide;
+	my $actions  = $ide->actions;
+	my $self     = bless { id => -1, @_ }, $class;
 	my $name     = $self->{name};
 	my $shortcut = $self->{shortcut};
 
-	my $actions = Padre->ide->actions;
-	if ( $actions->{$name} ) {
+	# Check the name
+	unless ( defined $name and length $name ) {
+		die join( ',', caller ) . ' tried to create an action without name';
+	}
+	if ( $name =~ /^menu\./ ) {
+
+		# The menu prefix is dedicated to menus and must not be used by actions
+		die join( ',', caller ) . ' tried to create an action with name prefix menu';
+	}
+	if ( $actions->{$name} && $name !~ /^view\.language\./ ) {
 		warn "Found a duplicate action '$name'\n";
 	}
 
+	# Menu events are handled by Padre::Wx::Action, the real events
+	# should go to {event}!
+	if ( defined $self->{menu_event} ) {
+		$self->add_event( $self->{menu_event} );
+		$self->{menu_event} = sub {
+			Padre->ide->actions->{$name}->_event(@_);
+		};
+	}
+	$self->{queue_event} ||= $self->{menu_event};
+
+	# Validate the shortcut
 	if ($shortcut) {
 		foreach my $n ( keys %$actions ) {
 			my $a = $actions->{$n};
@@ -125,7 +101,7 @@ sub new {
 			last;
 		}
 
-		my $shortcuts = Padre->ide->{shortcuts};
+		my $shortcuts = $ide->{shortcuts};
 		if ( defined( $shortcuts->{$shortcut} ) ) {
 			warn "Found a duplicate shortcut '$shortcut' with " . $shortcuts->{$shortcut}->name . " for '$name'\n";
 		} else {
@@ -133,9 +109,15 @@ sub new {
 		}
 	}
 
-	$actions->{ $self->{name} } = $self;
+	# Save the action
+	$actions->{$name} = $self;
 
 	return $self;
+}
+
+# Translate on the fly when requested
+sub label {
+	Wx::gettext( $_[0]->{label} );
 }
 
 # A label textual data without any strange menu characters
@@ -144,6 +126,11 @@ sub label_text {
 	my $label = $self->label;
 	$label =~ s/\&//g;
 	return $label;
+}
+
+# Translate on the fly when requested
+sub comment {
+	Wx::gettext( $_[0]->{comment} );
 }
 
 # Label for use with menu (with shortcut)
@@ -206,24 +193,30 @@ sub _event {
 	return 1;
 }
 
-#####################################################################
-# Main Methods
+1;
+
+# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# LICENSE
+# This program is free software; you can redistribute it and/or
+# modify it under the same terms as Perl 5 itself.
+
+__END__
 
 =pod
 
 =head1 NAME
 
-Padre::Action - Padre Action Object
+Padre::Wx::Action - Padre Action Object
 
 =head1 SYNOPSIS
 
-  my $action = Padre::Action->new(
-    name       => 'file.save',
-    label      => 'Save',
-    comment    => 'Saves the current file to disk',
-    icon       => '...',
-    shortcut   => 'CTRL-S',
-    menu_event => sub { },
+  my $action = Padre::Wx::Action->new(
+      name       => 'file.save',
+      label      => 'Save',
+      comment    => 'Saves the current file to disk',
+      icon       => '...',
+      shortcut   => 'CTRL-S',
+      menu_event => sub { },
   );
 
 =head1 DESCRIPTION
@@ -248,7 +241,7 @@ Each action requires an unique name which is used to reference and call it.
 
 The name usually has the syntax
 
-	group.action
+  group.action
 
 Both group and action should only contain \w+ chars.
 
@@ -309,18 +302,18 @@ was no change which could be undone.)
 
 The CODE receives a list of objects which should help with the decision:
 
-	config		contains the current configuration object
-	editor		the current editor object
-	document	the current document object
-	main		the main Wx object
+  config      Contains the current configuration object
+  editor      The current editor object
+  document    The current document object
+  main        The main Wx object
 
 A typical sub for handling would look like this:
 
-	need => sub {
-			my %objects = @_;
-			return 0 if !defined( $objects{editor} );
-			return $objects{editor}->CanUndo;
-		},
+  need => sub {
+      my %objects = @_;
+      return 0 if !defined( $objects{editor} );
+      return $objects{editor}->CanUndo;
+  },
 
 Use this with caution! As this function is called very often there are few
 to no checks and if this isn't a CODE reference, Padre may crash at all or
@@ -365,10 +358,3 @@ The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
-
-1;
-
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
-# LICENSE
-# This program is free software; you can redistribute it and/or
-# modify it under the same terms as Perl 5 itself.

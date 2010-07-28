@@ -28,11 +28,11 @@ object that can independently search and/or replace in an editor object.
 use 5.008;
 use strict;
 use warnings;
-use Encode     ();
-use List::Util ();
-use Params::Util '_INSTANCE';
+use Encode       ();
+use List::Util   ();
+use Params::Util ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 use Class::XSAccessor {
 	getters => {
@@ -49,7 +49,7 @@ sub new {
 	my $class = shift;
 	my $self = bless {@_}, $class;
 	unless ( defined $self->find_term ) {
-		die("Did not provide 'find_term' search term");
+		die "Did not provide 'find_term' search term";
 	}
 	unless ( length $self->find_term ) {
 
@@ -155,42 +155,42 @@ sub replace_previous {
 
 sub search_down {
 	my $self = shift;
-	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
 		return $self->editor_search_down(@_);
 	}
-	die("Missing or invalid content object to search in");
+	die "Missing or invalid content object to search in";
 }
 
 sub search_up {
 	my $self = shift;
-	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
 		return $self->editor_search_up(@_);
 	}
-	die("Missing or invalid content object to search in");
+	die "Missing or invalid content object to search in";
 }
 
 sub replace {
 	my $self = shift;
-	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
 		return $self->editor_replace(@_);
 	}
-	die("Missing or invalid content object to search in");
+	die "Missing or invalid content object to search in";
 }
 
 sub replace_all {
 	my $self = shift;
-	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
 		return $self->editor_replace_all(@_);
 	}
-	die("Missing or invalid content object to search in");
+	die "Missing or invalid content object to search in";
 }
 
 sub count_all {
 	my $self = shift;
-	if ( _INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
+	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Wx::Editor' ) ) {
 		return $self->editor_count_all(@_);
 	}
-	die("Missing or invalid content object to search in");
+	die "Missing or invalid content object to search in";
 }
 
 
@@ -203,8 +203,8 @@ sub count_all {
 sub editor_search_down {
 	my $self   = shift;
 	my $editor = shift;
-	unless ( _INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
-		die("Failed to provide editor object to search in");
+	unless ( Params::Util::_INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
+		die "Failed to provide editor object to search in";
 	}
 
 	# Execute the search and move to the resulting location
@@ -223,8 +223,8 @@ sub editor_search_down {
 sub editor_search_up {
 	my $self   = shift;
 	my $editor = shift;
-	unless ( _INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
-		die("Failed to provide editor object to search in");
+	unless ( Params::Util::_INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
+		die "Failed to provide editor object to search in";
 	}
 
 	# Execute the search and move to the resulting location
@@ -244,8 +244,8 @@ sub editor_search_up {
 sub editor_replace {
 	my $self   = shift;
 	my $editor = shift;
-	unless ( _INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
-		die("Failed to provide editor object to replace in");
+	unless ( Params::Util::_INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
+		die "Failed to provide editor object to replace in";
 	}
 
 	# Execute the search
@@ -284,8 +284,8 @@ sub editor_replace {
 sub editor_replace_all {
 	my $self   = shift;
 	my $editor = shift;
-	unless ( _INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
-		die("Failed to provide editor object to replace in");
+	unless ( Params::Util::_INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
+		die 'Failed to provide editor object to replace in';
 	}
 
 	# Execute the search for all matches
@@ -314,8 +314,8 @@ sub editor_replace_all {
 sub editor_count_all {
 	my $self   = shift;
 	my $editor = shift;
-	unless ( _INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
-		die("Failed to provide editor object to replace in");
+	unless ( Params::Util::_INSTANCE( $editor, 'Padre::Wx::Editor' ) ) {
+		die "Failed to provide editor object to replace in";
 	}
 
 	# Execute the search for all matches

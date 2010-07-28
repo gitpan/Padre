@@ -6,13 +6,16 @@ package Padre::Wx::Directory::Task;
 use 5.008;
 use strict;
 use warnings;
+use Scalar::Util               ();
 use Padre::Task                ();
 use Padre::Wx::Directory::Path ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Task';
 
 use constant NO_WARN => 1;
+
+
 
 
 
@@ -35,6 +38,9 @@ sub new {
 	}
 	unless ( defined $self->{recursive} ) {
 		$self->{recursive} = 1;
+	}
+	unless ( defined $self->{order} ) {
+		$self->{order} = 'first';
 	}
 
 	return $self;
@@ -68,7 +74,7 @@ sub run {
 	my $path = defined( $queue[0]->path ) ? $queue[0]->path : "";
 	my $name = defined( $queue[0]->name ) ? $queue[0]->name : "";
 
-	my %path_cache = ( File::Spec->catdir( $path, $name ) => $queue[0] );
+	my %seen = ( File::Spec->catdir( $path, $name ) => $queue[0] );
 
 	# Get the device of the root path
 	my $dev = ( stat($root) )[0];
@@ -86,21 +92,22 @@ sub run {
 		my @list = readdir DIRECTORY;
 		closedir DIRECTORY;
 
+		# Step 1 - Map the files into path objects
+		my @objects = ();
 		foreach my $file (@list) {
-
-			my $skip = 0;
-
 			next if $file =~ /^\.+\z/;
+
+			# Traverse symlinks
+			my $skip = 0;
 			my $fullname = File::Spec->catdir( $dir, $file );
-
 			while (1) {
-
 				my $target;
 
 				# readlink may die if symlinks are not implemented
+				local $@;
 				eval { $target = readlink($fullname); };
 				last if $@; # readlink failed
-				last unless defined($target); # not a link
+				last unless defined $target; # not a link
 
 				# Target may be "/home/user/foo" or "../foo" or "bin/foo"
 				$fullname =
@@ -109,21 +116,22 @@ sub run {
 					: File::Spec->canonpath( File::Spec->catdir( $dir, $target ) );
 
 				# Get it from the cache in case of loops:
-				if ( exists $path_cache{$fullname} ) {
-					push @files, $path_cache{$fullname} if defined( $path_cache{$fullname} );
+				if ( exists $seen{$fullname} ) {
+					if ( defined $seen{$fullname} ) {
+						push @files, $seen{$fullname};
+					}
 					$skip = 1;
 					last;
 				}
 
 				# Prepare a cache object to step out of symlink loops
-				$path_cache{$fullname} = undef;
+				$seen{$fullname} = undef;
 			}
 			next if $skip;
 
-			my @fstat = stat($fullname);
-
 			# File doesn't exist, either a directory error, symlink to nowhere or something unexpected.
 			# Don't worry, just skip, because we can't show it in the dir browser anyway
+			my @fstat = stat($fullname);
 			next if $#fstat == -1;
 
 			if ( $dev != $fstat[0] ) {
@@ -132,30 +140,70 @@ sub run {
 				next;
 			}
 
+			# Convert to the path object and apply ignorance
+			# The four element list we add is the mapping phase
+			# of a Schwartzian transform.
 			if ( -f _ ) {
 				my $object = Padre::Wx::Directory::Path->file( @path, $file );
 				next if $rule->skipped( $object->unix );
-				push @files, $object;
+				push @objects,
+					[
+					$object,
+					$fullname,
+					$object->is_directory,
+					lc( $object->name ),
+					];
 
 			} elsif ( -d _ ) {
 				my $object = Padre::Wx::Directory::Path->directory( @path, $file );
 				next if $rule->skipped( $object->unix );
-				push @files, $object;
-
-				# Continue down within it?
-				next unless $self->{recursive};
-				push @queue, $object;
-				$path_cache{$fullname} = $object;
-
+				push @objects,
+					[
+					$object,
+					$fullname,
+					$object->is_directory,
+					lc( $object->name ),
+					];
 			} else {
 				warn "Unknown or unsupported file type for $fullname" unless NO_WARN;
 			}
 		}
+
+		# Step 2 - Apply the desired sort order
+		if ( $self->{order} eq 'first' ) {
+			@objects =
+				sort { $b->[2] <=> $a->[2] or $a->[3] cmp $b->[3] } @objects;
+		} else {
+			@objects = sort { $a->[3] cmp $b->[3] } @objects;
+		}
+
+		# Step 3 - Inject into the output list below our parent so
+		# that the directory tree will generate properly.
+		my $i = 0;
+		my $p = Scalar::Util::refaddr($parent);
+		foreach ( 0 .. $#files ) {
+			next unless Scalar::Util::refaddr( $files[$_] ) == $p;
+			$i = $_ + 1;
+			last;
+		}
+		splice @files, $i, 0, map { $_->[0] } @objects;
+
+		# Step 4 - Queue the directories to recurse into
+		foreach my $object (@objects) {
+			next unless $object->[2];
+
+			# NOTE: Selective expansion should be done here
+			next unless $self->{recursive};
+
+			# Because we now sort a directory at a time, we'll need to do it
+			# depth-first. So add the directories to the front of the queue.
+			push @queue, $object->[0];
+			$seen{ $object->[1] } = $object->[0];
+		}
 	}
 
-	# Case insensitive Schwartzian sort so the caller doesn't have to
-	# do the sort while blocking.
-	$self->{model} = [ sort { $a->compare($b) } @files ];
+	# Save and return
+	$self->{model} = [@files];
 
 	return 1;
 }

@@ -5,11 +5,10 @@ package Padre::Wx::Menu::RightClick;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Current qw{_CURRENT};
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Wx::Menu';
 
 sub new {

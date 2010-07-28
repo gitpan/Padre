@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -101,7 +101,7 @@ sub on_menu_help_context_help {
 	if ( $error->isa('Parse::ErrorString::Perl::StackItem') ) {
 		return;
 	}
-	my $diagnostics = Wx::gettext("No diagnostics available for this error!");
+	my $diagnostics = Wx::gettext("No diagnostics available for this error.");
 	if ( $error->diagnostics ) {
 		$diagnostics = $error->diagnostics;
 		$diagnostics =~ s/[A-Z]<(.*?)>/$1/sg;
@@ -158,6 +158,11 @@ sub bottom {
 
 sub gettext_label {
 	Wx::gettext('Errors');
+}
+
+sub relocale {
+
+	# do nothing
 }
 
 sub clear {

@@ -12,8 +12,8 @@ Padre::Wx::Main - The main window for the Padre IDE
 =head1 DESCRIPTION
 
 C<Padre::Wx::Main> implements Padre's main window. It is the window
-containing the menus, the notebook with all opened tabs, the various sub-
-windows (outline, subs, output, errors, etc).
+containing the menus, the notebook with all opened tabs, the various
+sub-windows (outline, subs, output, errors, etc).
 
 It inherits from C<Wx::Frame>, so check Wx documentation to see all
 the available methods that can be applied to it besides the added ones
@@ -34,10 +34,12 @@ use File::HomeDir                 ();
 use File::Basename                ();
 use File::Temp                    ();
 use List::Util                    ();
+use List::MoreUtils               ();
 use Scalar::Util                  ();
 use Params::Util                  ();
 use Time::HiRes                   ();
-use Padre::Action                 ();
+use Padre::Wx::Action             ();
+use Padre::Wx::ActionLibrary      ();
 use Padre::Constant               ();
 use Padre::Util                   ('_T');
 use Padre::Perl                   ();
@@ -61,11 +63,14 @@ use Padre::Wx::FileDropTarget     ();
 use Padre::Wx::Dialog::Text       ();
 use Padre::Wx::Dialog::FilterTool ();
 use Padre::Wx::Role::Conduit      ();
+use Padre::Wx::Role::Dialog       ();
+use Padre::Wx::Dialog::WindowList ();
 use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = qw{
 	Padre::Wx::Role::Conduit
+	Padre::Wx::Role::Dialog
 	Wx::Frame
 };
 
@@ -146,10 +151,6 @@ sub new {
 	# This prevents tons of ide->config
 	$self->{config} = $config;
 
-	# Create the lock manager before any gui operations,
-	# so that we can do locking operations during startup.
-	$self->{locker} = Padre::Locker->new($self);
-
 	# Remember where the editor started from,
 	# this could be handy later.
 	$self->{cwd} = Cwd::cwd();
@@ -166,6 +167,10 @@ sub new {
 		chdir( File::HomeDir->my_home );
 	}
 
+	# Create the lock manager before any gui operations,
+	# so that we can do locking operations during startup.
+	$self->{locker} = Padre::Locker->new($self);
+
 	# Bootstrap locale support before we start fiddling with the GUI.
 	$self->{locale} = Padre::Locale::object();
 
@@ -173,8 +178,11 @@ sub new {
 	# if it gets very small, or even mildly small.
 	$self->SetMinSize( Wx::Size->new( 500, 400 ) );
 
-	# Drag and drop support
+	# Bootstrap drag and drop support
 	Padre::Wx::FileDropTarget->set($self);
+
+	# Bootstrap the action system
+	Padre::Wx::ActionLibrary->init($self);
 
 	# Temporary store for the notebook tab history
 	# TO DO: Storing this here (might) violate encapsulation.
@@ -186,9 +194,6 @@ sub new {
 
 	# Add some additional attribute slots
 	$self->{marker} = {};
-
-	# Create the actions
-	Padre::Action::create($self);
 
 	# Create the menu bar
 	$self->{menu} = Padre::Wx::Menubar->new($self);
@@ -272,7 +277,7 @@ sub new {
 	# at the beginning and hide it in the timer, if it was not needed
 	# TO DO: there might be better ways to fix that issue...
 	#$statusbar->Show;
-	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT, );
+	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT );
 	Wx::Event::EVT_TIMER(
 		$self,
 		Padre::Wx::ID_TIMER_POSTINIT,
@@ -356,13 +361,8 @@ sub timer_start {
 	# Check for new plug-ins and alert the user to them
 	$manager->alert_new;
 
-	unless ( $Padre::Test::VERSION or $config->feedback_done ) {
-		require Padre::Wx::Dialog::WhereFrom;
-		Padre::Wx::Dialog::WhereFrom->new($self);
-	}
-
 	# Start the change detection timer
-	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_FILECHECK );
+	my $timer1 = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_FILECHECK );
 	Wx::Event::EVT_TIMER(
 		$self,
 		Padre::Wx::ID_TIMER_FILECHECK,
@@ -370,12 +370,35 @@ sub timer_start {
 			$_[0]->timer_check_overwrite;
 		},
 	);
-	$timer->Start( $config->update_file_from_disk_interval * SECONDS, 0 );
+	$timer1->Start( $config->update_file_from_disk_interval * SECONDS, 0 );
 
 	# Start the second-generation task manager
 	$self->ide->task_manager->start;
 
+	# Give a chance for post-start code to run, then do the nth-start logic
+	my $timer2 = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_NTH );
+	Wx::Event::EVT_TIMER(
+		$self,
+		Padre::Wx::ID_TIMER_NTH,
+		sub {
+			$_[0]->timer_nth;
+		},
+	);
+	$timer2->Start( 1 * SECONDS, 1 );
+
 	return;
+}
+
+sub timer_nth {
+	my $self = shift;
+
+	# Hand off to the nth start system
+	unless ($Padre::Test::VERSION) {
+		require Padre::Wx::Nth;
+		Padre::Wx::Nth->nth( $self, $self->config->startup_count );
+	}
+
+	return 1;
 }
 
 
@@ -1618,36 +1641,22 @@ sub relocale {
 	# Relocale the plug-ins
 	$self->ide->plugin_manager->relocale;
 
-	# Empty actions to stop getting false warnings about duplicated
-	# actions and shortcuts
-	my %actions = ();
-	$self->ide->actions( \%actions );
-
-	# Create the actions (again)
-	Padre::Action::create($self);
-
 	# The menu doesn't support relocale, replace it
 	delete $self->{menu};
 	$self->{menu} = Padre::Wx::Menubar->new($self);
 	$self->SetMenuBar( $self->menu->wx );
+
+	# Refresh the plugins' menu entries
+	$self->refresh_menu_plugins;
 
 	# The toolbar doesn't support relocale, replace it
 	$self->rebuild_toolbar;
 
 	# Update window manager captions
 	$self->aui->relocale;
-	if ( $self->has_left ) {
-		$self->left->relocale;
-	}
-	if ( $self->has_right ) {
-		$self->right->relocale;
-	}
-	if ( $self->has_bottom ) {
-		$self->bottom->relocale;
-	}
-	if ( $self->has_syntax ) {
-		$self->syntax->relocale;
-	}
+	$self->left->relocale   if $self->has_left;
+	$self->right->relocale  if $self->has_right;
+	$self->bottom->relocale if $self->has_bottom;
 
 	return;
 }
@@ -2701,24 +2710,7 @@ sub save_current_session {
 
 Various methods to help send information to user.
 
-=head3 C<message>
-
-    $main->message( $msg, $title );
-
-Open a dialog box with C<$msg> as main text and C<$title> (title
-defaults to C<Message>). There's only one OK button. No return value.
-
-=cut
-
-sub message {
-	my $self    = shift;
-	my $message = shift;
-	my $title   = shift || Wx::gettext('Message');
-	Wx::MessageBox( $message, $title, Wx::wxOK | Wx::wxCENTRE, $self );
-	return;
-}
-
-=pod
+Some methods are inherited from L<Padre::Wx::Role::Dialog>.
 
 =head3 C<info>
 
@@ -2731,41 +2723,18 @@ The dialog has only a OK button and there is no return value.
 =cut
 
 sub info {
-	my $self    = shift;
-	my $message = shift;
-	my $title   = shift;
+	my $self = shift;
 
-	my $ide    = $self->ide;
-	my $config = $ide->config;
-
-	if ( $config->info_on_statusbar ) {
-		$message =~ s/[\r\n]+/ /g;
-		$self->{infomessage}         = $message;
-		$self->{infomessage_timeout} = time + 10;
-		$self->refresh_status;
-	} else {
-		$self->message( $message, $title );
+	unless ( $self->config->info_on_statusbar ) {
+		return $self->message(@_);
 	}
 
+	my $message = shift;
+	$message =~ s/[\r\n]+/ /g;
+	$self->{infomessage}         = $message;
+	$self->{infomessage_timeout} = time + 10;
+	$self->refresh_status;
 	return;
-}
-
-=pod
-
-=head3 C<error>
-
-    $main->error( $msg );
-
-Open an error dialog box with C<$msg> as main text. There's only one OK
-button. No return value.
-
-=cut
-
-sub error {
-	my ( $self, $message ) = @_;
-	$message ||= Wx::gettext('Unknown error from ') . caller;
-	my $styles = Wx::wxOK | Wx::wxCENTRE | Wx::wxICON_HAND;
-	Wx::MessageBox( $message, Wx::gettext('Error'), $styles, $self );
 }
 
 =pod
@@ -3202,6 +3171,9 @@ sub on_close_window {
 	$ide->plugin_manager->shutdown;
 	TRACE("After plugin manager shutdown") if DEBUG;
 
+	# Increment the startup counter now, so that it is higher next time
+	$config->set( startup_count => $config->startup_count + 1 );
+
 	# Write the configuration to disk
 	$ide->save_config;
 	$event->Skip;
@@ -3480,8 +3452,8 @@ No return value.
 sub on_open_selection {
 	my $self    = shift;
 	my $current = $self->current;
-	return unless $current->editor;
-	my $text = $current->text;
+	my $editor  = $current->editor or return;
+	my $text    = $current->text;
 
 	# get selection, ask for it if needed
 	unless ( length $text ) {
@@ -3523,8 +3495,8 @@ sub on_open_selection {
 		}
 	}
 	unless (@files) {
-		my $doc = $self->current->document;
-		push @files, $doc->guess_filename_to_open($text);
+		my $document = $current->document;
+		push @files, $document->guess_filename_to_open($text);
 	}
 
 	unless (@files) {
@@ -3535,18 +3507,17 @@ sub on_open_selection {
 		return;
 	}
 
-	# eliminate duplicates
-	my %seen;
-	@files = grep { !$seen{$_}++ } @files;
-
-	require Wx::Perl::Dialog::Simple;
-	my $file = Wx::Perl::Dialog::Simple::single_choice(
-		title   => Wx::gettext('Choose File'),
-		choices => \@files
-	);
-
-	if ($file) {
-		$self->setup_editors($file);
+	# Pick a file
+	@files = List::MoreUtils::uniq @files;
+	if ( @files > 1 ) {
+		my $file = $self->single_choice(
+			Wx::gettext('Choose File'),
+			'',
+			[ List::MoreUtils::uniq @files ],
+		);
+		$self->setup_editors($file) if defined $file;
+	} else {
+		$self->setup_editors( $files[0] );
 	}
 
 	return;
@@ -3844,7 +3815,6 @@ sub on_reload_some {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 
-	require Padre::Wx::Dialog::WindowList;
 	Padre::Wx::Dialog::WindowList->new(
 		$self,
 		title      => Wx::gettext('Reload some files'),
@@ -4480,7 +4450,6 @@ sub on_close_some {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 
-	require Padre::Wx::Dialog::WindowList;
 	Padre::Wx::Dialog::WindowList->new(
 		$self,
 		title      => Wx::gettext('Close some files'),
@@ -4583,6 +4552,7 @@ sub on_nth_pane {
 		$self->notebook->SetSelection($id);
 		$self->refresh_status( $self->current );
 		$page->{Document}->set_indentation_style(); # TO DO: encapsulation?
+		$page->SetFocus;
 
 		$manager->plugin_event('editor_changed');
 
@@ -5689,7 +5659,15 @@ sub timer_check_overwrite {
 	#		$doc->{timestamp} = $doc->timestamp_now;
 	#	}
 
-	$self->on_reload_some; # Show dialog for file reload selection
+	# Show dialog for file reload selection
+	my $winlist = Padre::Wx::Dialog::WindowList->new(
+		$self,
+		title      => Wx::gettext('Close some files'),
+		list_title => Wx::gettext('Select files to close:'),
+		buttons    => [ [ 'Close selected', sub { $_[0]->main->close_some(@_); } ] ],
+	);
+	$winlist->{no_fresh} = 1;
+	$winlist->show;
 
 	$doc->{_already_popup_file_changed} = 0;
 
@@ -5812,11 +5790,7 @@ sub on_new_from_template {
 	# Generate the full file content
 	require Template::Tiny;
 	my $output = '';
-	Template::Tiny->new->process(
-		$template,
-		$data,
-		\$output,
-	);
+	Template::Tiny->new->process( $template, $data, \$output );
 
 	# Create the file from the content
 	require Padre::MimeTypes;
@@ -5829,6 +5803,29 @@ sub on_new_from_template {
 =head2 Auxiliary Methods
 
 Various methods that did not fit exactly in above categories...
+
+=head2 C<action>
+
+  Padre::Current->main->action('help.about');
+
+Single execution of a named action.
+
+=cut
+
+sub action {
+	my $self = shift;
+	my $name = shift;
+
+	# Does the action exist
+	my $action = $self->ide->{actions}->{$name};
+	unless ($action) {
+		die "No such action '$name'";
+	}
+
+	# Execute the action
+	$action->menu_event->($self);
+	return 1;
+}
 
 =head3 C<install_cpan>
 
@@ -6150,7 +6147,7 @@ sub _filter_tool_run {
 	my $filter_out;
 	my $filter_err;
 
-	unless ( File::Open3::open3( $filter_in, $filter_out, $filter_err, $cmd ) ) {
+	unless ( IPC::Open3::open3( $filter_in, $filter_out, $filter_err, $cmd ) ) {
 		$self->error( sprintf( Wx::gettext("Error running filter tool:\n%s"), $! ) );
 		return;
 	}

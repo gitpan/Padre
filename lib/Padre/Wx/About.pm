@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -309,7 +309,7 @@ END_HTML
 sub _content_info {
 	my $self           = shift;
 	my $padre_info     = Wx::gettext('System Info');
-	my $config_dir_txt = Wx::gettext('Config dir:');
+	my $config_dir_txt = Wx::gettext('Config:');
 	my $config_dir     = Padre::Constant::CONFIG_DIR;
 
 	# Reformat the native wxWidgets version string slightly
@@ -426,7 +426,7 @@ sub ShowModal {
 
 # Arabic and Hebrew names are not showing up correctly
 sub _rtl {
-	my ( $self, $text ) = @_;
+	my $text = $_[1];
 	$text =~ s/(\p{InArabic}+)\s+(\p{InArabic}+)\s+(\p{InArabic}+)/$3 $2 $1/g;
 	$text =~ s/(\p{InHebrew}+)\s+(\p{InHebrew}+)/$2 $1/g;
 	return $text;

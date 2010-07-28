@@ -23,6 +23,7 @@ eg/ruby/hello_world.rb
 eg/syntax_demo.css
 eg/syntax_demo.js
 eg/syntax_demo.json
+fbp/feedback.fbp
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
@@ -37,20 +38,6 @@ inc/Module/Install/Win32.pm
 inc/Module/Install/With.pm
 inc/Module/Install/WriteAll.pm
 lib/Padre.pm
-lib/Padre/Action.pm
-lib/Padre/Action/Debug.pm
-lib/Padre/Action/Edit.pm
-lib/Padre/Action/File.pm
-lib/Padre/Action/Help.pm
-lib/Padre/Action/Internal.pm
-lib/Padre/Action/Perl.pm
-lib/Padre/Action/Queue.pm
-lib/Padre/Action/Refactor.pm
-lib/Padre/Action/Run.pm
-lib/Padre/Action/Search.pm
-lib/Padre/Action/Tools.pm
-lib/Padre/Action/View.pm
-lib/Padre/Action/Window.pm
 lib/Padre/Autosave.pm
 lib/Padre/Browser.pm
 lib/Padre/Browser/Document.pm
@@ -121,6 +108,9 @@ lib/Padre/PluginHandle.pm
 lib/Padre/PluginManager.pm
 lib/Padre/Pod2HTML.pm
 lib/Padre/PPI.pm
+lib/Padre/PPI/EndifyPod.pm
+lib/Padre/PPI/Transform.pm
+lib/Padre/PPI/UpdateCopyright.pm
 lib/Padre/Project.pm
 lib/Padre/Project/Null.pm
 lib/Padre/Project/Perl.pm
@@ -128,6 +118,7 @@ lib/Padre/Project/Perl/DZ.pm
 lib/Padre/Project/Perl/EUMM.pm
 lib/Padre/Project/Perl/MB.pm
 lib/Padre/Project/Perl/MI.pm
+lib/Padre/Project/Perl/Temp.pm
 lib/Padre/Project/Temp.pm
 lib/Padre/QuickFix.pm
 lib/Padre/Role/Task.pm
@@ -138,6 +129,7 @@ lib/Padre/Task/Addition.pm
 lib/Padre/Task/Browser.pm
 lib/Padre/Task/ErrorList.pm
 lib/Padre/Task/Eval.pm
+lib/Padre/Task/FindInFiles.pm
 lib/Padre/Task/FindUnmatchedBrace.pm
 lib/Padre/Task/FindVariableDeclaration.pm
 lib/Padre/Task/FunctionList.pm
@@ -156,8 +148,6 @@ lib/Padre/TaskThread.pm
 lib/Padre/TaskWorker.pm
 lib/Padre/Test.pm
 lib/Padre/Transform.pm
-lib/Padre/Transform/Perl.pm
-lib/Padre/Transform/Perl/UpdateCopyright.pm
 lib/Padre/Util.pm
 lib/Padre/Util/FileBrowser.pm
 lib/Padre/Util/SVN.pm
@@ -166,6 +156,9 @@ lib/Padre/Util/Win32.pm
 lib/Padre/Wx.pm
 lib/Padre/Wx/About.pm
 lib/Padre/Wx/Ack.pm
+lib/Padre/Wx/Action.pm
+lib/Padre/Wx/ActionLibrary.pm
+lib/Padre/Wx/ActionQueue.pm
 lib/Padre/Wx/App.pm
 lib/Padre/Wx/AuiManager.pm
 lib/Padre/Wx/Bottom.pm
@@ -215,6 +208,7 @@ lib/Padre/Wx/Directory/TreeCtrl.pm
 lib/Padre/Wx/Display.pm
 lib/Padre/Wx/Editor.pm
 lib/Padre/Wx/ErrorList.pm
+lib/Padre/Wx/FBP/WhereFrom.pm
 lib/Padre/Wx/FileDropTarget.pm
 lib/Padre/Wx/FindResult.pm
 lib/Padre/Wx/FunctionList.pm
@@ -239,6 +233,7 @@ lib/Padre/Wx/Menu/View.pm
 lib/Padre/Wx/Menu/Window.pm
 lib/Padre/Wx/Menubar.pm
 lib/Padre/Wx/Notebook.pm
+lib/Padre/Wx/Nth.pm
 lib/Padre/Wx/Outline.pm
 lib/Padre/Wx/Output.pm
 lib/Padre/Wx/PodFrame.pm
@@ -247,16 +242,14 @@ lib/Padre/Wx/Printout.pm
 lib/Padre/Wx/Progress.pm
 lib/Padre/Wx/Right.pm
 lib/Padre/Wx/Role/Conduit.pm
+lib/Padre/Wx/Role/Dialog.pm
+lib/Padre/Wx/Role/Form.pm
 lib/Padre/Wx/Role/Main.pm
 lib/Padre/Wx/Role/View.pm
 lib/Padre/Wx/StatusBar.pm
 lib/Padre/Wx/Syntax.pm
 lib/Padre/Wx/TodoList.pm
 lib/Padre/Wx/ToolBar.pm
-lib/Wx/Perl/Dialog.pm
-lib/Wx/Perl/Dialog/Frame.pm
-lib/Wx/Perl/Dialog/Simple.pm
-lib/Wx/Perl/Dialog/SingleChoice.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
@@ -269,6 +262,7 @@ share/doc/perlopref/Artistic
 share/doc/perlopref/Copying
 share/doc/perlopref/perlopref.pod
 share/doc/perlopref/README
+share/doc/wxwidgets/wxwidgets.pod
 share/examples/absolute_beginner/01_hello_world.pl
 share/examples/absolute_beginner/02_time.pl
 share/examples/absolute_beginner/03_good_morning.pl
@@ -403,13 +397,15 @@ t/25_task_handle.t
 t/26_task_eval.t
 t/27_task_signal.t
 t/28_task_manager.t
+t/40-perl.t
+t/41-perl-project.t
+t/42-perl-project-temp.t
 t/50-browser.t
 t/60-db.t
 t/61-directory-path.t
 t/62-directory-task.t
 t/63-directory-project.t
 t/70-document.t
-t/71-perl.t
 t/72-dialog-html.t
 t/73-display.t
 t/74-history-combobox.t
@@ -489,7 +485,7 @@ xt/critic-util.ini
 xt/critic-util.t
 xt/eol.t
 xt/files/broken.bin
-xt/files/lexical_replace_stress_test.pl
+xt/files/rename_variable_stress_test.pl
 xt/meta.t
 xt/mimetype.t
 xt/perl-beginner.t

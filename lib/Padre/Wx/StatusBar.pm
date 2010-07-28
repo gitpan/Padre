@@ -53,7 +53,7 @@ use Class::XSAccessor {
 	}
 };
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::StatusBar
@@ -167,8 +167,8 @@ sub refresh {
 	my $document = $current->document;
 	my $newline  = $document->newline_type || Padre::Constant::NEWLINE;
 	my $pageid   = $notebook->GetSelection;
-	my $filename = $document->filename || '';
 	my $old      = $notebook->GetPageText($pageid);
+	my $filename = $document->filename || '';
 	my $text =
 		$filename
 		? File::Basename::basename($filename)

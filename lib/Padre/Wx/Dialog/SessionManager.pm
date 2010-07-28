@@ -8,8 +8,9 @@ use warnings;
 use POSIX qw{ strftime };
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
+use Padre::Current  ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -324,9 +325,19 @@ sub _current_session {
 sub _refresh_list {
 	my ( $self, $column, $reverse ) = @_;
 
+	my $config = Padre::Current->config;
+
+	if ( defined($column) and defined($reverse) ) {
+		$config->set( 'sessionmanager_sortorder', join( ',', $column, $reverse ) );
+		$config->write;
+	} else {
+		( $column, $reverse ) = split( /,/, $config->sessionmanager_sortorder );
+	}
+
 	# default sorting
 	$column  ||= 0;
 	$reverse ||= 0;
+
 	my @fields = qw{ name description last_update }; # db fields of table session
 
 	# get list of sessions, sorted.

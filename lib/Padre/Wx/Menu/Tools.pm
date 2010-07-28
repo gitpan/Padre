@@ -10,9 +10,9 @@ use Padre::Constant ();
 use Padre::Config   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
-use Padre::Current  ('_CURRENT');
+use Padre::Current  ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -194,7 +194,7 @@ sub title {
 
 sub refresh {
 	my $self = shift;
-	my $main = _CURRENT(@_)->main;
+	my $main = Padre::Current::_CURRENT(@_)->main;
 
 	$self->remove;
 	$self->add($main);

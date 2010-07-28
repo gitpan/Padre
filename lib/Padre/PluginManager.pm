@@ -41,7 +41,7 @@ use Padre::PluginHandle    ();
 use Padre::Wx              ();
 use Padre::Wx::Menu::Tools ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 
 
@@ -166,7 +166,7 @@ sub plugin_objects {
 #
 # $pluginmgr->relocale;
 #
-# update padre's locale object to handle new plug-in l10n.
+# update Padre's locale object to handle new plug-in l10n.
 #
 sub relocale {
 	my $self   = shift;
@@ -552,8 +552,23 @@ sub _load_plugin {
 		return;
 	}
 
+	# Is the plugin compatible with this Padre
+	my $compatible = $self->_compatible($module);
+	if ($compatible) {
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext("%s - Not compatible with Padre version %s - %s"),
+				$module,
+				$Padre::PluginManager::VERSION,
+				$compatible,
+			)
+		);
+		$plugin->status('error');
+		return;
+	}
+
 	# Attempt to instantiate the plug-in
-	my $object = eval { $module->new( $self->{parent} ) };
+	my $object = eval { $module->new( $self->{parent} ); };
 	if ($@) {
 		$plugin->errstr(
 			sprintf(
@@ -604,6 +619,41 @@ sub _load_plugin {
 	$plugin->enable;
 
 	return 1;
+}
+
+sub _compatible {
+	my $self   = shift;
+	my $plugin = shift;
+
+	# What interfaces does the plugin need
+	unless ( $plugin->can('padre_interfaces') ) {
+		return "$plugin does not declare Padre interface requirements";
+	}
+	my @needs = $plugin->padre_interfaces;
+
+	while (@needs) {
+		my $module = shift @needs;
+		my $need   = shift @needs;
+
+		# Make sure the subsystem is loaded
+		local $@;
+		eval "require $module;";
+		return "$module no longer exists" if $@;
+
+		# Do we fall inside the version boundaries
+		no strict 'refs';
+		my $version = ${"${module}::VERSION"}    || 0;
+		my $compat  = ${"${module}::COMPATIBLE"} || 0;
+
+		unless ( $need <= $version ) {
+			return "$module is needed at newer version $need";
+		}
+		unless ( $need >= $compat ) {
+			return "$module is not back-compatible with $need";
+		}
+	}
+
+	return '';
 }
 
 =pod
@@ -859,13 +909,11 @@ sub get_menu {
 	my $self   = shift;
 	my $main   = shift;
 	my $module = shift;
+
 	my $plugin = $self->_plugin($module);
-	unless ( $plugin and $plugin->{status} eq 'enabled' ) {
-		return ();
-	}
-	unless ( $plugin->{object}->can('menu_plugins') ) {
-		return ();
-	}
+	return () unless $plugin and $plugin->{status} eq 'enabled';
+	return () unless $plugin->{object}->can('menu_plugins');
+
 	my ( $label, $menu ) = eval { $plugin->{object}->menu_plugins($main) };
 	if ($@) {
 		$plugin->errstr( Wx::gettext('Error when calling menu for plug-in ') . "'$module': $@" );
@@ -875,9 +923,7 @@ sub get_menu {
 		# crazy anyone trying to write a plug-in
 		return ();
 	}
-	unless ( defined $label and defined $menu ) {
-		return ();
-	}
+	return () unless defined $label and defined $menu;
 	return ( $label, $menu );
 }
 
@@ -911,7 +957,7 @@ sub reload_current_plugin {
 
 	# TO DO: locate project
 	my $dir = Padre::Util::get_project_dir($filename);
-	return $main->error( Wx::gettext('Could not locate project dir') ) if not $dir;
+	return $main->error( Wx::gettext('Could not locate project directory.') ) if not $dir;
 
 	# TO DO shall we relax the assumption of a lib subdir?
 	$dir = File::Spec->catdir( $dir, 'lib' );

@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.66';
+our $VERSION    = '0.68';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -215,8 +215,20 @@ disabled unless the user has specifically allowed experimental plug-ins.
 
 =cut
 
-sub padre_interfaces {
-	return ();
+# Disabled so that we can detect plugins created before the existance
+# of the compatibility mechanism.
+# sub padre_interfaces {
+#     return ();
+# }
+
+# Convenience integration with Class::Unload
+sub unload {
+	require Class::Unload;
+	my $either = shift;
+	foreach my $package (@_) {
+		Class::Unload->unload($package);
+	}
+	return 1;
 }
 
 

@@ -5,11 +5,11 @@ package Padre::Wx::Menu::Edit;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Current qw{_CURRENT};
+use Padre::Current  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -87,7 +87,7 @@ sub new {
 	my $edit_copy = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Copy specials"),
+		Wx::gettext("Copy Specials"),
 		$edit_copy
 	);
 
@@ -219,7 +219,7 @@ sub new {
 	$self->{convert_nl} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Convert EOL"),
+		Wx::gettext("Convert Line Endings"),
 		$self->{convert_nl}
 	);
 
@@ -346,7 +346,7 @@ sub title {
 
 sub refresh {
 	my $self     = shift;
-	my $current  = _CURRENT(@_);
+	my $current  = Padre::Current::_CURRENT(@_);
 	my $editor   = $current->editor || 0;
 	my $text     = $current->text;
 	my $document = $current->document;

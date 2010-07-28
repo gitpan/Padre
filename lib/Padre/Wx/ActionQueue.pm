@@ -1,4 +1,4 @@
-package Padre::Action::Queue;
+package Padre::Wx::ActionQueue;
 
 # Basic scripting for Padre
 
@@ -6,7 +6,7 @@ package Padre::Action::Queue;
 
 =head1 NAME
 
-Padre::Action::Queue doesn't create any actions itself but it provides a basic
+Padre::Wx::ActionQueue doesn't create any actions itself but it provides a basic
 scripting option for Padre, the Action Queue.
 
 =cut
@@ -14,22 +14,20 @@ scripting option for Padre, the Action Queue.
 use 5.008;
 use strict;
 use warnings;
-
 use Padre::Wx ();
 
-our $VERSION = '0.66';
-
-#####################################################################
+our $VERSION = '0.68';
 
 sub new {
 	my $class = shift;
+	my $wx    = shift;
+	my $main  = $wx->main;
 
-	my $main = Padre->ide->wx->main;
-
-	# Create myself
+	# Create the empty queue
 	my $self = bless {
-		actions => Padre->ide->actions,
-		Queue   => [],                 # Create an empty queue
+		wx      => $wx,
+		actions => $wx->ide->actions,
+		queue   => [],
 	}, $class;
 
 	# Create the Wx timer
@@ -51,24 +49,19 @@ sub new {
 
 sub add {
 	my $self = shift;
-
-	push @{ $self->{Queue} }, @_;
-
+	push @{ $self->{queue} }, @_;
 	return 1;
 }
-
-
 
 sub set_timer_interval {
 	my $self = shift;
 
 	# Get current interval
 	my $interval = 0;
-	$interval = $self->{timer}
-		if $self->{timer}->IsRunning;
+	$interval = $self->{timer} if $self->{timer}->IsRunning;
 
 	my $new_interval;
-	if ( $#{ $self->{Queue} } == -1 ) {
+	if ( $#{ $self->{queue} } == -1 ) {
 
 		# No pending queue actions
 		$new_interval = 1000;
@@ -93,29 +86,27 @@ sub on_timer {
 	my $event = shift;
 	my $force = shift;
 
-	if ( $#{ $self->{Queue} } > -1 ) {
-
-		# Get this only if needed
-		my $main = Padre->ide->wx->main;
+	if ( $#{ $self->{queue} } > -1 ) {
 
 		# Advoid another timer event during processing of this event
 		$self->{timer}->Stop;
 
-		my $action = shift( @{ $self->{Queue} } );
-
-		$self->{debug} and print STDERR scalar( localtime(time) ) . ' Action::Queue ' . $action . "\n";
+		my $queue  = $self->{queue};
+		my $action = shift @$queue;
+		if ( $self->{debug} ) {
+			my $now = scalar localtime time;
+			print STDERR "$now Action::Queue $action\n";
+		}
 
 		# Run the event handler
+		my $main = $self->{wx}->main;
 		&{ $self->{actions}->{$action}->{queue_event} }( $main, $event, $force );
 
 		# Reset not needed if timer wasn't stopped
 		$self->set_timer_interval;
-
 	}
 
-	if ( defined($event) ) {
-		$event->Skip(0);
-	}
+	$event->Skip(0) if defined $event;
 
 	return 1;
 

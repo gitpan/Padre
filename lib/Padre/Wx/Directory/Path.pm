@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use File::Spec::Unix ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 use constant {
 	FILE      => 0,
@@ -88,31 +88,6 @@ sub is_parent {
 	}
 
 	return 1;
-}
-
-# Compare two paths for the purpose of file sorting
-sub compare {
-	my $self = shift;
-	my $path = shift;
-	my $i    = 1;
-	while ( ++$i ) {
-		my $left  = $self->[$i];
-		my $right = $path->[$i];
-		unless ( defined $left ) {
-			return 0 unless defined $right;
-			return -1;
-		}
-		return 1 unless defined $right;
-
-		# Try to sort case insensitive first
-		my $result = ( lc($left) cmp lc($right) );
-		return $result if $result;
-
-		# To prevent nesting problems, repeat case sensitive
-		# before we descend to the next level.
-		$result = ( $left cmp $right ) or next;
-		return $result;
-	}
 }
 
 1;

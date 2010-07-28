@@ -130,7 +130,7 @@ requires 'Pod::Abstract'            => '0.16';
 requires 'Pod::Perldoc'             => '3.15';
 requires 'POD2::Base'               => '0.043';
 requires 'POSIX'                    => 0;
-requires 'PPI'                      => '1.205';
+requires 'PPI'                      => '1.213';
 requires 'PPIx::EditorTools'        => '0.09';
 requires 'PPIx::Regexp'             => '0.005';
 requires 'Storable'                 => '2.15';
@@ -185,7 +185,9 @@ print "Found locale    $locale\n";
 # What tests should we run?
 my @TESTS = 't/*.t';
 if ( win32 and $locale =~ /^English/ ) {
-	push @TESTS, 't/win32/*.t';
+	if ( author_context or $ENV{RELEASE_TESTING} ) {
+		push @TESTS, 't/win32/*.t';
+	}
 }
 if ( author_context or $ENV{AUTOMATED_TESTING} or $ENV{RELEASE_TESTING} ) {
 	push @TESTS, 'xt/*.t';

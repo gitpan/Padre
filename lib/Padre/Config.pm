@@ -15,7 +15,7 @@ use YAML::Tiny             ();
 use Params::Util           ();
 use Padre::Constant        ();
 use Padre::Util            ('_T');
-use Padre::Current         ('_CURRENT');
+use Padre::Current         ();
 use Padre::Config::Setting ();
 use Padre::Config::Human   ();
 use Padre::Config::Project ();
@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -228,8 +228,18 @@ sub set {
 	if ( $type == Padre::Constant::INTEGER and not _INTEGER($value) ) {
 		Carp::croak("Tried to change setting '$name' to non-integer '$value'");
 	}
-	if ( $type == Padre::Constant::PATH and not -e $value ) {
-		Carp::croak("Tried to change setting '$name' to non-existant path '$value'");
+	if ( $type == Padre::Constant::PATH ) {
+		if ( Padre::Constant::WIN32 and utf8::is_utf8($value) ) {
+			require Win32;
+			$value = Win32::GetLongPathName($value);
+
+			#Wx::DirPickerCtrl upgrades data to utf8.
+			#Perl on Windows cannot handle utf8 in file names, so this hack converts
+			#path back
+		}
+		if ( not -e $value ) {
+			Carp::croak("Tried to change setting '$name' to non-existant path '$value'");
+		}
 	}
 
 	# Set the value into the appropriate backend
@@ -246,7 +256,7 @@ sub apply {
 	my $self    = shift;
 	my $name    = shift;
 	my $value   = shift;
-	my $current = _CURRENT(@_);
+	my $current = Padre::Current::_CURRENT(@_);
 
 	# Set the config value
 	$self->set( $name => $value );
@@ -391,6 +401,16 @@ setting(
 	},
 );
 
+# How many times has the user run Padre?
+# Default is 1 and the value is incremented at shutdown rather than
+# startup so that we don't have to write files in the startup sequence.
+setting(
+	name    => 'startup_count',
+	type    => Padre::Constant::POSINT,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+
 
 
 
@@ -493,6 +513,16 @@ setting(
 	default => 0,
 );
 setting(
+	name    => 'main_directory_order',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'first',
+	options => {
+		first => _T('Directories First'),
+		mixed => _T('Directories Mixed'),
+	},
+);
+setting(
 	name    => 'main_directory_panel',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
@@ -519,6 +549,12 @@ setting(
 
 		return 1;
 	}
+);
+setting(
+	name  => 'main_directory_root',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HOST,
+	default => File::HomeDir->my_documents || '',
 );
 setting(
 	name    => 'main_output',
@@ -921,6 +957,12 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => "#\\s*(?:TO[- ]?DO|XXX|FIX[- ]?ME)(?:[ \\t]*[:-]?)(?:[ \\t]*)(.*?)\\s*\$",
+);
+setting(
+	name    => 'sessionmanager_sortorder',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => "0,0",
 );
 
 

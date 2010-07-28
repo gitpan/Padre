@@ -9,11 +9,11 @@ use Padre::Util ();
 use Padre::Help ();
 use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Help';
 
 # for caching help list (for faster access)
-my ( $cached_help_list, $cached_perlopref );
+my ( $cached_help_list, $cached_perlopref, $cached_wxwidgets );
 
 # Initialize help
 sub help_init {
@@ -23,6 +23,7 @@ sub help_init {
 	if ($cached_help_list) {
 		$self->{help_list} = $cached_help_list;
 		$self->{perlopref} = $cached_perlopref;
+		$self->{wxwidgets} = $cached_wxwidgets;
 		return;
 	}
 
@@ -135,6 +136,10 @@ sub help_init {
 	$self->{perlopref} = $self->_parse_perlopref;
 	push @index, keys %{ $self->{perlopref} };
 
+	# Add wxWidgets documentation
+	$self->{wxwidgets} = $self->_parse_wxwidgets;
+	push @index, keys %{ $self->{wxwidgets} };
+
 	# Return a unique sorted index
 	my %seen = ();
 	my @unique_sorted_index = sort grep { !$seen{$_}++ } @index;
@@ -143,6 +148,7 @@ sub help_init {
 	# Store the cached help list for faster access
 	$cached_help_list = $self->{help_list};
 	$cached_perlopref = $self->{perlopref};
+	$cached_wxwidgets = $self->{wxwidgets};
 }
 
 # Finds installed CPAN modules via @INC
@@ -204,6 +210,37 @@ sub _parse_perlopref {
 	return \%index;
 }
 
+# Parses wxwidgets.pod (Perl Operator Reference)
+sub _parse_wxwidgets {
+	my $self  = shift;
+	my %index = ();
+
+	# Open wxwidgets.pod for reading
+	my $wxwidgets = File::Spec->join( Padre::Util::sharedir('doc'), 'wxwidgets', 'wxwidgets.pod' );
+	if ( open my $fh, '<', $wxwidgets ) { #-# no critic (RequireBriefOpen)
+		                                  # Add PRECEDENCE to index
+		my $line;
+
+		# Add methods to index
+		my $method;
+		while ( $line = <$fh> ) {
+			if ( $line =~ /=head2\s+(.+)$/ ) {
+				$method = $1;
+				$index{$method} = $line;
+			} elsif ($method) {
+				$index{$method} .= $line;
+			}
+		}
+
+		# and we're done
+		close $fh;
+	} else {
+		TRACE("Cannot open wxwidgets.pod\n") if DEBUG;
+	}
+
+	return \%index;
+}
+
 # Renders the help topic content into XHTML
 sub help_render {
 	my $self  = shift;
@@ -215,6 +252,14 @@ sub help_render {
 		require Padre::Pod2HTML;
 		return (
 			Padre::Pod2HTML->pod2html( $self->{perlopref}->{$topic} ),
+			$topic,
+		);
+	} elsif ( $self->{wxwidgets}->{$topic} ) {
+
+		# Yes, it is a Perl 5 Operator
+		require Padre::Pod2HTML;
+		return (
+			Padre::Pod2HTML->pod2html( $self->{wxwidgets}->{$topic} ),
 			$topic,
 		);
 	}

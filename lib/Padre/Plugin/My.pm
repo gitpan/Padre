@@ -8,7 +8,7 @@ use Padre::Constant ();
 use Padre::Plugin   ();
 use Padre::Wx       ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -18,12 +18,15 @@ our @ISA     = 'Padre::Plugin';
 #####################################################################
 # Padre::Plugin Methods
 
-sub plugin_name {
-	'My Plugin';
+sub padre_interfaces {
+	return (
+		'Padre::Plugin'   => 0.66,
+		'Padre::Constant' => 0.66,
+	);
 }
 
-sub padre_interfaces {
-	'Padre::Plugin' => 0.43;
+sub plugin_name {
+	'My Plugin';
 }
 
 sub menu_plugins_simple {

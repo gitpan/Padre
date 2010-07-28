@@ -9,12 +9,22 @@
 
 use strict;
 use warnings;
-use Test::More tests => 20;
-use Test::NoWarnings;
+use Test::More;
 use Time::HiRes 'sleep';
 use Padre::Logger;
 use Padre::TaskThread ();
 use Padre::TaskWorker ();
+
+######################################################################
+# This test requires a DISPLAY to run
+BEGIN {
+	unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+plan tests => 21;
+use_ok('Test::NoWarnings');
 
 # Do we start with no threads as expected
 is( scalar( threads->list ), 0, 'One thread exists' );
@@ -41,7 +51,7 @@ SCOPE: {
 	# Start the worker inside the master
 	ok( $master->start($worker), '->add ok' );
 	TRACE("Pausing to allow worker thread startup...") if DEBUG;
-	sleep 0.1;
+	sleep 0.15; #0.1 was not enough
 	is( scalar( threads->list ), 2, 'Found 2 threads' );
 	ok( $master->is_running,   'Master is_running' );
 	ok( !$master->is_joinable, 'Master is not is_joinable' );

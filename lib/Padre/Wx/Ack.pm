@@ -22,7 +22,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 my $iter;
 my %opts;
@@ -47,14 +47,18 @@ sub load {
 		return "$error (you have $App::Ack::VERSION installed)";
 	}
 
-	# redefine some app::ack subs to display results in padre's output
 	SCOPE: {
 		no warnings 'redefine', 'once';
+
+		# redefine some App::Ack subs to display results in Padre's output
 		*{App::Ack::print_first_filename} = sub { print_results("$_[0]\n"); };
 		*{App::Ack::print_separator}      = sub { print_results("--\n"); };
 		*{App::Ack::print}                = sub { print_results( $_[0] ); };
 		*{App::Ack::print_filename}       = sub { print_results("$_[0]$_[1]"); };
 		*{App::Ack::print_line_no}        = sub { print_results("$_[0]$_[1]"); };
+
+		# define gettext_label to avoid crash on switching interface language
+		*{Wx::ListCtrl::gettext_label} = sub { return Wx::gettext('Find in Files'); };
 	}
 
 	return;
@@ -100,15 +104,15 @@ sub get_layout {
 	my $config = Padre->ide->config;
 
 	my @layout = (
-		[   [ 'Wx::StaticText', undef, Wx::gettext('Term:') ],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Search Term:') ],
 			[ 'Wx::ComboBox', '_ack_term_', $term, $search ],
 			[ 'Wx::Button',   '_find_',     Wx::wxID_FIND ],
 		],
-		[   [ 'Wx::StaticText', undef, Wx::gettext('Dir:') ],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Search Directory:') ],
 			[ 'Wx::ComboBox', '_ack_dir_',  $dir, $in_dir ],
 			[ 'Wx::Button',   '_pick_dir_', Wx::gettext('Pick &directory') ],
 		],
-		[   [ 'Wx::StaticText', undef, Wx::gettext('In Files/Types:') ],
+		[   [ 'Wx::StaticText', undef, Wx::gettext('Search in Files/Types:') ],
 			[ 'Wx::ComboBox', '_file_types_', '', $types ],
 			[ 'Wx::Button',   '_cancel_',     Wx::wxID_CANCEL ],
 		],
@@ -144,7 +148,7 @@ sub dialog {
 		parent => $main,
 		title  => Wx::gettext("Find in Files"),
 		layout => $layout,
-		width  => [ 190, 210 ],
+		width  => [ 190, 410 ],
 		size   => Wx::wxDefaultSize,
 		pos    => Wx::wxDefaultPosition,
 	);
@@ -204,6 +208,13 @@ sub find_clicked {
 	$search->{dir} ||= '.';
 	return if not $search->{term};
 
+
+
+	# really need to handle special characters.
+	my $term = quotemeta $search->{term};
+
+	# Ctrl+F $string - testing string to find
+	#print "Search term: " . $search->{term} .  " and after: $term\n";
 	my $main = Padre->ide->wx->main;
 
 	@_ = (); # cargo cult or bug? see Wx::Thread / Creating new threads
@@ -212,7 +223,9 @@ sub find_clicked {
 
 	# prepare \%opts
 	%opts = ();
-	$opts{regex} = $search->{term};
+
+	$opts{regex}       = $term;
+	$opts{search_term} = $search->{term};
 
 	# ignore_hidden_subdirs
 	if ( $search->{ignore_hidden_subdirs} ) {
@@ -380,13 +393,17 @@ sub on_ack_result_selected {
 
 	# TODO: those appear to be very fragile regexps
 	# specially with i18n of the message
-	if ( $opts{l} ) {
-		($file) = ( $text =~ /'.+'[^']+'(.+)'$/ );
-		$line = 1 if $file;
+	if ( $opts{l} && $text =~ /'.+'[^']+'(.+)'$/ ) {
+		$file = $1;
+		$line = 1;
+	} elsif ( $text =~ /^(.*)\((\d+)\):/ ) { # File(line):
+		( $file, $line ) = ( $1, $2 );
+	} elsif ( $text =~ /'.*'.*'(.*)'.*:/ ) { # Found 'x' in 'file':
+		$file = $1;
+		$line = 1;
 	} else {
-		( $file, $line ) = ( $text =~ /^(.*?)\((\d+)\)\:/ );
+		return;
 	}
-	return unless $line;
 
 	my $main = Padre->ide->wx->main;
 	my $id   = $main->setup_editor($file);
@@ -472,7 +489,7 @@ sub print_results {
 		if ( $opts{l} ) {
 			$text = sprintf(
 				Wx::gettext("'%s' missing in file '%s'\n"),
-				$opts{regex},
+				$opts{search_term}, #$opts{regex},
 				$text
 			);
 		}
@@ -484,7 +501,7 @@ sub print_results {
 			chop($text);
 			$text = sprintf(
 				Wx::gettext("Found '%s' in '%s':\n"),
-				$opts{regex},
+				$opts{search_term}, #$opts{regex},
 				$text,
 			);
 		}

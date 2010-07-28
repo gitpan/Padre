@@ -5,27 +5,29 @@ package Padre::Wx::Menu::View;
 use 5.008;
 use strict;
 use warnings;
-use File::Glob      ();
-use Padre::Constant ();
-use Padre::Current qw{_CURRENT};
-use Padre::Wx       ();
-use Padre::Wx::Menu ();
-use Padre::Locale   ();
+use File::Glob               ();
+use Padre::Constant          ();
+use Padre::Current           ();
+use Padre::Config::Style     ();
+use Padre::Wx                ();
+use Padre::Wx::ActionLibrary ();
+use Padre::Wx::Menu          ();
+use Padre::Locale            ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Wx::Menu';
 
-my @GUI_ELEMENTS = (
-	'functions',
-	'todo',
-	'outline',
-	'directory',
-	'output',
-	'show_syntaxcheck',
-	'show_errorlist',
-	'statusbar',
-	'toolbar',
-);
+my @GUI_ELEMENTS = qw{
+	functions
+	todo
+	outline
+	directory
+	output
+	show_syntaxcheck
+	show_errorlist
+	statusbar
+	toolbar
+};
 
 
 
@@ -37,7 +39,7 @@ my @GUI_ELEMENTS = (
 sub new {
 	my $class  = shift;
 	my $main   = shift;
-	my $config = Padre->ide->config;
+	my $config = $main->config;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
@@ -55,8 +57,7 @@ sub new {
 
 	# Show or hide GUI elements
 	foreach my $element (@GUI_ELEMENTS) {
-
-		next unless defined($element);
+		next unless defined $element;
 
 		my $action = 'view.' . $element;
 
@@ -72,27 +73,23 @@ sub new {
 
 	$self->AppendSeparator;
 
-	# View as (Highlighting File Type)
-	$self->{view_as_highlighting} = Wx::Menu->new;
-	$self->Append(
-		-1,
-		Wx::gettext("View Document As..."),
-		$self->{view_as_highlighting}
-	);
+	SCOPE: {
 
-	my %mimes = Padre::MimeTypes::menu_view_mimes();
-	foreach my $name ( sort { lc($a) cmp lc($b) } keys %mimes ) {
-		my $label = $name;
-		$label =~ s/^\d+//;
-		my $tag = "view.view_as_" . lc $label;
-		$tag =~ s/\s/_/g;
-		$self->add_radio_menu_item(
-			$self->{view_as_highlighting},
-			name       => $tag,
-			label      => $label,
-			comment    => sprintf( Wx::gettext('Switch document type to %s'), $label ),
-			menu_event => sub { $_[0]->set_mimetype( $mimes{$name} ) },
+		# View as (Highlighting File Type)
+		$self->{view_as_highlighting} = Wx::Menu->new;
+		$self->Append(
+			-1,
+			Wx::gettext("View Document As..."),
+			$self->{view_as_highlighting}
 		);
+
+		my %mimes = Padre::MimeTypes::menu_view_mimes();
+		foreach my $name ( sort { Wx::gettext( $mimes{$a} ) cmp Wx::gettext( $mimes{$b} ) } keys %mimes ) {
+			my $radio = $self->add_menu_action(
+				$self->{view_as_highlighting},
+				"view.mime.$name",
+			);
+		}
 	}
 
 	$self->AppendSeparator;
@@ -166,26 +163,28 @@ sub new {
 	}
 
 	# Font Size
-	$self->{font_size} = Wx::Menu->new;
-	$self->Append(
-		-1,
-		Wx::gettext("Font Size"),
-		$self->{font_size}
-	);
-	$self->{font_increase} = $self->add_menu_action(
-		$self->{font_size},
-		'view.font_increase',
-	);
+	if ( $config->feature_fontsize ) {
+		$self->{font_size} = Wx::Menu->new;
+		$self->Append(
+			-1,
+			Wx::gettext("Font Size"),
+			$self->{font_size}
+		);
+		$self->{font_increase} = $self->add_menu_action(
+			$self->{font_size},
+			'view.font_increase',
+		);
 
-	$self->{font_decrease} = $self->add_menu_action(
-		$self->{font_size},
-		'view.font_decrease',
-	);
+		$self->{font_decrease} = $self->add_menu_action(
+			$self->{font_size},
+			'view.font_decrease',
+		);
 
-	$self->{font_reset} = $self->add_menu_action(
-		$self->{font_size},
-		'view.font_reset',
-	);
+		$self->{font_reset} = $self->add_menu_action(
+			$self->{font_size},
+			'view.font_reset',
+		);
+	}
 
 	# Editor Look and Feel
 	$self->{style} = Wx::Menu->new;
@@ -194,50 +193,16 @@ sub new {
 		Wx::gettext("Style"),
 		$self->{style}
 	);
-	my %styles = (
-		default   => Wx::gettext('Padre'),
-		evening   => Wx::gettext('Evening'),
-		night     => Wx::gettext('Night'),
-		ultraedit => Wx::gettext('Ultraedit'),
-		notepad   => Wx::gettext('Notepad++'),
-	);
-	my @order = sort { ( $b eq 'default' ) <=> ( $a eq 'default' ) or $styles{$a} cmp $styles{$b} } keys %styles;
-	foreach my $name (@order) {
-		my $label = $styles{$name};
-		my $tag   = "view.view_as_" . lc $label;
-		$tag =~ s/\s/_/g;
-		my $radio = $self->add_radio_menu_item(
-			$self->{style},
-			name       => $tag,
-			label      => $label,
-			comment    => sprintf( Wx::gettext('Switch highlighting colors to %s style'), $label ),
-			menu_event => sub {
-				$_[0]->change_style($name);
-			},
-		);
-		if ( $config->editor_style and $config->editor_style eq $name ) {
-			$radio->Check(1);
-		}
-	}
 
+	SCOPE: {
+		my %styles = Padre::Config::Style->core_styles;
+		my @order =
+			sort { ( $b eq 'default' ) <=> ( $a eq 'default' ) or $styles{$a} cmp $styles{$b} } keys %styles;
 
-	my $dir = File::Spec->catdir( Padre::Constant::CONFIG_DIR, 'styles' );
-	my @private =
-		map { substr( File::Basename::basename($_), 0, -4 ) } File::Glob::glob( File::Spec->catdir( $dir, '*.yml' ) );
-	if (@private) {
-		$self->{style}->AppendSeparator;
-		foreach my $name (@private) {
-			my $label = $name;
-			my $tag   = "view.view_as_" . lc $label;
-			$tag =~ s/\s/_/g;
-			my $radio = $self->add_radio_menu_item(
+		foreach my $name (@order) {
+			my $radio = $self->add_menu_action(
 				$self->{style},
-				name       => $tag,
-				label      => $label,
-				comment    => sprintf( Wx::gettext('Switch highlighting colors to %s style'), $label ),
-				menu_event => sub {
-					$_[0]->change_style( $name, 1 );
-				},
+				"view.style.$name",
 			);
 			if ( $config->editor_style and $config->editor_style eq $name ) {
 				$radio->Check(1);
@@ -245,7 +210,25 @@ sub new {
 		}
 	}
 
+	SCOPE: {
+		my @styles = Padre::Config::Style->user_styles;
+		if (@styles) {
+			$self->{style}->AppendSeparator;
+			foreach my $name (@styles) {
+				my $radio = $self->add_menu_action(
+					$self->{style},
+					"view.style.$name",
+				);
+				if ( $config->editor_style and $config->editor_style eq $name ) {
+					$radio->Check(1);
+				}
+			}
+		}
+	}
+
 	# Language Support
+	Padre::Wx::ActionLibrary->init_language_actions;
+
 	# TO DO: God this is horrible, there has to be a better way
 	my $default  = Padre::Locale::system_rfc4646() || 'x-unknown';
 	my $current  = Padre::Locale::rfc4646();
@@ -255,19 +238,14 @@ sub new {
 	$self->{language} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Language"),
+		Wx::gettext('Language'),
 		$self->{language}
 	);
 
 	# Default menu entry
-	$self->{language_default} = $self->add_checked_menu_item(
+	$self->{language_default} = $self->add_menu_action(
 		$self->{language},
-		name       => 'view.language_default',
-		label      => Wx::gettext('System Default') . " ($default)",
-		comment    => sprintf( Wx::gettext('Switch menus to the default %s'), $default ),
-		menu_event => sub {
-			$_[0]->change_locale;
-		},
+		'view.language.default',
 	);
 	if ( defined $config->locale and $config->locale eq $default ) {
 		$self->{language_default}->Check(1);
@@ -276,36 +254,11 @@ sub new {
 	$self->{language}->AppendSeparator;
 
 	foreach my $name ( sort { $language{$a} cmp $language{$b} } keys %language ) {
-		my $label = $language{$name};
-
-		# Calculate the tag name before we apply any humour :/
-		my $tag = "view.view_as_" . lc $label;
-		$tag =~ s/\s/_/g;
-
-		if ( $label eq 'English (United Kingdom)' ) {
-
-			# NOTE: A dose of fun in a mostly boring application.
-			# With more Padre developers, more countries, and more
-			# people in total British English instead of American
-			# English CLEARLY it is a FAR better default for us to
-			# use.
-			# Because it's something of an in joke to English
-			# speakers, non-English localisations do NOT show this.
-			$label = "English (New Britstralian)";
-		}
-
-		my $langobj = Padre::Locale::object($name);
-		my $utf8txt = ' (' . Padre::Locale::label($name) . ')';
-
-		my $radio = $self->add_radio_menu_item(
+		my $radio = $self->add_menu_action(
 			$self->{language},
-			name       => $tag,
-			label      => $label . $utf8txt,
-			comment    => sprintf( Wx::gettext('Switch menus to %s'), $label ) . $utf8txt,
-			menu_event => sub {
-				$_[0]->change_locale($name);
-			},
+			"view.language.$name",
 		);
+
 		if ( $current eq $name ) {
 			$radio->Check(1);
 		}
@@ -328,14 +281,13 @@ sub title {
 
 sub refresh {
 	my $self     = shift;
-	my $current  = _CURRENT(@_);
+	my $current  = Padre::Current::_CURRENT(@_);
 	my $config   = $current->config;
 	my $document = $current->document;
 	my $doc      = $document ? 1 : 0;
 
 	# Simple check state cases from configuration
 	$self->{statusbar}->Check( $config->main_statusbar );
-
 	$self->{lines}->Check( $config->editor_linenumbers );
 	$self->{folding}->Check( $config->editor_folding );
 	$self->{currentline}->Check( $config->editor_currentline );
@@ -380,16 +332,18 @@ sub refresh {
 		}
 
 		# By default 'Plain Text';
-		$self->{view_as_highlighting}->FindItemByPosition(0)->Check(1) unless $has_checked;
+		unless ($has_checked) {
+			$self->{view_as_highlighting}->FindItemByPosition(0)->Check(1);
+		}
 	}
 
 	# Disable zooming and bookmarks if there's no current document
-	defined( $self->{font_increase} ) and $self->{font_increase}->Enable($doc);
-	defined( $self->{font_decrease} ) and $self->{font_decrease}->Enable($doc);
-	defined( $self->{font_reset} )    and $self->{font_reset}->Enable($doc);
+	$self->{font_increase}->Enable($doc) if defined $self->{font_increase};
+	$self->{font_decrease}->Enable($doc) if defined $self->{font_decrease};
+	$self->{font_reset}->Enable($doc)    if defined $self->{font_reset};
 
 	# You cannot set a bookmark unless the current document is on disk.
-	if ( defined( $self->{bookmark_set} ) ) {
+	if ( defined $self->{bookmark_set} ) {
 		my $set = ( $doc and defined $document->filename ) ? 1 : 0;
 		$self->{bookmark_set}->Enable($set);
 	}
@@ -399,12 +353,15 @@ sub refresh {
 
 sub gui_element_add {
 	my $self = shift;
-	my ( $element, $action, $id ) = @_;
+	my $id   = $_[2];
 
 	# Don't add duplicates
-	return 1 if grep {/^\Q$id\E$/} ( map { return '' unless ref($_) eq 'ARRAY'; $_->[2]; } (@GUI_ELEMENTS) );
+	foreach (@GUI_ELEMENTS) {
+		next unless ref $_ eq 'ARRAY';
+		return 1 if $_->[2] =~ /^\Q$id\E$/;
+	}
 
-	push @GUI_ELEMENTS, [ $element, $action, $id ];
+	push @GUI_ELEMENTS, [@_];
 
 	return 1;
 }

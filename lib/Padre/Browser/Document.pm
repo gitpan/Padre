@@ -21,7 +21,7 @@ use strict;
 use warnings;
 use File::Basename ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 use Class::XSAccessor {
 	constructor => 'new',

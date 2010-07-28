@@ -8,7 +8,7 @@ use Encode            ();
 use File::Spec        ();
 use File::Temp        ();
 use File::Find::Rule  ();
-use Params::Util      ('_INSTANCE');
+use Params::Util      ();
 use YAML::Tiny        ();
 use Padre::Util       ();
 use Padre::Perl       ();
@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -62,7 +62,7 @@ sub ppi_get {
 
 sub ppi_set {
 	my $self = shift;
-	my $document = _INSTANCE( shift, 'PPI::Document' );
+	my $document = Params::Util::_INSTANCE( shift, 'PPI::Document' );
 	unless ($document) {
 		Carp::croak("Did not provide a PPI::Document");
 	}
@@ -81,7 +81,7 @@ sub ppi_find_first {
 
 sub ppi_transform {
 	my $self = shift;
-	my $transform = _INSTANCE( shift, 'PPI::Transform' );
+	my $transform = Params::Util::_INSTANCE( shift, 'PPI::Transform' );
 	unless ($transform) {
 		Carp::croak("Did not provide a PPI::Transform");
 	}
@@ -109,7 +109,7 @@ sub ppi_select {
 sub ppi_location_to_character_position {
 	my $self     = shift;
 	my $location = shift;
-	if ( _INSTANCE( $location, 'PPI::Element' ) ) {
+	if ( Params::Util::_INSTANCE( $location, 'PPI::Element' ) ) {
 		$location = $location->location;
 	}
 	my $editor = $self->editor or return;
@@ -813,35 +813,44 @@ sub get_sub_line_number {
 #####################################################################
 # Padre::Document Document Manipulation
 
-sub lexical_variable_replacement {
+sub rename_variable {
 	my $self = shift;
-	my $name = shift;
 
-	# Can we find something to replace
+	# Can we find something to replace?
 	my ( $location, $token ) = $self->get_current_symbol;
 	if ( not defined $location ) {
 		Wx::MessageBox(
-			Wx::gettext("Current cursor does not seem to point at a variable"),
-			Wx::gettext("Check cancelled"),
+			Wx::gettext('Current cursor does not seem to point at a variable.'),
+			Wx::gettext('Rename variable'),
 			Wx::wxOK,
 			$self->current->main,
 		);
 		return;
 	}
 
+	my $dialog = Wx::TextEntryDialog->new(
+		$self->current->main,
+		Wx::gettext('New name'),
+		Wx::gettext('Rename variable'),
+		$token,
+	);
+	return if $dialog->ShowModal == Wx::wxID_CANCEL;
+	my $replacement = $dialog->GetValue;
+	$dialog->Destroy;
+
 	# Launch the background task
 	$self->task_request(
 		task        => 'Padre::Task::LexicalReplaceVariable',
 		document    => $self,
 		location    => $location,
-		replacement => $name,
-		callback    => 'lexical_variable_replacement_response',
+		replacement => $replacement,
+		callback    => 'rename_variable_response',
 	);
 
 	return;
 }
 
-sub lexical_variable_replacement_response {
+sub rename_variable_response {
 	my $self = shift;
 	my $task = shift;
 
@@ -858,11 +867,11 @@ sub lexical_variable_replacement_response {
 	my $text;
 	my $error = $self->{error} || '';
 	if ( $error =~ /no token/ ) {
-		$text = Wx::gettext("Current cursor does not seem to point at a variable");
+		$text = Wx::gettext("Current cursor does not seem to point at a variable.");
 	} elsif ( $error =~ /no declaration/ ) {
-		$text = Wx::gettext("No declaration could be found for the specified (lexical?) variable");
+		$text = Wx::gettext("No declaration could be found for the specified (lexical?) variable.");
 	} else {
-		$text = Wx::gettext("Unknown error");
+		$text = Wx::gettext("Unknown error") . "\n$error";
 	}
 	Wx::MessageBox(
 		$text,
@@ -1370,7 +1379,7 @@ sub autocomplete {
 	my $regex;
 	eval { $regex = qr{\b(\Q$prefix\E\w+(?:::\w+)*)\b} };
 	if ($@) {
-		return ("Cannot build regex for '$prefix'");
+		return ("Cannot build regular expression for '$prefix'.");
 	}
 
 	my %seen;
@@ -1641,7 +1650,7 @@ sub event_on_right_down {
 			sub {
 				my $editor = shift;
 				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
-				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				$doc->find_variable_declaration;
 			},
 		);
@@ -1650,24 +1659,10 @@ sub event_on_right_down {
 		Wx::Event::EVT_MENU(
 			$editor, $lexRepl,
 			sub {
+				my $doc = $self;
 
-				# FIX ME near duplication of the code in Padre::Wx::Menu::Perl
-				my $editor = shift;
-				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
-				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
-				require Padre::Wx::History::TextEntryDialog;
-				my $dialog = Padre::Wx::History::TextEntryDialog->new(
-					$editor->main,
-					Wx::gettext("Replacement"),
-					Wx::gettext("Replacement"),
-					'$foo',
-				);
-				return if $dialog->ShowModal == Wx::wxID_CANCEL;
-				my $replacement = $dialog->GetValue;
-				$dialog->Destroy;
-				return unless defined $replacement;
-				my $lock = $editor->main->lock('BUSY');
-				$doc->lexical_variable_replacement($replacement);
+				#my $lock = $editor->main->lock('BUSY');
+				$doc->rename_variable;
 			},
 		);
 	} # end if it's a variable
@@ -1680,7 +1675,7 @@ sub event_on_right_down {
 			sub {
 				my $editor = shift;
 				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
-				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				$doc->find_method_declaration;
 			},
 		);
@@ -1702,7 +1697,7 @@ sub event_on_right_down {
 				# FIX ME near duplication of the code in Padre::Wx::Menu::Perl
 				my $editor = shift;
 				my $doc    = $self;
-				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				require Padre::Wx::History::TextEntryDialog;
 				my $dialog = Padre::Wx::History::TextEntryDialog->new(
 					$editor->main,
@@ -1725,7 +1720,7 @@ sub event_on_right_down {
 			sub {
 				my $editor = shift;
 				my $doc    = $self;
-				return unless _INSTANCE( $doc, 'Padre::Document::Perl' );
+				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
 				$editor->main->open_regex_editor;
 			},
 		);

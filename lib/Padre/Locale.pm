@@ -50,7 +50,7 @@ use Padre::Logger;
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -461,8 +461,8 @@ BEGIN {
 		},
 	);
 
-	# Post-process to find the language each language
-	# will actually fall back to.
+	# Post-process to find the language that each language
+	# will actually fall back to, rather than prefer to fall back to.
 	foreach my $id ( keys %RFC4646 ) {
 		my $lang = $RFC4646{$id};
 		$lang->{actual} = List::Util::first {

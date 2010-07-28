@@ -24,14 +24,13 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
 use Padre::Constant ();
 use Padre::Config   ();
 use Padre::DB       ();
-use Padre::Action::Queue;
 
 # Generate faster accessors
 use Class::XSAccessor 1.05 {
@@ -157,9 +156,6 @@ sub new {
 		conduit => $self->{wx}->{main},
 	);
 
-	# Create the action queue
-	$self->{actionqueue} = Padre::Action::Queue->new;
-
 	# Startup completed, let go of the database
 	Padre::DB->commit;
 
@@ -235,7 +231,7 @@ sub run {
 			}
 
 			# Add the action to the queue
-			$self->{actionqueue}->add($action);
+			$self->wx->queue->add($action);
 		}
 	}
 

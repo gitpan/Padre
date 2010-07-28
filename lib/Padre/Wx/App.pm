@@ -35,7 +35,7 @@ use Padre::Wx ();
 
 # use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Wx::App';
 
 
@@ -72,6 +72,10 @@ sub create {
 	# Immediately populate the main window
 	require Padre::Wx::Main;
 	$self->{main} = Padre::Wx::Main->new( $self->{ide} );
+
+	# Create the action queue
+	require Padre::Wx::ActionQueue;
+	$self->{queue} = Padre::Wx::ActionQueue->new($self);
 
 	return $self;
 }
@@ -112,7 +116,19 @@ The C<config> accessor returns the L<Padre::Config> for the application.
 sub config {
 
 	# TRACE($_[0]) if DEBUG;
-	$_[0]->ide->config;
+	$_[0]->{ide}->config;
+}
+
+=pod
+
+=head2 C<queue>
+
+The C<queue> accessor returns the L<Padre::Wx::ActionQueue> for the application.
+
+=cut
+
+sub queue {
+	$_[0]->{queue};
 }
 
 

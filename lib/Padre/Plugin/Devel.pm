@@ -7,7 +7,7 @@ use Padre::Wx      ();
 use Padre::Plugin  ();
 use Padre::Current ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -18,7 +18,12 @@ our @ISA     = 'Padre::Plugin';
 # Padre::Plugin Methods
 
 sub padre_interfaces {
-	( 'Padre::Plugin' => 0.43, 'Padre::Wx::Main' => 0.43 );
+	return (
+		'Padre::Plugin'                       => 0.66,
+		'Padre::Wx'                           => 0.66,
+		'Padre::Wx::Main'                     => 0.66,
+		'Padre::Wx::History::TextEntryDialog' => 0.66,
+	);
 }
 
 sub plugin_name {

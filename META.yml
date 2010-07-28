@@ -110,7 +110,7 @@ requires:
   ORLite: 1.41
   POD2::Base: 0.043
   POSIX: 0
-  PPI: 1.205
+  PPI: 1.213
   PPIx::EditorTools: 0.09
   PPIx::Regexp: 0.005
   Params::Util: 0.33
@@ -143,4 +143,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.66
+version: 0.68

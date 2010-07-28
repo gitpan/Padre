@@ -8,9 +8,9 @@ use warnings;
 use List::Util      ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
-use Padre::Current  ('_CURRENT');
+use Padre::Current  ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -97,7 +97,7 @@ sub title {
 
 sub refresh {
 	my $self     = shift;
-	my $current  = _CURRENT(@_);
+	my $current  = Padre::Current::_CURRENT(@_);
 	my $notebook = $current->notebook or return;
 	my $pages    = $notebook->GetPageCount;
 
@@ -113,7 +113,7 @@ sub refresh {
 
 sub refresh_windowlist {
 	my $self     = shift;
-	my $current  = _CURRENT(@_);
+	my $current  = Padre::Current::_CURRENT(@_);
 	my $notebook = $current->notebook or return;
 	my $previous = $self->GetMenuItemCount - $self->{base} - 1;
 	my $pages    = $notebook->GetPageCount - 1;

@@ -7,7 +7,7 @@ use Padre::DB         ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 # workaround: need to be accessible from outside in oder to write unit test ( t/03-wx.t )
 # TO DO - Don't store run-time data in package lexicals
@@ -54,7 +54,7 @@ sub dialog {
 	my $title =
 		$text
 		? Wx::gettext("Set Bookmark")
-		: Wx::gettext("GoTo Bookmark");
+		: Wx::gettext("Go to Bookmark");
 
 	my $layout = get_layout( $text, $names );
 	$dialog = Padre::Wx::Dialog->new(

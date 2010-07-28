@@ -8,7 +8,7 @@ use warnings;
 use File::Spec     ();
 use Padre::Project ();
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 our @ISA     = 'Padre::Project';
 
 
@@ -19,9 +19,8 @@ our @ISA     = 'Padre::Project';
 # Configuration and Intuition
 
 sub headline {
-	my $self = shift;
-	$self->{headline}
-		or $self->{headline} = $self->_headline;
+	$_[0]->{headline}
+		or $_[0]->{headline} = $_[0]->_headline;
 }
 
 sub _headline {

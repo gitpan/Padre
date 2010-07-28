@@ -137,7 +137,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.66';
+our $VERSION = '0.68';
 
 
 
@@ -580,10 +580,13 @@ sub load_file {
 	#warn $self->{encoding};
 	$content = Encode::decode( $self->{encoding}, $content );
 
-	$self->{original_content} = $content;
-
 	# Determine new line type using file content.
 	$self->{newline_type} = Padre::Util::newline_type($content);
+
+	# Cache the original value of various things so we can do
+	# smart things at save time later.
+	$self->{original_content} = $content;
+	$self->{original_newline} = $self->{newline_type};
 
 	return 1;
 }
@@ -1228,28 +1231,28 @@ sub guess_indentation_style {
 	);
 
 	my $style;
+	my $config = Padre->ide->config;
 	if ( $indentation =~ /^t\d+/ ) { # we only do ONE tab
 		$style = {
 			use_tabs    => 1,
-			tabwidth    => 8,
+			tabwidth    => $config->editor_indent_tab_width || 8,
 			indentwidth => 8,
 		};
 	} elsif ( $indentation =~ /^s(\d+)/ ) {
 		$style = {
 			use_tabs    => 0,
-			tabwidth    => 8,
+			tabwidth    => $config->editor_indent_tab_width || 8,
 			indentwidth => $1,
 		};
 	} elsif ( $indentation =~ /^m(\d+)/ ) {
 		$style = {
 			use_tabs    => 1,
-			tabwidth    => 8,
+			tabwidth    => $config->editor_indent_tab_width || 8,
 			indentwidth => $1,
 		};
 	} else {
 
 		# fallback
-		my $config = Padre->ide->config;
 		$style = {
 			use_tabs    => $config->editor_indent_tab,
 			tabwidth    => $config->editor_indent_tab_width,
@@ -1520,7 +1523,7 @@ sub autocomplete {
 	my $post = $editor->GetTextRange( $first, $last );
 
 	my $regex = eval {qr{\b(\Q$prefix\E\w+)\b}};
-	return ("Cannot build regex for '$prefix'") if $@;
+	return ("Cannot build regular expression for '$prefix'.") if $@;
 
 	my %seen;
 	my @words;
