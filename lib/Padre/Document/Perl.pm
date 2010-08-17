@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -448,14 +448,14 @@ sub beginner_check {
 	# Ticket #534
 
 	require Padre::Document::Perl::Beginner;
-	my $Beginner = Padre::Document::Perl::Beginner->new(
+	my $beginner = Padre::Document::Perl::Beginner->new(
 		document => $self,
 		editor   => $self->editor
 	);
 
-	$Beginner->check( $self->text_get );
+	$beginner->check( $self->text_get );
 
-	my $error = $Beginner->error;
+	my $error = $beginner->error;
 
 	if ($error) {
 		Padre->ide->wx->main->error( Wx::gettext("Error: ") . $error );
@@ -736,6 +736,10 @@ sub _find_method {
 					my $lines = do { local $/ = undef; <$fh> };
 					close $fh;
 					my @subs = $lines =~ /sub\s+(\w+)/g;
+					if ( $lines =~ /use MooseX::Declare;/ ) {
+						my @subs = $lines =~ /\bmethod\s+(\w+)/g;
+					}
+
 
 					#use Data::Dumper;
 					#print Dumper \@subs;
@@ -755,6 +759,28 @@ sub _find_method {
 	return;
 }
 
+#scan text for sub declaration
+sub _find_sub_decl_line_number {
+	my ( $name, $text ) = @_;
+
+	my @lines = split /\n/, $text;
+
+	#print "Name '$name'\n";
+	foreach my $i ( 0 .. @lines - 1 ) {
+
+		#print "L: $lines[$i]\n";
+		if ($lines[$i] =~ /sub \s+ $name\b
+		 (?!;)
+		 (?! \([\$;\@\%\\]+ \);)
+		 /x
+			)
+		{
+			return $i;
+		}
+	}
+	return -1;
+}
+
 # Go to the named subroutine
 # Uses the outline if there is one (if the user has opened the outline tree)
 # If not, falls back to a regex, which is pretty basic at the moment
@@ -768,17 +794,10 @@ sub goto_sub {
 	}
 
 	# Fall back to regexs if there's no outline
-	my $text = $self->text_get;
-	my @lines = split /\n/, $text;
-
-	#print "Name '$name'\n";
-	foreach my $i ( 0 .. @lines - 1 ) {
-
-		#print "L: $lines[$i]\n";
-		if ( $lines[$i] =~ /sub \s+ $name\b/x ) {
-			$self->editor->goto_line_centerize($i);
-			return 1;
-		}
+	my $line = _find_sub_decl_line_number( $name, $self->text_get );
+	if ( $line > -1 ) {
+		$self->editor->goto_line_centerize($line);
+		return 1;
 	}
 	return;
 }

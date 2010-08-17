@@ -3,11 +3,10 @@ package Padre::Plugin::Devel;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx      ();
-use Padre::Plugin  ();
-use Padre::Current ();
+use Padre::Wx     ();
+use Padre::Plugin ();
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -28,6 +27,12 @@ sub padre_interfaces {
 
 sub plugin_name {
 	Wx::gettext('Padre Developer Tools');
+}
+
+# Reuse the Padre icon
+sub plugin_icon {
+	require Padre::Wx::Icon;
+	Padre::Wx::Icon::find('logo');
 }
 
 sub plugin_enable {
@@ -68,6 +73,7 @@ sub menu_plugins_simple {
 
 		Wx::gettext('Dump Expression...')    => 'dump_expression',
 		Wx::gettext('Dump Current Document') => 'dump_document',
+		Wx::gettext('Dump Task Manager')     => 'dump_taskmanager',
 		Wx::gettext('Dump Top IDE Object')   => 'dump_padre',
 		Wx::gettext('Dump Current PPI Tree') => 'dump_ppi',
 		Wx::gettext('Dump %INC and @INC')    => 'dump_inc',
@@ -145,6 +151,11 @@ sub dump_document {
 		return;
 	}
 	return $self->_dump($document);
+}
+
+sub dump_taskmanager {
+	my $self = shift;
+	return $self->_dump( $self->current->ide->task_manager );
 }
 
 #

@@ -21,7 +21,7 @@ the available methods that can be applied to it besides the added ones
 
 =cut
 
-use 5.008;
+use 5.008005;
 use strict;
 use warnings;
 use FindBin;
@@ -67,8 +67,9 @@ use Padre::Wx::Role::Dialog       ();
 use Padre::Wx::Dialog::WindowList ();
 use Padre::Logger;
 
-our $VERSION = '0.68';
-our @ISA     = qw{
+our $VERSION        = '0.69';
+our $BACKCOMPATIBLE = '0.58';
+our @ISA            = qw{
 	Padre::Wx::Role::Conduit
 	Padre::Wx::Role::Dialog
 	Wx::Frame
@@ -172,7 +173,8 @@ sub new {
 	$self->{locker} = Padre::Locker->new($self);
 
 	# Bootstrap locale support before we start fiddling with the GUI.
-	$self->{locale} = Padre::Locale::object();
+	my $startup_locale = $ide->opts->{startup_locale};
+	$self->{locale} = ( $startup_locale ? Padre::Locale::object($startup_locale) : Padre::Locale::object() );
 
 	# A large complex application looks, frankly, utterly stupid
 	# if it gets very small, or even mildly small.
@@ -472,7 +474,7 @@ Accessors that may not belong to this class:
 use Class::XSAccessor {
 	predicates => {
 
-		# Needed for lazily-constructed gui elements
+		# Needed for lazily-constructed GUI elements
 		has_about     => 'about',
 		has_left      => 'left',
 		has_right     => 'right',
@@ -632,8 +634,8 @@ sub open_resource {
 }
 
 sub help_search {
-	my ( $self, $topic ) = @_;
-
+	my $self  = shift;
+	my $topic = shift;
 	unless ( defined $self->{help_search} ) {
 		require Padre::Wx::Dialog::HelpSearch;
 		$self->{help_search} = Padre::Wx::Dialog::HelpSearch->new($self);
@@ -2711,6 +2713,22 @@ sub save_current_session {
 Various methods to help send information to user.
 
 Some methods are inherited from L<Padre::Wx::Role::Dialog>.
+
+=head2 C<status>
+
+    $main->status( $msg );
+
+Temporarily change the status bar leftmost block only to some message.
+
+This is a super-quick method intended for transient messages as short
+as a few tens of milliseconds (for example printing all directories
+read during a recursive file scan).
+
+=cut
+
+sub status {
+	$_[0]->GetStatusBar->say( $_[1] );
+}
 
 =head3 C<info>
 
@@ -5662,10 +5680,10 @@ sub timer_check_overwrite {
 	# Show dialog for file reload selection
 	my $winlist = Padre::Wx::Dialog::WindowList->new(
 		$self,
-		title      => Wx::gettext('Close some files'),
-		list_title => Wx::gettext('Select files to close:'),
-		buttons    => [ [ 'Close selected', sub { $_[0]->main->close_some(@_); } ] ],
-	);
+		title      => Wx::gettext('Reload some files'),
+		list_title => Wx::gettext('&Select files to reload:'),
+		buttons    => [ [ Wx::gettext('&Reload selected'), sub { $_[0]->main->reload_some(@_); } ] ],
+	)->show;
 	$winlist->{no_fresh} = 1;
 	$winlist->show;
 

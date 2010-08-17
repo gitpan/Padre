@@ -50,7 +50,7 @@ use Padre::Logger;
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -485,7 +485,7 @@ grep { defined $RFC4646{$_}->{wxid} } sort keys %RFC4646;
 # Find the rfc4646 to use by default
 sub rfc4646 {
 	my $config = Padre::Config->read;
-	my $locale = $#_ >= 1 ? $_[1] : $config->locale;
+	my $locale = $_[0] || $config->locale;
 
 	if ( $locale and not $RFC4646{$locale} ) {
 
@@ -627,7 +627,7 @@ sub encoding_from_string {
 	push @guesses, 'latin1';
 	my $guess = Encode::Guess::guess_encoding( $content, @guesses );
 	unless ( defined $guess ) {
-		$guess = '';                 # to avoid warnings
+		$guess = '';                 # To avoid warnings
 	}
 
 	TRACE("Encoding guess: ($guess)") if DEBUG;

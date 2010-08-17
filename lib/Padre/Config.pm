@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -778,6 +778,12 @@ setting(
 	default => 1,
 );
 setting(
+	name  => 'editor_cursor_blink',
+	type  => Padre::Constant::INTEGER,
+	store => Padre::Constant::HUMAN,
+	default => 500, # milliseconds - this is the actual default for the wxStyledTextCtrl - set to 0 to turn off
+);
+setting(
 	name    => 'find_case',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -1224,9 +1230,32 @@ setting(
 	default => 0,
 );
 
-# The "config_" namespace is for the paths of other non-Padre config files
-# for various external tools (usually so that projects can define the
+# The "config_" namespace is for the locations of configuration content
+# outside of the configuration API, and the paths to other non-Padre config
+# files for various external tools (usually so that projects can define the
 # the location of their project-specific policies).
+
+# The location of the server that will share config data between installs
+setting(
+	name    => 'config_sync_server',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'http://escher.ath.cx:3000',
+);
+
+setting(
+	name    => 'config_sync_username',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => '',
+);
+
+setting(
+	name    => 'config_sync_password',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => '',
+);
 
 # Location of the Perl::Tidy RC file, if a project wants to set a custom one.
 # When set to false, allow Perl::Tidy to use its own default config location.

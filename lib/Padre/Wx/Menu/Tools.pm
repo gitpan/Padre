@@ -12,7 +12,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -35,19 +35,25 @@ sub new {
 	# User Preferences
 	$self->add_menu_action(
 		$self,
-		'edit.preferences',
+		'tools.preferences',
 	);
+
+	# TODO Remove comments after 0.69 release
+	#	$self->add_menu_action(
+	#		$self,
+	#		'tools.sync',
+	#	);
 
 	# Key bindings
 	$self->add_menu_action(
 		$self,
-		'tools.key_bindings',
+		'tools.keys',
 	);
 
 	# Regex Editor
 	$self->add_menu_action(
 		$self,
-		'edit.regex',
+		'tools.regex',
 	);
 
 	$self->AppendSeparator;

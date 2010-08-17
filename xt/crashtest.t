@@ -18,7 +18,7 @@ unless ( $ENV{AUTOMATED_TESTING} or $ENV{RELEASE_TESTING} ) {
 }
 
 unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
-	plan skip_all => 'DISPLAY not set';
+	plan skip_all => 'Needs DISPLAY';
 }
 
 if ( $^O eq 'MSWin32' ) {
@@ -28,7 +28,7 @@ if ( $^O eq 'MSWin32' ) {
 my $devpl;
 
 # Search for dev.pl
-for ( '.', 'blib/lib', 'lib' ) {
+for ( '.', '..', '../..', 'blib/lib', 'lib' ) {
 	if ( $^O eq 'MSWin32' ) {
 		next if !-e File::Spec->catfile( $_, 'dev.pl' );
 	} else {

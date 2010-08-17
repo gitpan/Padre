@@ -24,6 +24,8 @@ eg/syntax_demo.css
 eg/syntax_demo.js
 eg/syntax_demo.json
 fbp/feedback.fbp
+fbp/findinfiles.fbp
+fbp/sync.fbp
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
@@ -124,9 +126,11 @@ lib/Padre/QuickFix.pm
 lib/Padre/Role/Task.pm
 lib/Padre/Search.pm
 lib/Padre/Startup.pm
+lib/Padre/Sync.pm
 lib/Padre/Task.pm
 lib/Padre/Task/Addition.pm
 lib/Padre/Task/Browser.pm
+lib/Padre/Task/Daemon.pm
 lib/Padre/Task/ErrorList.pm
 lib/Padre/Task/Eval.pm
 lib/Padre/Task/FindInFiles.pm
@@ -140,6 +144,7 @@ lib/Padre/Task/LWP.pm
 lib/Padre/Task/OpenResource.pm
 lib/Padre/Task/Outline.pm
 lib/Padre/Task/PPI.pm
+lib/Padre/Task/Run.pm
 lib/Padre/Task/Syntax.pm
 lib/Padre/TaskHandle.pm
 lib/Padre/TaskManager.pm
@@ -197,6 +202,8 @@ lib/Padre/Wx/Dialog/SessionSave.pm
 lib/Padre/Wx/Dialog/Shortcut.pm
 lib/Padre/Wx/Dialog/Snippets.pm
 lib/Padre/Wx/Dialog/SpecialValues.pm
+lib/Padre/Wx/Dialog/Sync.pm
+lib/Padre/Wx/Dialog/Sync2.pm
 lib/Padre/Wx/Dialog/Text.pm
 lib/Padre/Wx/Dialog/Warning.pm
 lib/Padre/Wx/Dialog/WhereFrom.pm
@@ -208,6 +215,8 @@ lib/Padre/Wx/Directory/TreeCtrl.pm
 lib/Padre/Wx/Display.pm
 lib/Padre/Wx/Editor.pm
 lib/Padre/Wx/ErrorList.pm
+lib/Padre/Wx/FBP/FindInFiles.pm
+lib/Padre/Wx/FBP/Sync.pm
 lib/Padre/Wx/FBP/WhereFrom.pm
 lib/Padre/Wx/FileDropTarget.pm
 lib/Padre/Wx/FindResult.pm
@@ -280,6 +289,7 @@ share/examples/wx/21_progress_bar.pl
 share/examples/wx/22_notebook.pl
 share/examples/wx/23_menu.pl
 share/examples/wx/30_editor.pl
+share/examples/wx/31_repl.pl
 share/examples/wx/40_draw.pl
 share/examples/wx/41-drag-image.pl
 share/examples/wx/42-drag-image-no-tail.pl
@@ -400,6 +410,7 @@ t/28_task_manager.t
 t/40-perl.t
 t/41-perl-project.t
 t/42-perl-project-temp.t
+t/43-perl-utils.t
 t/50-browser.t
 t/60-db.t
 t/61-directory-path.t

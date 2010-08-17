@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task::FunctionList ();
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 our @ISA     = 'Padre::Task::FunctionList';
 
 
@@ -14,10 +14,8 @@ our @ISA     = 'Padre::Task::FunctionList';
 
 ######################################################################
 # Padre::Task::FunctionList Methods
-
-sub find {
-	my $n = "\\cM?\\cJ";
-	return grep { defined $_ } $_[1] =~ m/
+my $n = "\\cM?\\cJ";
+our $sub_search_re = qr/
 		(?:
 		(?:$n)*__(?:DATA|END)__\b.*
 		|
@@ -25,7 +23,10 @@ sub find {
 		|
 		(?:^|$n)\s*sub\s+(\w+(?:::\w+)*)
 		)
-	/sgx;
+	/sx;
+
+sub find {
+	return grep { defined $_ } $_[1] =~ /$sub_search_re/g;
 }
 
 1;

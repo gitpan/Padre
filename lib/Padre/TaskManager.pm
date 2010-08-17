@@ -11,7 +11,8 @@ use Padre::Wx                ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION = '0.68';
+our $VERSION        = '0.69';
+our $BACKCOMPATIBLE = '0.66';
 
 # Set up the primary integration event
 our $THREAD_SIGNAL : shared;
@@ -28,7 +29,8 @@ sub new {
 	my $self    = bless {
 		active  => 0, # Are we running at the moment
 		threads => 1, # Are threads enabled
-		minimum => 2, # Workers to launch at startup
+		minimum => 0, # Workers to launch at startup
+		maximum => 3, # The most workers we should use
 		%param,
 		workers => [], # List of all workers
 		handles => {}, # Handles for all active tasks
@@ -60,6 +62,11 @@ sub minimum {
 	$_[0]->{minimum};
 }
 
+sub maximum {
+	TRACE( $_[0] ) if DEBUG;
+	$_[0]->{maximum};
+}
+
 sub start {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
@@ -70,15 +77,6 @@ sub start {
 	}
 	$self->{active} = 1;
 	$self->step;
-}
-
-sub start_thread {
-	TRACE( $_[0] ) if DEBUG;
-	my $self   = shift;
-	my $master = Padre::TaskThread->master;
-	my $worker = Padre::TaskWorker->new->spawn;
-	$self->{workers}->[ $_[0] ] = $worker;
-	return 1;
 }
 
 sub stop {
@@ -94,6 +92,15 @@ sub stop {
 	return 1;
 }
 
+sub start_thread {
+	TRACE( $_[0] ) if DEBUG;
+	my $self   = shift;
+	my $master = Padre::TaskThread->master;
+	my $worker = Padre::TaskWorker->new->spawn;
+	$self->{workers}->[ $_[0] ] = $worker;
+	return $worker;
+}
+
 sub stop_thread {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
@@ -104,11 +111,51 @@ sub stop_thread {
 # Get the next available free child
 sub next_thread {
 	TRACE( $_[0] ) if DEBUG;
-	my $self = shift;
-	foreach my $worker ( @{ $self->{workers} } ) {
+	my $self    = shift;
+	my $workers = $self->{workers};
+
+	# Find the first free worker of any kind
+	foreach my $worker (@$workers) {
 		next if $worker->handle;
 		return $worker;
 	}
+
+	# Create a new worker if we can
+	if ( @$workers < $self->maximum ) {
+		return $self->start_thread( scalar @$workers );
+	}
+
+	return undef;
+}
+
+# Get the best available child for a particular task
+sub best_thread {
+	TRACE( $_[0] ) if DEBUG;
+	my $self    = shift;
+	my $handle  = shift;
+	my $workers = $self->{workers};
+	my @unused  = grep { not $_->handle } @$workers;
+
+	# First try to find a specialist.
+	# Any of them will do at this point, no futher work needed.
+	foreach my $worker (@unused) {
+		next unless $worker->{seen}->{ $handle->class };
+		return $worker;
+	}
+
+	# Bias towards maximum reuse of a smaller number of threads.
+	# This will (hopefully) allow the most stale threads to swap
+	# better, and will simplify decisions on when to clean up
+	# excessive threads.
+	if ( defined $unused[0] ) {
+		return $unused[0];
+	}
+
+	# Create a new worker if we can
+	if ( @$workers < $self->maximum ) {
+		return $self->start_thread( scalar @$workers );
+	}
+
 	return undef;
 }
 
@@ -146,7 +193,7 @@ sub step {
 
 	# Shortcut if there is nowhere to run the task
 	if ( $self->{threads} ) {
-		unless ( $self->{minimum} > scalar keys %$handles ) {
+		if ( scalar keys %$handles >= $self->{maximum} ) {
 			return 1;
 		}
 	}
@@ -169,13 +216,11 @@ sub step {
 	# Register the handle for Wx event callbacks
 	$handles->{$hid} = $handle;
 
-	# Find a worker and register worker/thread relationship
-	my $worker = $self->next_thread or return;
-	$worker->handle($hid);
-	$handle->{worker} = $worker->wid;
+	# Find the next/best worker for the task
+	my $worker = $self->best_thread($handle) or return;
 
-	# Send the message into the worker to start the task
-	$worker->send( 'task', $handle->as_array );
+	# Send the task to the worker for execution
+	$worker->send_task($handle);
 
 	# Continue to the next iteration
 	return $self->step;

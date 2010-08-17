@@ -12,7 +12,7 @@ use Test::More;
 use File::Temp ();
 use File::Spec();
 
-plan skip_all => 'DISPLAY not set'
+plan skip_all => 'Needs DISPLAY'
 	unless $ENV{DISPLAY}
 		or ( $^O eq 'MSWin32' );
 
@@ -24,7 +24,7 @@ unless ( $ENV{AUTOMATED_TESTING} or $ENV{RELEASE_TESTING} ) {
 my $devpl;
 
 # Search for dev.pl
-for ( '.', 'blib/lib', 'lib' ) {
+for ( '.', '..', '../..', 'blib/lib', 'lib' ) {
 	if ( $^O eq 'MSWin32' ) {
 		next if !-e File::Spec->catfile( $_, 'dev.pl' );
 	} else {
@@ -64,6 +64,7 @@ $cmd .= $devpl . ' --invisible -- --home=' . $dir->dirname;
 $cmd .= ' ' . File::Spec->catfile( $dir->dirname, 'newfile.txt' );
 $cmd .= ' --actionqueue=internal.dump_padre,file.quit';
 
+print "Command is: $cmd\n";
 system $cmd;
 
 my $dump_fn = File::Spec->catfile( $dir->dirname, 'padre.dump' );
@@ -82,7 +83,7 @@ foreach my $action ( sort( keys( %{ $VAR1->{actions} } ) ) ) {
 
 		# All run actions need a open editor window and a saved file
 		if ( $action !~ /^run\.(stop|run_command)/ ) {
-			ok( $VAR1->{actions}->{$action}->{need_editor}, $action . ' requires a editor' );
+			ok( $VAR1->{actions}->{$action}->{need_editor}, $action . ' requires an editor' );
 			ok( $VAR1->{actions}->{$action}->{need_file},   $action . ' requires a filename' );
 		}
 	}

@@ -2,9 +2,10 @@
 
 use strict;
 use warnings;
-use constant CONFIG_OPTIONS => 119;
+use constant CONFIG_OPTIONS => 123;
 
 # Move of Debug to Run Menu
+# TODO can someone who knows what *2 + 21 means explain it in a comment please.
 use Test::More tests => CONFIG_OPTIONS * 2 + 21;
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';

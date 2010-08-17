@@ -277,7 +277,7 @@ sub on_about {
 	my ($self) = @_;
 
 	Wx::MessageBox(
-		"wxPerl editor, (c) 2008 Gabor Szabo\n" . "wxPerl edotr $VERSION, " . wxVERSION_STRING,
+		"wxPerl editor, (c) 2008 Gabor Szabo\n" . "wxPerl editor $VERSION, " . wxVERSION_STRING,
 		"About wxPerl editor", wxOK | wxCENTRE, $self
 	);
 }

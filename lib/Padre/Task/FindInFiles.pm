@@ -6,7 +6,7 @@ use warnings;
 use File::Spec  ();
 use Time::HiRes ();
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 
 
 
@@ -91,10 +91,21 @@ sub run {
 			if ( -f _ ) {
 				my $object = Padre::Wx::Directory::Path->file( @path, $file );
 				next if $rule->skipped( $object->unix );
-				my $lines = $self->file( $regexp => $object );
-				my $now = Time::HiRes::time();
-				if ( @$lines or $now - $timer > 1 ) {
-					$self->message( found => $file->name, $lines );
+
+				# Parse the file
+				my $line    = undef;
+				my @matched = ();
+				if ( open( my $fh, '<', $file->name ) ) {
+					while ( defined( my $line = <$fh> ) ) {
+						next unless $line =~ $regexp;
+						push @matched, $line;
+					}
+					close $fh;
+				}
+
+				# Report the lines we matched
+				if ( @matched or Time::HiRes::time() - $timer > 1 ) {
+					$self->message( found => $file->name, \@matched );
 				}
 
 			} elsif ( -d _ ) {
@@ -112,22 +123,9 @@ sub run {
 	return 1;
 }
 
-sub file {
-	my $self = shift;
-	my $rule = shift;
-	my $file = shift;
-
-	# Load the file
-	open( my $fh, '<', $file->name ) or return [];
-	my @lines = <$fh>;
-	close $fh;
-
-	die "CODE INCOMPLETE";
-}
-
 sub found {
 	require Padre::Current;
-	Padre::Current->main->error( $_[1] );
+	Padre::Current->main->status( $_[1] );
 }
 
 1;

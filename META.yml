@@ -71,7 +71,7 @@ requires:
   Debug::Client: 0.11
   Devel::Dumpvar: 0.04
   Devel::Refactor: 0.05
-  Digest::MD5: 0
+  Digest::MD5: 2.38
   Encode: 2.26
   ExtUtils::MakeMaker: 6.56
   ExtUtils::Manifest: 1.56
@@ -99,6 +99,8 @@ requires:
   IO::String: 1.08
   IPC::Open2: 0
   IPC::Open3: 0
+  IPC::Run: 0.83
+  JSON::XS: 2.29
   LWP: 5.815
   List::MoreUtils: 0.22
   List::Util: 1.18
@@ -143,4 +145,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.68
+version: 0.69

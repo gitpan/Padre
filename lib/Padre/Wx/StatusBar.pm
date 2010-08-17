@@ -53,7 +53,7 @@ use Class::XSAccessor {
 	}
 };
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::StatusBar
@@ -142,6 +142,23 @@ sub clear {
 	$self->SetStatusText( "", POSTRING );
 	$self->SetStatusText( "", RDONLY );
 	return;
+}
+
+=pod
+
+=head2 C<say>
+
+    $statusbar->say('Hello World!');
+
+Temporarily overwrite only the leftmost filename part of the status bar.
+
+It will return to it's normal value when the status bar is next refreshed
+for normal reasons (such as a keystroke or a file panel switch).
+
+=cut
+
+sub say {
+	$_[0]->SetStatusText( $_[1], FILENAME );
 }
 
 =pod

@@ -10,7 +10,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.68';
+our $VERSION = '0.69';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -242,6 +242,11 @@ sub refresh {
 	if ( $id ne $self->{document} ) {
 		$search->ChangeValue('');
 		$self->{document} = $id;
+	}
+
+	# Nothing to do if there is no content
+	if ( $document->is_unused ) {
+		return 1;
 	}
 
 	# Launch the background task
