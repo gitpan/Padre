@@ -67,7 +67,7 @@ use Padre::Wx::Role::Dialog       ();
 use Padre::Wx::Dialog::WindowList ();
 use Padre::Logger;
 
-our $VERSION        = '0.69';
+our $VERSION        = '0.70';
 our $BACKCOMPATIBLE = '0.58';
 our @ISA            = qw{
 	Padre::Wx::Role::Conduit
@@ -264,6 +264,7 @@ sub new {
 	$self->_show_outline( $config->main_outline );
 	$self->_show_directory( $config->main_directory );
 	$self->_show_output( $config->main_output );
+	$self->_show_command_line( $config->main_command_line );
 	$self->_show_syntax( $config->main_syntaxcheck );
 	$self->_show_errorlist( $config->main_errorlist );
 
@@ -475,21 +476,22 @@ use Class::XSAccessor {
 	predicates => {
 
 		# Needed for lazily-constructed GUI elements
-		has_about     => 'about',
-		has_left      => 'left',
-		has_right     => 'right',
-		has_bottom    => 'bottom',
-		has_output    => 'output',
-		has_ack       => 'ack',
-		has_syntax    => 'syntax',
-		has_functions => 'functions',
-		has_todo      => 'todo',
-		has_debugger  => 'debugger',
-		has_find      => 'find',
-		has_replace   => 'replace',
-		has_outline   => 'outline',
-		has_directory => 'directory',
-		has_errorlist => 'errorlist',
+		has_about        => 'about',
+		has_left         => 'left',
+		has_right        => 'right',
+		has_bottom       => 'bottom',
+		has_output       => 'output',
+		has_command_line => 'command_line',
+		has_ack          => 'ack',
+		has_syntax       => 'syntax',
+		has_functions    => 'functions',
+		has_todo         => 'todo',
+		has_debugger     => 'debugger',
+		has_find         => 'find',
+		has_replace      => 'replace',
+		has_outline      => 'outline',
+		has_directory    => 'directory',
+		has_errorlist    => 'errorlist',
 	},
 	getters => {
 
@@ -553,6 +555,15 @@ sub output {
 		$self->{output} = Padre::Wx::Output->new($self);
 	}
 	return $self->{output};
+}
+
+sub command_line {
+	my $self = shift;
+	unless ( defined $self->{command_line} ) {
+		require Padre::Wx::Command;
+		$self->{command_line} = Padre::Wx::Command->new($self);
+	}
+	return $self->{command_line};
 }
 
 sub functions {
@@ -1583,7 +1594,7 @@ sub change_locale {
 	my $self = shift;
 	my $name = shift;
 	unless ( defined $name ) {
-		$name = Padre::Locale::system_rfc4646();
+		$name = Padre::Locale::system_rfc4646 || Padre::Locale::last_resort_rfc4646;
 	}
 	TRACE("Changing locale to '$name'") if DEBUG;
 
@@ -1701,6 +1712,7 @@ sub reconfig {
 	$self->show_outline( $config->main_outline );
 	$self->show_directory( $config->main_directory );
 	$self->show_output( $config->main_output );
+	$self->show_command_line( $config->main_command_line );
 	$self->show_syntax( $config->main_syntaxcheck );
 
 	# Finally refresh the menu to clean it up
@@ -1974,6 +1986,47 @@ sub _show_output {
 		delete $self->{output};
 	}
 }
+
+
+=pod
+
+=head3 C<show_command_line>
+
+    $main->show_command_line( $visible );
+
+Show the command panel at the bottom if C<$visible> is true. Hide it
+otherwise. If C<$visible> is not provided, the method defaults to show
+the panel.
+
+=cut
+
+sub show_command_line {
+	my $self = shift;
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock('UPDATE');
+	unless ( $on == $self->menu->view->{command_line}->IsChecked ) {
+		$self->menu->view->{command_line}->Check($on);
+	}
+
+	$self->config->set( main_command_line => $on );
+	$self->_show_command_line($on);
+	$self->aui->Update;
+	$self->ide->save_config;
+
+	return;
+}
+
+sub _show_command_line {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+	if ( $_[0] ) {
+		$self->bottom->show( $self->command_line );
+	} elsif ( $self->has_command_line ) {
+		$self->bottom->hide( $self->command_line );
+		delete $self->{command_line};
+	}
+}
+
 
 =pod
 
@@ -5683,11 +5736,9 @@ sub timer_check_overwrite {
 		title      => Wx::gettext('Reload some files'),
 		list_title => Wx::gettext('&Select files to reload:'),
 		buttons    => [ [ Wx::gettext('&Reload selected'), sub { $_[0]->main->reload_some(@_); } ] ],
-	)->show;
+	);
 	$winlist->{no_fresh} = 1;
 	$winlist->show;
-
-	$doc->{_already_popup_file_changed} = 0;
 
 	return;
 }

@@ -130,7 +130,6 @@ lib/Padre/Sync.pm
 lib/Padre/Task.pm
 lib/Padre/Task/Addition.pm
 lib/Padre/Task/Browser.pm
-lib/Padre/Task/Daemon.pm
 lib/Padre/Task/ErrorList.pm
 lib/Padre/Task/Eval.pm
 lib/Padre/Task/FindInFiles.pm
@@ -149,11 +148,13 @@ lib/Padre/Task/Syntax.pm
 lib/Padre/TaskHandle.pm
 lib/Padre/TaskManager.pm
 lib/Padre/TaskProcess.pm
+lib/Padre/TaskQueue.pm
 lib/Padre/TaskThread.pm
 lib/Padre/TaskWorker.pm
 lib/Padre/Test.pm
 lib/Padre/Transform.pm
 lib/Padre/Util.pm
+lib/Padre/Util/CommandLine.pm
 lib/Padre/Util/FileBrowser.pm
 lib/Padre/Util/SVN.pm
 lib/Padre/Util/Template.pm
@@ -168,6 +169,7 @@ lib/Padre/Wx/App.pm
 lib/Padre/Wx/AuiManager.pm
 lib/Padre/Wx/Bottom.pm
 lib/Padre/Wx/Browser.pm
+lib/Padre/Wx/Command.pm
 lib/Padre/Wx/CPAN.pm
 lib/Padre/Wx/CPAN/Listview.pm
 lib/Padre/Wx/Debugger.pm
@@ -209,8 +211,9 @@ lib/Padre/Wx/Dialog/Warning.pm
 lib/Padre/Wx/Dialog/WhereFrom.pm
 lib/Padre/Wx/Dialog/WindowList.pm
 lib/Padre/Wx/Directory.pm
+lib/Padre/Wx/Directory/Browse.pm
 lib/Padre/Wx/Directory/Path.pm
-lib/Padre/Wx/Directory/Task.pm
+lib/Padre/Wx/Directory/Search.pm
 lib/Padre/Wx/Directory/TreeCtrl.pm
 lib/Padre/Wx/Display.pm
 lib/Padre/Wx/Editor.pm
@@ -259,6 +262,7 @@ lib/Padre/Wx/StatusBar.pm
 lib/Padre/Wx/Syntax.pm
 lib/Padre/Wx/TodoList.pm
 lib/Padre/Wx/ToolBar.pm
+lib/Padre/Wx/TreeCtrl.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
@@ -399,6 +403,7 @@ t/07-version.t
 t/08-style.t
 t/14-warnings.t
 t/15-locale.t
+t/20_task_queue.t
 t/21_task_thread.t
 t/22_task_worker.t
 t/23_task_chain.t
@@ -414,8 +419,6 @@ t/43-perl-utils.t
 t/50-browser.t
 t/60-db.t
 t/61-directory-path.t
-t/62-directory-task.t
-t/63-directory-project.t
 t/70-document.t
 t/72-dialog-html.t
 t/73-display.t
@@ -425,6 +428,7 @@ t/80-newline.t
 t/81-search.t
 t/82-plugin-manager.t
 t/83-autosave.t
+t/85-commandline.t
 t/91-vi.t
 t/92-padre-file.t
 t/93-padre-filename-win.t
@@ -461,6 +465,9 @@ t/files/find_variable_declaration_1.pm
 t/files/find_variable_declaration_2.pm
 t/files/hello_with_warn.pl
 t/files/lexically_rename_variable.pl
+t/files/method_declarator_1.pm
+t/files/method_declarator_2.pm
+t/files/method_declarator_3.pm
 t/files/missing_brace_1.pl
 t/files/missing_semicolon.pl
 t/files/no_strict.pl

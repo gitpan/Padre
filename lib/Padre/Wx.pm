@@ -9,7 +9,6 @@ use warnings;
 # Threading must be loaded before Wx loads
 use threads;
 use threads::shared;
-use Thread::Queue 2.11;
 
 # Load every exportable constant into here, so that they come into
 # existence in the Wx:: packages, allowing everywhere else in the code to
@@ -22,7 +21,7 @@ use Wx::STC    ();
 use Wx::AUI    ();
 use Wx::Locale ();
 
-our $VERSION        = '0.69';
+our $VERSION        = '0.70';
 our $BACKCOMPATIBLE = '0.43';
 
 # Hard version lock on a new-enough Wx.pm
@@ -62,6 +61,7 @@ use constant {
 	ID_TIMER_ACTIONQUEUE => 30005,
 	ID_TIMER_LASTRESORT  => 30006,
 	ID_TIMER_NTH         => 30007,
+	ID_TIMER_DIRECTORY   => 30008,
 };
 
 

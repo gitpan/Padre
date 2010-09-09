@@ -4,6 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 use YAML::Tiny                ();
+use Time::HiRes               ();
 use Padre::Constant           ();
 use Padre::Util               ();
 use Padre::Current            ();
@@ -11,7 +12,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -260,7 +261,7 @@ sub padre_setup {
 	return;
 }
 
-# Called a key is released in the editor
+# Called when a key is released in the editor
 sub on_key_up {
 	my ( $self, $event ) = @_;
 
@@ -269,7 +270,7 @@ sub on_key_up {
 		my $line = $self->GetLine( $self->GetCurrentLine() );
 		if ( $line !~ /^\s*$/ ) {
 
-			# Only cut on non-black lines
+			# Only cut on non-blank lines
 			$self->CmdKeyExecute(Wx::wxSTC_CMD_LINECUT);
 		} else {
 
@@ -994,18 +995,14 @@ sub on_focus {
 }
 
 sub on_char {
-	my ( $self, $event ) = @_;
-
-	my $doc = $self->{Document};
-	if ( $doc->can('event_on_char') ) {
-		$doc->event_on_char( $self, $event );
+	my $self     = shift;
+	my $event    = shift;
+	my $document = $self->{Document};
+	if ( $document->can('event_on_char') ) {
+		$document->event_on_char( $self, $event );
 	}
 
-	if ( $self->main->ide->{has_Time_HiRes} ) {
-		$doc->{last_char_time} = Time::HiRes::time();
-	} else {
-		$doc->{last_char_time} = time;
-	}
+	$document->{last_char_time} = Time::HiRes::time();
 
 	$event->Skip;
 	return;

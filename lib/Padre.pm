@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -44,6 +44,7 @@ use Class::XSAccessor 1.05 {
 	},
 	accessors => {
 		actions     => 'actions',
+		shortcuts   => 'shortcuts',
 		instance_id => 'instance_id',
 	},
 };
@@ -133,9 +134,9 @@ sub new {
 	# Load (and sync if needed) the configuration
 	$self->{config} = Padre::Config->read;
 
-	# Actions registry
-	my %actions = ();
-	$self->actions( \%actions );
+	# Actions and keyboard shortcuts registries
+	$self->actions(   {} );
+	$self->shortcuts( {} );
 
 	# Load a few more bits and pieces now we know
 	# that we'll need them
@@ -204,12 +205,6 @@ sub run {
 		if ( defined $documents ) {
 			chdir $documents;
 		}
-	}
-
-	# Check if we have Time::HiRes:
-	# This should be better done in a background job
-	if ( eval { require Time::HiRes; } and ( !$@ ) ) {
-		$self->{has_Time_HiRes} = 1;
 	}
 
 	# HACK: Uncomment this to locate difficult-to-find crashes

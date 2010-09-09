@@ -23,8 +23,7 @@ use Padre::DB                    ();
 use Padre::Wx                    ();
 use Padre::Wx::Role::Main        ();
 use Padre::Wx::History::ComboBox ();
-
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -35,10 +34,10 @@ our @ISA     = qw{
 =head2 new
 
   my $find = Padre::Wx::Dialog::Replace->new($main);
-
 Create and return a C<Padre::Wx::Dialog::Replace> search and replace widget.
 
 =cut
+
 
 sub new {
 	my $class = shift;
@@ -148,7 +147,7 @@ sub new {
 	$self->{find_button} = Wx::Button->new(
 		$self,
 		Wx::wxID_FIND,
-		Wx::gettext("&Find"),
+		Wx::gettext('&Find'),
 	);
 	Wx::Event::EVT_BUTTON(
 		$self,
@@ -157,50 +156,60 @@ sub new {
 			$_[0]->find_button;
 		}
 	);
-	Wx::Event::EVT_CHAR(
+	Wx::Event::EVT_KEY_DOWN(
 		$self->{find_button},
 		sub {
-			$self->hotkey( $_[1]->GetKeyCode );
+			$self->hotkey( $_[1], $self->{find_button} );
 		}
 	);
 
 	# The "Replace" button
-	$self->{replace} = Wx::Button->new(
+	$self->{replace_button} = Wx::Button->new(
 		$self,
 		Wx::wxID_REPLACE,
-		Wx::gettext("&Replace"),
+		Wx::gettext('&Replace'),
 	);
 	Wx::Event::EVT_BUTTON(
 		$self,
-		$self->{replace},
+		$self->{replace_button},
 		sub {
 			$_[0]->replace_button;
 		}
 	);
-	Wx::Event::EVT_CHAR(
-		$self->{replace},
+	Wx::Event::EVT_KEY_DOWN(
+		$self->{replace_button},
 		sub {
-			$self->hotkey( $_[1]->GetKeyCode );
+			$self->hotkey( $_[1], $self->{replace_button} );
 		}
 	);
-	$self->{replace}->SetDefault;
+	$self->{replace_button}->SetDefault;
 
 	# The "Close" button
-	$self->{cancel_button} = Wx::Button->new(
+	$self->{close_button} = Wx::Button->new(
 		$self,
 		Wx::wxID_CANCEL,
-		Wx::gettext("&Close"),
+		Wx::gettext('&Close'),
 	);
 	Wx::Event::EVT_BUTTON(
 		$self,
-		$self->{cancel_button},
+		$self->{close_button},
 		sub {
-			$_[0]->cancel_button;
+			$_[0]->close;
 		}
 	);
 
-	# Form Layout
+	# Tab order
+	$self->{find_regex}->MoveAfterInTabOrder( $self->{find_text} );
+	$self->{replace_text}->MoveAfterInTabOrder( $self->{find_regex} );
+	$self->{find_case}->MoveAfterInTabOrder( $self->{replace_regex} );
+	$self->{find_reverse}->MoveAfterInTabOrder( $self->{find_case} );
+	$self->{find_first}->MoveAfterInTabOrder( $self->{find_reverse} );
+	$self->{replace_all}->MoveAfterInTabOrder( $self->{find_first} );
+	$self->{find_button}->MoveAfterInTabOrder( $self->{replace_all} );
+	$self->{replace_button}->MoveAfterInTabOrder( $self->{find_button} );
+	$self->{close_button}->MoveAfterInTabOrder( $self->{replace_button} );
 
+	# Form Layout
 	# Find sizer begins here
 	my $find = Wx::StaticBoxSizer->new(
 		Wx::StaticBox->new(
@@ -214,7 +223,7 @@ sub new {
 		Wx::StaticText->new(
 			$self,
 			Wx::wxID_STATIC,
-			Wx::gettext("Find Text:"),
+			Wx::gettext('Find Text:'),
 		),
 		0,
 		Wx::wxALIGN_LEFT | Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,
@@ -246,7 +255,7 @@ sub new {
 		Wx::StaticText->new(
 			$self,
 			Wx::wxID_STATIC,
-			Wx::gettext("Replace Text:"),
+			Wx::gettext('Replace Text:'),
 		),
 		0,
 		Wx::wxALIGN_LEFT | Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,
@@ -312,13 +321,13 @@ sub new {
 		5,
 	);
 	$bottom->Add(
-		$self->{replace},
+		$self->{replace_button},
 		0,
 		Wx::wxGROW | Wx::wxLEFT | Wx::wxRIGHT,
 		5,
 	);
 	$bottom->Add(
-		$self->{cancel_button},
+		$self->{close_button},
 		0,
 		Wx::wxGROW | Wx::wxLEFT,
 		5,
@@ -362,7 +371,6 @@ sub new {
 	$self->{find_regex}->SetValue( $config->find_regex );
 	$self->{find_first}->SetValue( $config->find_first );
 	$self->{find_reverse}->SetValue( $config->find_reverse );
-
 	return $self;
 }
 
@@ -381,6 +389,7 @@ of the search and not as the string to be used.
 
 =cut
 
+
 sub find {
 	my $self = shift;
 	my $text = $self->current->text;
@@ -395,7 +404,6 @@ sub find {
 	# Clear out and reset the dialog, then prepare the new find
 	$self->{find_text}->refresh;
 	$self->{replace_text}->refresh;
-
 	if ( $self->IsShown ) {
 		$self->find_button;
 	} else {
@@ -409,14 +417,8 @@ sub find {
 		}
 		$self->Show(1);
 	}
-
 	return;
 }
-
-
-
-
-
 ######################################################################
 # Button Events
 
@@ -440,7 +442,7 @@ sub find_button {
 	# Generate the search object
 	my $search = $self->as_search;
 	unless ($search) {
-		$main->error("Not a valid search");
+		$main->error('Not a valid search');
 
 		# Move the focus back to the search text
 		# so they can tweak their search.
@@ -455,21 +457,21 @@ sub find_button {
 	if ( $self->{find_first}->GetValue ) {
 		$self->Hide;
 	}
-
 	return;
 }
 
 =pod
 
-=head2 cancel_button
+=head2 close
 
-  $self->cancel_button
+  $self->close
 
-Hide dialog when pressed cancel button.
+Hide dialog.
 
 =cut
 
-sub cancel_button {
+
+sub close {
 	my $self = shift;
 	$self->Hide;
 
@@ -482,7 +484,6 @@ sub cancel_button {
 	if ($editor) {
 		$editor->SetFocus;
 	}
-
 	return;
 }
 
@@ -501,6 +502,7 @@ again.
 
 =cut
 
+
 # TO DO: The change to this function that turned it into a dual-purpose function
 #       unintentionally transfered responsibility for the implementation of
 #       "Replace All" from the main class to a dialog class.
@@ -515,7 +517,7 @@ sub replace_button {
 	# Generate the search object
 	my $search = $self->as_search;
 	unless ($search) {
-		$main->error("Not a valid search");
+		$main->error('Not a valid search');
 
 		# Move the focus back to the search text
 		# so they can tweak their search.
@@ -540,7 +542,6 @@ sub replace_button {
 	# Move the focus back to the search text
 	# so they can change it if they want.
 	$self->{find_text}->SetFocus;
-
 	return;
 }
 
@@ -556,6 +557,7 @@ Replace all appearances of given string in the current document.
 
 =cut
 
+
 sub replace_all {
 	my $self   = shift;
 	my $main   = $self->main;
@@ -564,7 +566,7 @@ sub replace_all {
 	# Generate the search object
 	my $search = $self->as_search;
 	unless ($search) {
-		$main->error("Not a valid search");
+		$main->error('Not a valid search');
 		return;
 	}
 
@@ -589,14 +591,8 @@ sub replace_all {
 	# Move the focus back to the search text
 	# so they can change it if they want.
 	$self->{find_text}->SetFocus;
-
 	return;
 }
-
-
-
-
-
 #####################################################################
 # Support Methods
 
@@ -625,17 +621,20 @@ sub as_search {
 
 # Adds Ultraedit-like hotkeys for quick find/replace triggering
 sub hotkey {
-	my $self = shift;
-	my $code = shift;
+	my ( $self, $key_event, $sender ) = @_;
 
-	# Handle the 'f' hotkey
-	if ( $code == 102 ) {
+	if ( $key_event->GetKeyCode == ord 'F' ) {
 		$self->find_button;
 	}
-
-	# Handle the 'r' hotkey
-	if ( $code == 114 ) {
+	if ( $key_event->GetKeyCode == ord 'R' ) {
 		$self->replace_button;
+	}
+	if ( $key_event->GetKeyCode == Wx::WXK_TAB ) {
+
+		#$sender->Navigate( $key_event->ShiftDown ? 0 : 1 );
+	}
+	if ( $key_event->GetKeyCode == Wx::WXK_ESCAPE ) {
+		$self->close;
 	}
 
 	return;
@@ -647,19 +646,15 @@ sub save {
 	my $self    = shift;
 	my $config  = $self->current->config;
 	my $changed = 0;
-
 	foreach my $name (qw{ find_case find_regex find_first find_reverse }) {
 		my $value = $self->{$name}->GetValue;
 		next if $config->$name() == $value;
 		$config->set( $name => $value );
 		$changed = 1;
 	}
-
 	$config->write if $changed;
-
 	return $config;
 }
-
 1;
 
 =pod
@@ -667,14 +662,13 @@ sub save {
 =head1 COPYRIGHT & LICENSE
 
 Copyright 2008-2010 The Padre development team as listed in Padre.pm.
-
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
-
 The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
+
 
 # Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE

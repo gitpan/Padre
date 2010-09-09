@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::MimeTypes      ();
 use Padre::Role::Task     ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Main
@@ -505,7 +505,7 @@ sub search {
 	return;
 }
 
-sub task_response {
+sub task_finish {
 	my $self    = shift;
 	my $task    = shift;
 	my $matched = $task->{matched} or return;

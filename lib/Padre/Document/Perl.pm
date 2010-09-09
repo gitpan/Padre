@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -251,7 +251,7 @@ sub keywords {
 # triggering a "Variable length lookbehind not implemented" error.
 # return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
 sub get_function_regex {
-	qr/(?:^|[^# \t])[ \t]*(sub\s+$_[1])\b/;
+	qr/(?:^|[^# \t])[ \t]*((?:sub|func|method)\s+$_[1])\b/;
 }
 
 sub get_functions {
@@ -266,7 +266,7 @@ sub find_functions {
 		|
 		$n$n=\w+.*?$n$n=cut\b(?=.*?$n$n)
 		|
-		(?:^|$n)\s*sub\s+(\w+(?:::\w+)*)
+		(?:^|$n)\s*(?:sub|func|method)\s+(\w+(?:::\w+)*)
 		)
 	/sgx;
 }
@@ -476,9 +476,9 @@ sub find_unmatched_brace {
 
 	# Fire the task
 	$self->task_request(
-		task     => 'Padre::Task::FindUnmatchedBrace',
-		document => $self,
-		callback => 'find_unmatched_brace_response',
+		task      => 'Padre::Task::FindUnmatchedBrace',
+		document  => $self,
+		on_finish => 'find_unmatched_brace_response',
 	);
 
 	return;
@@ -579,10 +579,10 @@ sub find_variable_declaration {
 
 	# Create a new object of the task class and schedule it
 	$self->task_request(
-		task     => 'Padre::Task::FindVariableDeclaration',
-		document => $self,
-		location => $location,
-		callback => 'find_variable_declaration_response',
+		task      => 'Padre::Task::FindVariableDeclaration',
+		document  => $self,
+		location  => $location,
+		on_finish => 'find_variable_declaration_response',
 	);
 
 	return;
@@ -737,7 +737,11 @@ sub _find_method {
 					close $fh;
 					my @subs = $lines =~ /sub\s+(\w+)/g;
 					if ( $lines =~ /use MooseX::Declare;/ ) {
-						my @subs = $lines =~ /\bmethod\s+(\w+)/g;
+						push @subs, ( $lines =~ /\bmethod\s+(\w+)/g );
+					}
+
+					if ( $lines =~ /use (?:MooseX::)?Method::Signatures;/ ) {
+						my @subs = $lines =~ /\b(?:method|func)\s+(\w+)/g;
 					}
 
 
@@ -863,7 +867,7 @@ sub rename_variable {
 		document    => $self,
 		location    => $location,
 		replacement => $replacement,
-		callback    => 'rename_variable_response',
+		on_finish   => 'rename_variable_response',
 	);
 
 	return;
@@ -912,7 +916,7 @@ sub introduce_temporary_variable {
 		varname        => $name,
 		start_location => $editor->GetSelectionStart,
 		end_location   => $editor->GetSelectionEnd - 1,
-		callback       => 'introduce_temporary_variable_response',
+		on_finish      => 'introduce_temporary_variable_response',
 	);
 
 	return;
@@ -1493,22 +1497,23 @@ WARNING: This method runs very often (on each keypress), keep it as efficient
 =cut
 
 sub event_on_char {
-	my ( $self, $editor, $event ) = @_;
+	my $self   = shift;
+	my $editor = shift;
+	my $event  = shift;
+	my $config = $editor->config;
+	my $main   = $editor->main;
 
-	my $config = Padre->ide->config;
-	my $main   = Padre->ide->wx->main;
-
-	$editor->Freeze;
-
-	$self->autocomplete_matching_char(
-		$editor, $event,
-		34  => 34,  # " "
-		39  => 39,  # ' '
-		40  => 41,  # ( )
-		60  => 62,  # < >
-		91  => 93,  # [ ]
-		123 => 125, # { }
-	);
+	if ( $config->autocomplete_brackets ) {
+		$self->autocomplete_matching_char(
+			$editor, $event,
+			34  => 34,  # " "
+			39  => 39,  # ' '
+			40  => 41,  # ( )
+			60  => 62,  # < >
+			91  => 93,  # [ ]
+			123 => 125, # { }
+		);
+	}
 
 	my $selection_exists = 0;
 	my $text             = $editor->GetSelectedText;
@@ -1516,8 +1521,7 @@ sub event_on_char {
 		$selection_exists = 1;
 	}
 
-	my $key = $event->GetUnicodeKey;
-
+	my $key   = $event->GetUnicodeKey;
 	my $pos   = $editor->GetCurrentPos;
 	my $line  = $editor->LineFromPosition($pos);
 	my $first = $editor->PositionFromLine($line);
@@ -1620,8 +1624,6 @@ sub event_on_char {
 
 		}
 	}
-
-	$editor->Thaw;
 
 	# Auto complete only when the user selected 'always'
 	# and no ALT key is pressed

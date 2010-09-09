@@ -17,9 +17,12 @@ results fed back to them, if the answer is still relevant.
 use 5.008005;
 use strict;
 use warnings;
-use Scalar::Util ();
+use Scalar::Util   ();
+use Padre::Current ();
+use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION        = '0.70';
+our $BACKCOMPATIBLE = '0.69';
 
 # Use a shared sequence for object revisioning greatly
 # simplifies the indexing process.
@@ -35,6 +38,7 @@ my %INDEX    = ();
 
 # Get the object's current revision
 sub task_revision {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 
 	# Set a revision if this is the first time
@@ -49,25 +53,30 @@ sub task_revision {
 		Scalar::Util::weaken( $INDEX{ $self->{task_revision} } );
 	}
 
+	TRACE("Owner revision is $self->{task_revision}") if DEBUG;
 	return $self->{task_revision};
 }
 
 # Object state has changed, update revision and flush index.
 sub task_reset {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	if ( $self->{task_revision} ) {
 		delete $INDEX{ $self->{task_revision} };
+		Padre::Current->ide->task_manager->cancel( $self->{task_revision} );
 	}
 	$self->{task_revision} = ++$SEQUENCE;
 }
 
 # Locate an object by revision
 sub task_owner {
+	TRACE( $_[0] ) if DEBUG;
 	$INDEX{ $_[1] };
 }
 
 # Create a new task bound to the owner
 sub task_request {
+	TRACE( $_[0] ) if DEBUG;
 	my $self  = shift;
 	my %param = @_;
 
@@ -81,15 +90,23 @@ sub task_request {
 	) or die "Missing or invalid task class '$task'";
 
 	# Create and start the task with ourself as the owner
+	TRACE("Creating and scheduling task $class") if DEBUG;
 	$class->new( owner => $self, %param )->schedule;
 }
 
 # By default explode to highlight task requesters that
 # have not implemented an appropriate response handler.
-sub task_response {
+sub task_finish {
 	my $class = ref( $_[0] ) || $_[0];
 	my $task  = ref( $_[1] ) || $_[1];
-	die "Unhandled task_response for $class (recieved $task)";
+	die "Unhandled task_finish for $class (recieved $task)";
+}
+
+# Pass task messages through to the owner
+sub task_message {
+	my $class = ref( $_[0] ) || $_[0];
+	my $task  = ref( $_[1] ) || $_[1];
+	die "Unhandled task_message for $class (recieved $task message $_[2]->[0])";
 }
 
 1;

@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 
 
@@ -1314,6 +1314,16 @@ sub init {
 	);
 
 	Padre::Wx::Action->new(
+		name        => 'view.command_line',
+		label       => _T('Show Command Line window'),
+		comment     => _T('Show the command line window'),
+		menu_method => 'AppendCheckItem',
+		menu_event  => sub {
+			$_[0]->show_command_line( $_[1]->IsChecked );
+		},
+	);
+
+	Padre::Wx::Action->new(
 		name        => 'view.todo',
 		label       => _T('Show To-do List'),
 		comment     => _T('Show a window listing all todo items in the current document'),
@@ -1393,7 +1403,7 @@ sub init {
 				label      => $mime{$mime_type},
 				comment    => _T('Switch document type'),
 				menu_event => sub {
-					$_[0]->set_mimetype( $mime{$mime_type} );
+					$_[0]->set_mimetype($mime_type);
 				},
 			);
 		}
@@ -1741,6 +1751,7 @@ sub init {
 		need_editor => 1,
 		label       => _T('Rename Variable...'),
 		comment     => _T('Prompt for a replacement variable name and replace all occurrences of this variable'),
+		shortcut    => 'Shift-Alt-R',
 		menu_event  => sub {
 			my $document = $_[0]->current->document or return;
 			$document->can('rename_variable') or return;
@@ -1756,6 +1767,7 @@ sub init {
 			      'Cut the current selection and create a new sub from it. '
 				. 'A call to this sub is added in the place where the selection was.'
 		),
+		shortcut   => 'Shift-Alt-M',
 		menu_event => sub {
 			my $document = $_[0]->current->document or return;
 			$document->can('extract_subroutine') or return;
@@ -1926,7 +1938,7 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		toolbar      => 'stock/code/stock_macro-stop-after-command',
-		label        => _T('Step In') . ' (&s) ',
+		label        => _T('Step In (&s)'),
 		comment      => _T(
 			'Execute the next statement, enter subroutine if needed. (Start debugger if it is not yet running)'),
 
@@ -1943,7 +1955,7 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		toolbar      => 'stock/code/stock_macro-stop-after-procedure',
-		label        => _T('Step Over') . ' (&n) ',
+		label        => _T('Step Over (&n)'),
 		comment      => _T(
 			'Execute the next statement. If it is a subroutine call, stop only after it returned. (Start debugger if it is not yet running)'
 		),
@@ -1962,7 +1974,7 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		toolbar      => 'stock/code/stock_macro-jump-back',
-		label        => _T('Step Out') . ' (&r) ',
+		label        => _T('Step Out (&r)'),
 		comment      => _T('If within a subroutine, run till return is called and then stop.'),
 
 		#shortcut     => 'Shift-F5',
@@ -1978,7 +1990,7 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		toolbar      => 'stock/code/stock_tools-macro',
-		label        => _T('Run till Breakpoint') . ' (&c) ',
+		label        => _T('Run till Breakpoint (&c)'),
 		comment      => _T('Start running and/or continue running till next breakpoint or watch'),
 
 		#shortcut     => 'Shift-F5',
@@ -2009,7 +2021,7 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		toolbar      => 'stock/code/stock_macro-insert-breakpoint',
-		label        => _T('Set Breakpoint') . ' (&b) ',
+		label        => _T('Set Breakpoint (&b)'),
 		comment      => _T('Set a breakpoint to the current location of the cursor with a condition'),
 
 		#shortcut     => 'Shift-F5',
@@ -2070,7 +2082,7 @@ sub init {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
-		label        => _T('Show Stack Trace') . ' (&T) ',
+		label        => _T('Show Stack Trace (&t)'),
 		comment      => _T('When in a subroutine call show all the calls since the main of the program'),
 
 		#shortcut     => 'Shift-F5',
@@ -2101,7 +2113,7 @@ sub init {
 		need_editor  => 1,
 		need_runable => 1,
 		need_file    => 1,
-		label        => _T('Show Value Now') . ' (&x) ',
+		label        => _T('Show Value Now (&x)'),
 		comment      => _T('Show the value of a variable now in a pop-up window.'),
 
 		#shortcut     => 'Shift-F5',
@@ -2132,7 +2144,7 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		toolbar      => 'actions/stop',
-		label        => _T('Quit Debugger') . ' (&q) ',
+		label        => _T('Quit Debugger (&q)'),
 		comment      => _T('Quit the process being debugged'),
 
 		#shortcut     => 'Shift-F5',
@@ -2444,6 +2456,17 @@ sub init {
 		menu_event => sub {
 			$_[0]->show_syntax(1);
 			$_[0]->syntax->SetFocus;
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name       => 'window.goto_command_line_window',
+		label      => _T('Go to Command Line Window'),
+		comment    => _T('Set the focus to the "Command Line" window'),
+		shortcut   => 'Alt-Z',
+		menu_event => sub {
+			$_[0]->show_command_line(1);
+			$_[0]->command_line->SetFocus;
 		},
 	);
 

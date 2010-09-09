@@ -37,7 +37,7 @@ use Padre::Wx::Dialog     ();
 use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Wx::Dialog
@@ -314,7 +314,7 @@ sub display {
 	}
 }
 
-sub task_response {
+sub task_finish {
 	my $self     = shift;
 	my $task     = shift;
 	my $then     = $task->{then};

@@ -10,7 +10,7 @@ use Padre::Wx             ();
 use Padre::Wx::Icon       ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -292,7 +292,12 @@ sub button_main {
 # handler called when the preferences button has been clicked.
 #
 sub button_preferences {
-	$_[0]->{plugin}->object->plugin_preferences;
+	my $self = shift;
+	eval { $self->{plugin}->object->plugin_preferences; };
+	if ($@) {
+		$self->{plugin}->errstr($@);
+		$self->show_error_message;
+	}
 }
 
 #

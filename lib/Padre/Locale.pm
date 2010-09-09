@@ -50,7 +50,7 @@ use Padre::Logger;
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -170,6 +170,16 @@ BEGIN {
 			wxid      => Wx::wxLANGUAGE_CZECH,
 			fallback  => [],
 			supported => 1,
+		},
+
+		'da' => {
+			gettext   => _T('Danish'),
+			utf8text  => 'Dansk',
+			iso639    => 'da',
+			iso3166   => 'DA',
+			wxid      => Wx::wxLANGUAGE_DANISH,
+			fallback  => [ 'en-gb', 'en-us' ],
+			supported => 0,
 		},
 
 		'de' => {
@@ -349,11 +359,11 @@ BEGIN {
 		'nl-be' => {
 			gettext   => _T('Dutch (Belgium)'),
 			utf8text  => 'Nederlands (België)',
-			iso639    => 'en',
+			iso639    => 'nl',
 			iso3166   => 'BE',
 			wxid      => Wx::wxLANGUAGE_DUTCH_BELGIAN,
 			fallback  => ['nl-nl'],
-			supported => 1,
+			supported => 0,
 		},
 
 		'no' => {
@@ -475,9 +485,12 @@ BEGIN {
 use constant WX => Wx::Locale::GetSystemLanguage();
 
 use constant system_rfc4646 => List::Util::first {
-	$RFC4646{$_}->{wxid} == WX;
+	defined $RFC4646{$_}->{wxid}
+		&& $RFC4646{$_}->{wxid} == WX;
 }
-grep { defined $RFC4646{$_}->{wxid} } sort keys %RFC4646;
+sort keys %RFC4646;
+
+use constant last_resort_rfc4646 => 'en-gb';
 
 #####################################################################
 # Locale 2.0 Implementation

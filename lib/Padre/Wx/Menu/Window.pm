@@ -10,7 +10,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -78,6 +78,11 @@ sub new {
 	$self->{window_goto_syntax_check_window} = $self->add_menu_action(
 		$self,
 		'window.goto_syntax_check_window',
+	);
+
+	$self->{window_goto_command_line_window} = $self->add_menu_action(
+		$self,
+		'window.goto_command_line_window',
 	);
 
 	$self->{window_goto_main_window} = $self->add_menu_action(

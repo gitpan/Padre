@@ -9,7 +9,7 @@ use Padre::Constant       ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -81,6 +81,10 @@ sub show {
 		$page->gettext_label,
 		1,
 	);
+	if ( $page->can('view_icon') ) {
+		my $pos = $self->GetPageIndex($page);
+		$self->SetPageBitmap( $pos, $page->view_icon );
+	}
 	$page->Show;
 	$self->Show;
 	$self->aui->GetPane($self)->Show;

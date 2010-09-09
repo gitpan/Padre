@@ -2,8 +2,8 @@ package Padre::Config;
 
 # Configuration subsystem for Padre
 
-# To help force the break from the first-generate HASH based configuration
-# over to thdee second-generation method based configuration, initially we
+# To help force the break from the first-generation HASH based configuration
+# over to the second-generation method based configuration, initially we
 # will use an ARRAY-based object, so that all existing code is forcefully
 # broken.
 
@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -380,7 +380,7 @@ setting(
 	name    => 'startup_splash',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
-	default => 1,
+	default => 0,
 	startup => 1,
 );
 
@@ -558,6 +558,12 @@ setting(
 );
 setting(
 	name    => 'main_output',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
+	name    => 'main_command_line',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,

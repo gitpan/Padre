@@ -5,14 +5,14 @@ use strict;
 use warnings;
 use File::Spec                 ();
 use Padre::Constant            ();
-use Padre::Wx                  ();
+use Padre::Wx::TreeCtrl        ();
 use Padre::Wx::Role::Main      ();
 use Padre::Wx::Directory::Path ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
-	Wx::TreeCtrl
+	Padre::Wx::TreeCtrl
 };
 
 
@@ -184,21 +184,10 @@ sub on_tree_item_menu {
 # Scan the tree to find all directory nodes which are expanded.
 # Returns a reference to a HASH of ->unix path strings.
 sub expanded {
-	my $self   = shift;
-	my @queue  = $self->GetRootItem;
-	my %expand = ();
-	while (@queue) {
-		my $parent = shift @queue;
-		my ( $child, $cookie ) = $self->GetFirstChild($parent);
-		while ($child) {
-			if ( $self->IsExpanded($child) ) {
-				$expand{ $self->GetPlData($child)->unix } = 1;
-				push @queue, $child;
-			}
-			( $child, $cookie ) = $self->GetNextChild( $parent, $cookie );
-		}
-	}
-	return \%expand;
+	my $self  = shift;
+	my $items = $self->GetExpandedPlData;
+	my %hash  = map { $_->unix => 1 } @$items;
+	return \%hash;
 }
 
 1;

@@ -14,7 +14,7 @@ use Padre::Wx::ActionLibrary ();
 use Padre::Wx::Menu          ();
 use Padre::Locale            ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = 'Padre::Wx::Menu';
 
 my @GUI_ELEMENTS = qw{
@@ -24,6 +24,7 @@ my @GUI_ELEMENTS = qw{
 	directory
 	output
 	show_syntaxcheck
+	command_line
 	show_errorlist
 	statusbar
 	toolbar
@@ -302,6 +303,7 @@ sub refresh {
 	$self->{lockinterface}->Check( $config->main_lockinterface );
 	$self->{indentation_guide}->Check( $config->editor_indentationguides );
 	$self->{show_calltips}->Check( $config->editor_calltips );
+	$self->{command_line}->Check( $config->main_command_line );
 	$self->{show_syntaxcheck}->Check( $config->main_syntaxcheck );
 	$self->{show_errorlist}->Check( $config->main_errorlist );
 	$self->{toolbar}->Check( $config->main_toolbar );

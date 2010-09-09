@@ -11,7 +11,7 @@ use Padre::Wx             ();
 use Padre::Wx::Icon       ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -344,7 +344,7 @@ sub refresh {
 	);
 }
 
-sub task_response {
+sub task_finish {
 	my $self = shift;
 	my $task = shift;
 	$self->{model} = $task->{model};

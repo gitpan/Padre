@@ -3,14 +3,16 @@ package Padre::Wx::Directory;
 use 5.008;
 use strict;
 use warnings;
+use Params::Util                   ();
 use Padre::Cache                   ();
 use Padre::Role::Task              ();
 use Padre::Wx::Role::View          ();
 use Padre::Wx::Role::Main          ();
 use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
+use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -36,6 +38,7 @@ use Class::XSAccessor {
 # Creates the Directory Left Panel with a Search field
 # and the Directory Browser
 sub new {
+	TRACE( $_[0] ) if DEBUG;
 	my $class = shift;
 	my $main  = shift;
 
@@ -47,14 +50,11 @@ sub new {
 		Wx::wxDefaultSize,
 	);
 
+	# Modes
+	$self->{searching} = 0;
+
 	# Where is the current root directory of the tree
 	$self->{root} = '';
-
-	# The list of all files to build into the tree
-	$self->{files} = [];
-
-	# The directories in the tree that should be expanded
-	$self->{expand} = {};
 
 	# Create the search control
 	my $search = $self->{search} = Wx::SearchCtrl->new(
@@ -97,6 +97,17 @@ sub new {
 
 	# Create the tree control
 	$self->{tree} = Padre::Wx::Directory::TreeCtrl->new($self);
+	$self->{tree}->SetPlData(
+		$self->{tree}->GetRootItem,
+		Padre::Wx::Directory::Path->directory,
+	);
+	Wx::Event::EVT_TREE_ITEM_EXPANDED(
+		$self,
+		$self->{tree},
+		sub {
+			shift->on_expand(@_);
+		}
+	);
 
 	# Fill the panel
 	my $sizerv = Wx::BoxSizer->new(Wx::wxVERTICAL);
@@ -117,6 +128,30 @@ sub new {
 
 
 ######################################################################
+# Padre::Role::Task Methods
+
+sub task_request {
+	my $self    = shift;
+	my $current = $self->current;
+	my $project = $current->project;
+	if ($project) {
+		return $self->SUPER::task_request(
+			@_,
+			project => $project,
+		);
+	} else {
+		return $self->SUPER::task_request(
+			@_,
+			root => $current->config->main_directory_root,
+		);
+	}
+}
+
+
+
+
+
+######################################################################
 # Padre::Wx::Role::View Methods
 
 sub view_panel {
@@ -128,6 +163,7 @@ sub view_label {
 }
 
 sub view_close {
+	TRACE( $_[0] ) if DEBUG;
 	shift->main->show_directory(0);
 }
 
@@ -141,14 +177,48 @@ sub view_close {
 # If it is a project, caches search field content while it is typed and
 # searchs for files that matchs the type word.
 sub on_text {
+	TRACE( $_[0] ) if DEBUG;
 	my $self   = shift;
 	my $search = $self->{search};
 
-	# Show or hide the cancel button
-	$search->ShowCancelButton( $search->IsEmpty ? 0 : 1 );
+	if ( $self->{searching} ) {
+		if ( $search->IsEmpty ) {
 
-	# The changed search state requires a rerender
-	$self->render;
+			# Leaving search mode
+			$self->{searching} = 0;
+			$self->task_reset;
+			$self->clear;
+			$self->refill;
+			$self->browse;
+		} else {
+
+			# Changing search term
+			$self->find;
+		}
+	} else {
+		if ( $search->IsEmpty ) {
+
+			# Nothing to do
+			# NOTE: Why would this even fire?
+		} else {
+
+			# Entering search mode
+			$self->{expand}    = $self->tree->GetExpandedPlData;
+			$self->{searching} = 1;
+			$search->ShowCancelButton(1);
+			$self->find;
+		}
+	}
+
+	return 1;
+}
+
+sub on_expand {
+	my $self  = shift;
+	my $event = shift;
+	my $item  = $event->GetItem;
+	my $path  = $self->{tree}->GetPlData($item);
+	return $self->browse($path);
 }
 
 
@@ -176,6 +246,7 @@ sub searching {
 # Updates the gui, so each compoment can update itself
 # according to the new state.
 sub clear {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $lock = $self->main->lock('UPDATE');
 	$self->{search}->SetValue('');
@@ -184,120 +255,18 @@ sub clear {
 	return;
 }
 
-# Updates the gui if needed, calling Searcher and Browser respectives
-# refresh function.
-# Called outside Directory.pm, on directory browser focus and item dragging
-sub refresh {
-	my $self = shift;
-
-	# NOTE: Without a file open, Padre does not consider itself to
-	# have a "current project". We should probably try to find a way
-	# to correct this in future.
-	my $current = $self->current;
-	my $config  = $current->config;
-	my $project = $current->project;
-	my $root    = '';
-	my @options = (
-		order => $config->main_directory_order,
-	);
-	if ($project) {
-		$root = $project->root;
-		push @options, ( project => $project );
-	} else {
-		$root = $config->main_directory_root;
-		push @options, ( root => $root );
-	}
-
-	# Before we change anything, store the expansion state
-	unless ( $self->searching ) {
-		$self->{expand} = $self->tree->expanded;
-	}
-
-	# Switch project states if needed
-	unless ( $self->{root} eq $root ) {
-		my $ide = $current->ide;
-
-		# Save the current model data to the cache
-		# if we potentially need it again later.
-		if ( $ide->project_exists( $self->{root} ) ) {
-			my $stash = Padre::Cache::stash(
-				__PACKAGE__,
-				$ide->project( $self->{root} ),
-			);
-			%$stash = (
-				root   => $self->{root},
-				files  => $self->{files},
-				expand => $self->{expand},
-			);
-		}
-
-		# Flush the now-unusable state
-		$self->{root}   = $root;
-		$self->{files}  = [];
-		$self->{expand} = {};
-
-		# Do we have an (out of date) cached state we can use?
-		# If so, display it immediately and update it later.
-		if ($project) {
-			my $stash = Padre::Cache::stash(
-				__PACKAGE__,
-				$project,
-			);
-			if ( $stash->{root} ) {
-
-				# We have a cached state
-				$self->{files}  = $stash->{files};
-				$self->{expand} = $stash->{expand};
-			}
-		}
-
-		# Flush the search box and rerender the tree
-		$self->{search}->SetValue('');
-		$self->{search}->ShowCancelButton(0);
-		$self->render;
-	}
-
-	# Trigger the refresh task to update the temporary state
-	$self->task_request(
-		task      => 'Padre::Wx::Directory::Task',
-		callback  => 'refresh_response',
-		recursive => 1,
-		@options,
-	);
-
-	return 1;
-}
-
-sub refresh_response {
-	my $self = shift;
-	my $task = shift;
-	$self->{files} = $task->{model};
-	$self->render;
-}
-
-# This is a primitive first attempt to get familiar with the tree API
-sub render {
+# Refill the tree from storage
+sub refill {
 	my $self   = shift;
-	my $tree   = $self->tree;
+	my $tree   = $self->{tree};
 	my $root   = $tree->GetRootItem;
-	my $expand = $self->{expand};
+	my $files  = delete $self->{files} or return;
+	my $expand = delete $self->{expand} or return;
+	my $lock   = $self->main->lock('UPDATE');
+	my @stack  = ();
+	shift @$files;
 
-	# Prepare search mode if needed
-	my $search = $self->searching;
-	my @files = $search ? $self->filter( $self->term ) : @{ $self->{files} };
-
-	# Flush the old tree contents
-	# TO DO: This is inefficient, upgrade to something that does the
-	# equivalent of a treewise diff application, modifying the tree
-	# to get the result we want instead of rebuilding it entirely.
-	my $lock = $self->main->lock('UPDATE');
-	$tree->DeleteChildren($root);
-
-	# Fill the new tree
-	my @stack = ();
-	while (@files) {
-		my $path = shift @files;
-		my $image = $path->type ? 'folder' : 'package';
+	foreach my $path (@$files) {
 		while (@stack) {
 
 			# If we are not the child of the deepest element in
@@ -307,7 +276,7 @@ sub render {
 			# We have finished filling the directory.
 			# Now it (maybe) has children, we can expand it.
 			my $complete = pop @stack;
-			if ( $search or $expand->{ $tree->GetPlData($complete)->unix } ) {
+			if ( $expand->{ $tree->GetPlData($complete)->unix } ) {
 				$tree->Expand($complete);
 			}
 		}
@@ -317,11 +286,11 @@ sub render {
 
 		# Add the next item to that parent
 		my $item = $tree->AppendItem(
-			$parent,                      # Parent node
-			$path->name,                  # Label
-			$tree->{images}->{$image},    # Icon
-			-1,                           # Wx Identifier
-			Wx::TreeItemData->new($path), # Embedded data
+			$parent,                           # Parent
+			$path->name,                       # Label
+			$tree->{images}->{ $path->image }, # Icon
+			-1,                                # Icon (Selected)
+			Wx::TreeItemData->new($path),      # Embedded data
 		);
 
 		# If it is a folder, it goes onto the stack
@@ -333,48 +302,332 @@ sub render {
 	# Apply the same Expand logic above to any remaining stack elements
 	while (@stack) {
 		my $complete = pop @stack;
-		if ( $search or $expand->{ $tree->GetPlData($complete)->unix } ) {
+		if ( $expand->{ $tree->GetPlData($complete)->unix } ) {
 			$tree->Expand($complete);
 		}
 	}
 
-	# When in search mode, force the scroll position to the top after
-	# every refresh. It tends to want to scroll to the bottom.
-	if ($search) {
-		my ( $first, $cookie ) = $tree->GetFirstChild($root);
-		$tree->ScrollTo($first) if $first;
+	# If we moved during the fill, move back
+	my $first = ( $tree->GetFirstChild($root) )[0];
+	$tree->ScrollTo($first) if $first->IsOk;
+
+	return 1;
+}
+
+
+
+
+
+######################################################################
+# Directory Tree Methods
+
+# Updates the gui if needed, calling Searcher and Browser respectives
+# refresh function.
+# Called outside Directory.pm, on directory browser focus and item dragging
+sub refresh {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+
+	# NOTE: Without a file open, Padre does not consider itself to
+	# have a "current project". We should probably try to find a way
+	# to correct this in future.
+	my $current = $self->current;
+	my $config  = $current->config;
+	my $project = $current->project;
+	my $root    = $project ? $project->root : $config->main_directory_root;
+	my @options = (
+		order => $config->main_directory_order,
+	);
+
+	# Switch project states if needed
+	unless ( $self->{root} eq $root ) {
+		my $ide = $current->ide;
+
+		# Save the current model data to the cache
+		# if we potentially need it again later.
+		if ( $ide->project_exists( $self->{root} ) ) {
+			my $stash = Padre::Cache->stash(
+				__PACKAGE__ => $ide->project( $self->{root} ),
+			);
+			if ( $self->{searching} ) {
+
+				# Save the stored browse state
+				%$stash = (
+					root   => $self->{root},
+					files  => $self->{files},
+					expand => $self->{expand},
+				);
+			} else {
+
+				# Capture the browse state fresh.
+				%$stash = (
+					root   => $self->{root},
+					files  => $self->tree->GetChildrenPlData,
+					expand => $self->tree->expanded,
+				);
+			}
+		}
+
+		# Flush the now-unusable local state
+		$self->clear;
+		$self->{root}   = $root;
+		$self->{files}  = undef;
+		$self->{expand} = undef;
+
+		# Do we have an (out of date) cached state we can use?
+		# If so, display it immediately and update it later on.
+		if ($project) {
+			my $stash = Padre::Cache->stash(
+				__PACKAGE__ => $project,
+			);
+			if ( $stash->{root} ) {
+
+				# We have a cached state
+				$self->{files}  = $stash->{files};
+				$self->{expand} = $stash->{expand};
+				$self->refill;
+			}
+		}
+
+		# Flush the search box and restart
+		$self->browse;
 	}
 
 	return 1;
 }
 
-# Filter the file list to remove all files that do not match a search term
-# TO DO: I believe that the two phases shown below can be merged into one.
-sub filter {
+
+
+
+
+######################################################################
+# Browse Methods
+
+sub browse {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-	my $term = shift;
+	return if $self->searching;
 
-	# Apply a simple substring match on the file name only
-	my $quote = quotemeta $term;
-	my $regex = qr/$quote/i;
-	my @match =
-		grep { $_->is_directory or $_->name =~ $regex } @{ $self->{files} };
+	# Switch tasks to the browse task
+	$self->task_reset;
+	$self->task_request(
+		task       => 'Padre::Wx::Directory::Browse',
+		on_message => 'browse_message',
+		on_finish  => 'browse_finish',
+		list       => [ @_ ? @_ : Padre::Wx::Directory::Path->directory ],
+	);
 
-	# Prune empty directories
-	# NOTE: This is tricky and hard to make sense of, but damned fast :)
-	foreach my $i ( reverse 0 .. $#match ) {
-		my $path  = $match[$i];
-		my $after = $match[ $i + 1 ];
-		my $prune = (
-			$path->is_directory and not( defined $after
-				and $after->depth - $path->depth == 1 )
-		);
-		if ($prune) {
-			splice @match, $i, 1;
+	return;
+}
+
+sub browse_message {
+	TRACE( $_[0] ) if DEBUG;
+	my $self   = shift;
+	my $task   = shift;
+	my $parent = shift;
+
+	# Find the parent, discarding the message if we can't find it
+	my $tree   = $self->{tree};
+	my $cursor = $tree->GetRootItem;
+	foreach my $name ( $parent->path ) {
+
+		# Locate the child to descend to.
+		# Discard the entire message if the target child doesn't exist.
+		$cursor = $tree->GetChildByText( $cursor, $name ) or return 1;
+	}
+
+	# Mix the returned files into the existing entries.
+	# If there aren't any existing entries, this shortcuts quite nicely.
+	my ( $child, $cookie ) = $tree->GetFirstChild($cursor);
+	my $position = 0;
+	while (@_) {
+		if ( $child->IsOk ) {
+
+			# Are we before, after, or a duplicate
+			my $compare = $self->compare( $_[0], $tree->GetPlData($child) );
+			if ( $compare > 0 ) {
+
+				# Deleted entry, remove the current position
+				my $delete = $child;
+				( $child, $cookie ) = $tree->GetNextChild( $cursor, $cookie );
+				$tree->Delete($delete);
+
+			} elsif ( $compare < 0 ) {
+
+				# New entry, insert before the current position
+				my $path = shift;
+				$tree->InsertItem(
+					$cursor,                           # Parent
+					$position,                         # Before
+					$path->name,                       # Label
+					$tree->{images}->{ $path->image }, # Icon
+					-1,                                # Icon (Selected)
+					Wx::TreeItemData->new($path),      # Embedded data
+				);
+				$position++;
+
+			} else {
+
+				# Already exists, discard the duplicate
+				( $child, $cookie ) = $tree->GetNextChild( $cursor, $cookie );
+				$position++;
+				shift @_;
+			}
+
+		} else {
+
+			# We are past the last entry
+			my $path = shift;
+			$tree->AppendItem(
+				$cursor,                           # Parent
+				$path->name,                       # Label
+				$tree->{images}->{ $path->image }, # Icon
+				-1,                                # Icon (Selected)
+				Wx::TreeItemData->new($path),      # Embedded data
+			);
 		}
 	}
 
-	return @match;
+	# Remove any deleted trailing entries
+	while ( $child->IsOk ) {
+
+		# Deleted entry, remove the current position
+		my $delete = $child;
+		( $child, $cookie ) = $tree->GetNextChild( $cursor, $cookie );
+		$tree->Delete($delete);
+	}
+
+	return 1;
+}
+
+sub browse_finish {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	my $task = shift;
+}
+
+
+
+
+
+######################################################################
+# Incremental Search Methods
+
+sub find {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	return unless $self->searching;
+
+	# Switch tasks to the find task
+	$self->task_reset;
+	$self->task_request(
+		task       => 'Padre::Wx::Directory::Search',
+		on_message => 'find_message',
+		on_finish  => 'find_finish',
+		filter     => $self->term,
+	);
+
+	# Create the find timer
+	$self->{find_timer} = Wx::Timer->new(
+		$self,
+		Padre::Wx::ID_TIMER_DIRECTORY
+	);
+	Wx::Event::EVT_TIMER(
+		$self,
+		Padre::Wx::ID_TIMER_ACTIONQUEUE,
+		sub {
+			$self->find_timer( $_[1], $_[2] );
+		},
+	);
+	$self->{find_timer}->Start(1000);
+
+	# Make sure no existing files are listed
+	$self->{tree}->DeleteChildren( $self->{tree}->GetRootItem );
+
+	return;
+}
+
+# We have hit a find_message render interval
+sub find_timer {
+	TRACE( $_[0] ) if DEBUG;
+}
+
+# Add any matching file to the tree
+sub find_message {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	my $task = shift;
+	my $file = Params::Util::_INSTANCE( shift, 'Padre::Wx::Directory::Path' ) or return;
+
+	# Find where we need to start creating nodes from
+	my $tree   = $self->tree;
+	my $cursor = $tree->GetRootItem;
+	my @base   = ();
+	my @dirs   = $file->path;
+	pop @dirs;
+	while (@dirs) {
+		my $name  = shift @dirs;
+		my $child = $tree->GetLastChild($cursor);
+		if ( $child->IsOk and $tree->GetPlData($child)->name eq $name ) {
+			$cursor = $child;
+			push @base, $name;
+		} else {
+			unshift @dirs, $name;
+			last;
+		}
+	}
+
+	# Will we need to expand anything at the end?
+	my $expand = @dirs ? $cursor : undef;
+
+	# Because this should never be called from inside some larger
+	# update locker, lets risk the use of our own more targetted locking
+	# instead of using the official main->lock functionality.
+	# NOTE: It will HOPEFULLY be faster than the main one.
+	# NOTE: If we could avoid the scrollback snapping around on its own,
+	# we probably wouldn't need this lock at all.
+	my $scroll = $tree->GetScrollPos(Wx::wxVERTICAL);
+	my $lock   = Wx::WindowUpdateLocker->new($tree);
+
+	# Create any new child directories
+	while (@dirs) {
+		my $name = shift @dirs;
+		my $path = Padre::Wx::Directory::Path->directory( @base, $name );
+		my $item = $tree->AppendItem(
+			$cursor,                      # Parent
+			$path->name,                  # Label
+			$tree->{images}->{folder},    # Icon
+			-1,                           # Wx identifier
+			Wx::TreeItemData->new($path), # Embedded data
+		);
+		$cursor = $item;
+		push @base, $name;
+	}
+
+	# Create the file itself
+	$tree->AppendItem(
+		$cursor,
+		$file->name,
+		$tree->{images}->{package},
+		-1,
+		Wx::TreeItemData->new($file),
+	);
+
+	# Expand anything we created.
+	$tree->ExpandAllChildren($expand) if $expand;
+
+	# Make sure the scroll position has not changed
+	$tree->SetScrollPos( Wx::wxVERTICAL, 0, 0 );
+
+	return 1;
+}
+
+sub find_finish {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	my $task = shift;
+
+	# Done... but we don't need to do anything
 }
 
 
@@ -404,6 +657,7 @@ sub side {
 # Come up with a saner approach to migrating views between arbitrary panels
 # that we can expand out so all views can potentially be moved around.
 sub move {
+	TRACE( $_[0] ) if DEBUG;
 	my $self   = shift;
 	my $main   = $self->main;
 	my $config = $main->config;
@@ -418,6 +672,14 @@ sub move {
 	}
 	$main->show_directory(1);
 	return 1;
+}
+
+# Compare two paths to see which should be first
+sub compare {
+	my $self  = shift;
+	my $left  = shift;
+	my $right = shift;
+	return ( $right->is_directory <=> $left->is_directory or lc( $left->name ) cmp lc( $right->name ) );
 }
 
 1;

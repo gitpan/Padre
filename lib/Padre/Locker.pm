@@ -13,8 +13,9 @@ use strict;
 use warnings;
 use Padre::Lock ();
 use Padre::DB   ();
+use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 sub new {
 	my $class = shift;
@@ -218,6 +219,9 @@ sub method_decrement {
 			# as a whole.
 			local $@;
 			eval { $self->{owner}->$_(); };
+			if ( DEBUG and $@ ) {
+				TRACE("ERROR: '$@'");
+			}
 		}
 		$self->{method_pending} = {};
 	}

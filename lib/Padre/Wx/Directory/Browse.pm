@@ -1,4 +1,4 @@
-package Padre::Wx::Directory::Task;
+package Padre::Wx::Directory::Browse;
 
 # This is a simple flexible task that fetches lists of file names
 # (but does not look inside of those files)
@@ -9,8 +9,9 @@ use warnings;
 use Scalar::Util               ();
 use Padre::Task                ();
 use Padre::Wx::Directory::Path ();
+use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = 'Padre::Task';
 
 use constant NO_WARN => 1;
@@ -23,6 +24,7 @@ use constant NO_WARN => 1;
 # Constructor
 
 sub new {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift->SUPER::new(@_);
 
 	# Automatic project integration
@@ -32,15 +34,15 @@ sub new {
 		delete $self->{project};
 	}
 
-	# Property defaults
+	# Check params
+	unless ( defined $self->{order} ) {
+		$self->{order} = 'first';
+	}
 	unless ( defined $self->{skip} ) {
 		$self->{skip} = [];
 	}
-	unless ( defined $self->{recursive} ) {
-		$self->{recursive} = 1;
-	}
-	unless ( defined $self->{order} ) {
-		$self->{order} = 'first';
+	unless ( defined $self->{list} ) {
+		die "Did not provide a directory list to refresh";
 	}
 
 	return $self;
@@ -54,40 +56,38 @@ sub new {
 # Padre::Task Methods
 
 sub run {
+	TRACE( $_[0] ) if DEBUG;
 	require Module::Manifest;
 	my $self  = shift;
 	my $root  = $self->{root};
-	my @queue = Padre::Wx::Directory::Path->directory;
-	my @files = ();
+	my $list  = $self->{list};
+	my @queue = @$list;
 
 	# Prepare the skip rules
 	my $rule = Module::Manifest->new;
 	$rule->parse( skip => $self->{skip} );
 
-	# WARNING!!!
-	# what should really happen here?
-	# I'm only initialising the values here as
-	# t/62-directory-task.t and t/63-directory-project.t
-	# fails the no warnings test
-	# but I'm quite sure you don't want an empty string
-	# should it test and return maybe?
-	my $path = defined( $queue[0]->path ) ? $queue[0]->path : "";
-	my $name = defined( $queue[0]->name ) ? $queue[0]->name : "";
-
-	my %seen = ( File::Spec->catdir( $path, $name ) => $queue[0] );
-
 	# Get the device of the root path
 	my $dev = ( stat($root) )[0];
 
-	# Recursively scan for files
+	# Recursively scan directories for their content
+	my $descend = scalar @$list;
 	while (@queue) {
-		my $parent = shift @queue;
-		my @path   = $parent->path;
-		my $dir    = File::Spec->catdir( $root, @path );
+
+		# Abort the task if we've been cancelled
+		if ( $self->cancel ) {
+			TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+			return 1;
+		}
 
 		# Read the file list for the directory
 		# NOTE: Silently ignore any that fail. Anything we don't have
 		# permission to see inside of them will just be invisible.
+		$descend--;
+		my $request = shift @queue;
+		my @path    = $request->path;
+		my $dir     = File::Spec->catdir( $root, @path );
+		next unless -d $dir;
 		opendir DIRECTORY, $dir or next;
 		my @list = readdir DIRECTORY;
 		closedir DIRECTORY;
@@ -114,18 +114,6 @@ sub run {
 					File::Spec->file_name_is_absolute($target)
 					? $target
 					: File::Spec->canonpath( File::Spec->catdir( $dir, $target ) );
-
-				# Get it from the cache in case of loops:
-				if ( exists $seen{$fullname} ) {
-					if ( defined $seen{$fullname} ) {
-						push @files, $seen{$fullname};
-					}
-					$skip = 1;
-					last;
-				}
-
-				# Prepare a cache object to step out of symlink loops
-				$seen{$fullname} = undef;
 			}
 			next if $skip;
 
@@ -144,26 +132,29 @@ sub run {
 			# The four element list we add is the mapping phase
 			# of a Schwartzian transform.
 			if ( -f _ ) {
-				my $object = Padre::Wx::Directory::Path->file( @path, $file );
-				next if $rule->skipped( $object->unix );
+				my $child = Padre::Wx::Directory::Path->file( @path, $file );
+				next if $rule->skipped( $child->unix );
 				push @objects,
 					[
-					$object,
+					$child,
 					$fullname,
-					$object->is_directory,
-					lc( $object->name ),
+					$child->is_directory,
+					lc( $child->name ),
 					];
 
 			} elsif ( -d _ ) {
-				my $object = Padre::Wx::Directory::Path->directory( @path, $file );
-				next if $rule->skipped( $object->unix );
+				my $child = Padre::Wx::Directory::Path->directory( @path, $file );
+				next if $rule->skipped( $child->unix );
 				push @objects,
 					[
-					$object,
+					$child,
 					$fullname,
-					$object->is_directory,
-					lc( $object->name ),
+					$child->is_directory,
+					lc( $child->name ),
 					];
+				if ( $descend >= 0 ) {
+					push @queue, $child;
+				}
 			} else {
 				warn "Unknown or unsupported file type for $fullname" unless NO_WARN;
 			}
@@ -177,33 +168,12 @@ sub run {
 			@objects = sort { $a->[3] cmp $b->[3] } @objects;
 		}
 
-		# Step 3 - Inject into the output list below our parent so
-		# that the directory tree will generate properly.
-		my $i = 0;
-		my $p = Scalar::Util::refaddr($parent);
-		foreach ( 0 .. $#files ) {
-			next unless Scalar::Util::refaddr( $files[$_] ) == $p;
-			$i = $_ + 1;
-			last;
-		}
-		splice @files, $i, 0, map { $_->[0] } @objects;
-
-		# Step 4 - Queue the directories to recurse into
-		foreach my $object (@objects) {
-			next unless $object->[2];
-
-			# NOTE: Selective expansion should be done here
-			next unless $self->{recursive};
-
-			# Because we now sort a directory at a time, we'll need to do it
-			# depth-first. So add the directories to the front of the queue.
-			push @queue, $object->[0];
-			$seen{ $object->[1] } = $object->[0];
+		# Step 3 - Send the completed directory back to the parent process
+		#          Don't send a response if the directory is empty.
+		if (@objects) {
+			$self->handle->message( OWNER => $request, map { $_->[0] } @objects );
 		}
 	}
-
-	# Save and return
-	$self->{model} = [@files];
 
 	return 1;
 }

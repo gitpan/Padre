@@ -5,13 +5,13 @@ use strict;
 use warnings;
 use threads;
 use threads::shared;
-use Thread::Queue 2.11;
 use Scalar::Util             ();
+use Params::Util             ();
 use Storable                 ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION  = '0.69';
+our $VERSION  = '0.70';
 our $SEQUENCE = 0;
 
 
@@ -31,27 +31,26 @@ sub new {
 }
 
 sub hid {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	$_[0]->{hid};
 }
 
 sub task {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	$_[0]->{task};
 }
 
 sub child {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	$_[0]->{child};
 }
 
-sub queue {
-	TRACE( $_[0] ) if DEBUG;
-	$_[0]->{queue};
-}
-
 sub class {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	Scalar::Util::blessed( $_[0]->{task} );
 }
 
@@ -60,6 +59,18 @@ sub worker {
 	my $self = shift;
 	$self->{worker} = shift if @_;
 	return $self->{worker};
+}
+
+sub queue {
+
+	# TRACE( $_[0] ) if DEBUG;
+	$_[0]->{queue};
+}
+
+sub inbox {
+
+	# TRACE( $_[0] ) if DEBUG;
+	$_[0]->{inbox};
 }
 
 
@@ -108,9 +119,7 @@ sub from_array {
 sub message {
 	TRACE( $_[0] ) if DEBUG;
 	if ( $_[0]->child ) {
-		Padre::Wx::Role::Conduit->signal(
-			Storable::freeze( [ shift->hid, @_ ] )
-		);
+		Padre::Wx::Role::Conduit->signal( Storable::freeze( [ shift->hid, @_ ] ) );
 	} else {
 		shift->worker->send( 'message', @_ );
 	}
@@ -121,13 +130,26 @@ sub on_message {
 	TRACE( $_[0] ) if DEBUG;
 	my $self   = shift;
 	my $method = shift;
+	my $task   = $self->{task};
 
-	# Special case for printing a simple message to the main window
-	# status bar, without needing to pollute the task classes.
-	if ( $method eq 'STATUS' and not $self->child ) {
-		require Padre::Current;
-		Padre::Current->main->status(@_);
-		return;
+	unless ( $self->child ) {
+
+		# Special case for printing a simple message to the main window
+		# status bar, without needing to pollute the task classes.
+		if ( $method eq 'STATUS' ) {
+			require Padre::Current;
+			Padre::Current->main->status(@_);
+			return;
+		}
+
+		# Special case for routing messages to the owner of a task
+		# rather than to the task itself.
+		if ( $method eq 'OWNER' ) {
+			my $owner  = $task->owner      or return;
+			my $method = $task->on_message or return;
+			$owner->$method( $task, @_ );
+			return;
+		}
 	}
 
 	# Does the method exist
@@ -224,14 +246,18 @@ sub run {
 	my $self = shift;
 	my $task = $self->task;
 
+	# Create the inbox for the handle
+	$self->{inbox} = [];
+
 	# Create a circular reference back from the task
 	$task->{handle} = $self;
 
 	# Call the task's run method
 	eval { $task->run(); };
 
-	# Clean up the circular
+	# Clean up the temps
 	delete $task->{handle};
+	delete $self->{inbox};
 
 	# Save the exception if thrown
 	if ($@) {
@@ -253,6 +279,100 @@ sub started {
 sub stopped {
 	TRACE( $_[0] ) if DEBUG;
 	$_[0]->message( 'STOPPED', $_[0]->{task} );
+}
+
+# Has this task been cancelled by the parent?
+sub cancel {
+	my $self = shift;
+
+	# Have we been cancelled but forgot to check till now?
+	return 1 if $self->{cancel};
+
+	# Without an inbox or queue we aren't running properly,
+	# so the question of whether we have been cancelled is moot.
+	my $inbox = $self->{inbox} or return;
+	my $queue = $self->{queue} or return;
+
+	# Fetch any new messages from the queue, scanning for cancel
+	foreach my $message ( $queue->dequeue_nb ) {
+		if ( $message->[0] eq 'cancel' ) {
+			$self->{cancel} = 1;
+			next;
+		}
+		push @$inbox, $message;
+	}
+
+	return !!$self->{cancel};
+}
+
+# Blocking check for inbound messages from the parent
+sub dequeue {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	my $handle = $self->handle or return 0;
+
+	# Pull from the inbox first
+	my $inbox = $handle->inbox or return 0;
+	if (@$inbox) {
+		return shift @$inbox;
+	}
+
+	# Pull off the queue
+	my $queue = $handle->queue or return 0;
+	foreach my $message ( $queue->dequeue ) {
+		if ( $message->[0] eq 'cancel' ) {
+			$self->{cancel} = 1;
+			next;
+		}
+	}
+
+	# Check the message for valid structure
+	my $message = shift @$inbox or return 0;
+	unless ( Params::Util::_ARRAY($message) ) {
+		TRACE('Non-ARRAY message received by a worker thread') if DEBUG;
+		return 0;
+	}
+	unless ( Params::Util::_IDENTIFIER( $message->[0] ) ) {
+		TRACE('Non-method message received by worker thread') if DEBUG;
+		return 0;
+	}
+
+	return $message;
+}
+
+# Non-blocking check for inbound messages from our parent
+sub dequeue_nb {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	my $handle = $self->handle or return 0;
+
+	# Pull from the inbox first
+	my $inbox = $handle->inbox or return 0;
+	if (@$inbox) {
+		return shift @$inbox;
+	}
+
+	# Pull off the queue, non-blocking
+	my $queue = $handle->queue or return 0;
+	foreach my $message ( $queue->dequeue ) {
+		if ( $message->[0] eq 'cancel' ) {
+			$self->{cancel} = 1;
+			next;
+		}
+	}
+
+	# Check the message for valid structure
+	my $message = shift @$inbox or return 0;
+	unless ( Params::Util::_ARRAY($message) ) {
+		TRACE('Non-ARRAY message received by a worker thread') if DEBUG;
+		return 0;
+	}
+	unless ( Params::Util::_IDENTIFIER( $message->[0] ) ) {
+		TRACE('Non-method message received by worker thread') if DEBUG;
+		return 0;
+	}
+
+	return $message;
 }
 
 1;

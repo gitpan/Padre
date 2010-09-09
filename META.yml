@@ -86,7 +86,7 @@ requires:
   File::ShareDir: 1.00
   File::Spec: 3.2701
   File::Spec::Functions: 3.2701
-  File::Temp: 0
+  File::Temp: 0.20
   File::Which: 1.08
   File::pushd: 1.00
   FindBin: 0
@@ -131,18 +131,18 @@ requires:
   Text::Balanced: 2.01
   Text::Diff: 0.35
   Text::FindIndent: 0.06
-  Thread::Queue: 2.11
+  Time::HiRes: 1.9718
   URI: 0
   Wx: 0.91
   Wx::Perl::ProcessStream: 0.25
   YAML::Tiny: 1.32
   perl: 5.008005
   threads: 1.71
-  threads::shared: 1.26
+  threads::shared: 1.33
   version: 0.80
 resources:
   bugtracker: http://padre.perlide.org/trac/
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.69
+version: 0.70

@@ -95,24 +95,36 @@ use Params::Util      ();
 use Padre::Current    ();
 use Padre::Role::Task ();
 
-our $VERSION    = '0.69';
+our $VERSION    = '0.70';
 our $COMPATIBLE = '0.65';
 
 sub new {
 	my $class = shift;
 	my $self = bless {@_}, $class;
 
-	# Check parameters for the object that owns the task
 	if ( exists $self->{owner} ) {
-		if ( exists $self->{callback} ) {
-			unless ( Params::Util::_IDENTIFIER( $self->{callback} ) ) {
-				die "Task 'callback' must be a method name";
+
+		# Check parameters relevant to our optional owner
+		if ( exists $self->{on_message} ) {
+			my $method = Params::Util::_IDENTIFIER( $self->{on_message} );
+			unless ($method) {
+				die "Task 'on_message' must be a method name";
+			}
+			unless ( $self->{owner}->can($method) ) {
+				die "The on_message handler '$method' is not implemented";
 			}
 		}
-		my $callback = $self->callback;
-		unless ( $self->{owner}->can($callback) ) {
-			die "Task callback '$callback' is not defined";
+		if ( exists $self->{on_finish} ) {
+			unless ( Params::Util::_IDENTIFIER( $self->{on_finish} ) ) {
+				die "Task 'on_finish' must be a method name";
+			}
 		}
+		my $method = $self->on_finish;
+		unless ( $self->{owner}->can($method) ) {
+			die "Task on_finish '$method' is not implemented";
+		}
+
+		# Save the numeric identifier of our owner
 		$self->{owner} = $self->{owner}->task_revision;
 	}
 
@@ -131,8 +143,12 @@ sub owner {
 	Padre::Role::Task->task_owner( $_[0]->{owner} );
 }
 
-sub callback {
-	$_[0]->{callback} || 'task_response';
+sub on_message {
+	$_[0]->{on_message};
+}
+
+sub on_finish {
+	$_[0]->{on_finish} || 'task_finish';
 }
 
 
@@ -209,11 +225,32 @@ sub finish {
 
 	if ( $self->{owner} ) {
 		my $owner = $self->owner or return;
-		my $callback = $self->callback;
-		$owner->$callback($self);
+		my $method = $self->on_finish;
+		$owner->$method($self);
 	}
 
-	return 1;
+	return;
+}
+
+
+
+
+
+######################################################################
+# Birectional Communication
+
+sub cancel {
+	return !!( defined $_[0]->{handle} and $_[0]->{handle}->cancel );
+}
+
+sub dequeue {
+	return unless defined $_[0]->{handle};
+	return $_[0]->{handle}->dequeue;
+}
+
+sub dequeue_nb {
+	return unless defined $_[0]->{handle};
+	return $_[0]->{handle}->dequeue_nb;
 }
 
 1;

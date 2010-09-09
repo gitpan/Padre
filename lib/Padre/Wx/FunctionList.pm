@@ -10,7 +10,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -261,7 +261,7 @@ sub refresh {
 }
 
 # Set an updated method list from the task
-sub task_response {
+sub task_finish {
 	my $self = shift;
 	my $task = shift;
 	my $list = $task->{list} or return;

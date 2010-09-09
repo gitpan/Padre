@@ -32,7 +32,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 my $SPLASH = undef;
 
@@ -58,7 +58,7 @@ sub startup {
 	my %setting = (
 		main_singleinstance      => Padre::Constant::DEFAULT_SINGLEINSTANCE,
 		main_singleinstance_port => Padre::Constant::DEFAULT_SINGLEINSTANCE_PORT,
-		startup_splash           => 1,
+		startup_splash           => 0,
 		threads                  => 1,
 	);
 

@@ -9,7 +9,7 @@ use Scalar::Util      ();
 use Padre::TaskThread ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = 'Padre::TaskThread';
 
 
@@ -101,6 +101,13 @@ sub task {
 # Any messages that arrive when we are NOT actively running a task
 # should be discarded with no consequence.
 sub message {
+	TRACE( $_[0] ) if DEBUG;
+	TRACE("Discarding message '$_[1]->[0]'") if DEBUG;
+}
+
+# A cancel request that arrives when we are NOT active running a task
+# should be discarded with no consequence.
+sub cancel {
 	TRACE( $_[0] ) if DEBUG;
 	TRACE("Discarding message '$_[1]->[0]'") if DEBUG;
 }

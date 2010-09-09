@@ -8,6 +8,8 @@ use lib 'privinc';
 use inc::Module::Install 1.00;
 use POSIX qw(locale_h);
 
+
+
 # Workaround for the fact that Module::Install loads the modules
 # into memory and when Test::NoWarnings is loaded it will hide
 # the warnings generated from that point.
@@ -98,7 +100,7 @@ requires 'File::Remove'             => '1.42';
 requires 'File::ShareDir'           => '1.00';
 requires 'File::Spec'               => '3.2701';
 requires 'File::Spec::Functions'    => '3.2701';
-requires 'File::Temp'               => 0;
+requires 'File::Temp'               => '0.20';
 requires 'File::Which'              => '1.08';
 requires 'File::pushd'              => '1.00';
 requires 'FindBin'                  => 0;
@@ -141,9 +143,9 @@ requires 'Term::ReadLine'           => 0;
 requires 'Text::Balanced'           => '2.01';
 requires 'Text::Diff'               => '0.35';
 requires 'Text::FindIndent'         => '0.06';
-requires 'Thread::Queue'            => '2.11';
+requires 'Time::HiRes'              => '1.9718';
 requires 'threads'                  => '1.71';
-requires 'threads::shared'          => '1.26';
+requires 'threads::shared'          => '1.33';
 requires 'URI'                      => '0';
 requires 'version'                  => '0.80';
 requires 'Win32'                    => '0.31' if win32;

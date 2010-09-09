@@ -5,12 +5,12 @@ package Padre::Constant;
 use 5.008005;
 use strict;
 use warnings;
-use Carp          ();
-use File::Path    ();
-use File::Spec    ();
-use File::HomeDir ();
+use Carp       ();
+use File::Path ();
+use File::Spec ();
+use File::HomeDir 0.91 ();
 
-our $VERSION        = '0.69';
+our $VERSION        = '0.70';
 our $BACKCOMPATIBLE = '0.57';
 
 # Convenience constants for the operating system
@@ -142,7 +142,16 @@ BEGIN {
 # NOTE: The only reason this is here is that it is needed both during
 # main configuration, and also during Padre::Startup.
 use constant DEFAULT_SINGLEINSTANCE => ( WIN32 and not( $ENV{HARNESS_ACTIVE} or $^P ) ) ? 1 : 0;
-use constant DEFAULT_SINGLEINSTANCE_PORT => 4444;
+
+# It would be better if we had fully dynamic collision awareness support,
+# so that Padre could automatically port hop.
+# In the mean time, just make sure that dev.pl, test, and production versions
+# of Padre use different ports, so they don't collide with each other.
+use constant DEFAULT_SINGLEINSTANCE_PORT => (
+	  $ENV{PADRE_DEV}      ? 4446
+	: $ENV{HARNESS_ACTIVE} ? 4445
+	: 4444
+);
 
 1;
 

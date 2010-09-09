@@ -137,7 +137,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 
 
@@ -311,7 +311,7 @@ sub rebless {
 	if ($class) {
 		unless ( $class->VERSION ) {
 			eval "require $class;";
-			die("Failed to load $class: $@") if $@;
+			die "Failed to load $class: $@" if $@;
 		}
 		bless $self, $class;
 	}
@@ -321,9 +321,8 @@ sub rebless {
 	$filename = $self->{file}->filename
 		if defined( $self->{file} )
 			and defined( $self->{file}->{filename} );
-	warn("No module  mime_type='$mime_type' filename='$filename'\n") unless $module;
+	warn "No module  mime_type='$mime_type' filename='$filename'\n" unless $module;
 
-	#warn("Module '$module' mime_type='$mime_type' filename='$filename'\n") if $module;
 	$self->set_highlighter($module);
 
 	return;
@@ -342,7 +341,7 @@ sub current {
 
 sub DESTROY {
 	if ( defined $_[0]->{filename} ) {
-		Padre::Cache::release( $_[0]->{filename} );
+		Padre::Cache->release( $_[0]->{filename} );
 	}
 }
 
@@ -358,11 +357,13 @@ sub colourize {
 	my $lexer  = $self->lexer;
 	my $editor = $self->editor;
 	$editor->SetLexer($lexer);
+	TRACE("coloUrize called") if DEBUG;
 
 	$self->remove_color;
 	if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 		$self->colorize;
 	} else {
+		TRACE("Colourize is being called") if DEBUG;
 		$editor->Colourise( 0, $editor->GetLength );
 	}
 }
@@ -553,9 +554,12 @@ sub load_file {
 	my $file = $self->file;
 
 	if (DEBUG) {
-		my $name = $file->{file}->{filename} || '';
+		my $name = $file->{filename} || '';
 		TRACE("Loading file '$name'");
 	}
+
+	# Show the file-changed-dialog again after the file was (re)loaded:
+	delete $self->{_already_popup_file_changed};
 
 	# check if file exists
 	if ( !$file->exists ) {
@@ -733,6 +737,9 @@ sub autoclean {
 
 sub save_file {
 	my $self = shift;
+
+	# Show the file-changed-dialog again after the file was saved:
+	delete $self->{_already_popup_file_changed};
 
 	# If padre is run on files that have no project
 	# I.E Padre foo.pl &
@@ -967,6 +974,7 @@ sub lexer {
 		warn "no highlighter\n";
 		$highlighter = 'stc';
 	}
+	TRACE("The highlighter is '$highlighter'") if DEBUG;
 	return Wx::wxSTC_LEX_CONTAINER if $highlighter ne 'stc';
 	return Wx::wxSTC_LEX_AUTOMATIC unless defined Padre::MimeTypes->get_lexer( $self->mimetype );
 

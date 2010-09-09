@@ -39,7 +39,7 @@ use threads;
 use threads::shared;
 use Padre::Constant ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 # Handle the PADRE_DEBUG environment variable
 BEGIN {
@@ -82,7 +82,7 @@ END_PERL
 # Global trace function
 sub TRACE {
 	my $time    = scalar localtime time;
-	my $caller  = ( caller(1) )[3];
+	my $caller  = ( caller(1) )[3] || 'main';
 	my $logfile = Padre::Constant::LOG_FILE;
 	my $thread =
 		  ( $INC{'threads.pm'} and threads->self->tid )

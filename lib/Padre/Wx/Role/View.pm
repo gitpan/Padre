@@ -4,7 +4,7 @@ use 5.008005;
 use strict;
 use warnings;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 1;
 
@@ -67,6 +67,13 @@ The method should generally initiate whatever is needed to close the
 tool via the highest level API. Note that while we aren't calling the
 equivalent menu handler directly, we are calling the high-level method
 on the main window that the menu itself calls.
+
+=head1 OPTIONAL
+
+=head2 view_icon
+
+This method should return a valid Wx bitmap to be used as the icon for
+a notebook page (displayed alongside C<view_label>).
 
 =head1 COPYRIGHT & LICENSE
 

@@ -3,10 +3,11 @@ package Padre::Wx::Action;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Config   ();
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 # Generate faster accessors
 use Class::XSAccessor {
@@ -14,12 +15,14 @@ use Class::XSAccessor {
 		id            => 'id',
 		name          => 'name',
 		icon          => 'icon',
-		shortcut      => 'shortcut',
 		menu_event    => 'menu_event',
 		menu_method   => 'menu_method',
 		toolbar_event => 'toolbar_event',
 		toolbar_icon  => 'toolbar',
-	}
+	},
+	accessors => {
+		shortcut => 'shortcut',
+	},
 };
 
 
@@ -66,7 +69,7 @@ sub new {
 	my $actions  = $ide->actions;
 	my $self     = bless { id => -1, @_ }, $class;
 	my $name     = $self->{name};
-	my $shortcut = $self->{shortcut};
+	my $shortcut = defined $self->{shortcut} ? $self->{shortcut} : '';
 
 	# Check the name
 	unless ( defined $name and length $name ) {
@@ -91,6 +94,25 @@ sub new {
 	}
 	$self->{queue_event} ||= $self->{menu_event};
 
+	# Create shortcut setting for the action
+	my $config  = Padre->ide->config;
+	my $setting = $self->shortcut_setting;
+	if ( not $config->can($setting) ) {
+		$config->setting(
+			name    => $setting,
+			type    => Padre::Constant::ASCII,
+			store   => Padre::Constant::HUMAN,
+			default => $shortcut,
+		);
+	}
+
+	my $config_shortcut = eval '$config->' . $setting;
+	warn "$@\n" if $@;
+	if ($config_shortcut) {
+		$shortcut = $config_shortcut;
+		$self->shortcut($shortcut);
+	}
+
 	# Validate the shortcut
 	if ($shortcut) {
 		foreach my $n ( keys %$actions ) {
@@ -101,8 +123,8 @@ sub new {
 			last;
 		}
 
-		my $shortcuts = $ide->{shortcuts};
-		if ( defined( $shortcuts->{$shortcut} ) ) {
+		my $shortcuts = $ide->shortcuts;
+		if ( exists $shortcuts->{$shortcut} ) {
 			warn "Found a duplicate shortcut '$shortcut' with " . $shortcuts->{$shortcut}->name . " for '$name'\n";
 		} else {
 			$shortcuts->{$shortcut} = $self;
@@ -144,12 +166,24 @@ sub comment {
 sub label_menu {
 	my $self  = shift;
 	my $label = $self->label;
-	if ( $self->shortcut
-		and ( ( $self->shortcut eq 'F12' ) or ( $self->id == -1 or Padre::Constant::WIN32() ) ) )
+
+	my $shortcut = $self->shortcut;
+
+	if ( $shortcut
+		and ( ( $shortcut eq 'F12' ) or ( $self->id == -1 or Padre::Constant::WIN32() ) ) )
 	{
-		$label .= "\t" . $self->shortcut;
+		$label .= "\t" . $shortcut;
 	}
 	return $label;
+}
+
+sub shortcut_setting {
+	my $self = shift;
+
+	my $setting = 'keyboard_shortcut_' . $self->name;
+	$setting =~ s/\W/_/g; # setting names must be valid subroutine names
+
+	return $setting;
 }
 
 # Add an event to an action:
@@ -215,7 +249,7 @@ Padre::Wx::Action - Padre Action Object
       label      => 'Save',
       comment    => 'Saves the current file to disk',
       icon       => '...',
-      shortcut   => 'CTRL-S',
+      shortcut   => 'Ctrl-S',
       menu_event => sub { },
   );
 

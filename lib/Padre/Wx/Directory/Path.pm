@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use File::Spec::Unix ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 use constant {
 	FILE      => 0,
@@ -32,7 +32,7 @@ sub directory {
 	my $class = shift;
 	return bless [
 		DIRECTORY,
-		File::Spec::Unix->catfile(@_),
+		File::Spec::Unix->catfile( @_ ? @_ : ('') ),
 		@_,
 	], $class;
 }
@@ -46,6 +46,10 @@ sub directory {
 
 sub type {
 	$_[0]->[0];
+}
+
+sub image {
+	$_[0]->[0] ? 'folder' : 'package';
 }
 
 sub name {

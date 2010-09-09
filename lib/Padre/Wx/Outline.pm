@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -97,7 +97,7 @@ sub view_close {
 ######################################################################
 # Padre::Role::Task Methods
 
-sub task_response {
+sub task_finish {
 	TRACE( $_[1] ) if DEBUG;
 	my $self = shift;
 	my $task = shift;

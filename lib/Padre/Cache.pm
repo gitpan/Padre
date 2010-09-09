@@ -8,11 +8,12 @@ use strict;
 use warnings;
 use Params::Util ();
 
-our $VERSION = '0.69';
+our $VERSION = '0.70';
 
 my %DATA = ();
 
 sub stash {
+	my $class = shift;
 	my $owner = shift;
 	my $key   = shift;
 
@@ -32,7 +33,7 @@ sub stash {
 }
 
 sub release {
-	delete $DATA{ $_[0] };
+	delete $DATA{ $_[1] };
 }
 
 1;
