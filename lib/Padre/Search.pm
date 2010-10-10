@@ -12,13 +12,13 @@ Padre::Search - The Padre Search API
   my $search = Padre::Search->new(
       find_term => 'foo',
   );
-
+  
   # Execute the search on the current editor
   $search->search_next(Padre::Current->editor);
 
 =head2 DESCRIPTION
 
-This is the Padre Search API. It allows the creation of abstract objects
+This is the Padre Search API. It allows the creation of abstract search
 object that can independently search and/or replace in an editor object.
 
 =head2 METHODS
@@ -32,22 +32,17 @@ use Encode       ();
 use List::Util   ();
 use Params::Util ();
 
-our $VERSION = '0.70';
-
-use Class::XSAccessor {
-	getters => {
-		find_term    => 'find_term',
-		find_case    => 'find_case',
-		find_regex   => 'find_regex',
-		find_reverse => 'find_reverse',
-		replace_term => 'replace_term',
-		search_regex => 'search_regex',
-	}
-};
+our $VERSION = '0.72';
 
 sub new {
 	my $class = shift;
 	my $self = bless {@_}, $class;
+
+	# Check params
+	my $config = delete $self->{config};
+	unless ($config) {
+		$config = Padre::Current->config;
+	}
 	unless ( defined $self->find_term ) {
 		die "Did not provide 'find_term' search term";
 	}
@@ -57,14 +52,45 @@ sub new {
 		return;
 	}
 	unless ( defined $self->find_case ) {
-		$self->{find_case} = $self->config->find_case;
+		$self->{find_case} = $config->find_case;
 	}
 	unless ( defined $self->find_regex ) {
-		$self->{find_regex} = $self->config->find_regex;
+		$self->{find_regex} = $config->find_regex;
 	}
 	unless ( defined $self->find_reverse ) {
-		$self->{find_reverse} = $self->config->find_reverse;
+		$self->{find_reverse} = $config->find_reverse;
 	}
+
+	# Pre-compile the search
+	unless ( defined $self->search_regex ) {
+		return;
+	}
+
+	return $self;
+}
+
+sub find_term {
+	$_[0]->{find_term};
+}
+
+sub find_case {
+	$_[0]->{find_case};
+}
+
+sub find_regex {
+	$_[0]->{find_regex};
+}
+
+sub find_reverse {
+	$_[0]->{find_reverse};
+}
+
+sub replace_term {
+	$_[0]->{replace_term};
+}
+
+sub search_regex {
+	my $self = shift;
 
 	# Escape the raw search term
 	my $term = $self->find_term;
@@ -79,18 +105,10 @@ sub new {
 	}
 
 	# Compile the regex
-	$self->{search_regex} = eval { $self->find_case ? qr/$term/m : qr/$term/mi };
+	my $search_regex = eval { $self->find_case ? qr/$term/m : qr/$term/mi };
 	return if $@;
 
-	return $self;
-}
-
-sub config {
-	my $self = shift;
-	unless ( defined $self->{config} ) {
-		$self->{config} = Padre::Current->config;
-	}
-	return $self->{config};
+	return $search_regex;
 }
 
 
@@ -339,6 +357,10 @@ sub editor_count_all {
 
 =head2 matches
 
+  my ($first_char, $last_char, @all) = $search->matches(
+      $search_text,
+      $search_regexp,
+      $
 Parameters:
 
 * The text in which we need to search
@@ -391,6 +413,7 @@ sub matches {
 	return ( @$pair, @matches );
 }
 
+# NOTE: This current fails to work with multi-line searche expressions
 sub match_lines {
 	my ( $self, $selected_text, $regex ) = @_;
 
@@ -398,15 +421,12 @@ sub match_lines {
 	my $text = Encode::encode( 'utf-8', $selected_text );
 	my @lines = split( /\n/, $text );
 
-	my @matches;
-	foreach my $lineNumber ( 0 .. ( scalar(@lines) - 1 ) ) {
-
-		if ( $lines[$lineNumber] =~ /$regex/ ) {
-			push( @matches, ( { lineNumber => ( $lineNumber + 1 ), line => $lines[$lineNumber] } ) );
-		}
+	my @matches = ();
+	foreach my $i ( 0 .. $#lines ) {
+		next unless $lines[$i] =~ /$regex/;
+		push @matches, [ $i + 1, $lines[$i] ];
 	}
 	return @matches;
-
 }
 
 1;

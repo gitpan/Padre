@@ -10,13 +10,14 @@ use Padre::Wx               ();
 use Padre::Wx::Role::Main   ();
 use Padre::Wx::Role::Dialog ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Padre::Wx::Role::Dialog
 	Wx::Dialog
 };
 
+# Creates the key bindings dialog and returns the instance
 sub new {
 	my $class = shift;
 	my $main  = shift;
@@ -279,7 +280,8 @@ sub _on_char {
 	return;
 }
 
-sub translate_shortcut {
+# Translates the shortcut to its native language
+sub _translate_shortcut {
 	my ($shortcut) = @_;
 
 	my @parts = split /-/, $shortcut;
@@ -304,6 +306,15 @@ sub _on_list_item_selected {
 	$self->{button_reset}->Enable( $shortcut ne $self->config->default( $action->shortcut_setting ) );
 
 	$self->{button_delete}->Enable( $shortcut ne '' );
+
+	$self->_update_shortcut_ui($shortcut);
+
+	return;
+}
+
+# Updates the shortcut UI
+sub _update_shortcut_ui {
+	my ( $self, $shortcut ) = @_;
 
 	my @parts = split /-/, $shortcut;
 	my $regular_key = @parts ? $parts[-1] : '';
@@ -348,12 +359,13 @@ sub _on_set_button {
 	push @key_list, $regular_key if not $regular_key eq 'None';
 	my $shortcut = join '-', @key_list;
 
-	$self->try_to_set_binding( $action_name, $shortcut );
+	$self->_try_to_set_binding( $action_name, $shortcut );
 
 	return;
 }
 
-sub try_to_set_binding {
+# Tries to set the binding and asks the user if he want to set the shortcut if has already be used elsewhere
+sub _try_to_set_binding {
 	my ( $self, $action_name, $shortcut ) = @_;
 
 	my $other_action = $self->ide->shortcuts->{$shortcut};
@@ -366,20 +378,20 @@ sub try_to_set_binding {
 				. Wx::gettext('Do you want to override it with the selected action?'),
 			Wx::gettext('Override Shortcut')
 		);
-		if ( !$answer ) {
-			$self->set_binding( $other_action->name, '' );
+		if ($answer) {
+			$self->_set_binding( $other_action->name, '' );
 		} else {
 			return;
 		}
 	}
 
-	$self->set_binding( $action_name, $shortcut );
-	$self->_update_list;
+	$self->_set_binding( $action_name, $shortcut );
 
 	return;
 }
 
-sub set_binding {
+# Sets the key binding in Padre's configuration
+sub _set_binding {
 	my ( $self, $action_name, $shortcut ) = @_;
 
 	my $shortcuts = $self->ide->shortcuts;
@@ -397,6 +409,27 @@ sub set_binding {
 	$self->config->set( $action->shortcut_setting, $shortcut );
 	$self->config->write;
 
+	# Update the action's UI
+	my $non_default = $self->config->default( $action->shortcut_setting ) ne $shortcut;
+	$self->_update_action_ui( $action_name, $shortcut, $non_default );
+
+	return;
+}
+
+# Private method to update the UI from the provided preference
+sub _update_action_ui {
+
+	my ( $self, $action_name, $shortcut, $non_default ) = @_;
+
+	my $list = $self->{list};
+	my $index = $list->FindItem( -1, $action_name );
+
+	$self->{button_reset}->Enable($non_default);
+	$list->SetItem( $index, 2, _translate_shortcut($shortcut) );
+	$self->_set_item_bold_font( $index, $non_default );
+
+	$self->_update_shortcut_ui($shortcut);
+
 	return;
 }
 
@@ -408,8 +441,7 @@ sub _on_delete_button {
 	my $index       = $self->{list}->GetFirstSelected;
 	my $action_name = $self->{list}->GetItemText($index);
 
-	$self->set_binding( $action_name, '' );
-	$self->_update_list;
+	$self->_set_binding( $action_name, '' );
 
 	return;
 }
@@ -422,7 +454,7 @@ sub _on_reset_button {
 	my $action_name = $self->{list}->GetItemText($index);
 	my $action      = $self->ide->actions->{$action_name};
 
-	$self->try_to_set_binding(
+	$self->_try_to_set_binding(
 		$action_name,
 		$self->config->default( $action->shortcut_setting )
 	);
@@ -470,7 +502,11 @@ sub _update_list {
 		# Add the key binding to the list control
 		$list->InsertStringItem( $index, $action_name );
 		$list->SetItem( $index, 1, $action->label_text );
-		$list->SetItem( $index, 2, translate_shortcut($shortcut) );
+		$list->SetItem( $index, 2, _translate_shortcut($shortcut) );
+
+		# Non-default (i.e. overriden) shortcuts should have a bold font
+		my $non_default = $self->config->default( $action->shortcut_setting ) ne $shortcut;
+		$self->_set_item_bold_font( $index, $non_default );
 
 		# Alternating table colors
 		$list->SetItemBackgroundColour( $index, $alternate_color ) unless $index % 2;
@@ -508,7 +544,7 @@ sub _resize_columns {
 	return;
 }
 
-
+# Shows the key binding dialog
 sub show {
 	my $self = shift;
 

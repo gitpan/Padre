@@ -26,7 +26,7 @@ use Padre::Wx::Role::Main        ();
 use Padre::Wx::History::ComboBox ();
 use Padre::Wx::FindResult        ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -65,7 +65,7 @@ sub new {
 		'',
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		'search',
+		['search'],
 	);
 
 	# "Find as Regex" option

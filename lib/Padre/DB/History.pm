@@ -8,16 +8,16 @@ use strict;
 use warnings;
 use Params::Util ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 sub recent {
 	my $class  = shift;
 	my $type   = shift;
 	my $limit  = Params::Util::_POSINT(shift) || 10;
 	my $recent = Padre::DB->selectcol_arrayref(
-		"select distinct name from history where type = ? order by id desc limit $limit",
-		{}, $type,
-	) or die "Failed to find recent values from history";
+		'select distinct name from history where type = ? order by id desc limit ?',
+		{}, $type, $limit
+	) or die 'Failed to find recent values from history';
 	return wantarray ? @$recent : $recent;
 }
 

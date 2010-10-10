@@ -3,10 +3,14 @@ package Padre::Task::FindInFiles;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec  ();
-use Time::HiRes ();
+use File::Spec    ();
+use Time::HiRes   ();
+use Padre::Search ();
+use Padre::Task   ();
+use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
+our @ISA     = 'Padre::Task';
 
 
 
@@ -20,7 +24,7 @@ sub new {
 
 	# Automatic project integration
 	if ( exists $self->{project} ) {
-		$self->{root} = $self->{project}->root;
+		$self->{root} ||= $self->{project}->root;
 		$self->{skip} = $self->{project}->ignore_skip;
 		delete $self->{project};
 	}
@@ -28,6 +32,19 @@ sub new {
 	# Property defaults
 	unless ( defined $self->{skip} ) {
 		$self->{skip} = [];
+	}
+	unless ( defined $self->{maxsize} ) {
+		require Padre::Current;
+		$self->{maxsize} = Padre::Current->config->editor_file_size_limit;
+	}
+
+	# Create the embedded search object
+	unless ( $self->{search} ) {
+		$self->{search} = Padre::Search->new(
+			find_term  => $self->{find_term},
+			find_case  => $self->{find_case},
+			find_regex => $self->{find_regex},
+		) or return;
 	}
 
 	return $self;
@@ -46,24 +63,6 @@ sub run {
 	my $self  = shift;
 	my $root  = $self->{root};
 	my @queue = Padre::Wx::Directory::Path->directory;
-	my $timer = 0;
-	my @files = ();
-
-	# Prepare the search regex
-	my $term = $self->{find_term};
-	if ( $self->{find_regex} ) {
-
-		# Escape non-trailing $ so they won't interpolate
-		$term =~ s/\$(?!\z)/\\\$/g;
-	} else {
-
-		# Escape everything
-		$term = quotemeta $term;
-	}
-
-	# Compile the search regexp
-	my $regexp = eval { $self->{find_case} ? qr/$term/m : qr/$term/mi };
-	return 1 if $@;
 
 	# Prepare the skip rules
 	my $rule = Module::Manifest->new;
@@ -79,53 +78,67 @@ sub run {
 		# NOTE: Silently ignore any that fail. Anything we don't have
 		# permission to see inside of them will just be invisible.
 		opendir DIRECTORY, $dir or next;
-		my @list = readdir DIRECTORY;
+		my @list = sort readdir DIRECTORY;
 		closedir DIRECTORY;
+
+		# Notify our parent we are working on this directory
+		$self->handle->message( STATUS => "Searching... " . $parent->unix );
 
 		foreach my $file (@list) {
 			my $skip = 0;
 			next if $file =~ /^\.+\z/;
 			my $fullname = File::Spec->catdir( $dir, $file );
 			my @fstat = stat($fullname);
+			unless ( -e _ ) {
 
-			if ( -f _ ) {
-				my $object = Padre::Wx::Directory::Path->file( @path, $file );
-				next if $rule->skipped( $object->unix );
+				# The file dissapeared mid-search?
+				next;
+			}
 
-				# Parse the file
-				my $line    = undef;
-				my @matched = ();
-				if ( open( my $fh, '<', $file->name ) ) {
-					while ( defined( my $line = <$fh> ) ) {
-						next unless $line =~ $regexp;
-						push @matched, $line;
-					}
-					close $fh;
-				}
-
-				# Report the lines we matched
-				if ( @matched or Time::HiRes::time() - $timer > 1 ) {
-					$self->message( found => $file->name, \@matched );
-				}
-
-			} elsif ( -d _ ) {
+			# Handle non-files
+			if ( -d _ ) {
 				my $object = Padre::Wx::Directory::Path->directory( @path, $file );
 				next if $rule->skipped( $object->unix );
 				unshift @queue, $object;
-
-			} else {
+				next;
+			}
+			unless ( -f _ ) {
 				warn "Unknown or unsupported file type for $fullname";
+				next;
 			}
 
+			# This is a file
+			my $object = Padre::Wx::Directory::Path->file( @path, $file );
+			next if $rule->skipped( $object->unix );
+
+			# Skip if the file is too big
+			if ( $fstat[7] > $self->{maxsize} ) {
+				TRACE("Skipped $fullname: File size $fstat[7] exceeds maximum of $self->{maxsize}") if DEBUG;
+				next;
+			}
+
+			# Read the entire file
+			open( my $fh, '<', $fullname ) or next;
+			my $buffer = do { local $/; <$fh> };
+			close $fh;
+
+			# Hand off to the compiled search object
+			my @lines = $self->{search}->match_lines(
+				$buffer,
+				$self->{search}->search_regex,
+			);
+			TRACE( "Found " . scalar(@lines) . " matches in " . $fullname ) if DEBUG;
+			next unless @lines;
+
+			# Found results, inform our owner
+			$self->handle->message( OWNER => $object, @lines );
 		}
 	}
 
-	return 1;
-}
+	# Notify our parent we are finished searching
+	$self->handle->message( STATUS => '' );
 
-sub found {
-	require Padre::Current;
-	Padre::Current->main->status( $_[1] );
+	return 1;
 }
 
 1;

@@ -9,11 +9,11 @@ use Padre::Util ();
 use Padre::Help ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Help';
 
 # for caching help list (for faster access)
-my ( $cached_help_list, $cached_perlopref, $cached_wxwidgets );
+my ( $cached_help_list, $cached_perlopquick, $cached_wxwidgets );
 
 # Initialize help
 sub help_init {
@@ -21,9 +21,9 @@ sub help_init {
 
 	# serve the cached copy if it is already built
 	if ($cached_help_list) {
-		$self->{help_list} = $cached_help_list;
-		$self->{perlopref} = $cached_perlopref;
-		$self->{wxwidgets} = $cached_wxwidgets;
+		$self->{help_list}   = $cached_help_list;
+		$self->{perlopquick} = $cached_perlopquick;
+		$self->{wxwidgets}   = $cached_wxwidgets;
 		return;
 	}
 
@@ -123,6 +123,9 @@ sub help_init {
 		'$ENV{expr}',       '%SIG', '$SIG{expr}'
 		);
 
+	# Support given keyword
+	push @index, ('given');
+
 	# Add Perl functions (perlfunc)
 	$Type{say}   = 1;
 	$Type{state} = 1;
@@ -133,8 +136,8 @@ sub help_init {
 	push @index, $self->_find_installed_modules;
 
 	# Add Perl Operators Reference
-	$self->{perlopref} = $self->_parse_perlopref;
-	push @index, keys %{ $self->{perlopref} };
+	$self->{perlopquick} = $self->_parse_perlopquick;
+	push @index, keys %{ $self->{perlopquick} };
 
 	# Add wxWidgets documentation
 	$self->{wxwidgets} = $self->_parse_wxwidgets;
@@ -146,9 +149,9 @@ sub help_init {
 	$self->{help_list} = \@unique_sorted_index;
 
 	# Store the cached help list for faster access
-	$cached_help_list = $self->{help_list};
-	$cached_perlopref = $self->{perlopref};
-	$cached_wxwidgets = $self->{wxwidgets};
+	$cached_help_list   = $self->{help_list};
+	$cached_perlopquick = $self->{perlopquick};
+	$cached_wxwidgets   = $self->{wxwidgets};
 }
 
 # Finds installed CPAN modules via @INC
@@ -172,16 +175,16 @@ sub _find_installed_modules {
 	return keys %seen;
 }
 
-# Parses perlopref.pod (Perl Operator Reference)
-# http://github.com/cowens/perlopref/tree/master
-sub _parse_perlopref {
+# Parses perlopquick.pod (Perl Operator Reference)
+# http://github.com/cowens/perlopquick/tree/master
+sub _parse_perlopquick {
 	my $self  = shift;
 	my %index = ();
 
-	# Open perlopref.pod for reading
-	my $perlopref = File::Spec->join( Padre::Util::sharedir('doc'), 'perlopref', 'perlopref.pod' );
-	if ( open my $fh, '<', $perlopref ) { #-# no critic (RequireBriefOpen)
-		                                  # Add PRECEDENCE to index
+	# Open perlopquick.pod for reading
+	my $perlopquick = File::Spec->join( Padre::Util::sharedir('doc'), 'perlopquick', 'perlopquick.pod' );
+	if ( open my $fh, '<', $perlopquick ) { #-# no critic (RequireBriefOpen)
+		                                    # Add PRECEDENCE to index
 		until ( <$fh> =~ /=head1 PRECEDENCE/ ) { }
 
 		my $line;
@@ -204,7 +207,7 @@ sub _parse_perlopref {
 		# and we're done
 		close $fh;
 	} else {
-		TRACE("Cannot open perlopref.pod\n") if DEBUG;
+		TRACE("Cannot open perlopquick.pod\n") if DEBUG;
 	}
 
 	return \%index;
@@ -246,12 +249,12 @@ sub help_render {
 	my $self  = shift;
 	my $topic = shift;
 
-	if ( $self->{perlopref}->{$topic} ) {
+	if ( $self->{perlopquick}->{$topic} ) {
 
 		# Yes, it is a Perl 5 Operator
 		require Padre::Pod2HTML;
 		return (
-			Padre::Pod2HTML->pod2html( $self->{perlopref}->{$topic} ),
+			Padre::Pod2HTML->pod2html( $self->{perlopquick}->{$topic} ),
 			$topic,
 		);
 	} elsif ( $self->{wxwidgets}->{$topic} ) {
@@ -277,6 +280,10 @@ sub help_render {
 		# it is Perl function, handle q/.../, m//, y///, tr///
 		$hints->{perlfunc} = 1;
 		$topic =~ s/\/.*?\/$//;
+	} elsif ( $topic eq 'given' ) {
+
+		# Redirect to 'use feature'
+		$topic = 'feature';
 	} else {
 
 		# Append the module's release date to the topic

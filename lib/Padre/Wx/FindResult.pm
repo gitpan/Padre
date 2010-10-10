@@ -21,7 +21,7 @@ use Padre::Wx;
 use Wx::Event qw( EVT_BUTTON );
 
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Wx::ListView';
 
 use Class::XSAccessor {
@@ -107,9 +107,6 @@ sub set_column_widths {
 
 	return;
 }
-
-
-####
 
 =pod
 
@@ -290,14 +287,12 @@ Populate the list with the line number and text.
 # populates the list
 
 sub populate_list {
-	my ( $self, $lines ) = @_;
-
-	for ( my $i = ( scalar(@$lines) - 1 ); $i >= 0; $i-- ) {
-
-		my $item = $self->InsertStringItem( 0, $lines->[$i]->{lineNumber} );
-		$self->SetItem( $item, 1, $lines->[$i]->{line} );
+	my $self  = shift;
+	my $lines = shift;
+	foreach my $line (@$lines) {
+		my $item = $self->InsertStringItem( 0, $line->[0] );
+		$self->SetItem( $item, 1, $line->[1] );
 	}
-
 }
 
 sub view_close {

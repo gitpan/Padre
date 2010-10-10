@@ -24,7 +24,7 @@ use Padre::Util    ('_T');
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 #####################################################################
 # Document Registration
@@ -55,7 +55,7 @@ sub _initialize {
 		asm   => 'text/x-asm',
 		bat   => 'text/x-bat',
 		bib   => 'application/x-bibtex',
-		bml   => 'text/x-bml',            # dreamwidth file format
+		bml   => 'application/x-bml',     # dreamwidth file format
 		c     => 'text/x-c',
 		cc    => 'text/x-c++src',
 		cpp   => 'text/x-c++src',
@@ -65,6 +65,7 @@ sub _initialize {
 		hpp   => 'text/x-c++src',
 		hxx   => 'text/x-c++src',
 		'h++' => 'text/x-c++src',
+		cs    => 'text/x-csharp',
 		css   => 'text/css',
 		diff  => 'text/x-patch',
 		e     => 'text/x-eiffel',
@@ -149,7 +150,9 @@ sub _initialize {
 		},
 
 		# application/x-msdos-program includes .exe and .com, so don't use it
-		'application/x-bat' => {
+		# text/x-bat is used in EXT_MIME, application/x-bat was listed here,
+		# they need to be the same
+		'text/x-bat' => {
 			name  => 'BAT',
 			lexer => Wx::wxSTC_LEX_BATCH, # CONFIRMED
 		},
@@ -342,6 +345,12 @@ sub _initialize {
 			name  => 'Template Toolkit',
 			lexer => Wx::wxSTC_LEX_HTML,
 		},
+
+		'text/x-csharp' => {
+			name  => 'C#',
+			lexer => Wx::wxSTC_LEX_CPP,  # better than nothing
+		},
+
 	);
 
 	# TO DO:
@@ -391,16 +400,22 @@ sub add_mime_class {
 	my $mime  = shift;
 	my $class = shift;
 	if ( not $MIME_TYPES{$mime} ) {
-
-		# TO DO: display on the GUI
-		warn "Mime type $mime is not supported when add_mime_class($class) was called\n";
+		Padre::Current->main->error(
+			sprintf(
+				Wx::gettext("Mime type is not supported when %s(%s) was called"),
+				'add_mime_class', $mime
+			)
+		);
 		return;
 	}
 
 	if ( $MIME_TYPES{$mime}{class} ) {
-
-		# TO DO: display on the GUI
-		warn "Mime type $mime already has a class '$MIME_TYPES{$mime}{class}' when add_mime_class($class) was called\n";
+		Padre::Current->main->error(
+			sprintf(
+				Wx::gettext("Mime type already has a class '%s' when %s(%s) was called"),
+				$MIME_TYPES{$mime}{class}, 'add_mime_class', $mime
+			)
+		);
 		return;
 	}
 	$MIME_TYPES{$mime}{class} = $class;
@@ -411,16 +426,22 @@ sub remove_mime_class {
 	my $mime = shift;
 
 	if ( not $MIME_TYPES{$mime} ) {
-
-		# TO DO: display on GUI
-		warn "Mime type $mime is not supported when remove_mime_class($mime) was called\n";
+		Padre::Current->main->error(
+			sprintf(
+				Wx::gettext("Mime type is not supported when %s(%s) was called"),
+				'remove_mime_class', $mime
+			)
+		);
 		return;
 	}
 
 	if ( not $MIME_TYPES{$mime}{class} ) {
-
-		# TO DO: display on GUI
-		warn "Mime type $mime does not have a class entry when remove_mime_class($mime) was called\n";
+		Padre::Current->main->error(
+			sprintf(
+				Wx::gettext("Mime type is does not have a class entry when %s(%s) was called"),
+				'remove_mime_class', $mime
+			)
+		);
 		return;
 	}
 	delete $MIME_TYPES{$mime}{class};
@@ -431,9 +452,12 @@ sub get_mime_class {
 	my $mime = shift;
 
 	if ( not $MIME_TYPES{$mime} ) {
-
-		# TO DO: display on GUI
-		warn "Mime type $mime is not supported when remove_mime_class($mime) was called\n";
+		Padre::Current->main->error(
+			sprintf(
+				Wx::gettext("Mime type is not supported when %s(%s) was called"),
+				'get_mime_class', $mime
+			)
+		);
 		return;
 	}
 
@@ -580,6 +604,10 @@ sub get_mime_type_names {
 sub get_mime_type_name {
 	my $self = shift;
 	my $mime_type = shift || '';
+	return Wx::gettext('UNKNOWN')
+		if $mime_type eq ''
+			or not $MIME_TYPES{$mime_type}
+			or not $MIME_TYPES{$mime_type}{name};
 	return Wx::gettext( $MIME_TYPES{$mime_type}{name} );
 }
 
@@ -674,13 +702,19 @@ sub guess_mimetype {
 			};
 
 			# Is this a script of some kind?
-			if ( $text =~ /\A#!/m ) {
-				if ( $text =~ /\A#![^\n]*\bperl6?\b/m ) {
-					return $self->perl_mime_type($text);
-				}
-				if ( $text =~ /\A#![^\n]*\b(?:z|k|ba)?sh\b/ ) {
-					return 'application/x-shellscript';
-				}
+			if ( $text =~ /\A#!/ ) {
+				return $self->perl_mime_type($text)
+					if $text =~ /\A#!.*\bperl6?\b/m;
+				return 'application/x-tcl'
+					if $text =~ /\A#!.*\bsh\b.*(?:\n.*)?\nexec wish/m;
+				return 'application/x-tcl'
+					if $text =~ /\A#!.*\bwish\b/m;
+				return 'application/x-shellscript'
+					if $text =~ /\A#!.*\b(?:z|k|ba|t?c|da)?sh\b/m;
+				return 'text/x-python'
+					if $text =~ /\A#!.*\bpython\b/m;
+				return 'application/x-ruby'
+					if $text =~ /\A#!.*\bruby\b/m;
 			}
 
 			# YAML will start with a ---
@@ -747,8 +781,12 @@ sub guess_mimetype {
 
 			# Try to detect plain CSS without HTML around it
 			return 'text/css'
-				if ( $text !~ /\<\w+\/?\>/ )
-				and ( $text =~ /^([\.\#]?\w+( [\.\#]?\w+)*)(\,[\s\t\r\n]*([\.\#]?\w+( [\.\#]?\w+)*))*[\s\t\r\n]*\{/ );
+				if $text !~ /\<\w+\/?\>/
+					and $text =~ /^([\.\#]?\w+( [\.\#]?\w+)*)(\,[\s\t\r\n]*([\.\#]?\w+( [\.\#]?\w+)*))*[\s\t\r\n]*\{/;
+
+			# Try to recognize XML
+			return 'text/xml'
+				if $text =~ /^<\?xml version="\d+\.\d+" encoding=".+"\?>/;
 
 			# LUA detection
 			my $lua_score = 0;

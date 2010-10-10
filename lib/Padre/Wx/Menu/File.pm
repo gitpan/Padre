@@ -12,7 +12,7 @@ use Padre::Constant ();
 use Padre::Current  ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -202,7 +202,7 @@ sub new {
 		'file.save_as',
 	);
 
-	$self->{save_as} = $self->add_menu_action(
+	$self->{save_intuition} = $self->add_menu_action(
 		$self,
 		'file.save_intuition',
 	);
@@ -243,7 +243,7 @@ sub new {
 	$self->{recentfiles} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("&Recent Files"),
+		Wx::gettext('&Recent Files'),
 		$self->{recentfiles}
 	);
 	$self->add_menu_action(
@@ -309,6 +309,7 @@ sub refresh {
 	$self->{reload_all}->Enable($document);
 	$self->{save}->Enable($document);
 	$self->{save_as}->Enable($document);
+	$self->{save_intuition}->Enable($document);
 	$self->{save_all}->Enable($document);
 	$self->{print}->Enable($document);
 	defined( $self->{open_session} ) and $self->{open_selection}->Enable($document);
@@ -329,8 +330,12 @@ sub refresh_recent {
 		}
 	}
 
+	my %is_open_document = map { defined $_->filename ? ( $_->filename => 1 ) : () } $self->{main}->documents;
+
 	my $idx = 0;
-	foreach my $file ( Padre::DB::History->recent('files') ) {
+	foreach my $file ( Padre::DB::History->recent( 'files', 10 + scalar keys %is_open_document ) ) {
+		next if exists $is_open_document{$file};
+
 		if (Padre::Constant::WIN32) {
 			next unless -f $file;
 		} else {
@@ -364,8 +369,8 @@ sub refresh_recent {
 						$file, 'files',
 					);
 					Wx::MessageBox(
-						sprintf( Wx::gettext("File %s not found."), $file ),
-						Wx::gettext("Open cancelled"),
+						sprintf( Wx::gettext('File %s not found.'), $file ),
+						Wx::gettext('Open cancelled'),
 						Wx::wxOK,
 						$self->{main},
 					);

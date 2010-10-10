@@ -1,7 +1,72 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
 
-0.70 To be released
+0.72 2010.10.10
+    - 'Quick Menu Access' and 'Advanced Preferences' dialogs now completely
+      translated (ZENOG)
+    - The directory tree search now prints each directory it is
+      searching in the status bar. This helps you see where the
+      search is up to, and identify when it is finished (ADAMK)
+    - Recognize XML files by their content, without knowing the filename
+      extension (ZENOG)
+    - Fix #749: Recognize shell/Python/Ruby/Tcl scripts from shebang (ZENOG)
+    - Fix #898: "Find in Files" dialog: buttons too small (ZENOG)
+    - Fix #1007: Output window buffering issues (GARU)
+    - Fix #947: Toggling comments does not work for XML (ZENOG)
+    - Fix #579: (Un)commenting comments the last unselected line (ZENOG)
+    - Fix: deactivate menu entry "File->Save as" when there are not open
+      files (ZENOG)
+    - Fix #988: Recent files menu contains currently opened files (ZENOG)
+    - Fix #1010: Grey out comment toggling in menu if necessary (ZENOG)
+    - Bumped PPIx::Regexp to 0.011 removing 2 dependencies (ADAMK)
+    - Bumped Format::Human::Bytes to 0.07 removing 8 dependencies (ADAMK)
+    - Fix #926: Escape key does not always work in the regex editor (ZENOG)
+    - Fixed keyboard (tab) navigation in the regex editor (ZENOG)
+    - Fix #452: focus order in Replace dialog (ZENOG)
+    - Updated German translation (ZENOG)
+    - Mime type for C# added (CHORNY)
+    - The help search dialog now uses the latest perlopquick.pod instead
+      of the old perlopref.pod (AZAWAWI)
+    - Additional refactoring shortcut: Change the style of a given variable
+      lexically from/to CamelCase with two clicks. (SMUELLER)
+    - Fixed crash when closing the debugger panel (AZAWAWI)
+    - Fixed crash of "Join Lines" feature on an empty document (AZAWAWI)
+    - Fixed #1002: "Quick fix" feature on plain text document leads to
+      error output on console (AZAWAWI)
+    - Fixed #1006: F2 help does not know about 'given' (AZAWAWI)
+    - Fixed key bindings dialog to remember cursor position when setting,
+      deleting or resetting a shortcut (AZAWAWI)
+    - Fixed key bindings dialog to highlight overriden shortcuts with a
+      bold font (AZAWAWI)
+    - Always load the shortcut from its configuration setting otherwise we
+      will have false duplicate shortcut warnings (AZAWAWI)
+    - Reflect both changed key shortcuts when overridden (AZAWAWI)
+    - Removed the extra warning about duplicate keyboard shortcuts for a
+      Padre action (AZAWAWI)
+    - Fixed the shortcut overriding logic to actually work as
+      expected (AZAWAWI)
+    - Upgraded Find in Files to use Task 2.0, replacing the original
+      ack-based implementation (ADAMK)
+    - Removed ack dependency, and related File::Next dependency (ADAMK)
+    - Purged all code and mention of ack from the Padre codebase. Thanks
+      a ton for getting us through our first couple of years Andy, but
+      we've outgrown it now (ADAMK)
+    - Fixed an "Open Session" crash when there is not any session (AZAWAWI)
+    - Make the use of external window for running scripts the default. (SZABGAB)
+    - Save Intuition now understands that modules named t::Foo are for
+      testing, and will save them into your t/ directory (ADAMK)
+    - Find in Files now integrates with Project Intuition. The same
+      manifest/ignore/skip logic used to generate the directory tree is
+      also used to prevent Find in Files searching into your version
+      control, build/make/blib files, and anywhere else your project
+      doesn't like. (ADAMK)
+    - Add "Create directory" and "remove file" to the directory browser. (SZABGAB) 
+    - Aff "Goto Last position" (SZABGAB)
+
+0.71 not released
+    - No incompatible API changes during the 0.72 release cycle
+
+0.70 2010.09.09
     - The Task 2.0 API now supports full birectional communication for all
       task classes out the box. (ADAMK)
     - Directory search now runs incrementally via background task (ADAMK)
@@ -27,7 +92,6 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
     - partial fix for #452: 'focus order in Replace dialog' (ZENOG)
     - Fix focus order in Find dialog (ZENOG)
     - Close replace dialog on Escape key in all cases (ZENOG)
-    - 'Quick Menu Access' dialog now completely translated (ZENOG)
 
 0.69 2010.08.17
     - Landed ConfigSync branch (MATTP)

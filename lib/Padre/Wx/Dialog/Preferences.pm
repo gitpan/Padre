@@ -11,7 +11,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Wx::Dialog';
 
 our %PANELS = (
@@ -355,10 +355,18 @@ sub _behaviour_panel {
 
 		# Will be moved to a own AutoComp-panel as soon as there are enough options for this (and I get the spare time to do it):
 		[   [   'Wx::CheckBox',
+				'autocomplete_brackets',
+				( $config->autocomplete_brackets ? 1 : 0 ),
+				Wx::gettext("Autocomplete brackets")
+			],
+			[]
+		],
+		[   [   'Wx::CheckBox',
 				'autocomplete_multiclosebracket',
 				( $config->autocomplete_multiclosebracket ? 1 : 0 ),
 				Wx::gettext(
-					"Add another closing bracket if there is already one (and the auto-bracket-function is enabled)")
+					"Add another closing bracket if there is already one (and the 'Autocomplete brackets' above is enabled)"
+				)
 			],
 			[]
 		],
@@ -1184,6 +1192,10 @@ sub run {
 	$config->set(
 		'update_file_from_disk_interval',
 		$data->{update_file_from_disk_interval}
+	);
+	$config->set(
+		'autocomplete_brackets',
+		$data->{autocomplete_brackets} ? 1 : 0
 	);
 	$config->set(
 		'autocomplete_multiclosebracket',

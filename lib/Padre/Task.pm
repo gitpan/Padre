@@ -95,7 +95,7 @@ use Params::Util      ();
 use Padre::Current    ();
 use Padre::Role::Task ();
 
-our $VERSION    = '0.70';
+our $VERSION    = '0.72';
 our $COMPATIBLE = '0.65';
 
 sub new {
@@ -229,7 +229,7 @@ sub finish {
 		$owner->$method($self);
 	}
 
-	return;
+	return 1;
 }
 
 

@@ -137,7 +137,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 
 
@@ -321,8 +321,14 @@ sub rebless {
 	$filename = $self->{file}->filename
 		if defined( $self->{file} )
 			and defined( $self->{file}->{filename} );
-	warn "No module  mime_type='$mime_type' filename='$filename'\n" unless $module;
-
+	if ( not $module ) {
+		$self->current->main->error(
+			sprintf(
+				Wx::gettext("No module  mime_type='%s' filename='%s'"),
+				$mime_type, $filename
+			)
+		);
+	}
 	$self->set_highlighter($module);
 
 	return;
@@ -971,7 +977,12 @@ sub lexer {
 
 	my $highlighter = $self->highlighter;
 	if ( not $highlighter ) {
-		warn "no highlighter\n";
+		$self->current->main->error(
+			sprintf(
+				Wx::gettext("no highlighter for mime-type '%s' using stc"),
+				$self->mimetype
+			)
+		);
 		$highlighter = 'stc';
 	}
 	TRACE("The highlighter is '$highlighter'") if DEBUG;
@@ -1503,8 +1514,7 @@ the C<force =E<gt> 1> parameter to override this.
 # order for padre not to crash if user wants to un/comment lines with
 # a document type that did not define those methods.
 #
-# TO DO Remove this base method, and compensate by disabling the menu entries
-# if the document class does not define this method.
+# TO DO Remove this base method
 sub comment_lines_str { }
 
 

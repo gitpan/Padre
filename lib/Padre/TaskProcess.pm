@@ -6,7 +6,7 @@ use warnings;
 use Carp        ();
 use Padre::Task ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Task';
 
 

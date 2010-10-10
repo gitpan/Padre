@@ -7,7 +7,7 @@ use Padre::Config   ();
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 # Generate faster accessors
 use Class::XSAccessor {
@@ -106,23 +106,14 @@ sub new {
 		);
 	}
 
+	# Load the shortcut from its configuration setting
 	my $config_shortcut = eval '$config->' . $setting;
 	warn "$@\n" if $@;
-	if ($config_shortcut) {
-		$shortcut = $config_shortcut;
-		$self->shortcut($shortcut);
-	}
+	$shortcut = $config_shortcut;
+	$self->shortcut($shortcut);
 
 	# Validate the shortcut
 	if ($shortcut) {
-		foreach my $n ( keys %$actions ) {
-			my $a = $actions->{$n};
-			next unless $a->shortcut;
-			next unless $a->shortcut eq $shortcut;
-			warn "Found a duplicate shortcut '$shortcut' with " . $a->name . " for '$name'\n";
-			last;
-		}
-
 		my $shortcuts = $ide->shortcuts;
 		if ( exists $shortcuts->{$shortcut} ) {
 			warn "Found a duplicate shortcut '$shortcut' with " . $shortcuts->{$shortcut}->name . " for '$name'\n";

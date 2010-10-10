@@ -21,7 +21,7 @@ use Scalar::Util   ();
 use Padre::Current ();
 use Padre::Logger;
 
-our $VERSION        = '0.70';
+our $VERSION        = '0.72';
 our $BACKCOMPATIBLE = '0.69';
 
 # Use a shared sequence for object revisioning greatly
@@ -124,6 +124,7 @@ The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
+
 
 # Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 # LICENSE

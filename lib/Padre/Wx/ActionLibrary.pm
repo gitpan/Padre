@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 
 
@@ -761,6 +761,8 @@ sub init {
 			my $main     = shift;
 			my $document = $main->current->document or return;
 			my $editor   = $document->editor;
+			return unless $document->can('get_quick_fix_provider');
+
 			$editor->AutoCompSetSeparator( ord '|' );
 			my @list  = ();
 			my @items = ();
@@ -775,7 +777,7 @@ sub init {
 					push @list, $item->{text};
 				}
 			};
-			warn "Error while calling get_quick_fix_provider: $@\n" if $@;
+			TRACE("Error while calling get_quick_fix_provider: $@\n") if $@;
 			my $empty_list = ( scalar @list == 0 );
 			if ($empty_list) {
 				@list = ( Wx::gettext('No suggestions') );
@@ -1246,8 +1248,11 @@ sub init {
 		comment    => _T('Search for a text in all files below a given directory'),
 		shortcut   => 'Ctrl-Shift-F',
 		menu_event => sub {
-			require Padre::Wx::Ack;
-			Padre::Wx::Ack::on_ack(@_);
+			require Padre::Wx::Dialog::FindInFiles;
+			my $dialog = Padre::Wx::Dialog::FindInFiles->new( $_[0] );
+			$dialog->run;
+			$dialog->Destroy;
+			return;
 		},
 	);
 
@@ -1370,6 +1375,15 @@ sub init {
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
 			$_[0]->show_errorlist( $_[1]->IsChecked );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name       => 'view.show_findinfiles',
+		label      => _T('Hide Find in Files'),
+		comment    => _T('Hide the list of matches for a Find in Files search'),
+		menu_event => sub {
+			$_[0]->show_findinfiles(0);
 		},
 	);
 
@@ -1749,13 +1763,69 @@ sub init {
 	Padre::Wx::Action->new(
 		name        => 'perl.rename_variable',
 		need_editor => 1,
-		label       => _T('Rename Variable...'),
+		label       => _T('Rename Variable'),
 		comment     => _T('Prompt for a replacement variable name and replace all occurrences of this variable'),
 		shortcut    => 'Shift-Alt-R',
 		menu_event  => sub {
 			my $document = $_[0]->current->document or return;
 			$document->can('rename_variable') or return;
 			$document->rename_variable;
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name        => 'perl.variable_to_camel_case',
+		need_editor => 1,
+		label       => _T('Change variable to camelCase'),
+		comment     => _T('Change variable style from camel_case to camelCase'),
+
+		#shortcut    => 'Shift-Alt-R',
+		menu_event => sub {
+			my $document = $_[0]->current->document or return;
+			$document->can('change_variable_style') or return;
+			$document->change_variable_style( to_camel_case => 1 );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name        => 'perl.variable_to_camel_case_ucfirst',
+		need_editor => 1,
+		label       => _T('Change variable to CamelCase.'),
+		comment     => _T('Change variable style from camel_case to CamelCase'),
+
+		#shortcut    => 'Shift-Alt-R',
+		menu_event => sub {
+			my $document = $_[0]->current->document or return;
+			$document->can('change_variable_style') or return;
+			$document->change_variable_style( to_camel_case => 1, 'ucfirst' => 1 );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name        => 'perl.variable_from_camel_case',
+		need_editor => 1,
+		label       => _T('Change variable style to using_underscores'),
+		comment     => _T('Change variable style from camelCase to camel_case'),
+
+		#shortcut    => 'Shift-Alt-R',
+		menu_event => sub {
+			my $document = $_[0]->current->document or return;
+			$document->can('change_variable_style') or return;
+			$document->change_variable_style( from_camel_case => 1 );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name        => 'perl.variable_from_camel_case_ucfirst',
+		need_editor => 1,
+		label       => _T('Change variable style to Using_Underscores'),
+		comment     => _T('Change variable style from camelCase to Camel_Case'),
+
+		#shortcut    => 'Shift-Alt-R',
+		menu_event => sub {
+			my $document = $_[0]->current->document or return;
+			$document->can('change_variable_style') or return;
+			$document->change_variable_style( from_camel_case => 1, 'ucfirst' => 1 );
 		},
 	);
 
@@ -2378,13 +2448,27 @@ sub init {
 	Padre::Wx::Action->new(
 		name        => 'window.last_visited_file_old',
 		label       => _T('Last Visited File'),
-		comment     => _T('???'),
+		comment     => _T('Jump between the two last visited files back and force'),
 		shortcut    => 'Ctrl-Shift-P',
 		need_editor => 1,
 		menu_event  => sub {
 			shift->on_last_visited_pane(@_);
 		},
 	);
+
+	Padre::Wx::Action->new(
+		name    => 'window.goto_previous_position',
+		label   => _T('Goto previous position'),
+		comment => _T('Jump to the last position saved in memory'),
+
+		#shortcut    => '',
+		need_editor => 1,
+		menu_event  => sub {
+			require Padre::Wx::Dialog::Positions;
+			Padre::Wx::Dialog::Positions->goto_prev_position( $_[0] );
+		},
+	);
+
 
 	Padre::Wx::Action->new(
 		name        => 'window.right_click',

@@ -17,12 +17,17 @@ eg/perl6/outline_test.p6
 eg/perl6/perl6.pod
 eg/perl6/Perl6Class.pm
 eg/perl6/Perl6Grammar.p6
+eg/python/hello_py
 eg/README
 eg/ruby/add.rb
 eg/ruby/hello_world.rb
+eg/ruby/hello_world_rb
 eg/syntax_demo.css
 eg/syntax_demo.js
 eg/syntax_demo.json
+eg/tcl/hello_tcl
+eg/tcl/portable_tcl
+eg/xml/xml_example
 fbp/feedback.fbp
 fbp/findinfiles.fbp
 fbp/sync.fbp
@@ -161,7 +166,6 @@ lib/Padre/Util/Template.pm
 lib/Padre/Util/Win32.pm
 lib/Padre/Wx.pm
 lib/Padre/Wx/About.pm
-lib/Padre/Wx/Ack.pm
 lib/Padre/Wx/Action.pm
 lib/Padre/Wx/ActionLibrary.pm
 lib/Padre/Wx/ActionQueue.pm
@@ -181,6 +185,7 @@ lib/Padre/Wx/Dialog/DocStats.pm
 lib/Padre/Wx/Dialog/Encode.pm
 lib/Padre/Wx/Dialog/FilterTool.pm
 lib/Padre/Wx/Dialog/Find.pm
+lib/Padre/Wx/Dialog/FindInFiles.pm
 lib/Padre/Wx/Dialog/Form.pm
 lib/Padre/Wx/Dialog/Goto.pm
 lib/Padre/Wx/Dialog/HelpSearch.pm
@@ -190,6 +195,7 @@ lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/OpenResource.pm
 lib/Padre/Wx/Dialog/OpenURL.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
+lib/Padre/Wx/Dialog/Positions.pm
 lib/Padre/Wx/Dialog/Preferences.pm
 lib/Padre/Wx/Dialog/Preferences/Editor.pm
 lib/Padre/Wx/Dialog/Preferences/File.pm
@@ -222,6 +228,7 @@ lib/Padre/Wx/FBP/FindInFiles.pm
 lib/Padre/Wx/FBP/Sync.pm
 lib/Padre/Wx/FBP/WhereFrom.pm
 lib/Padre/Wx/FileDropTarget.pm
+lib/Padre/Wx/FindInFiles.pm
 lib/Padre/Wx/FindResult.pm
 lib/Padre/Wx/FunctionList.pm
 lib/Padre/Wx/History/ComboBox.pm
@@ -271,10 +278,10 @@ privinc/Module/Install/PRIVATE/Padre.pm
 README
 script/padre
 script/padre-client
-share/doc/perlopref/Artistic
-share/doc/perlopref/Copying
-share/doc/perlopref/perlopref.pod
-share/doc/perlopref/README
+share/doc/perlopquick/Artistic
+share/doc/perlopquick/Copying
+share/doc/perlopquick/perlopquick.pod
+share/doc/perlopquick/README
 share/doc/wxwidgets/wxwidgets.pod
 share/examples/absolute_beginner/01_hello_world.pl
 share/examples/absolute_beginner/02_time.pl
@@ -416,6 +423,7 @@ t/40-perl.t
 t/41-perl-project.t
 t/42-perl-project-temp.t
 t/43-perl-utils.t
+t/44-perl-syntax.t
 t/50-browser.t
 t/60-db.t
 t/61-directory-path.t

@@ -7,7 +7,7 @@ use warnings;
 use Wx        ();
 use Padre::Wx ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = ('Wx::Dialog');
 
 sub create_widget {
@@ -434,7 +434,7 @@ sub _build_layout {
 	$box->Add( 0, $args{top}, 0 ) if $args{top};
 
 	ROW:
-	foreach my $i ( 0 .. @{ $args{layout} } - 1 ) { ## Z-TODO: normal for loop
+	for ( my $i = 0; $i < @{ $args{layout} }; $i++ ) {
 		my $row = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
 		$box->Add( 0, $args{element_spacing}[1], 0 ) if $args{element_spacing}[1] and $i;
 		$box->Add($row);
@@ -443,10 +443,10 @@ sub _build_layout {
 		$row->Add( $args{left}, 0, 0 ) if $args{left};
 
 		COL:
-		foreach my $j ( 0 .. @{ $args{layout}[$i] } - 1 ) { ## Z-TODO: normal for loop
+		for ( my $j = 0; $j < @{ $args{layout}[$i] }; $j++ ) {
 			my $width = [ $args{width}[$j], -1 ];
 
-			if ( not @{ $args{layout}[$i][$j] } ) {         # [] means Expand
+			if ( not @{ $args{layout}[$i][$j] } ) { # [] means Expand
 				$row->Add( $args{width}[$j], 0, 0, Wx::wxEXPAND, 0 );
 				next;
 			}
@@ -457,15 +457,19 @@ sub _build_layout {
 			if ( $class eq 'Wx::StaticText' ) {
 				$widget = $class->new( $dialog, -1, $arg, Wx::wxDefaultPosition, $width );
 			} elsif ( $class eq 'Wx::Button' ) {
-				my $s = Wx::Button::GetDefaultSize;
-
-				#print $s->GetWidth, " ", $s->GetHeight, "\n";
-				my @args = $arg =~ /[a-zA-Z]/ ? ( -1, $arg ) : ( $arg, '' );
-				my $size = Wx::Button::GetDefaultSize();
+				my @args;
+				my $size = Wx::Button::GetDefaultSize;
+				if ( $arg =~ /[a-zA-Z]/ ) {
+					@args = ( -1, $arg );
+					$size = $width if length $arg > 12;
+				} else {
+					@args = ( $arg, '' );
+				}
 				$widget = $class->new( $dialog, @args, Wx::wxDefaultPosition, $size );
 			} elsif ( $class eq 'Wx::DirPickerCtrl' ) {
 				my $title = shift(@params) || '';
-				$widget = $class->new( $dialog, -1, $arg, $title, Wx::wxDefaultPosition, $width );
+				$widget =
+					$class->new( $dialog, -1, $arg, $title, Wx::wxDefaultPosition, $width ); # TODO width is ignored?
 
 				# it seems we cannot set the default directory and
 				# we still have to set this directory in order to get anything back in

@@ -10,7 +10,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -80,6 +80,11 @@ sub new {
 	$self->add_menu_action(
 		$self,
 		'search.find_in_files',
+	);
+
+	$self->add_menu_action(
+		$self,
+		'search.replace_in_files',
 	);
 
 	$self->AppendSeparator;

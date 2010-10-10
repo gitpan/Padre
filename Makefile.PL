@@ -73,7 +73,6 @@ all_from 'lib/Padre.pm';
 requires 'perl' => '5.008005';
 
 # General dependencies
-requires 'App::Ack'                 => '1.86';
 requires 'App::cpanminus'           => '0.9923';
 requires 'Class::Adapter'           => '1.05';
 requires 'Class::Unload'            => '0.03';
@@ -104,7 +103,7 @@ requires 'File::Temp'               => '0.20';
 requires 'File::Which'              => '1.08';
 requires 'File::pushd'              => '1.00';
 requires 'FindBin'                  => 0;
-requires 'Format::Human::Bytes'     => '0.04';
+requires 'Format::Human::Bytes'     => '0.06';
 requires 'Getopt::Long'             => 0;
 requires 'HTML::Entities'           => '3.57';
 requires 'HTML::Parser'             => '3.58';
@@ -135,8 +134,8 @@ requires 'Pod::Perldoc'             => '3.15';
 requires 'POD2::Base'               => '0.043';
 requires 'POSIX'                    => 0;
 requires 'PPI'                      => '1.213';
-requires 'PPIx::EditorTools'        => '0.09';
-requires 'PPIx::Regexp'             => '0.005';
+requires 'PPIx::EditorTools'        => '0.10';
+requires 'PPIx::Regexp'             => '0.011';
 requires 'Storable'                 => '2.15';
 requires 'Template::Tiny'           => '0.11';
 requires 'Term::ReadLine'           => 0;
@@ -164,9 +163,6 @@ test_requires 'Test::NoWarnings'    => '0.084';
 
 # Special dependencies
 
-# Force-bump ack dep, removed once we remove Ack
-requires 'File::Next' => '1.06';
-
 # In the Padre.ppd file we need to list IO-stringy instead
 requires 'IO::Scalar' => '2.110';
 
@@ -175,9 +171,6 @@ requires 'IO::Scalar' => '2.110';
 
 # Add later, once we native support portability
 # requires 'Portable' => '0.12' if win32;
-
-# For PPIx::Regexp Readonly dependency
-requires 'Readonly::XS' => '1.05';
 
 # PAR support disabled for now
 # requires 'File::ShareDir::PAR' => '0.04';

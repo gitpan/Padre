@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -966,12 +966,6 @@ know about Wx, but currently it still does.
 
 =item L<Padre::Wx>
 
-=item L<Padre::Wx::Ack>
-
-Implementation of the L<ack> integration in C<Edit/Ack> menu item.
-It probably should be either under Dialog or moved out to be a
-plug-in.
-
 =item L<Padre::Wx::App>
 
 is the L<Wx::App> subclass. Does not really do much.
@@ -1112,6 +1106,10 @@ Aaron Trevena (TEEJAY)
 Ahmad Zawawi أحمد محمد زواوي (AZAWAWI)
 
 Adam Kennedy (ADAMK) E<lt>adamk@cpan.orgE<gt>
+
+Alexandr Ciornii (CHORNY)
+
+Blake Willmarth (BLAKEW)
 
 Breno G. de Oliveira (GARU)
 

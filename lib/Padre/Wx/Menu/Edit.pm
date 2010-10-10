@@ -9,7 +9,7 @@ use Padre::Current  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -46,7 +46,7 @@ sub new {
 	my $edit_select = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Select"),
+		Wx::gettext('Select'),
 		$edit_select
 	);
 
@@ -87,7 +87,7 @@ sub new {
 	my $edit_copy = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Copy Specials"),
+		Wx::gettext('Copy Specials'),
 		$edit_copy
 	);
 
@@ -197,7 +197,7 @@ sub new {
 	$self->{convert_encoding} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Convert Encoding"),
+		Wx::gettext('Convert Encoding'),
 		$self->{convert_encoding}
 	);
 
@@ -219,7 +219,7 @@ sub new {
 	$self->{convert_nl} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Convert Line Endings"),
+		Wx::gettext('Convert Line Endings'),
 		$self->{convert_nl}
 	);
 
@@ -242,7 +242,7 @@ sub new {
 	$self->{tabs} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Tabs and Spaces"),
+		Wx::gettext('Tabs and Spaces'),
 		$self->{tabs},
 	);
 
@@ -272,7 +272,7 @@ sub new {
 	$self->{case} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Upper/Lower Case"),
+		Wx::gettext('Upper/Lower Case'),
 		$self->{case},
 	);
 
@@ -292,7 +292,7 @@ sub new {
 	$self->{diff} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext("Diff Tools"),
+		Wx::gettext('Diff Tools'),
 		$self->{diff},
 	);
 
@@ -345,18 +345,20 @@ sub title {
 }
 
 sub refresh {
-	my $self     = shift;
-	my $current  = Padre::Current::_CURRENT(@_);
-	my $editor   = $current->editor || 0;
-	my $text     = $current->text;
-	my $document = $current->document;
-	my $hasdoc   = $document ? 1 : 0;
-	my $newline  = $hasdoc ? $document->newline_type : '';
+	my $self          = shift;
+	my $current       = Padre::Current::_CURRENT(@_);
+	my $editor        = $current->editor || 0;
+	my $text          = $current->text;
+	my $document      = $current->document;
+	my $hasdoc        = $document ? 1 : 0;
+	my $comment       = $hasdoc ? ( $document->comment_lines_str ? 1 : 0 ) : 0;
+	my $newline       = $hasdoc ? $document->newline_type : '';
+	my $has_quick_fix = $hasdoc && $document->can('get_quick_fix_provider');
 
 	# Handle the simple cases
 	$self->{goto}->Enable($hasdoc);
 	$self->{next_problem}->Enable($hasdoc);
-	$self->{quick_fix}->Enable($hasdoc);
+	$self->{quick_fix}->Enable($has_quick_fix);
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{brace_match_select}->Enable($hasdoc);
@@ -364,9 +366,9 @@ sub refresh {
 
 	$self->{insert_special}->Enable($hasdoc);
 	$self->{snippets}->Enable($hasdoc);
-	$self->{comment_toggle}->Enable($hasdoc);
-	$self->{comment}->Enable($hasdoc);
-	$self->{uncomment}->Enable($hasdoc);
+	$self->{comment_toggle}->Enable($comment);
+	$self->{comment}->Enable($comment);
+	$self->{uncomment}->Enable($comment);
 	$self->{convert_encoding_system}->Enable($hasdoc);
 	$self->{convert_encoding_utf8}->Enable($hasdoc);
 	$self->{convert_encoding_to}->Enable($hasdoc);

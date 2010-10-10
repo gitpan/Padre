@@ -12,7 +12,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -1424,7 +1424,9 @@ sub get_text_from_clipboard {
 sub comment_toggle_lines {
 	my ( $self, $begin, $end, $str ) = @_;
 
-	if ( _get_line_by_number( $self, $begin ) =~ /^\s*\Q$str\E/ ) {
+	my $comment_start = ref $str eq 'ARRAY' ? $str->[0] : $str;
+
+	if ( _get_line_by_number( $self, $begin ) =~ /^\s*\Q$comment_start\E/ ) {
 		uncomment_lines(@_);
 	} else {
 		comment_lines(@_);
@@ -1450,12 +1452,6 @@ sub comment_lines {
 		$pos = $self->GetLineEndPosition($end);
 		$self->InsertText( $pos, $str->[1] );
 	} else {
-		## it is not enough, only current position to check :(
-		# my $is_first_column = $self->GetColumn( $self->GetCurrentPos ) == 0;
-		# if ( $is_first_column && $end > $begin ) {
-		# $end--;
-		# }
-
 		foreach my $line ( $begin .. $end ) {
 			my $text = _get_line_by_number( $self, $line );
 
@@ -1499,11 +1495,6 @@ sub uncomment_lines {
 			$self->ReplaceSelection('');
 		}
 	} else {
-
-		# my $is_first_column = $self->GetColumn( $self->GetCurrentPos ) == 0;
-		# if ( $is_first_column && $end > $begin ) {
-		# $end--;
-		# }
 		foreach my $line ( $begin .. $end ) {
 			my $text = _get_line_by_number( $self, $line );
 
@@ -1567,7 +1558,12 @@ sub configure_editor {
 }
 
 sub goto_line_centerize {
-	$_[0]->goto_pos_centerize( $_[0]->PositionFromLine( $_[1] ) );
+	my $self = shift;
+	my $line = shift;
+
+	require Padre::Wx::Dialog::Positions;
+	Padre::Wx::Dialog::Positions->set_position();
+	$self->goto_pos_centerize( $self->PositionFromLine($line) );
 }
 
 # borrowed from Kephra

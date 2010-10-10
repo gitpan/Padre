@@ -13,7 +13,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current  ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -40,6 +40,34 @@ sub new {
 	$self->{rename_variable} = $self->add_menu_action(
 		$self,
 		'perl.rename_variable',
+	);
+
+	# Create the variable-style submenu
+	my $style = Wx::Menu->new;
+	$self->{variable_style_menu} = $self->Append(
+		-1,
+		Wx::gettext('Change variable style'),
+		$style,
+	);
+
+	$self->add_menu_action(
+		$style,
+		'perl.variable_to_camel_case',
+	);
+
+	$self->add_menu_action(
+		$style,
+		'perl.variable_to_camel_case_ucfirst',
+	);
+
+	$self->add_menu_action(
+		$style,
+		'perl.variable_from_camel_case',
+	);
+
+	$self->add_menu_action(
+		$style,
+		'perl.variable_from_camel_case_ucfirst',
 	);
 
 	$self->{extract_subroutine} = $self->add_menu_action(
@@ -75,6 +103,7 @@ sub refresh {
 	$self->{introduce_temporary}->Enable( $document->can('introduce_temporary_variable') ? 1 : 0 );
 	$self->{extract_subroutine}->Enable( $document->can('extract_subroutine')            ? 1 : 0 );
 	$self->{endify_pod}->Enable( $document->isa('Padre::Document::Perl')                 ? 1 : 0 );
+	$self->{variable_style_menu}->Enable( $document->isa('Padre::Document::Perl')        ? 1 : 0 );
 
 	return;
 }

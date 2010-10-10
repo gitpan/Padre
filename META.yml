@@ -59,7 +59,6 @@ no_index:
     - t
     - xt
 requires:
-  App::Ack: 1.86
   App::cpanminus: 0.9923
   Class::Adapter: 1.05
   Class::Unload: 0.03
@@ -80,7 +79,6 @@ requires:
   File::Find::Rule: 0.30
   File::Glob: 0
   File::HomeDir: 0.91
-  File::Next: 1.06
   File::Path: 2.07
   File::Remove: 1.42
   File::ShareDir: 1.00
@@ -90,7 +88,7 @@ requires:
   File::Which: 1.08
   File::pushd: 1.00
   FindBin: 0
-  Format::Human::Bytes: 0.04
+  Format::Human::Bytes: 0.06
   Getopt::Long: 0
   HTML::Entities: 3.57
   HTML::Parser: 3.58
@@ -113,8 +111,8 @@ requires:
   POD2::Base: 0.043
   POSIX: 0
   PPI: 1.213
-  PPIx::EditorTools: 0.09
-  PPIx::Regexp: 0.005
+  PPIx::EditorTools: 0.10
+  PPIx::Regexp: 0.011
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.11
   Parse::ExuberantCTags: 1.00
@@ -124,7 +122,6 @@ requires:
   Pod::Perldoc: 3.15
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
-  Readonly::XS: 1.05
   Storable: 2.15
   Template::Tiny: 0.11
   Term::ReadLine: 0
@@ -145,4 +142,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.70
+version: 0.72

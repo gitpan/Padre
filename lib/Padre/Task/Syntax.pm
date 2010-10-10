@@ -7,7 +7,7 @@ use Carp         ();
 use Params::Util ();
 use Padre::Task  ();
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = 'Padre::Task';
 
 
@@ -30,8 +30,9 @@ sub new {
 	# Remove the document entirely as we do this,
 	# as it won't be able to survive serialisation.
 	my $document = delete $self->{document};
-	$self->{text}    = $document->text_get;
-	$self->{project} = $document->project->root;
+	$self->{text}     = $document->text_get;
+	$self->{project}  = $document->project_dir;
+	$self->{filename} = $document->filename;
 
 	return $self;
 }

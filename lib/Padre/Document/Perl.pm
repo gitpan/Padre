@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -230,6 +230,12 @@ sub guess_subpath {
 		my $name = $1;
 		my @dirs = split /::/, $name;
 		pop @dirs;
+
+		# The use of a module name beginning with t:: is a common
+		# pattern for declaring test-only classes.
+		if ( $dirs[0] and $dirs[0] eq 't' ) {
+			return @dirs;
+		}
 
 		return ( 'lib', @dirs );
 	}
@@ -872,6 +878,47 @@ sub rename_variable {
 
 	return;
 }
+
+sub change_variable_style {
+	my $self = shift;
+	my %opt  = @_;
+	if ( 0 == grep { defined $_ } @opt{qw(to_camel_case from_camel_case)} ) {
+		warn "Need either 'to_camel_case' or 'from_camel_case' options";
+		return;
+	} elsif (
+		2 == grep {
+			defined $_
+		} @opt{qw(to_camel_case from_camel_case)}
+		)
+	{
+		warn "Need either 'to_camel_case' or 'from_camel_case' options, not both";
+		return;
+	}
+
+	# Can we find something to replace?
+	my ( $location, $token ) = $self->get_current_symbol;
+	if ( not defined $location ) {
+		Wx::MessageBox(
+			Wx::gettext('Current cursor does not seem to point at a variable.'),
+			Wx::gettext('Varable case change'),
+			Wx::wxOK,
+			$self->current->main,
+		);
+		return;
+	}
+
+	# Launch the background task
+	$self->task_request(
+		%opt, # should contain only keys to_camel_case or from_camel_case and optionally ucfirst
+		task      => 'Padre::Task::LexicalReplaceVariable',
+		document  => $self,
+		location  => $location,
+		on_finish => 'rename_variable_response',
+	);
+
+	return;
+}
+
 
 sub rename_variable_response {
 	my $self = shift;
@@ -1686,6 +1733,54 @@ sub event_on_right_down {
 				$doc->rename_variable;
 			},
 		);
+
+		# Start variable style sub-menu
+		my $style      = Wx::Menu->new;
+		my $style_menu = $menu->Append(
+			-1,
+			Wx::gettext('Change variable style'),
+			$style,
+		);
+
+		my $toCC = $style->Append( -1, Wx::gettext('Change variable to camelCase') );
+		Wx::Event::EVT_MENU(
+			$editor, $toCC,
+			sub {
+				my $doc = $self;
+				$doc->change_variable_style( to_camel_case => 1 );
+			},
+		);
+
+		my $toCC_ucfirst = $style->Append( -1, Wx::gettext('Change variable to CamelCase') );
+		Wx::Event::EVT_MENU(
+			$editor,
+			$toCC_ucfirst,
+			sub {
+				my $doc = $self;
+				$doc->change_variable_style( to_camel_case => 1, 'ucfirst' => 1 );
+			},
+		);
+
+		my $fromCC = $style->Append( -1, Wx::gettext('Change variable style to using_underscores') );
+		Wx::Event::EVT_MENU(
+			$editor, $fromCC,
+			sub {
+				my $doc = $self;
+				$doc->change_variable_style( from_camel_case => 1 );
+			},
+		);
+
+		my $fromCC_ucfirst = $style->Append( -1, Wx::gettext('Change variable style to Using_Underscores') );
+		Wx::Event::EVT_MENU(
+			$editor,
+			$fromCC_ucfirst,
+			sub {
+				my $doc = $self;
+				$doc->change_variable_style( from_camel_case => 1, 'ucfirst' => 1 );
+			},
+		);
+
+		# End variable style sub-menu
 	} # end if it's a variable
 
 	# TO DO connect this to the action of menu item in the Perl menu!
@@ -1954,21 +2049,15 @@ sub guess_filename_to_open {
 	} else {
 
 		# relative to the project lib dir
-		my $filename = File::Spec->catfile(
-			$self->project_dir,
-			'lib', $module,
-		);
-		if ( -e $filename ) {
-			push @files, $filename;
-		}
-
 		# relative to the project dir
-		my $filename2 = File::Spec->catfile(
-			$self->project_dir,
-			$module,
-		);
-		if ( -e $filename2 ) {
-			push @files, $filename2;
+		foreach my $dirs ( ['lib'], [], ['inc'] ) {
+			my $filename = File::Spec->catfile(
+				$self->project_dir,
+				@$dirs, $module,
+			);
+			if ( -e $filename ) {
+				push @files, $filename;
+			}
 		}
 
 		# TO DO: it should not be our @INC but the @INC of the perl used for

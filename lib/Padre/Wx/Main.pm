@@ -1,4 +1,5 @@
 package Padre::Wx::Main;
+
 use utf8;
 
 =encoding UTF-8
@@ -67,7 +68,7 @@ use Padre::Wx::Role::Dialog       ();
 use Padre::Wx::Dialog::WindowList ();
 use Padre::Logger;
 
-our $VERSION        = '0.70';
+our $VERSION        = '0.72';
 our $BACKCOMPATIBLE = '0.58';
 our @ISA            = qw{
 	Padre::Wx::Role::Conduit
@@ -492,6 +493,7 @@ use Class::XSAccessor {
 		has_outline      => 'outline',
 		has_directory    => 'directory',
 		has_errorlist    => 'errorlist',
+		has_findinfiles  => 'findinfiles',
 	},
 	getters => {
 
@@ -627,6 +629,15 @@ sub errorlist {
 		$self->{errorlist} = Padre::Wx::ErrorList->new($self);
 	}
 	return $self->{errorlist};
+}
+
+sub findinfiles {
+	my $self = shift;
+	unless ( defined $self->{findinfiles} ) {
+		require Padre::Wx::FindInFiles;
+		$self->{findinfiles} = Padre::Wx::FindInFiles->new($self);
+	}
+	return $self->{findinfiles};
 }
 
 sub directory_panel {
@@ -1987,6 +1998,38 @@ sub _show_output {
 	}
 }
 
+=pod
+
+=head3 C<show_findinfiles>
+
+    $main->show_findinfiles( $visible );
+
+Show the Find in Files panel at the bottom if C<$visible> is true.
+Hide it otherwise. If C<$visible> is not provided, the method defaults
+to show the panel.
+
+=cut
+
+sub show_findinfiles {
+	my $self = shift;
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock('UPDATE');
+	$self->_show_findinfiles($on);
+	$self->aui->Update;
+
+	return;
+}
+
+sub _show_findinfiles {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+	if ( $_[0] ) {
+		$self->bottom->show( $self->findinfiles );
+	} elsif ( $self->has_findinfiles ) {
+		$self->bottom->hide( $self->findinfiles );
+		delete $self->{findinfiles};
+	}
+}
 
 =pod
 
@@ -2475,7 +2518,20 @@ sub run_command {
 				$_[1]->Skip(1);
 				my $outpanel = $_[0]->output;
 				$outpanel->style_neutral;
-				$outpanel->AppendText( $_[1]->GetLine . "\n" );
+
+				# NOTE: ticket 1007 happens if we do
+				# $outpanel->AppendText( $_[1]->GetLine . "\n" );
+				# if, however, we do the following, we empty the
+				# entire buffer and the bug completely goes away.
+				my $out = join "\n", @{ $_[1]->GetProcess->GetStdOutBuffer };
+
+				# NOTE: also, ProcessStream seems to call this sub on every
+				# "\n", but since the buffer is already empty, it just prints
+				# our own linebreak. This means if a text has lots of "\n",
+				# we'll get tons of empty lines at the end of the panel.
+				# Please fix this if you can, but make sure ticket 1007 doesn't
+				# happen again. Also remember to repeat the fix for STDERR below
+				$outpanel->AppendText( $out . "\n" ) if $out;
 				return;
 			},
 		);
@@ -2485,9 +2541,15 @@ sub run_command {
 				$_[1]->Skip(1);
 				my $outpanel = $_[0]->output;
 				$outpanel->style_bad;
-				$outpanel->AppendText( $_[1]->GetLine . "\n" );
 
-				$_[0]->errorlist->collect_data( $_[1]->GetLine );
+				# NOTE: ticket 1007 happens if we do
+				# $outpanel->AppendText( $_[1]->GetLine . "\n" );
+				# if, however, we do the following, we empty the
+				# entire buffer and the bug completely goes away.
+				my $errors = join "\n", @{ $_[1]->GetProcess->GetStdErrBuffer };
+				$outpanel->AppendText( $errors . "\n" ) if $errors;
+
+				$_[0]->errorlist->collect_data($errors);
 
 				return;
 			},
@@ -2554,7 +2616,8 @@ sub run_document {
 	}
 
 	unless ( $document->can('get_command') ) {
-		return $self->error( Wx::gettext("No execution mode was defined for this document") );
+		return $self->error(
+			Wx::gettext("No execution mode was defined for this document") . ': ' . $document->mimetype );
 	}
 
 	my $cmd = eval { $document->get_command($debug) };
@@ -3015,14 +3078,16 @@ sub on_comment_block {
 	my $document        = $current->document;
 	my $selection_start = $editor->GetSelectionStart;
 	my $selection_end   = $editor->GetSelectionEnd;
-	my $length          = length $document->text_get;
-	my $begin           = $editor->LineFromPosition($selection_start);
-	my $end             = $editor->LineFromPosition($selection_end);
-	my $string          = $document->comment_lines_str;
-	if ( not defined $string ) {
+	my $length_before   = length $document->text_get;
+	my $begin_line      = $editor->LineFromPosition($selection_start);
+	my $end_line =
+		$editor->LineFromPosition( $selection_start == $selection_end ? $selection_end : $selection_end - 1 );
+	my $comment = $document->comment_lines_str;
+
+	if ( not defined $comment ) {
 		$self->error(
 			sprintf(
-				Wx::gettext("Could not determine the comment character for %s document type"),
+				Wx::gettext('Could not determine the comment character for %s document type'),
 				Padre::MimeTypes->get_mime_type_name( $document->mimetype )
 			)
 		);
@@ -3030,11 +3095,11 @@ sub on_comment_block {
 	}
 
 	if ( $operation eq 'TOGGLE' ) {
-		$editor->comment_toggle_lines( $begin, $end, $string );
+		$editor->comment_toggle_lines( $begin_line, $end_line, $comment );
 	} elsif ( $operation eq 'COMMENT' ) {
-		$editor->comment_lines( $begin, $end, $string );
+		$editor->comment_lines( $begin_line, $end_line, $comment );
 	} elsif ( $operation eq 'UNCOMMENT' ) {
-		$editor->uncomment_lines( $begin, $end, $string );
+		$editor->uncomment_lines( $begin_line, $end_line, $comment );
 	} else {
 		TRACE("Invalid comment operation '$operation'") if DEBUG;
 	}
@@ -3042,7 +3107,7 @@ sub on_comment_block {
 	if ( $selection_end > $selection_start ) {
 		$editor->SetSelection(
 			$selection_start,
-			$selection_end + ( length $document->text_get ) - $length
+			$selection_end + ( length $document->text_get ) - $length_before
 		);
 	}
 	return;
@@ -4759,7 +4824,7 @@ sub on_join_lines {
 	my $line = $page->LineFromPosition($pos1);
 
 	# Don't crash if cursor at the last line
-	return if ( $line > 0 ) and ( $line + 1 == $page->GetLineCount );
+	return if ( $line >= 0 ) and ( $line + 1 == $page->GetLineCount );
 
 	my $pos2 = $page->PositionFromLine( $line + 1 );
 
@@ -5797,19 +5862,19 @@ Put focus on tab visited the longest time ago. No return value.
 sub on_oldest_visited_pane {
 	my ( $self, $event ) = @_;
 
-	my $history = $self->{page_history};
+	my $page_history = $self->{page_history};
 
-	if ( @$history >= 2 ) {
+	if ( @$page_history >= 2 ) {
 
 		# This works, but isn't perfect, improve if you want!
 		$self->{oldest_visited_pane_depth} = 0
 			if ( !defined( $self->{oldest_visited_pane_time} ) )
 			or $self->{oldest_visited_pane_time} < ( Time::HiRes::time() - 1 );
 
-		@$history[ -1, -2 ] = @$history[ -2, -1 ];
+		@$page_history[ -1, -2 ] = @$page_history[ -2, -1 ];
 		foreach my $i ( $self->pageids ) {
 			my $editor = $_[0]->notebook->GetPage($i);
-			if ( Scalar::Util::refaddr($editor) eq $history->[ $self->{oldest_visited_pane_depth} ] ) {
+			if ( Scalar::Util::refaddr($editor) eq $page_history->[ $self->{oldest_visited_pane_depth} ] ) {
 				$self->notebook->SetSelection($i);
 
 				++$self->{last_visited_pane_depth};

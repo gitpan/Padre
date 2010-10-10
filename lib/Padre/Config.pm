@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.70';
+our $VERSION = '0.72';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -1060,7 +1060,7 @@ setting(
 	name    => 'run_use_external_window',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
-	default => 0,
+	default => 1,
 );
 setting(
 	name    => 'external_diff_tool',
