@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Wx::FBP::FindInFiles ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = qw{
 	Padre::Wx::FBP::FindInFiles
 };
@@ -72,8 +72,16 @@ sub directory {
 # Main Methods
 
 sub run {
-	my $self   = shift;
-	my $config = $self->config;
+	my $self = shift;
+
+	# Do they have a specific search term in mind?
+	my $text = $self->current->text;
+	$text = '' if $text =~ /\n/;
+
+	# Clear out and reset the search term box
+	$self->{find_term}->refresh;
+	$self->{find_term}->SetValue($text) if length $text;
+	$self->{find_term}->SetFocus;
 
 	# Show the dialog
 	my $result = $self->ShowModal;

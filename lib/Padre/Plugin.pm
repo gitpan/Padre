@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.72';
+our $VERSION    = '0.74';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -142,7 +142,9 @@ know where to look for your plug-in l10n catalog.
 
 It defaults to F<$sharedir/locale> (with C<$sharedir> as defined by
 C<File::ShareDir> and thus should work as is for your plug-in if you're
-using the C<install_share> command of L<Module::Install>.
+using the C<install_share> command of L<Module::Install>. If you are
+using L<Module::Build> version 0.36 and later, please use the C<share_dir>
+new() argument.
 
 Your plug-in catalogs should be named F<$plugin-$locale.po> (or F<.mo>
 for the compiled form) where C<$plugin> is the class name of your plug-in with
@@ -842,7 +844,14 @@ L<Padre::Wx::Main> (main window) object.
 =cut
 
 sub main {
-	$IDE{ Scalar::Util::refaddr( $_[0] ) }->wx->main;
+	my $self = shift;
+
+	# TODO sometimes Padre crashes here claiming that thing is undef:
+	if ( not defined $IDE{ Scalar::Util::refaddr($self) } ) {
+		Carp::cluck("UNDEF !!! $_[0]");
+		return $self->main; # fixes warning from badcode tests
+	}
+	$IDE{ Scalar::Util::refaddr($self) }->wx->main;
 }
 
 =pod

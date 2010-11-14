@@ -10,7 +10,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -60,6 +60,11 @@ sub new {
 	$self->add_menu_action(
 		$self,
 		'window.goto_previous_position',
+	);
+
+	$self->add_menu_action(
+		$self,
+		'window.show_previous_positions',
 	);
 
 	$self->{window_right_click} = $self->add_menu_action(

@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -125,7 +125,9 @@ sub task_finish {
 				}
 			)
 		);
-		foreach my $type (qw(pragmata modules attributes methods events)) {
+		my @types = qw(classes grammars packages pragmata modules
+			attributes methods events roles regexes);
+		foreach my $type (@types) {
 			$self->add_subtree( $pkg, $type, $branch );
 		}
 		$self->Expand($branch);
@@ -319,19 +321,14 @@ sub refresh {
 	my $document = $self->current->document or return;
 	my $length   = $document->text_length;
 
-	if ( $document eq $self->{document} ) {
+	# Shortcut if nothing has changed.
+	# NOTE: Given the speed at which the timer fires a cheap
+	# length check is better than an expensive MD5 check.
+	return if ( $document eq $self->{document} ) and ( $length eq $self->{length} );
 
-		# Shortcut if nothing has changed.
-		# NOTE: Given the speed at which the timer fires a cheap
-		# length check is better than an expensive MD5 check.
-		if ( $length eq $self->{length} ) {
-			return;
-		}
-	} else {
+	# Clear the outline tree before starting a refresh
+	$self->clear;
 
-		# New file, don't keep the current list visible
-		$self->clear;
-	}
 	$self->{document} = $document;
 	$self->{length}   = $length;
 

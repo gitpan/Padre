@@ -9,7 +9,7 @@ use Padre::Current  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -358,7 +358,7 @@ sub refresh {
 	# Handle the simple cases
 	$self->{goto}->Enable($hasdoc);
 	$self->{next_problem}->Enable($hasdoc);
-	$self->{quick_fix}->Enable($has_quick_fix);
+	$self->{quick_fix}->Enable($has_quick_fix) if $self->{main}->config->feature_quick_fix;
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{brace_match_select}->Enable($hasdoc);

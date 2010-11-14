@@ -13,7 +13,7 @@ use File::Find ();
 use Config;
 use ExtUtils::Embed;
 
-our $VERSION = '0.26';
+our $VERSION = '0.73';
 use base qw{ Module::Install::Base };
 
 sub setup_padre {
@@ -239,11 +239,40 @@ END_MAKEFILE
 
 }
 
+sub _slurp {
+	my $file = shift;
+	open my $fh, '<', $file or die "Could not slurp $file\n";
+	binmode $fh;
+	local $/ = undef;
+	my $content = <$fh>;
+	close $fh;
+	return $content;
+}
+
+sub _patch_version {
+	my ($self, $file) = @_;
+
+	# Patch the Padre version and the win32-comma-separated version
+	if(open my $fh, '>', $file) {
+		my $output = _slurp("$file.in");
+		my $version = $self->version;
+		my $win32_version = $version;
+		$win32_version =~ s/\./,/;
+		$output =~ s/__PADRE_WIN32_VERSION__/$win32_version,0,0/g;
+		$output =~ s/__PADRE_VERSION__/$version/g;
+		print $fh $output;
+		close $fh;
+	} else {
+		die "Could not open $file for writing\n";
+	}
+}
+
 #
 # Builds Padre.exe using gcc
 #
 sub build_padre_exe {
-	
+	my $self = shift;
+
 	print "Building padre.exe\n";
 
 	# source folder
@@ -253,22 +282,25 @@ sub build_padre_exe {
 	# Create the blib/bin folder
 	system $^X , qw[-MExtUtils::Command -e mkpath --], $bin;
 
-	# TODO update the version number in win32/padre.exe.manifest
-
 	# Step 1: Make sure we do not have old files
-	my @temp_files = map {"$src/$_"} qw[ padre-rc.res perlxsi.c ];
+	my @temp_files = map {"$src/$_"} qw[ padre.exe.manifest padre-rc.rc padre-rc.res perlxsi.c ];
 	map { unlink } (grep { -f } @temp_files);
 
-	# Step 2: Build Padre's win32 resource using windres
+	# Step 2: Patch the Padre version number in the win32 executable's manifest
+	# and resource version info
+	$self->_patch_version('win32/padre.exe.manifest');
+	$self->_patch_version('win32/padre-rc.rc');
+
+	# Step 3: Build Padre's win32 resource using windres
 	system qq[cd $src && windres --input padre-rc.rc --output padre-rc.res --output-format=coff];
 
-	# Step 3: Generate xs_init() function for static libraries
+	# Step 4: Generate xs_init() function for static libraries
 	xsinit("$src/perlxsi.c", 0);
 
-	# Step 4: Build padre.exe using $Config{cc}
+	# Step 5: Build padre.exe using $Config{cc}
 	system "cd $src && $Config{cc} -mwin32 -mwindows -Wl,-s padre.c perlxsi.c padre-rc.res -o ../$bin/padre.exe ".ccopts.ldopts;
 
-	# Step 5: Remove temporary files
+	# Step 6: Remove temporary files
 	map { unlink } (grep { -f } @temp_files);
 }
 

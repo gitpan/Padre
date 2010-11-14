@@ -12,7 +12,7 @@ use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -403,6 +403,16 @@ sub refresh {
 ######################################################################
 # Browse Methods
 
+# Rebrowse issues a browse task for ALL currently expanded nodes in the
+# browse tree. This will cause all changes on disk to be reflected in the
+# visible browse tree.
+sub rebrowse {
+	TRACE( $_[0] ) if DEBUG;
+	my $self     = shift;
+	my $expanded = $self->{tree}->GetExpandedPlData;
+	$self->browse(@$expanded);
+}
+
 sub browse {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
@@ -444,7 +454,15 @@ sub browse_message {
 		if ( $child->IsOk ) {
 
 			# Are we before, after, or a duplicate
-			my $compare = $self->compare( $_[0], $tree->GetPlData($child) );
+			my $chd = $tree->GetPlData($child);
+			if ( not defined $_[0] or not defined $chd ) {
+
+				# TODO: this should never happen, but it does and it crashes padre in the compare method
+				# when calling is_directory on the object.
+				warn "Something is wrong as one of the directory objects is undef";
+				next;
+			}
+			my $compare = $self->compare( $_[0], $chd );
 			if ( $compare > 0 ) {
 
 				# Deleted entry, remove the current position

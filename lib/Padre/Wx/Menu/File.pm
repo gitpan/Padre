@@ -12,7 +12,7 @@ use Padre::Constant ();
 use Padre::Current  ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -72,6 +72,14 @@ sub new {
 		$file_new,
 		'file.new_p5_distro',
 	);
+
+	if ( $main->config->feature_wizard_selector ) {
+		$file_new->AppendSeparator;
+		$self->add_menu_action(
+			$file_new,
+			'file.wizard_selector',
+		);
+	}
 
 	### NOTE: Add support for plugins here
 

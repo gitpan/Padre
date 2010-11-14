@@ -7,7 +7,7 @@ use Carp         ();
 use Params::Util ();
 use Padre::Task  ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = 'Padre::Task';
 
 

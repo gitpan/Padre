@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -671,10 +671,15 @@ sub find_method_declaration {
 		);
 		return;
 	}
+
+	require Padre::Wx::Dialog::Positions;
+	Padre::Wx::Dialog::Positions->set_position();
+
 	if ( not $filename ) {
 
 		#print "No filename\n";
 		# goto $line in current file
+
 		$self->goto_sub($token);
 	} else {
 		my $main = Padre->ide->wx->main;
@@ -900,7 +905,7 @@ sub change_variable_style {
 	if ( not defined $location ) {
 		Wx::MessageBox(
 			Wx::gettext('Current cursor does not seem to point at a variable.'),
-			Wx::gettext('Varable case change'),
+			Wx::gettext('Variable case change'),
 			Wx::wxOK,
 			$self->current->main,
 		);
@@ -1711,27 +1716,14 @@ sub event_on_right_down {
 	if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
 		$menu->AppendSeparator if not $introduced_separator++;
 
-		my $findDecl = $menu->Append( -1, Wx::gettext("Find Variable Declaration") );
-		Wx::Event::EVT_MENU(
-			$editor,
-			$findDecl,
-			sub {
-				my $editor = shift;
-				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
-				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
-				$doc->find_variable_declaration;
-			},
+		$menu->add_menu_action(
+			$menu,
+			'perl.find_variable',
 		);
 
-		my $lexRepl = $menu->Append( -1, Wx::gettext('Rename Variable') );
-		Wx::Event::EVT_MENU(
-			$editor, $lexRepl,
-			sub {
-				my $doc = $self;
-
-				#my $lock = $editor->main->lock('BUSY');
-				$doc->rename_variable;
-			},
+		$menu->add_menu_action(
+			$menu,
+			'perl.rename_variable',
 		);
 
 		# Start variable style sub-menu
@@ -1742,60 +1734,35 @@ sub event_on_right_down {
 			$style,
 		);
 
-		my $toCC = $style->Append( -1, Wx::gettext('Change variable to camelCase') );
-		Wx::Event::EVT_MENU(
-			$editor, $toCC,
-			sub {
-				my $doc = $self;
-				$doc->change_variable_style( to_camel_case => 1 );
-			},
+		$menu->add_menu_action(
+			$style,
+			'perl.variable_to_camel_case',
 		);
 
-		my $toCC_ucfirst = $style->Append( -1, Wx::gettext('Change variable to CamelCase') );
-		Wx::Event::EVT_MENU(
-			$editor,
-			$toCC_ucfirst,
-			sub {
-				my $doc = $self;
-				$doc->change_variable_style( to_camel_case => 1, 'ucfirst' => 1 );
-			},
+		$menu->add_menu_action(
+			$style,
+			'perl.variable_to_camel_case_ucfirst',
 		);
 
-		my $fromCC = $style->Append( -1, Wx::gettext('Change variable style to using_underscores') );
-		Wx::Event::EVT_MENU(
-			$editor, $fromCC,
-			sub {
-				my $doc = $self;
-				$doc->change_variable_style( from_camel_case => 1 );
-			},
+		$menu->add_menu_action(
+			$style,
+			'perl.variable_from_camel_case',
 		);
 
-		my $fromCC_ucfirst = $style->Append( -1, Wx::gettext('Change variable style to Using_Underscores') );
-		Wx::Event::EVT_MENU(
-			$editor,
-			$fromCC_ucfirst,
-			sub {
-				my $doc = $self;
-				$doc->change_variable_style( from_camel_case => 1, 'ucfirst' => 1 );
-			},
+		$menu->add_menu_action(
+			$style,
+			'perl.variable_from_camel_case_ucfirst',
 		);
 
 		# End variable style sub-menu
 	} # end if it's a variable
 
-	# TO DO connect this to the action of menu item in the Perl menu!
-	if ( defined $location and $token =~ /^\w+$/ ) {
-		my $find = $menu->Append( -1, Wx::gettext("Find Method Declaration") );
-		Wx::Event::EVT_MENU(
-			$editor, $find,
-			sub {
-				my $editor = shift;
-				my $doc    = $self; # FIX ME if Padre::Wx::Editor had a method to access its Document...
-				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
-				$doc->find_method_declaration;
-			},
-		);
 
+	if ( defined $location and $token =~ /^\w+$/ ) {
+		$menu->add_menu_action(
+			$menu,
+			'perl.find_method',
+		);
 	}
 
 
@@ -1804,43 +1771,15 @@ sub event_on_right_down {
 	if ( $select_start != $select_end ) { # if something's selected
 		$menu->AppendSeparator if not $introduced_separator++;
 
-		my $intro_temp = $menu->Append( -1, Wx::gettext("Introduce Temporary Variable") );
-		Wx::Event::EVT_MENU(
-			$editor,
-			$intro_temp,
-			sub {
-
-				# FIX ME near duplication of the code in Padre::Wx::Menu::Perl
-				my $editor = shift;
-				my $doc    = $self;
-				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
-				require Padre::Wx::History::TextEntryDialog;
-				my $dialog = Padre::Wx::History::TextEntryDialog->new(
-					$editor->main,
-					Wx::gettext("Variable Name"),
-					Wx::gettext("Variable Name"),
-					'$tmp',
-				);
-				return if $dialog->ShowModal == Wx::wxID_CANCEL;
-				my $replacement = $dialog->GetValue;
-				$dialog->Destroy;
-				return unless defined $replacement;
-				$doc->introduce_temporary_variable($replacement);
-			},
+		$menu->add_menu_action(
+			$menu,
+			'perl.introduce_temporary',
 		);
 
-		my $edit_regex = $menu->Append( -1, Wx::gettext("Edit with Regex Editor") );
-		Wx::Event::EVT_MENU(
-			$editor,
-			$edit_regex,
-			sub {
-				my $editor = shift;
-				my $doc    = $self;
-				return unless Params::Util::_INSTANCE( $doc, 'Padre::Document::Perl' );
-				$editor->main->open_regex_editor;
-			},
+		$menu->add_menu_action(
+			$menu,
+			'perl.edit_with_regex_editor',
 		);
-
 	} # end if something's selected
 }
 

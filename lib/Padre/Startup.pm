@@ -4,7 +4,7 @@ package Padre::Startup;
 
 =head1 NAME
 
-Padre::Startup::Config - Padre start-up related configuration settings
+Padre::Startup - Padre start-up related configuration settings
 
 =head1 DESCRIPTION
 
@@ -32,7 +32,7 @@ use strict;
 use warnings;
 use Padre::Constant ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 
 my $SPLASH = undef;
 

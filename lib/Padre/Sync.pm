@@ -32,7 +32,7 @@ use Padre::Util     ();
 use Padre::Current  ();
 use Padre::Constant ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 
 
 
@@ -342,7 +342,7 @@ sub server_to_local {
 =head2 C<english_status>
 
 Will return a string explaining current state of Sync
-dependant on $self->{state}
+dependent on $self->{state}
 
 =cut
 

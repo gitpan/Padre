@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -662,11 +662,19 @@ setting(
 );
 
 # Editor Settings
+my $default_editor_font = '';
+if (Padre::Constant::WIN32) {
+
+	# The default editor font should be Consolas 10pt on Vista and Windows 7
+	require Win32;
+	my $os = Win32::GetOSName;
+	$default_editor_font = 'Consolas 10' if $os eq 'WinVista' or $os eq 'Win7';
+}
 setting(
 	name    => 'editor_font',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
-	default => '',
+	default => $default_editor_font,
 );
 setting(
 	name    => 'editor_linenumbers',
@@ -1101,6 +1109,18 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+);
+setting(
+	name    => 'feature_wizard_selector',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+setting(
+	name    => 'feature_quick_fix',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
 );
 
 # Window menu list shorten common path

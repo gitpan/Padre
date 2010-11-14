@@ -3,13 +3,14 @@ package Padre::Wx::Directory::TreeCtrl;
 use 5.008;
 use strict;
 use warnings;
+use File::Path                 ();
 use File::Spec                 ();
 use Padre::Constant            ();
 use Padre::Wx::TreeCtrl        ();
 use Padre::Wx::Role::Main      ();
 use Padre::Wx::Directory::Path ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Padre::Wx::TreeCtrl
@@ -88,9 +89,6 @@ sub new {
 }
 
 
-
-
-
 ######################################################################
 # Event Handlers
 
@@ -111,8 +109,8 @@ sub on_tree_item_activated {
 	# Open the selected file
 	my $current = $self->current;
 	my $main    = $current->main;
-	my $project = $current->project;
-	my $file    = File::Spec->catfile( $project->root, $data->path );
+	my $file    = File::Spec->catfile( $parent->root, $data->path );
+
 	$main->setup_editor($file);
 	return;
 }
@@ -127,18 +125,12 @@ sub key_up {
 	# see Padre::Wx::Main::key_up
 	$mod = $mod & ( Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() );
 
-	#	print "Mod: $mod Code: $code\n";
-
 	my $current = $self->current;
 	my $main    = $current->main;
 	my $project = $current->project;
 
-	#my $tree    = $main->directory->{tree};
-
 	my $item_id = $self->GetSelection;
 	my $data    = $self->GetPlData($item_id);
-
-	#print "$self, $tree\n";
 
 	return if not $data;
 
@@ -160,16 +152,13 @@ sub _create_directory {
 	my $main = $self->main;
 	my $dir_name =
 		$main->prompt( 'Please type in the name of the new directory', 'Create Directory', 'CREATE_DIRECTORY' );
-	return if $dir_name =~ /^\s*$/;
+	return if ( !defined($dir_name) || $dir_name =~ /^\s*$/ );
 
-	#print "$file  + '$dir_name'\n";
-	# TODO: create directory
 	require File::Spec;
 	require File::Basename;
 	my $path = File::Basename::dirname($file);
 	if ( mkdir File::Spec->catdir( $path, $dir_name ) ) {
-
-		# TODO: refresh
+		$self->GetParent->browse;
 	} else {
 		$main->error( sprintf( Wx::gettext(q(Could not create: '%s': %s)), $path, $! ) );
 	}
@@ -182,14 +171,15 @@ sub _delete_file {
 
 	my $main = $self->main;
 
-	return if not $main->yes_no( sprintf( Wx::gettext('Really delete the file "%s"'), $file ) );
+	return if not $main->yes_no( sprintf( Wx::gettext('Really delete the file "%s"?'), $file ) );
 
-	if ( unlink $file ) {
+	my $error_ref;
+	File::Path::remove_tree( $file, { error => \$error_ref } );
 
-		# TODO: fix the following does not refresh the listing
-		$self->GetParent->refresh;
+	if ( scalar @$error_ref == 0 ) {
+		$self->GetParent->browse;
 	} else {
-		$main->error( sprintf( Wx::gettext(q(Could not delete: '%s': %s)), $file, $! ) );
+		$main->error( sprintf Wx::gettext(q(Could not delete: '%s': %s)), $file, ( join ' ', @$error_ref ) );
 	}
 }
 
@@ -244,7 +234,7 @@ sub on_tree_item_menu {
 
 	Wx::Event::EVT_MENU(
 		$self,
-		$menu->Append( -1, Wx::gettext('Create subdirectory') ),
+		$menu->Append( -1, Wx::gettext('Create Directory') ),
 		sub {
 			my $self = shift;
 			$self->_create_directory($file);
@@ -254,11 +244,11 @@ sub on_tree_item_menu {
 	$menu->AppendSeparator;
 
 	# Updates the directory listing
-	my $refresh = $menu->Append( -1, Wx::gettext('Refresh') );
 	Wx::Event::EVT_MENU(
-		$self, $refresh,
+		$self,
+		$menu->Append( -1, Wx::gettext('Refresh') ),
 		sub {
-			shift->GetParent->refresh;
+			shift->GetParent->rebrowse;
 		}
 	);
 

@@ -216,6 +216,7 @@ lib/Padre/Wx/Dialog/Text.pm
 lib/Padre/Wx/Dialog/Warning.pm
 lib/Padre/Wx/Dialog/WhereFrom.pm
 lib/Padre/Wx/Dialog/WindowList.pm
+lib/Padre/Wx/Dialog/WizardSelector.pm
 lib/Padre/Wx/Directory.pm
 lib/Padre/Wx/Directory/Browse.pm
 lib/Padre/Wx/Directory/Path.pm
@@ -282,7 +283,6 @@ share/doc/perlopquick/Artistic
 share/doc/perlopquick/Copying
 share/doc/perlopquick/perlopquick.pod
 share/doc/perlopquick/README
-share/doc/wxwidgets/wxwidgets.pod
 share/examples/absolute_beginner/01_hello_world.pl
 share/examples/absolute_beginner/02_time.pl
 share/examples/absolute_beginner/03_good_morning.pl
@@ -495,9 +495,9 @@ t/win32/010-file-new.t
 t/win32/011-file-open.t
 t/win32/012-file-open-selection.t
 win32/padre-rc.h
-win32/padre-rc.rc
+win32/padre-rc.rc.in
 win32/padre.c
-win32/padre.exe.manifest
+win32/padre.exe.manifest.in
 win32/padre.ico
 win32/README
 xt/actions.t

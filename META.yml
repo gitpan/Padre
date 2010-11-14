@@ -5,7 +5,7 @@ author:
 build_requires:
   Capture::Tiny: 0.06
   ExtUtils::MakeMaker: 6.42
-  Locale::Msgfmt: 0.14
+  Locale::Msgfmt: 0.15
   Test::Exception: 0.27
   Test::MockObject: 1.09
   Test::More: 0.88
@@ -142,4 +142,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.72
+version: 0.74

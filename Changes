@@ -1,6 +1,44 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
 
+0.74 2010.11.14
+    - Fix #926 completely: Esc key does not always work in regex editor (ZENOG)
+    - automagic MIME type detection: check first for XHTML, then XML, then
+      HTML; more flexible XML detection (ZENOG)
+    - Fix #1023: Outline view creates multiple "main" on Windows (AZAWAWI)
+    - Added Perl 6 Outline support (AZAWAWI)
+    - Directory tree right-click refresh now triggers a "rebrowse" task to
+      synchronise all filesystem changes from disk to the tree (ADAMK)
+    - The plug-in menu is properly refreshed after closing the key bindings
+      dialog (AZAWAWI)
+    - Added the experimental wizard selector dialog which is enabled by
+      the 'feature_wizard_selector' configuration setting (AZAWAWI)
+    - Fix #1029: '"delete trailing spaces" puts the cursor to the start of
+      the document' (ZENOG)
+    - Find in Files sets the default search text properly (ADAMK)
+    - Quick fix feature is now disabled until it is stable again. You can
+      enable it again by using the 'feature_quick_fix' configuration setting
+      in the Tools/Preferences/Advanced dialog and then restart Padre (AZAWAWI)
+    - The default editor font should be Consolas 10pt on Vista and Windows 7
+      (AZAWAWI)
+    - Fix #982: '"open file" from directory window has no effect' (ZENOG)
+    - Directory tree: "browse" after creating directories and deleting files
+      (ZENOG)
+    - Updated wxwidgets.pod to include a copyright and license section for
+      Debian compatibility (AZAWAWI)
+    - Bumped Locale::Msgfmt dependency to 0.15 (AZAWAWI)
+    - Moved wxwidgets.pod to Padre::Plugin::WxWidgets. Please install it if you
+      need such support (AZAWAWI)
+    - Added win32 version information to padre.exe. This enables the task manager
+      to display a better descriptive name of the padre.exe process. (AZAWAWI)
+    - Padre version is now patched into the win32 executable's manifest and
+      resource files during build time (AZAWAWI)
+    - Directory tree: support deletion of directories (ZENOG)
+    - Update German translation (ZENOG)
+
+0.73 not released
+    - No incompatible API changes during the 0.74 release cycle
+
 0.72 2010.10.10
     - 'Quick Menu Access' and 'Advanced Preferences' dialogs now completely
       translated (ZENOG)

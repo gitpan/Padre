@@ -68,7 +68,7 @@ use Padre::Wx::Role::Dialog       ();
 use Padre::Wx::Dialog::WindowList ();
 use Padre::Logger;
 
-our $VERSION        = '0.72';
+our $VERSION        = '0.74';
 our $BACKCOMPATIBLE = '0.58';
 our @ISA            = qw{
 	Padre::Wx::Role::Conduit
@@ -653,6 +653,11 @@ sub open_resource {
 		$self->{open_resource} = Padre::Wx::Dialog::OpenResource->new($self);
 	}
 	return $self->{open_resource};
+}
+
+sub wizard_selector {
+	require Padre::Wx::Dialog::WizardSelector;
+	return Padre::Wx::Dialog::WizardSelector->new( $_[0] );
 }
 
 sub help_search {
@@ -5694,7 +5699,12 @@ sub on_delete_ending_space {
 		my $editor = $current->editor;
 		$editor->ReplaceSelection($code);
 	} else {
+		my $editor      = $current->editor;
+		my $line_number = $editor->GetCurrentLine;
+
 		$document->text_set($code);
+
+		$editor->GotoLine($line_number);
 	}
 }
 

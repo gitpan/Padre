@@ -24,7 +24,7 @@ use Padre::Util    ('_T');
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 
 #####################################################################
 # Document Registration
@@ -93,6 +93,7 @@ sub _initialize {
 		pl    => \&perl_mime_type,
 		plx   => \&perl_mime_type,
 		pm    => \&perl_mime_type,
+		pmc   => \&perl_mime_type,        # Compiled Perl Module or gimme5's output
 		pod   => \&perl_mime_type,
 		psgi  => 'application/x-psgi',
 		sty   => 'application/x-latex',
@@ -103,8 +104,6 @@ sub _initialize {
 		xs => 'text/x-perlxs',
 		tt => 'text/x-perltt',
 
-		# Compiled Perl Module or gimme5's output
-		pmc   => \&perl_mime_type,
 		conf  => 'text/x-config',
 		sh    => 'application/x-shellscript',
 		ksh   => 'application/x-shellscript',
@@ -402,7 +401,7 @@ sub add_mime_class {
 	if ( not $MIME_TYPES{$mime} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type is not supported when %s(%s) was called"),
+				Wx::gettext("Mime type was not supported when %s(%s) was called"),
 				'add_mime_class', $mime
 			)
 		);
@@ -412,7 +411,7 @@ sub add_mime_class {
 	if ( $MIME_TYPES{$mime}{class} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type already has a class '%s' when %s(%s) was called"),
+				Wx::gettext("Mime type already had a class '%s' when %s(%s) was called"),
 				$MIME_TYPES{$mime}{class}, 'add_mime_class', $mime
 			)
 		);
@@ -438,7 +437,7 @@ sub remove_mime_class {
 	if ( not $MIME_TYPES{$mime}{class} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type is does not have a class entry when %s(%s) was called"),
+				Wx::gettext("Mime type did not have a class entry when %s(%s) was called"),
 				'remove_mime_class', $mime
 			)
 		);
@@ -767,6 +766,15 @@ sub guess_mimetype {
 				if $text
 					=~ /(\[\%[\+\-\=\~]? (PROCESS|WRAPPER|FOREACH|BLOCK|END|INSERT|INCLUDE)\b .* [\+\-\=\~]?\%\].*){3}/si;
 
+			# Try to recognize XHTML
+			return 'text/html'
+				if $text =~ /\A<\?xml version="\d+\.\d+" encoding=".+"\?>/m
+					and $text =~ /^<!DOCTYPE html/m;
+
+			# Try to recognize XML
+			return 'text/xml'
+				if $text =~ /^<\?xml version="\d+\.\d+"(?: +encoding=".+")?(?: +standalone="(?:yes|no)")?\?>/;
+
 			# Look for HTML (now we can be relatively confident it's not HTML inside Perl)
 			if ( $text =~ /\<\/(?:html|body|div|p|table)\>/ ) {
 
@@ -775,7 +783,6 @@ sub guess_mimetype {
 				if ( $text =~ /\[\%\-?\s+\w+(?:\.\w+)*\s+\-?\%\]/ ) {
 					return 'text/x-perltt';
 				}
-
 				return 'text/html';
 			}
 
@@ -783,10 +790,6 @@ sub guess_mimetype {
 			return 'text/css'
 				if $text !~ /\<\w+\/?\>/
 					and $text =~ /^([\.\#]?\w+( [\.\#]?\w+)*)(\,[\s\t\r\n]*([\.\#]?\w+( [\.\#]?\w+)*))*[\s\t\r\n]*\{/;
-
-			# Try to recognize XML
-			return 'text/xml'
-				if $text =~ /^<\?xml version="\d+\.\d+" encoding=".+"\?>/;
 
 			# LUA detection
 			my $lua_score = 0;

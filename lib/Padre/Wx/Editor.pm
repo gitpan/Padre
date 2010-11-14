@@ -12,7 +12,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -1561,8 +1561,6 @@ sub goto_line_centerize {
 	my $self = shift;
 	my $line = shift;
 
-	require Padre::Wx::Dialog::Positions;
-	Padre::Wx::Dialog::Positions->set_position();
 	$self->goto_pos_centerize( $self->PositionFromLine($line) );
 }
 

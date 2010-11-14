@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 
 
 
@@ -185,6 +185,18 @@ sub init {
 			Padre::Wx::Dialog::ModuleStart->start( $_[0] );
 		},
 	);
+
+	# The new wizard selector feature
+	if ( $config->feature_wizard_selector ) {
+		Padre::Wx::Action->new(
+			name       => 'file.wizard_selector',
+			label      => _T('Wizard Selector...'),
+			comment    => _T('Selects and opens a wizard'),
+			menu_event => sub {
+				$_[0]->wizard_selector->show;
+			},
+		);
+	}
 
 	### NOTE: Add support for plugins here
 
@@ -804,7 +816,7 @@ sub init {
 			);
 			$editor->UserListShow( 1, $words );
 		},
-	);
+	) if $config->feature_quick_fix;
 
 	Padre::Wx::Action->new(
 		name        => 'edit.autocomp',
@@ -1263,10 +1275,7 @@ sub init {
 		shortcut   => 'Ctrl-Shift-R',
 		toolbar    => 'places/folder-saved-search',
 		menu_event => sub {
-
-			#Create and show the dialog
-			my $open_resource_dialog = $_[0]->open_resource;
-			$open_resource_dialog->show;
+			$_[0]->open_resource->show;
 		},
 	);
 
@@ -1350,8 +1359,8 @@ sub init {
 
 	Padre::Wx::Action->new(
 		name        => 'view.directory',
-		label       => _T('Show Directory Tree'),
-		comment     => _T('Show a window with a directory browser of the current project'),
+		label       => _T('Show Project Browser/Tree'),
+		comment     => _T('Project Browser - Was known as the Directory Tree.'),
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
 			$_[0]->show_directory( $_[1]->IsChecked );
@@ -1790,7 +1799,7 @@ sub init {
 	Padre::Wx::Action->new(
 		name        => 'perl.variable_to_camel_case_ucfirst',
 		need_editor => 1,
-		label       => _T('Change variable to CamelCase.'),
+		label       => _T('Change variable to CamelCase'),
 		comment     => _T('Change variable style from camel_case to CamelCase'),
 
 		#shortcut    => 'Shift-Alt-R',
@@ -2263,6 +2272,18 @@ sub init {
 		},
 	);
 
+	Padre::Wx::Action->new(
+		name        => 'perl.edit_with_regex_editor',
+		need_editor => 1,
+		label       => _T('Edit with Regex Editor'),
+		comment     => _T('Open the selected text in the Regex Editor'),
+		menu_event  => sub {
+			my $document = Padre::Current->document or return;
+			return unless Params::Util::_INSTANCE( $document, 'Padre::Document::Perl' );
+			Padre::Current->main->open_regex_editor;
+		},
+	);
+
 	# Link to the Plugin Manager
 
 	Padre::Wx::Action->new(
@@ -2448,7 +2469,7 @@ sub init {
 	Padre::Wx::Action->new(
 		name        => 'window.last_visited_file_old',
 		label       => _T('Last Visited File'),
-		comment     => _T('Jump between the two last visited files back and force'),
+		comment     => _T('Jump between the two last visited files back and forth'),
 		shortcut    => 'Ctrl-Shift-P',
 		need_editor => 1,
 		menu_event  => sub {
@@ -2466,6 +2487,19 @@ sub init {
 		menu_event  => sub {
 			require Padre::Wx::Dialog::Positions;
 			Padre::Wx::Dialog::Positions->goto_prev_position( $_[0] );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name    => 'window.show_previous_positions',
+		label   => _T('Show previous positions'),
+		comment => _T('Show the list of positions recently visited'),
+
+		#shortcut    => '',
+		need_editor => 1,
+		menu_event  => sub {
+			require Padre::Wx::Dialog::Positions;
+			Padre::Wx::Dialog::Positions->show_positions( $_[0] );
 		},
 	);
 

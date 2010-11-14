@@ -19,7 +19,7 @@ use Padre::Wx::Menu::Tools    ();
 use Padre::Wx::Menu::Window   ();
 use Padre::Wx::Menu::Help     ();
 
-our $VERSION = '0.72';
+our $VERSION = '0.74';
 
 
 
@@ -143,6 +143,7 @@ sub refresh {
 		$self->debug->refresh($current);
 	}
 
+	$self->plugins->refresh($current);
 	$self->window->refresh($current);
 	$self->help->refresh($current);
 
