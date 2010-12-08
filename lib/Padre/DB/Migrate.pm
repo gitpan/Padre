@@ -18,7 +18,7 @@ use Padre::DB::Migrate::Patch ();
 
 use vars qw{@ISA};
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 
 BEGIN {
@@ -131,12 +131,15 @@ sub import {
 			if ($DEBUG) {
 				print STDERR "Applying schema patch $patch...\n";
 			}
-			my $exit = system( $perl, "-I$include", $patch, $file );
-			if ( $exit == -1 ) {
-				Carp::croak("Migration patch $patch failed, database in unknown state");
-			} elsif ( $? & 127 ) {
-				Carp::croak( sprintf( "Child died with signal %d", ( $? & 127 ) ) );
-			}
+			local @ARGV = $file;
+			do $patch;
+
+			#my $exit = system( $perl, "-I$include", $patch, $file );
+			# if ( $exit == -1 ) {
+			# Carp::croak("Migration patch $patch failed, database in unknown state");
+			# } elsif ( $? & 127 ) {
+			# Carp::croak( sprintf( "Child died with signal %d", ( $? & 127 ) ) );
+			# }
 		}
 
 		# Migration complete, set user_version to new state
@@ -144,6 +147,8 @@ sub import {
 		$dbh->do("pragma user_version = $destination");
 		$dbh->disconnect;
 	}
+
+	local $SIG{__WARN__} = sub { return if $_[0] =~ /Subroutine \w+ redefined at/; warn $_[0] };
 
 	# Hand off to the regular constructor
 	$class->SUPER::import(

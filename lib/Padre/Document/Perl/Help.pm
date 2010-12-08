@@ -9,7 +9,7 @@ use Padre::Util ();
 use Padre::Help ();
 use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = 'Padre::Help';
 
 # for caching help list (for faster access)
@@ -296,9 +296,11 @@ sub help_render {
 
 		# Append the module's release date to the topic
 		require Module::CoreList;
-		my $first_release_by_date = Module::CoreList->first_release_by_date($topic);
+		my $version = Module::CoreList->first_release_by_date($topic);
 		my $since_version =
-			$first_release_by_date ? sprintf( Wx::gettext('(Since Perl v%s)'), $first_release_by_date ) : '';
+			$version
+			? sprintf( Wx::gettext('(Since Perl %s)'), $self->_format_perl_version($version) )
+			: '';
 		my $deprecated =
 			( Module::CoreList->can('is_deprecated') && Module::CoreList::is_deprecated($topic) )
 			? Wx::gettext('- DEPRECATED!')
@@ -327,6 +329,15 @@ sub help_render {
 	}
 
 	return ( $html, $location || $topic );
+}
+
+# Borrowed from corelist in Module::CoreList and then modified
+# a bit for clarity.
+# Returns Perl v-string from an old-style numerical Perl version
+sub _format_perl_version {
+	my ( $self, $version ) = @_;
+	return $version if $version < 5.006;
+	return version->new($version)->normal;
 }
 
 # Returns the help topic list

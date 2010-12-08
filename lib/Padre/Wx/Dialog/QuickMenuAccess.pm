@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Logger;
 
 # package exports and version
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -228,6 +228,7 @@ sub _setup_events {
 
 			$self->_list->SetFocus
 				if ( $code == Wx::WXK_DOWN )
+				or ( $code == Wx::WXK_UP )
 				or ( $code == Wx::WXK_NUMPAD_PAGEDOWN )
 				or ( $code == Wx::WXK_PAGEDOWN );
 
@@ -317,7 +318,7 @@ sub _show_recently_opened_actions {
 
 	# Fetch them from Padre's RecentlyUsed database table
 	require Padre::DB::RecentlyUsed;
-	my $recently_used  = Padre::DB::RecentlyUsed->select( "where type = ?", 'ACTION' ) || [];
+	my $recently_used  = Padre::DB::RecentlyUsed->select( "where type = ? order by last_used desc", 'ACTION' ) || [];
 	my @recent_actions = ();
 	my %actions        = %{ Padre::ide->actions };
 	foreach my $e (@$recently_used) {
@@ -333,7 +334,6 @@ sub _show_recently_opened_actions {
 			TRACE("action '$action_name' is not defined anymore!") if DEBUG;
 		}
 	}
-	@recent_actions = sort { $a->{value} cmp $b->{value} } @recent_actions;
 	$self->_matched_results( \@recent_actions );
 
 	# Show results in matching items list

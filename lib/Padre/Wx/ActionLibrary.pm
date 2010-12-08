@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 
 
@@ -186,17 +186,15 @@ sub init {
 		},
 	);
 
-	# The new wizard selector feature
-	if ( $config->feature_wizard_selector ) {
-		Padre::Wx::Action->new(
-			name       => 'file.wizard_selector',
-			label      => _T('Wizard Selector...'),
-			comment    => _T('Selects and opens a wizard'),
-			menu_event => sub {
-				$_[0]->wizard_selector->show;
-			},
-		);
-	}
+	# The wizard selector feature
+	Padre::Wx::Action->new(
+		name       => 'file.wizard_selector',
+		label      => _T('Wizard Selector...'),
+		comment    => _T('Selects and opens a wizard'),
+		menu_event => sub {
+			$_[0]->wizard_selector->show;
+		},
+	) if $config->feature_wizard_selector;
 
 	### NOTE: Add support for plugins here
 
@@ -1197,23 +1195,6 @@ sub init {
 		},
 	);
 
-	# Quick Find: starts search with selected text
-
-	Padre::Wx::Action->new(
-		name        => 'search.quick_find',
-		need_editor => 1,
-		label       => _T('Quick Find'),
-		comment     => _T('Incremental search seen at the bottom of the window'),
-		menu_method => 'AppendCheckItem',
-		menu_event  => sub {
-			$_[0]->config->set(
-				'find_quick',
-				$_[1]->IsChecked ? 1 : 0,
-			);
-			return;
-		},
-	);
-
 	# We should be able to remove F4 and Shift+F4 and hook this functionality
 	# to F3 and Shift+F3 Incremental find (#60)
 	Padre::Wx::Action->new(
@@ -1374,16 +1355,6 @@ sub init {
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
 			$_[0]->show_syntax( $_[1]->IsChecked );
-		},
-	);
-
-	Padre::Wx::Action->new(
-		name        => 'view.show_errorlist',
-		label       => _T('Show Errors'),
-		comment     => _T('Show the list of errors received during execution of a script'),
-		menu_method => 'AppendCheckItem',
-		menu_event  => sub {
-			$_[0]->show_errorlist( $_[1]->IsChecked );
 		},
 	);
 
@@ -2446,7 +2417,7 @@ sub init {
 		name        => 'window.next_file',
 		label       => _T('Next File'),
 		comment     => _T('Put focus on the next tab to the right'),
-		shortcut    => 'Alt-Right',
+		shortcut    => 'Ctrl-PageDown',
 		need_editor => 1,
 		menu_event  => sub {
 			shift->on_next_pane(@_);
@@ -2457,7 +2428,7 @@ sub init {
 		name        => 'window.previous_file',
 		label       => _T('Previous File'),
 		comment     => _T('Put focus on the previous tab to the left'),
-		shortcut    => 'Alt-Left',
+		shortcut    => 'Ctrl-PageUp',
 		need_editor => 1,
 		menu_event  => sub {
 			shift->on_prev_pane(@_);
@@ -2617,15 +2588,9 @@ sub init {
 		comment    => _T('Search the Perl help pages (perldoc)'),
 		shortcut   => 'F1',
 		menu_event => sub {
-			my $focus = Wx::Window::FindFocus();
-			if ( Params::Util::_INSTANCE( $focus, 'Padre::Wx::ErrorList' ) ) {
-				$_[0]->errorlist->on_menu_help_context_help;
-			} else {
 
-				# Show help for selected text
-				$_[0]->help( $_[0]->current->text );
-				return;
-			}
+			# Show help for selected text
+			$_[0]->help( $_[0]->current->text );
 		},
 	);
 

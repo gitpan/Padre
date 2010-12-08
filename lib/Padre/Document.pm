@@ -137,7 +137,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 
 
@@ -243,9 +243,6 @@ sub new {
 		# The Padre::File - module knows how to format the filename to the right
 		# syntax to correct (for example) .//file.pl to ./file.pl)
 		$self->{filename} = $self->{file}->{filename};
-
-		# TODO: Fix Ticket #845 here. We need to make sure only the filename and not the folder name is here.
-		# This causes F5 to fail as the get_command in Document::Perl doesn' handle this corretly
 
 		if ( $self->{file}->exists ) {
 

@@ -22,7 +22,7 @@ use constant DEBUG => 0;
 # loaded less code now cuts the per-thread cost of several meg.
 use Wx ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 # Worker id sequence, so identifiers will be available in objects
 # across all instances and threads before the thread has been spawned.
@@ -163,9 +163,9 @@ sub start {
 
 # Immediately detach and terminate when queued jobs are completed
 sub stop {
-	TRACE( $_[0] ) if DEBUG;
+	TRACE( $_[0] )            if DEBUG;
 	TRACE("Detaching thread") if DEBUG;
-	$_[0]->thread->detach;
+	$_[0]->thread->detach     if defined( $_[0]->thread );
 	$_[0]->send('stop_child');
 }
 

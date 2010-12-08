@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -284,15 +284,21 @@ sub find_functions {
 Returns the full command (interpreter, file name (maybe temporary) and arguments
 for both of them) for running the current document.
 
-Accepts one optional argument: a debug flag.
+Optionally accepts a hash reference with the following boolean arguments:
+  'debug' - return a command where the debugger is started
+  'trace' - activates diagnostic output
 
 =cut
 
 sub get_command {
-	my $self    = shift;
-	my $debug   = shift;
+	my $self = shift;
+	my $arg_ref = shift || {};
+
+	my $debug = exists $arg_ref->{debug} ? $arg_ref->{debug} : 0;
+	my $trace = exists $arg_ref->{trace} ? $arg_ref->{trace} : 0;
+
 	my $current = Padre::Current->new( document => $self );
-	my $config  = $current->config;
+	my $config = $current->config;
 
 	# Use a temporary file if run_save is set to 'unsaved'
 	my $filename =
@@ -300,33 +306,10 @@ sub get_command {
 		? $self->store_in_tempfile
 		: $self->filename;
 
-	# Run with console Perl to prevent unexpected results under wperl
+	# Run with console Perl to prevent unexpected results under wxperl
 	# The configuration values is cheaper to get compared to cperl(),
 	# try it first.
-	my $perl = $config->run_perl_cmd;
-
-	# Warn if the Perl interpreter is not executable:
-	if ( defined $perl and $perl ne '' ) {
-		if ( !-x $perl ) {
-			my $ret = Wx::MessageBox(
-				Wx::gettext(
-					sprintf(
-						'%s seems to be no executable Perl interpreter, use the system default perl instead?', $perl
-					)
-				),
-				Wx::gettext('Run'),
-				Wx::wxYES_NO | Wx::wxCENTRE,
-				$current->main,
-			);
-			if ( $ret == Wx::wxYES ) {
-				$perl = Padre::Perl::cperl();
-			} else {
-				return;
-			}
-		}
-	} else {
-		$perl = Padre::Perl::cperl();
-	}
+	my $perl = $self->get_interpreter;
 
 	# Set default arguments
 	my %run_args = (
@@ -341,15 +324,58 @@ sub get_command {
 	}
 
 	# (Ticket #530) Pack args here, because adding the space later confuses the called Perls @ARGV
-	my $Script_Args = '';
-	$Script_Args = ' ' . $run_args{script} if defined( $run_args{script} ) and ( $run_args{script} ne '' );
+	my $script_args = '';
+	$script_args = ' ' . $run_args{script} if defined( $run_args{script} ) and ( $run_args{script} ne '' );
 
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
 
-	return $debug
-		? qq{"$perl" -Mdiagnostics(-traceonly) $run_args{interpreter} "$filename"$Script_Args}
-		: qq{"$perl" $run_args{interpreter} "$filename"$Script_Args};
+	my @commands = (qq{"$perl"});
+	push @commands, '-d'                        if $debug;
+	push @commands, '-Mdiagnostics(-traceonly)' if $trace;
+	push @commands, "$run_args{interpreter}";
+	push @commands, qq{"$filename"$script_args};
+
+	return join ' ', @commands;
+}
+
+=head2 get_interpreter
+
+Returns the Perl interpreter for running the current document.
+
+=cut
+
+sub get_interpreter {
+	my $self = shift;
+	my $arg_ref = shift || {};
+
+	my $debug = exists $arg_ref->{debug} ? $arg_ref->{debug} : 0;
+	my $trace = exists $arg_ref->{trace} ? $arg_ref->{trace} : 0;
+
+	my $current = Padre::Current->new( document => $self );
+	my $config = $current->config;
+
+	# The configuration value is cheaper to get compared to cperl(),
+	# try it first.
+	my $perl = $config->run_perl_cmd;
+
+	# warn if the Perl interpreter is not executable
+	if ( defined $perl and $perl ne '' ) {
+		if ( !-x $perl ) {
+			Padre->ide->wx->main->message(
+				Wx::gettext(
+					sprintf(
+						'%s seems to be no executable Perl interpreter, using the system default perl instead.', $perl
+					)
+				),
+			);
+			$perl = Padre::Perl::cperl();
+		}
+	} else {
+		$perl = Padre::Perl::cperl();
+	}
+
+	return $perl;
 }
 
 sub pre_process {
@@ -464,7 +490,7 @@ sub beginner_check {
 	my $error = $beginner->error;
 
 	if ($error) {
-		Padre->ide->wx->main->error( Wx::gettext("Error: ") . $error );
+		Padre->ide->wx->main->error( Wx::gettext('Error: ') . $error );
 	} else {
 		Padre->ide->wx->main->message( Wx::gettext('No errors found.') );
 	}
@@ -1959,19 +1985,22 @@ sub find_help_topic {
 		$doc, [ $line + 1, $col + 1 ],
 	);
 
-	if ($token) {
+	return $token->content if defined($token);
 
-		#print $token->class . "\n";
-		if ( $token->isa('PPI::Token::Symbol') ) {
-			if ( $token->content =~ /^[\$\@\%].+?$/ ) {
-				return 'perldata';
-			}
-		} elsif ( $token->isa('PPI::Token::Operator') ) {
-			return $token->content;
-		}
-	}
-
-	return;
+	#TODO enable once we figure out what we actually need to accomplish here :)
+	#	if ($token) {
+	#
+	#		#print $token->class . "\n";
+	#		if ( $token->isa('PPI::Token::Symbol') ) {
+	#			if ( $token->content =~ /^[\$\@\%].+?$/ ) {
+	#				return 'perldata';
+	#			}
+	#		} elsif ( $token->isa('PPI::Token::Operator') ) {
+	#			return $token->content;
+	#		}
+	#	}
+	#
+	# 	return;
 }
 
 

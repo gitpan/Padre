@@ -25,7 +25,7 @@ use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 =pod
 
@@ -57,6 +57,8 @@ sub find_padre_exe {
 
 sub desktop {
 	if (Padre::Constant::WXWIN32) {
+
+		#TODO Support Vista/Win7 UAC (User Account Control)
 
 		# Find Padre's executable
 		my ( $padre_exe, $padre_exe_dir ) = find_padre_exe();

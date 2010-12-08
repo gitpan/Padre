@@ -41,6 +41,7 @@ use Params::Util                  ();
 use Time::HiRes                   ();
 use Padre::Wx::Action             ();
 use Padre::Wx::ActionLibrary      ();
+use Padre::Wx::WizardLibrary      ();
 use Padre::Constant               ();
 use Padre::Util                   ('_T');
 use Padre::Perl                   ();
@@ -68,7 +69,7 @@ use Padre::Wx::Role::Dialog       ();
 use Padre::Wx::Dialog::WindowList ();
 use Padre::Logger;
 
-our $VERSION        = '0.74';
+our $VERSION        = '0.76';
 our $BACKCOMPATIBLE = '0.58';
 our @ISA            = qw{
 	Padre::Wx::Role::Conduit
@@ -122,8 +123,6 @@ sub new {
 	# the previous size is completely suspect.
 	if ( $config->main_maximized ) {
 		$style |= Wx::wxMAXIMIZE;
-		$size     = [ -1, -1 ];
-		$position = [ -1, -1 ];
 	}
 
 	# Generate a smarter default size than Wx does
@@ -186,6 +185,9 @@ sub new {
 
 	# Bootstrap the action system
 	Padre::Wx::ActionLibrary->init($self);
+
+	# Bootstrap the wizard system
+	Padre::Wx::WizardLibrary->init($self);
 
 	# Temporary store for the notebook tab history
 	# TO DO: Storing this here (might) violate encapsulation.
@@ -267,7 +269,6 @@ sub new {
 	$self->_show_output( $config->main_output );
 	$self->_show_command_line( $config->main_command_line );
 	$self->_show_syntax( $config->main_syntaxcheck );
-	$self->_show_errorlist( $config->main_errorlist );
 
 	# Lock the panels if needed
 	$self->aui->lock_panels( $config->main_lockinterface );
@@ -451,8 +452,6 @@ Accessors to GUI elements:
 
 =item * C<syntax>
 
-=item * C<errorlist>
-
 =back
 
 Accessors to operating data:
@@ -492,7 +491,6 @@ use Class::XSAccessor {
 		has_replace      => 'replace',
 		has_outline      => 'outline',
 		has_directory    => 'directory',
-		has_errorlist    => 'errorlist',
 		has_findinfiles  => 'findinfiles',
 	},
 	getters => {
@@ -620,15 +618,6 @@ sub directory {
 		$self->{directory} = Padre::Wx::Directory->new($self);
 	}
 	return $self->{directory};
-}
-
-sub errorlist {
-	my $self = shift;
-	unless ( defined $self->{errorlist} ) {
-		require Padre::Wx::ErrorList;
-		$self->{errorlist} = Padre::Wx::ErrorList->new($self);
-	}
-	return $self->{errorlist};
 }
 
 sub findinfiles {
@@ -1687,6 +1676,21 @@ sub relocale {
 	$self->right->relocale  if $self->has_right;
 	$self->bottom->relocale if $self->has_bottom;
 
+	# Replace the regex editor, keep the data (if it exists)
+	if ( exists $self->{regex_editor} ) {
+		my $data_ref    = $self->{regex_editor}->get_data;
+		my $was_visible = $self->{regex_editor}->Hide;
+
+		$self->{regex_editor} = Padre::Wx::Dialog::RegexEditor->new($self);
+		$self->{regex_editor}->show if $was_visible;
+		$self->{regex_editor}->set_data($data_ref);
+	}
+
+	# Replace the about box if it exists
+	if ( exists $self->{about} ) {
+		$self->{about} = Padre::Wx::About->new($self);
+	}
+
 	return;
 }
 
@@ -2122,33 +2126,6 @@ sub _show_syntax {
 	}
 }
 
-sub show_errorlist {
-	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock('UPDATE');
-	unless ( $on == $self->menu->view->{show_errorlist}->IsChecked ) {
-		$self->menu->view->{show_errorlist}->Check($on);
-	}
-
-	$self->config->set( main_errorlist => $on );
-	$self->_show_errorlist($on);
-	$self->aui->Update;
-	$self->ide->save_config;
-
-	return;
-}
-
-sub _show_errorlist {
-	my $self = shift;
-	my $lock = $self->lock('UPDATE');
-	if ( $_[0] ) {
-		$self->bottom->show( $self->errorlist );
-	} elsif ( $self->has_errorlist ) {
-		$self->bottom->hide( $self->errorlist );
-		delete $self->{errorlist};
-	}
-}
-
 =pod
 
 =head2 Introspection
@@ -2483,9 +2460,6 @@ sub run_command {
 	# Disable access to the run menus
 	$self->menu->run->disable;
 
-	# Clear the error list
-	$self->errorlist->clear;
-
 	# Prepare the output window for the output
 	$self->show_output(1);
 	$self->output->Remove( 0, $self->output->GetLastPosition );
@@ -2554,8 +2528,6 @@ sub run_command {
 				my $errors = join "\n", @{ $_[1]->GetProcess->GetStdErrBuffer };
 				$outpanel->AppendText( $errors . "\n" ) if $errors;
 
-				$_[0]->errorlist->collect_data($errors);
-
 				return;
 			},
 		);
@@ -2566,7 +2538,6 @@ sub run_command {
 				$_[1]->GetProcess->Destroy;
 				delete $self->{command};
 				$self->menu->run->enable;
-				$_[0]->errorlist->populate;
 			},
 		);
 	}
@@ -2601,7 +2572,7 @@ Note: this should really be somewhere else, but can stay here for now.
 
 sub run_document {
 	my $self     = shift;
-	my $debug    = shift;
+	my $trace    = shift;
 	my $document = $self->current->document;
 	unless ($document) {
 		return $self->error( Wx::gettext("No open document") );
@@ -2622,10 +2593,10 @@ sub run_document {
 
 	unless ( $document->can('get_command') ) {
 		return $self->error(
-			Wx::gettext("No execution mode was defined for this document") . ': ' . $document->mimetype );
+			Wx::gettext('No execution mode was defined for this document type') . ': ' . $document->mimetype );
 	}
 
-	my $cmd = eval { $document->get_command($debug) };
+	my $cmd = eval { $document->get_command( { $trace ? ( trace => 1 ) : () } ) };
 	if ($@) {
 		chomp $@;
 		$self->error($@);
@@ -3287,8 +3258,6 @@ sub on_close_window {
 	# Save the window geometry
 	#$config->set( main_auilayout => $self->aui->SavePerspective );
 	$config->set( main_maximized => $self->IsMaximized ? 1 : 0 );
-
-	# Don't save the maximized window size
 	unless ( $self->IsMaximized ) {
 		my ( $main_width, $main_height ) = $self->GetSizeWH;
 		my ( $main_left,  $main_top )    = $self->GetPositionXY;
@@ -3320,7 +3289,7 @@ sub on_close_window {
 	$event->Skip;
 
 	# Stop the task manager.
-	TRACE("Shutting down TaskManager") if DEBUG;
+	TRACE("Shutting down Task Manager") if DEBUG;
 	$self->ide->task_manager->stop;
 
 	# Vacuum database on exit so that it does not grow.
@@ -3537,7 +3506,6 @@ sub setup_editor {
 
 	# no need to call this here as set_preferences already calls padre_setup.
 	# $editor->padre_setup;
-	Wx::Event::EVT_MOTION( $editor, \&Padre::Wx::Editor::on_mouse_motion );
 
 	if ( $config->feature_cursormemory ) {
 		$document->restore_cursor_position;
@@ -6104,7 +6072,6 @@ sub key_up {
 		#			# TO DO get the list of panels at the bottom from some other place
 		#			if (my $editor = $self->current->editor) {
 		#				if ($current_focus->isa('Padre::Wx::Output') or
-		#					$current_focus->isa('Padre::Wx::ErrorList') or
 		#					$current_focus->isa('Padre::Wx::Syntax')
 		#				) {
 		#					$editor->SetFocus;

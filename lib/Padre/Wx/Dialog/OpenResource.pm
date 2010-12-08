@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::MimeTypes      ();
 use Padre::Role::Task     ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Main
@@ -306,6 +306,7 @@ sub _setup_events {
 
 			$self->{matches_list}->SetFocus
 				if ( $code == Wx::WXK_DOWN )
+				or ( $code == Wx::WXK_UP )
 				or ( $code == Wx::WXK_NUMPAD_PAGEDOWN )
 				or ( $code == Wx::WXK_PAGEDOWN );
 
@@ -471,12 +472,11 @@ sub _show_recently_opened_resources {
 
 	# Fetch them from Padre's RecentlyUsed database table
 	require Padre::DB::RecentlyUsed;
-	my $recently_used = Padre::DB::RecentlyUsed->select( 'where type = ?', 'RESOURCE' ) || [];
+	my $recently_used = Padre::DB::RecentlyUsed->select( 'where type = ? order by last_used desc', 'RESOURCE' ) || [];
 	my @recent_files = ();
 	foreach my $e (@$recently_used) {
 		push @recent_files, $self->_path( $e->value );
 	}
-	@recent_files = sort { File::Basename::fileparse($a) cmp File::Basename::fileparse($b) } @recent_files;
 
 	# Show results in matching items list
 	$self->{matched_files} = \@recent_files;
@@ -529,6 +529,9 @@ sub render {
 	$search_expr =~ s/\\\*/.*?/g;
 	$search_expr =~ s/\\\?/./g;
 
+	# Save user selections for later
+	my @matches = $self->{matches_list}->GetSelections;
+
 	#Populate the list box now
 	$self->{matches_list}->Clear;
 	my $pos = 0;
@@ -550,7 +553,9 @@ sub render {
 		}
 	}
 	if ( $pos > 0 ) {
-		$self->{matches_list}->Select(0);
+
+		#Keep the old user selection if it is possible
+		$self->{matches_list}->Select( scalar @matches > 0 ? $matches[0] : 0 );
 		$self->{status_text}->ChangeValue( $self->_path( $self->{matches_list}->GetClientData(0) ) );
 		$self->{status_text}->Enable(1);
 		$self->{copy_button}->Enable(1);

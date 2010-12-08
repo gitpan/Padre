@@ -37,9 +37,10 @@ use strict;
 use warnings;
 use threads;
 use threads::shared;
+use Carp            ();
 use Padre::Constant ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 # Handle the PADRE_DEBUG environment variable
 BEGIN {
@@ -100,6 +101,10 @@ sub TRACE {
 			$caller,
 			string($_),
 		);
+	}
+	if ( $ENV{PADRE_DEBUG_STACK} ) {
+		print Carp::longmess(), "\n";
+		print '-' x 50, "\n";
 	}
 
 	# close $fh;

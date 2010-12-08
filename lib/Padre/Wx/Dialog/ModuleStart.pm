@@ -10,7 +10,7 @@ use File::Spec        ();
 use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 our %license_id = ( # TODO: check for other module builders as well
 	Wx::gettext('Apache License')         => 'apache',       ## TODO: does not work w/ Module::Build
@@ -65,9 +65,7 @@ sub get_layout {
 			[ 'Wx::ComboBox', '_builder_choice_', '', \@builders, Wx::wxCB_READONLY ],
 		],
 		[   [ 'Wx::StaticText', undef,              Wx::gettext('License:') ],
-			[ 'Wx::ComboBox',   '_license_choice_', '', [ keys %license_id ], Wx::wxCB_SORT ],
-
-			# TODO: SORT does not seem to work on Linux
+			[ 'Wx::ComboBox',   '_license_choice_', '', [ sort keys %license_id ], Wx::wxCB_READONLY ],
 		],
 		[   [ 'Wx::StaticText', undef, Wx::gettext('Parent Directory:') ],
 			[ 'Wx::DirPickerCtrl', '_directory_', '', Wx::gettext('Pick parent directory') ],

@@ -24,7 +24,7 @@ use warnings;
 use Params::Util   ();
 use Padre::Current ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 =pod
 
@@ -111,14 +111,9 @@ sub current {
 Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself.
+it and/or modify it under the same terms as Perl 5 itself.
 
 The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
-
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
-# LICENSE
-# This program is free software; you can redistribute it and/or
-# modify it under the same terms as Perl 5 itself.

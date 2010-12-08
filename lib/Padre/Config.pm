@@ -23,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -581,12 +581,6 @@ setting(
 	default => 0,
 );
 setting(
-	name    => 'main_errorlist',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-);
-setting(
 	name    => 'main_statusbar',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -829,12 +823,6 @@ setting(
 );
 setting(
 	name    => 'find_nomatch',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-);
-setting(
-	name    => 'find_quick',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
@@ -1121,6 +1109,12 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+);
+setting(
+	name    => 'feature_restart_hung_task_manager',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
 );
 
 # Window menu list shorten common path

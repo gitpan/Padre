@@ -24,13 +24,14 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
 use Padre::Constant ();
 use Padre::Config   ();
 use Padre::DB       ();
+use Padre::Logger;
 
 # Generate faster accessors
 use Class::XSAccessor 1.05 {
@@ -44,10 +45,12 @@ use Class::XSAccessor 1.05 {
 	},
 	accessors => {
 		actions     => 'actions',
+		wizards     => 'wizards',
 		shortcuts   => 'shortcuts',
 		instance_id => 'instance_id',
 	},
 };
+
 
 sub import {
 	unless ( $_[1] and $_[1] eq ':everything' ) {
@@ -138,6 +141,9 @@ sub new {
 	$self->actions(   {} );
 	$self->shortcuts( {} );
 
+	# Wizard registry
+	$self->wizards( {} );
+
 	# Load a few more bits and pieces now we know
 	# that we'll need them
 	require Padre::Project;
@@ -169,6 +175,8 @@ sub run {
 	# Allow scripts to detect that they are being executed within Padre
 	local $ENV{PADRE_VERSION} = $VERSION;
 
+	TRACE("Padre->run was called version $VERSION") if DEBUG;
+
 	# Clean arguments (with a bad patch for saving URLs)
 	if (Padre::Constant::WIN32) {
 
@@ -196,6 +204,8 @@ sub run {
 		$self->plugin_manager->load_plugins;
 	}
 
+	TRACE("Plugins loaded") if DEBUG;
+
 	# Move our current dir to the user's documents directory by default
 	if (Padre::Constant::WIN32) {
 
@@ -211,12 +221,12 @@ sub run {
 	#       that are throw silent exceptions.
 	# local $SIG{__DIE__} = sub { print @_; die $_[0] };
 
-	# Kill the splash screen
+	TRACE("Kill the splash screen") if DEBUG;
 	if ($Padre::Startup::VERSION) {
 		Padre::Startup->destroy_splash;
 	}
 
-	# Process the action queue
+	TRACE("Process the action queue") if DEBUG;
 	if ( defined $self->opts->{actionqueue} ) {
 		foreach my $action ( split( /\,/, $self->opts->{actionqueue} ) ) {
 			next if $action eq ''; # Skip empty action names
@@ -230,7 +240,7 @@ sub run {
 		}
 	}
 
-	# Switch into runtime mode
+	TRACE("Switch into runtime mode") if DEBUG;
 	$self->wx->MainLoop;
 
 	# All shutdown procedures complete.
@@ -1157,7 +1167,7 @@ Sebastian Willing (SEWI)
 
 Steffen Müller (TSEE) E<lt>smueller@cpan.orgE<gt>
 
-Zeno Gantner
+Zeno Gantner (ZENOG)
 
 =head2 Translators
 
@@ -1195,7 +1205,7 @@ Heiko Jansen (HJANSEN)
 
 Sebastian Willing (SEWI)
 
-Zeno Gantner
+Zeno Gantner (ZENOG)
 
 =head3 Hebrew
 

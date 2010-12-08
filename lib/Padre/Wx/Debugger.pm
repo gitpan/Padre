@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 use Padre::Wx ();
 use Padre::Logger;
@@ -57,7 +57,7 @@ sub debug_perl {
 	}
 
 	unless ( $document->isa('Padre::Document::Perl') ) {
-		$main->error( Wx::gettext("Not a Perl document") );
+		$main->error( Wx::gettext('Not a Perl document') );
 		return;
 	}
 
@@ -84,13 +84,10 @@ sub debug_perl {
 	my $host = 'localhost';
 	my $port = 12345 + int rand(1000); # TODO make this configurable?
 
-
 	{
 		local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
 
-		# Run with console Perl to prevent unexpected results under wperl
-		my $perl = Padre::Perl::cperl();
-		$main->run_command(qq["$perl" -d "$filename"]);
+		$main->run_command( $document->get_command( { debug => 1 } ) );
 	}
 
 	require Debug::Client;

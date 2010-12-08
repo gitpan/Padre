@@ -3,11 +3,34 @@ package Padre::Document::Perl::Syntax;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Constant     ();
-use Padre::Task::Syntax ();
+use Padre::Constant          ();
+use Padre::Task::Syntax      ();
+use Parse::ErrorString::Perl ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = 'Padre::Task::Syntax';
+
+sub new {
+	my $class = shift;
+
+	my %args = @_;
+
+	if ( defined $ENV{PADRE_IS_TEST} ) {
+
+		# Note: $ENV{PADRE_IS_TEST} is defined in t/44-perl-syntax.t
+		# Run with console Perl to prevent failures while testing
+		require Padre::Perl;
+		$args{perl} = Padre::Perl::cperl();
+	} else {
+
+		#Otherwise run with user-preferred interpreter
+		$args{perl} = $args{document}->get_interpreter;
+	}
+
+	my $self = $class->SUPER::new(%args);
+
+	return $self;
+}
 
 sub syntax {
 	my $self = shift;
@@ -27,16 +50,16 @@ sub syntax {
 		require File::Temp;
 		my $file = File::Temp->new( UNLINK => 1 );
 		$filename = $file->filename;
-		binmode( $file, ":utf8" );
+		binmode( $file, ':utf8' );
 
-		# If this is a module, we will need to hook %INC to avoid the module
+		# If this is a module, we will need to overwrite %INC to avoid the module
 		# loading another module, which loads the system installed equivalent
 		# of the package we are currently compile-testing.
 		if ( $text =~ /^\s*package ([\w:]+)/ ) {
-			my $hook = $1 . ".pm";
-			$hook =~ s/::/\//g;
+			my $module_file = $1 . '.pm';
+			$module_file =~ s/::/\//g;
 			$file->print("BEGIN {\n");
-			$file->print("\t\$INC{'$hook'} = '$file';\n");
+			$file->print("\t\$INC{'$module_file'} = '$file';\n");
 			$file->print("}\n");
 			$file->print("#line 0\n");
 		}
@@ -44,9 +67,7 @@ sub syntax {
 		$file->print($text);
 		$file->close;
 
-		# Run with console Perl to prevent unexpected results under wperl
-		require Padre::Perl;
-		my @cmd = ( Padre::Perl::cperl() );
+		my @cmd = ( $self->{perl} );
 
 		# Append Perl command line options
 		if ( $self->{project} ) {
@@ -58,9 +79,11 @@ sub syntax {
 		$err->close;
 
 		# Redirect perl's output to temporary file
+		# NOTE: Please DO NOT use -Mdiagnostics since it will wrap
+		# error messages on multiple lines and that would
+		# complicate parsing (azawawi)
 		push @cmd,
 			(
-			'-Mdiagnostics',
 			'-c',
 			$file->filename,
 			'2>' . $err->filename,
@@ -94,76 +117,23 @@ sub syntax {
 		File::Remove::remove( $err->filename );
 	}
 
-	# Don't really know where that comes from...
-	my $i = index( $stderr, 'Uncaught exception from user code' );
-	if ( $i > 0 ) {
-		$stderr = substr( $stderr, 0, $i );
-	}
-
-	# Handle the "no errors or warnings" case
+	# Shortcut: Handle the "no errors or warnings" case
 	if ( $stderr =~ /^\s+syntax OK\s+$/s ) {
 		return [];
 	}
 
-	# Split into message paragraphs
-	$stderr =~ s/\n\n/\n/go;
-	$stderr =~ s/\n\s/\x1F /go;
-	my @messages = split( /\n/, $stderr );
+	# Since we're not going to use -Mdiagnostics,
+	# we will simply reuse Padre::ErrorString::Perl for Perl error parsing
+	my @issues = Parse::ErrorString::Perl->new->parse_string($stderr);
 
-	my @issues = ();
-	my @diag   = ();
-	foreach my $message (@messages) {
-		last if index( $message, 'has too many errors' ) > 0;
-		last if index( $message, 'had compilation errors' ) > 0;
-		last if index( $message, 'syntax OK' ) > 0;
-
-		my $error = {};
-		my $tmp   = '';
-
-		if ( $message =~ s/\s\(\#(\d+)\)\s*\Z//o ) {
-			$error->{diag} = $1 - 1;
+	# We need the 'at' or 'near' clauses appended to the issue because
+	# it is more meaningful
+	for my $issue (@issues) {
+		if ( defined( $issue->{at} ) ) {
+			$issue->{message} .= ', at ' . $issue->{at};
+		} elsif ( defined( $issue->{near} ) ) {
+			$issue->{message} .= ', near "' . $issue->{near} . '"';
 		}
-
-		if ( $message =~ m/\)\s*\Z/o ) {
-			my $pos = rindex( $message, '(' );
-			$tmp = substr( $message, $pos, length($message) - $pos, '' );
-		}
-
-		if ( $message =~ s/\s\(\#(\d+)\)(.+)//o ) {
-			$error->{diag} = $1 - 1;
-			my $diagtext = $2;
-			$diagtext =~ s/\x1F//go;
-			push @diag, join( ' ', split( ' ', $diagtext ) );
-		}
-
-		if ( $message =~ s/\sat(?:\s|\x1F)+(.+?)(?:\s|\x1F)line(?:\s|\x1F)(\d+)//o ) {
-			next if $1 ne $filename;
-			$error->{line} = $2;
-			$error->{msg}  = $message;
-		}
-
-		if ($tmp) {
-			$error->{msg} .= "\n" . $tmp;
-		}
-
-		if ( defined $error->{msg} ) {
-			$error->{msg} =~ s/\x1F/\n/go;
-		}
-
-		if ( defined $error->{diag} ) {
-			$error->{desc} = $diag[ $error->{diag} ];
-			delete $error->{diag};
-		}
-		if ( defined( $error->{desc} )
-			&& $error->{desc} =~ /^\s*\([WD]/o )
-		{
-			$error->{severity} = 1;
-		} else {
-			$error->{severity} = 0;
-		}
-		delete $error->{desc};
-
-		push @issues, $error;
 	}
 
 	return \@issues;

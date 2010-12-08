@@ -12,7 +12,7 @@ use Padre::Wx::Role::Main ();
 # RichTextCtrl
 use Wx::RichText ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -252,6 +252,8 @@ sub _create_controls {
 			-1,
 			$m{$name}{name},
 		);
+
+		$self->{$name}->SetToolTip( Wx::ToolTip->new( $m{$name}{tooltip} ) );
 	}
 
 	# Dialog Layout
@@ -372,28 +374,57 @@ sub _bind_events {
 		}
 	);
 
-
 	Wx::Event::EVT_BUTTON(
 		$self,
 		$self->{insert_button},
-		sub {
-			my $self = shift;
-			my $editor = $self->current->editor or return;
-			$editor->InsertText( $editor->GetCurrentPos, $self->{regex}->GetValue );
-		},
+		sub { shift->_insert_regex; },
 	);
 }
+
+#
+# A private method that inserts the current regex into the current document
+#
+sub _insert_regex {
+	my $self = shift;
+
+	my $match_part   = $self->{regex}->GetValue;
+	my $replace_part = $self->{replace}->GetValue;
+
+	my $modifiers = $self->_get_modifier_settings;
+
+	my $editor = $self->current->editor or return;
+	$editor->InsertText( $editor->GetCurrentPos, "s/$match_part/$replace_part/$modifiers" );
+
+	return;
+}
+
 
 #
 # A private method that returns a hash of regex modifiers
 #
 sub _modifiers {
 	return (
-		ignore_case => { mod => 'i', name => sprintf( Wx::gettext('&Ignore case (%s)'), 'i' ) },
-		single_line => { mod => 's', name => sprintf( Wx::gettext('&Single-line (%s)'), 's' ) },
-		multi_line  => { mod => 'm', name => sprintf( Wx::gettext('&Multi-line (%s)'),  'm' ) },
-		extended    => { mod => 'x', name => sprintf( Wx::gettext('&Extended (%s)'),    'x' ) },
-		global      => { mod => 'g', name => sprintf( Wx::gettext('&Global (%s)'),      'g' ) },
+		ignore_case => {
+			mod     => 'i', name => Wx::gettext('Ignore case (&i)'),
+			tooltip => Wx::gettext('Case-insensitive matching')
+		},
+		single_line => {
+			mod     => 's', name => Wx::gettext('Single-line (&s)'),
+			tooltip => Wx::gettext('"." also matches newline')
+		},
+		multi_line => {
+			mod => 'm', name => Wx::gettext('Multi-line (&m)'),
+			tooltip => Wx::gettext('"^" and "$" match the start and end of any line inside the string')
+		},
+		extended => {
+			mod => 'x', name => Wx::gettext('Extended (&x)'),
+			tooltip =>
+				Wx::gettext('Extended regular expressions allow free formatting (whitespace is ignored) and comments')
+		},
+		global => {
+			mod     => 'g', name => Wx::gettext('Global (&g)'),
+			tooltip => Wx::gettext('Replace all occurrences of the pattern')
+		},
 	);
 }
 
@@ -438,11 +469,17 @@ sub show {
 }
 
 #
-# Private method to dump the regular expression
-# description as text
+# Private method to dump the regular expression description as text
 #
 sub _dump_regex {
+	if ( scalar @_ == 2 ) {
+		my ( $self, $regex ) = @_;
+		require PPIx::Regexp;
+		return $self->_dump_regex( PPIx::Regexp->new("/$regex/"), '', 0 );
+	}
+
 	my ( $self, $parent, $str, $level ) = @_;
+
 	$str   = '' unless $str;
 	$level = 0  unless $level;
 	my @children = $parent->isa('PPIx::Regexp::Node') ? $parent->children : ();
@@ -480,26 +517,75 @@ sub _parse_regex_elements {
 	return @array;
 }
 
+#
+# Returns the user input data of the dialog as a hashref
+#
+sub get_data {
+	my $self = shift;
+
+	my %data = (
+		text => {
+			regex         => $self->{regex}->GetValue,
+			replace       => $self->{replace}->GetValue,
+			original_text => $self->{original_text}->GetValue,
+		},
+		modifiers => [ $self->_get_modifier_settings ],
+	);
+
+	return \%data;
+}
+
+#
+# Sets the user input data of the dialog given a hashref containing the results of get_data
+#
+sub set_data {
+	my ( $self, $data_ref ) = @_;
+
+	foreach my $text_field ( keys %{ $data_ref->{text} } ) {
+		$self->{$text_field}->SetValue( $data_ref->{text}->{$text_field} );
+	}
+
+	my $modifier_string = $data_ref->{modifiers}->[0];
+	my %modifiers       = $self->_modifiers();
+	foreach my $name ( keys %modifiers ) {
+		$self->{$name}->SetValue(1) if $modifier_string =~ s/$modifiers{$name}{mod}//;
+	}
+
+	return;
+}
+
+#
+# Private method to get the modifier settings as two strings
+# the first strings returns the active modifiers, the second the
+# inactive ones
+#
+sub _get_modifier_settings {
+	my $self = shift;
+
+	my $active_modifiers   = '';
+	my $inactive_modifiers = '';
+	my %modifiers          = $self->_modifiers();
+	foreach my $name ( keys %modifiers ) {
+		if ( $self->{$name}->IsChecked ) {
+			$active_modifiers .= $modifiers{$name}{mod};
+		} else {
+			$inactive_modifiers .= $modifiers{$name}{mod};
+		}
+	}
+
+	return ( $active_modifiers, $inactive_modifiers );
+}
+
 sub run {
 	my $self = shift;
 
-	my $regex = $self->{regex}->GetRange( 0, $self->{regex}->GetLastPosition );
-	my $original_text = $self->{original_text}->GetRange( 0, $self->{original_text}->GetLastPosition );
-	my $replace = $self->{replace}->GetRange( 0, $self->{replace}->GetLastPosition );
-	my $result_text = $original_text;
+	my $regex         = $self->{regex}->GetValue;
+	my $original_text = $self->{original_text}->GetValue;
+	my $replace       = $self->{replace}->GetValue;
+	my $result_text   = $original_text;
 
-
-	my $start     = '';
-	my $end       = '';
-	my %modifiers = $self->_modifiers();
-	foreach my $name ( keys %modifiers ) {
-		if ( $self->{$name}->IsChecked ) {
-			$start .= $modifiers{$name}{mod};
-		} else {
-			$end .= $modifiers{$name}{mod};
-		}
-	}
-	my $xism = "$start-$end";
+	my ( $active, $inactive ) = $self->_get_modifier_settings;
+	my $xism = "$active-$inactive";
 
 	$self->{matched_text}->Clear;
 	$self->{result_text}->Clear;
@@ -546,8 +632,10 @@ sub run {
 		foreach my $char (@chars) {
 			if ( $pos == $match_start ) {
 				$self->{matched_text}->BeginTextColour(Wx::wxRED);
+				$self->{matched_text}->BeginUnderline;
 			} elsif ( $pos == $match_end ) {
 				$self->{matched_text}->EndTextColour;
+				$self->{matched_text}->EndUnderline;
 			}
 			$self->{matched_text}->AppendText($char);
 			$pos++;
@@ -558,14 +646,11 @@ sub run {
 		$self->{matched_text}->EndTextColour;
 	}
 
-	eval {
-		if ( $self->{global}->IsChecked )
-		{
-			$result_text =~ s{(?$xism:$regex)}{$replace}g;
-		} else {
-			$result_text =~ s{(?$xism:$regex)}{$replace};
-		}
-	};
+	if ( $self->{global}->IsChecked ) {
+		eval "\$result_text =~ s{(?$xism:$regex)}{$replace}g";
+	} else {
+		eval "\$result_text =~ s{(?$xism:$regex)}{$replace}";
+	}
 	if ($@) {
 		$self->{result_text}->BeginTextColour(Wx::wxRED);
 		$self->{result_text}->AppendText( sprintf( Wx::gettext('Replace failure in %s:  %s'), $regex, $@ ) );
@@ -579,9 +664,7 @@ sub run {
 
 	$self->{matched_text}->EndTextColour;
 
-	require PPIx::Regexp;
-	my $regexp = PPIx::Regexp->new("/$regex/");
-	$self->{description_text}->SetValue( $self->_dump_regex($regexp) );
+	$self->{description_text}->SetValue( $self->_dump_regex($regex) ) if $self->{description_text}->IsShown;
 
 	#	$self->{regex}->Clear;
 	#	my @elements = _parse_regex_elements;
@@ -673,8 +756,3 @@ This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl 5 itself.
 
 =cut
-
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
-# LICENSE
-# This program is free software; you can redistribute it and/or
-# modify it under the same terms as Perl 5 itself.

@@ -24,7 +24,7 @@ use Padre::Util    ('_T');
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 #####################################################################
 # Document Registration
@@ -681,6 +681,7 @@ sub guess_mimetype {
 		my $basename = File::Basename::basename($filename);
 		if ($basename) {
 			return 'text/x-makefile' if $basename =~ /^Makefile\.?/i;
+			return 'text/plain'      if $basename =~ /^(changes|changelog)/i;
 		}
 	}
 

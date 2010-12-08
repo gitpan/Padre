@@ -27,7 +27,7 @@ use Padre::DB::Migrate {
 
 	# Acceleration options (remove these if they cause trouble)
 	array      => 1,
-	xsaccessor => 1,
+	xsaccessor => 0, # TODO see t/62-migrate.t for explanation
 }; #, '-DEBUG';
 
 # Overlay classes to enhance the ORLite defaults
@@ -39,7 +39,7 @@ use Padre::DB::LastPositionInFile ();
 use Padre::DB::Session            ();
 use Padre::DB::SessionFile        ();
 
-our $VERSION    = '0.74';
+our $VERSION    = '0.76';
 our $COMPATIBLE = '0.26';
 
 

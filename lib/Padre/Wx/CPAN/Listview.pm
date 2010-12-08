@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -61,7 +61,7 @@ sub clear {
 sub set_column_widths {
 	my $self = shift;
 
-	my $width0 = $self->GetCharWidth * length( Wx::gettext("Status") ) + 16;
+	my $width0 = $self->GetCharWidth * length( Wx::gettext('Status') ) + 16;
 	my $width1 = $self->GetSize->GetWidth - $width0;
 
 	#my $width1 = $self->GetCharWidth * ( length("blabla") + 2 );

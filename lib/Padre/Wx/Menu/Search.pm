@@ -10,7 +10,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -47,12 +47,6 @@ sub new {
 	);
 
 	$self->AppendSeparator;
-
-	# Quick Find: starts search with selected text
-	$self->{quick_find} = $self->add_menu_action(
-		$self,
-		'search.quick_find',
-	);
 
 	# We should be able to remove F4 and Shift+F4 and hook this functionality
 	# to F3 and Shift+F3 Incremental find (#60)
@@ -114,7 +108,6 @@ sub refresh {
 	$self->{find_next}->Enable($doc);
 	$self->{find_previous}->Enable($doc);
 	$self->{replace}->Enable($doc);
-	$self->{quick_find}->Enable($doc);
 	$self->{quick_find_next}->Enable($doc);
 	$self->{quick_find_previous}->Enable($doc);
 	return;

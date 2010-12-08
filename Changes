@@ -1,6 +1,84 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
 
+0.76 2010.12.08
+    - Fix #636: Filter too strict (Padre CPAN module installer) (ZENOG)
+    - Fix #1032: Regex Editor: Escape sequences don't work in
+      "Result from replace" (ZENOG)
+    - Next/previous file now use Ctrl-Page Down/Up instead of Alt-Right/Left
+      (AZAWAWI)
+    - Find in Files results panel now uses a tree instead of a text area and
+      clicking n a result opens the file at the specified line number
+      as expected (AZAWAWI)
+    - Updated the experimental Padre wizard API and integrated it with the
+      wizard selector dialog. This is still disabled by default and can be
+      enabled by the 'feature_wizard_selector' configuration setting (AZAWAWI)
+    - Fix the bug of lost user selection when searching a big project directory
+      and typing fast in "Open Resource" dialog (AZAWAWI)
+    - Fixed "Open Resource" and "Quick Menu Access" dialogs to display recently-
+      used resources by last usage being first instead by filename (AZAWAWI)
+    - consider script and interpreter parameters when debugging Perl scripts
+      (ZENOG)
+    - Fix #814: Find-in-files result window, clicking on filename does not do
+      anything (ZENOG)
+    - Document::get_command now has two named arguments: 'trace' for diagnostic
+      output, and 'debug' for enabling a debugger. Plug-ins that use
+      get_command(1) need to change this call to get_command({ trace => 1})
+      (ZENOG)
+    - remove configuration option 'find_quick' (not used any more) (ZENOG)
+    - Fixed #881 "Find In Files" results window should be prettier 
+      (AZAWAWI, ZENOG)
+    - As the user types the search term in the "Find in Files" dialog, make
+      sure the find button enabled status is correct (AZAWAWI)
+    - Fix #1051: Syntax checker does not return the correct error message 
+      (AZAWAWI)
+    - By removing -Mdiagnostics (which enabled 'use warnings') from syntax
+      checker, we now get a more correct syntax checking behavior (AZAWAWI)
+    - Removed custom parsing of Perl's standard error in syntax checker and
+      reused Parse::ErrorString::Perl to get better error parsing and diagnostic
+      information via perldiag (AZAWAWI)
+    - "Error List" window has been removed since it is redundant to
+      "Syntax Check" window (AZAWAWI)
+    - In "Open Resource" and "Quick Menu Access" UP arrow shifts focus to
+      the results list when the focus is on the filter field (AZAWAWI)
+    - Moved from the simple 0 and 1 age of error 'severity' to the actual way
+      Perl classifies errors as in perldiag. The syntax task now passes upon
+      completion a reference an array of Parse::ErrorString::Perl::ErrorItem
+      objects (AZAWAWI)
+    - "Syntax Check" window is now a tree instead of a list. First-level nodes
+      represent the error/warning messages and the second-level nodes are the
+      perldiag diagnostics for them (if available) (AZAWAWI)
+    - "Select Next Problem" is now working again after it was broken since Padre
+      0.57. Removed Copy Selected/All features until requested again (AZAWAWI)
+    - Removed "Errors" window and moved its only useful feature: Perl
+      diagnostics help to "Syntax Check" window (AZAWAWI)
+    - Removed tooltip from margin error markers as it was broken since Padre
+      0.65+ (AZAWAWI)
+    - Fix #957: Syntax Check should use perl given in Preferences (ZENOG)
+    - Fix #1059: Padre 0.74 build failure on 5.8.9 (AZAWAWI)
+    - Regex editor: insert complete substitution operator, including modifiers;
+      underline match results so that matching whitespaces are also highlighted;
+      add tooltips to modifiers; only update regex description if visible (avoid
+      require if not necessary) (ZENOG)
+    - Fix #922: Regex editor keeps first language after language change (ZENOG)
+    - Update German translation (ZENOG)
+    - Update Italian translation (SBLANDIN)
+    - Update Dutch and Spanish translation (CLAUDIO)
+    - Update Russan translation (Vladimir)
+    - Fix #1064: Build failures on Padre 0.74 Perl 5.8.9 (AZAWAWI, ADAMK, MDOOTSON)
+    - Added feature_restart_hung_task_manager configuration setting to enable
+      automatic restart of the currently hung task manager. This is enabled by
+      default (AZAWAWI)
+    - Fix #1068: Padre Task manager fails to run tasks after stress testing it
+      (AZAWAWI)
+    - No more redirecting words under the cursor that are Perl symbols to
+      perldata help topic (AZAWAWI)
+    - Changes or Changelog files are now detected as text instead of CSS files
+      (AZAWAWI)
+    - In F2 help search, core module since-Perl-version string is now a v-string
+      (e.g. v5.8.9 instead of v5.008009) (AZAWAWI)
+    - Correctly start up maximized if we were closed maximized (ADAMK)
+
 0.74 2010.11.14
     - Fix #926 completely: Esc key does not always work in regex editor (ZENOG)
     - automagic MIME type detection: check first for XHTML, then XML, then

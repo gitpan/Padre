@@ -6,8 +6,9 @@ package Padre::Config::Upgrade;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 =pod
 
@@ -35,6 +36,7 @@ This method does all the checks when being called on a L<Padre::Config> object.
 sub check {
 	my $self = shift;
 
+	TRACE("Checking the need to upgrade the configuration") if DEBUG;
 	foreach my $storage ( 'human', 'host' ) {
 		unless ( defined $self->$storage->{Version} ) {
 

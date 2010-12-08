@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = 'Padre::Task';
 
 
@@ -87,6 +87,8 @@ sub run {
 		foreach my $file (@list) {
 			my $skip = 0;
 			next if $file =~ /^\.+\z/;
+			next if $file =~ /^\.svn$/;
+			next if $file =~ /^\.git$/;
 			my $fullname = File::Spec->catdir( $dir, $file );
 			my @fstat = stat($fullname);
 			unless ( -e _ ) {
@@ -108,7 +110,7 @@ sub run {
 			}
 
 			# This is a file
-			my $object = Padre::Wx::Directory::Path->file( @path, $file );
+			my $object = Padre::Wx::Directory::Path->file($fullname);
 			next if $rule->skipped( $object->unix );
 
 			# Skip if the file is too big

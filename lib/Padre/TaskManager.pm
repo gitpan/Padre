@@ -11,7 +11,7 @@ use Padre::Wx                ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION        = '0.74';
+our $VERSION        = '0.76';
 our $BACKCOMPATIBLE = '0.66';
 
 # Set up the primary integration event
@@ -30,7 +30,7 @@ sub new {
 		active  => 0, # Are we running at the moment
 		threads => 1, # Are threads enabled
 		minimum => 0, # Workers to launch at startup
-		maximum => 3, # The most workers we should use
+		maximum => 5, # The most workers we should use
 		%param,
 		workers => [], # List of all workers
 		handles => {}, # Handles for all active tasks
@@ -93,6 +93,11 @@ sub stop {
 		}
 		Padre::TaskThread->master->stop;
 	}
+
+	# Empty task handles
+	# TODO: is this the right way of doing it?
+	$self->{handles} = {};
+
 	return 1;
 }
 
@@ -198,7 +203,18 @@ sub step {
 	# Shortcut if there is nowhere to run the task
 	if ( $self->{threads} ) {
 		if ( scalar keys %$handles >= $self->{maximum} ) {
-			return 1;
+			if ( Padre::Current->main->config->feature_restart_hung_task_manager ) {
+
+				# Restart hung task manager!
+				TRACE('PANIC: Restarting task manager') if DEBUG;
+				$self->stop;
+				$self->start;
+			} else {
+
+				# Ignore the problem and hope the user does not notice :)
+				TRACE('No more task handles available. Sorry') if DEBUG;
+				return 1;
+			}
 		}
 	}
 
@@ -305,7 +321,7 @@ sub on_signal {
 	# Handle the special shutdown message
 	if ( $method eq 'STOPPED' ) {
 
-		# Remove from the running list to guarentee no more events
+		# Remove from the running list to guarantee no more events
 		# will be sent to the handle (and thus to the task)
 		delete $self->{running}->{$hid};
 

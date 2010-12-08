@@ -23,7 +23,7 @@ use Padre::DB                    ();
 use Padre::Wx                    ();
 use Padre::Wx::Role::Main        ();
 use Padre::Wx::History::ComboBox ();
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -507,7 +507,7 @@ again.
 #       unintentionally transfered responsibility for the implementation of
 #       "Replace All" from the main class to a dialog class.
 #       This was a mistake, the dialog should not be where this is implemented.
-#       Revert this change and restore the independant "Replace All" code, so
+#       Revert this change and restore the independent "Replace All" code, so
 #       that the dialog goes back to acting only as controller.
 sub replace_button {
 	my $self   = shift;

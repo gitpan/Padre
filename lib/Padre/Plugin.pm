@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.74';
+our $VERSION    = '0.76';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -182,6 +182,20 @@ sub plugin_icon {
 	return unless -f $file;
 	return unless -r $file;
 	return Wx::Bitmap->new( $file, Wx::wxBITMAP_TYPE_PNG );
+}
+
+=pod
+
+=head2 C<plugin_wizards>
+
+The C<plugin_wizards> method will be called by Padre when it retrieves the wizard list.
+
+The default implementation returns an empty list
+
+=cut
+
+sub plugin_wizards {
+	return ();
 }
 
 =pod
@@ -880,7 +894,7 @@ L<Padre>
 Copyright 2008-2010 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself.
+it and/or modify it under the same terms as Perl 5 itself.
 
 The full text of the license can be found in the
 LICENSE file included with this module.

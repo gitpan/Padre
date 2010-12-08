@@ -7,7 +7,7 @@ use Padre::Config   ();
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.74';
+our $VERSION = '0.76';
 
 # Generate faster accessors
 use Class::XSAccessor {
@@ -247,10 +247,6 @@ Padre::Wx::Action - Padre Action Object
 =head1 DESCRIPTION
 
 This is the base class for the Padre Action API.
-
-To be documented...
-
--- Ahmad M. Zawawi
 
 =head1 KEYS
 
