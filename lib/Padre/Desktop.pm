@@ -25,7 +25,7 @@ use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 
 =pod
 
@@ -146,7 +146,7 @@ __END__
 
 =head1 COPYRIGHT
 
-Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -156,7 +156,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

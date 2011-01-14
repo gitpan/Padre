@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -1072,7 +1072,7 @@ See also L<http://padre.perlide.org/>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 L<http://padre.perlide.org/>
 
 =head1 LICENSE
@@ -1274,7 +1274,7 @@ Tatsuhiko Miyagawa for consulting on our I18N and L10N support.
 
 =cut
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

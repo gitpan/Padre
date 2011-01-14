@@ -13,7 +13,8 @@ eval {
 if ($@) {
 	plan skip_all => 'Win32::GuiTest is required for this test';
 }
-plan( skip_all => 'test is currently broken' );
+
+#plan( skip_all => 'test is currently broken' );
 
 use t::lib::Padre;
 require t::lib::Padre::Win32;
@@ -30,7 +31,10 @@ my $dir = $RealBin;
 # Stupid Save box don't accpect '/' in the input
 $dir =~ s/\//\\/g;
 
-SendKeys("$dir\\..\\files\\missing_brace_1.pl");
+diag $dir;
+my $file = "$dir\\..\\files\\missing_brace_1.pl";
+diag "File to open: $file";
+SendKeys($file);
 SendKeys("%{O}");
 sleep 1;
 

@@ -11,7 +11,7 @@ use Padre::Task                ();
 use Padre::Wx::Directory::Path ();
 use Padre::Logger;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 our @ISA     = 'Padre::Task';
 
 use constant NO_WARN => 1;
@@ -92,6 +92,7 @@ sub run {
 		# Abort the task if we've been cancelled
 		if ( $self->cancel ) {
 			TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+			$self->handle->status;
 			return 1;
 		}
 
@@ -118,12 +119,19 @@ sub run {
 		closedir DIRECTORY;
 
 		# Notify our parent we are working on this directory
-		$self->handle->message( STATUS => "Searching... " . $object->unix );
+		$self->handle->status( "Searching... " . $object->unix );
 
 		# Step 1 - Map the files into path objects
 		my @objects = ();
 		foreach my $file (@list) {
 			next if $file =~ /^\.+\z/;
+
+			# Abort the task if we've been cancelled
+			if ( $self->cancel ) {
+				TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+				$self->handle->status;
+				return 1;
+			}
 
 			# Traverse symlinks
 			my $skip = 0;
@@ -210,14 +218,14 @@ sub run {
 	}
 
 	# Notify our parent we are finished searching
-	$self->handle->message( STATUS => '' );
+	$self->handle->status;
 
 	return 1;
 }
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

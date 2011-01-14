@@ -8,7 +8,7 @@ use warnings;
 use File::Spec     ();
 use Padre::Project ();
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 our @ISA     = 'Padre::Project';
 
 
@@ -90,6 +90,9 @@ sub ignore_rule {
 		# In a distribution, we can ignore more things
 		return 0 if $_->{name} =~ /^(?:blib|_build|inc|Makefile|pm_to_blib)\z/;
 
+		# It is fairly common to get bogged down in NYTProf output
+		return 0 if $_->{name} =~ /^nytprof(?:\.out)\z/;
+
 		# Everything left, so we show it
 		return 1;
 	};
@@ -99,12 +102,13 @@ sub ignore_skip {
 	return [
 		'(?:^|\\/)\\.',
 		'(?:^|\\/)(?:blib|_build|inc|Makefile|pm_to_blib)\z',
+		'(?:^|\\/)nytprof(?:\.out)\z',
 	];
 }
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

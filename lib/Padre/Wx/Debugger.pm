@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 
 use Padre::Wx ();
 use Padre::Logger;
@@ -114,18 +114,11 @@ sub debug_perl {
 		}
 	}
 
-	$self->_set_debugger();
-
-	#my @out = $debugger->get;
-	#use Data::Dumper;
-	#print Data::Dumper::Dumper \@out;
-
-	#my $out = $debugger->get;
-	#print $out;
-
-	#$main->show_output(1);
-	#$main->output->clear;
-	#$main->output->AppendText("File: $file row: $row");
+	unless ( $self->_set_debugger ) {
+		$main->error( Wx::gettext('Debugging failed. Did you check your program for syntax errors?') );
+		$self->debug_perl_quit;
+		return;
+	}
 
 	return 1;
 }
@@ -135,10 +128,9 @@ sub _set_debugger {
 
 	my $main = Padre->ide->wx->main;
 
-	my $file   = $self->{_debugger_}{filename};
-	my $row    = $self->{_debugger_}{row};
-	my $editor = $main->current->editor;
-	return unless $editor;
+	my $file   = $self->{_debugger_}{filename} or return;
+	my $row    = $self->{_debugger_}{row}      or return;
+	my $editor = $main->current->editor        or return;
 	if ( $editor->{Document}->filename ne $file ) {
 		$main->setup_editor($file);
 		$editor = $main->current->editor;
@@ -174,7 +166,7 @@ sub _set_debugger {
 		}
 	}
 
-	return;
+	return 1;
 }
 
 sub debugger_is_running {
@@ -504,7 +496,7 @@ sub quit {
 # Keep the debugger window open even after ending the script
 #
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

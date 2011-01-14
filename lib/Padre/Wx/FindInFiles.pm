@@ -16,13 +16,16 @@ use Padre::Wx             ();
 use Padre::Wx::TreeCtrl   ();
 use Padre::Logger;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
 	Padre::Wx::TreeCtrl
 };
+
+
+
 
 
 ######################################################################
@@ -39,7 +42,7 @@ sub new {
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTR_SINGLE | Wx::wxTR_FULL_ROW_HIGHLIGHT | Wx::wxTR_HAS_BUTTONS
+		Wx::wxTR_SINGLE | Wx::wxTR_FULL_ROW_HIGHLIGHT | Wx::wxTR_HAS_BUTTONS | Wx::wxCLIP_CHILDREN | Wx::wxVSCROLL
 	);
 
 	# Create the image list
@@ -135,53 +138,57 @@ sub search_message {
 	my $self = shift;
 	my $task = shift;
 	my $path = shift;
+	my $root = $self->GetRootItem;
+
+	# Lock the tree to reduce flicker and prevent auto-scrolling
+	my $lock = $self->scroll_lock;
+
+	# Add the file node to the tree
 	require Padre::Wx::Directory::Path; # added to avoid crash in next line
-	my $unix = $path->unix;
-	my $term = $task->{search}->find_term;
-
-
-	# Generate the text all at once in advance and add to the control
-	my @results = @_;
-	my $root    = $self->GetRootItem;
-	my ( $dir_item, $file_item );
-	for my $result (@results) {
-		my $dir  = File::Basename::dirname($unix);
-		my $file = File::Basename::basename($unix);
-
-		# Add a directory tree item if it doesnt exist and insert the files inside it
-		$dir_item = $self->AppendItem( $root, $dir, $self->{images}->{folder} ) unless $dir_item;
-		unless ($file_item) {
-			$file_item = $self->AppendItem( $dir_item, $file, $self->{images}->{file} );
-			$self->SetPlData(
-				$file_item,
-				{   dir  => $dir,
-					file => $file,
-				}
-			);
+	my $name  = $path->name;
+	my $dir   = File::Spec->catfile( $task->root, $path->dirs );
+	my $full  = File::Spec->catfile( $task->root, $path->path );
+	my $lines = scalar @_;
+	my $label =
+		$lines > 1
+		? sprintf(
+		Wx::gettext('%s (%s results)'),
+		$full,
+		$lines,
+		)
+		: $full;
+	my $file = $self->AppendItem( $root, $label, $self->{images}->{file} );
+	$self->SetPlData(
+		$file,
+		{   dir  => $dir,
+			file => $name,
 		}
-		my $item = $self->AppendItem( $file_item, $result->[0] . ": " . $result->[1], $self->{images}->{result} );
-		$self->SetPlData(
-			$item,
-			{   dir  => $dir,
-				file => $file,
-				line => $result->[0],
-				msg  => $result->[1],
-			}
-		);
-	}
-	my $num_results = scalar(@results);
+	);
 
-	# Add number of results inside each file if it is more than one
-	if ( $file_item && $num_results > 1 ) {
-		$self->SetItemText(
-			$file_item,
-			sprintf( Wx::gettext('%s (%s results)'), $self->GetItemText($file_item), $num_results )
+	# Add the lines nodes to the tree
+	foreach my $row (@_) {
+		my $line = $self->AppendItem(
+			$file,
+			$row->[0] . ': ' . $row->[1],
+			$self->{images}->{result},
+		);
+		$self->SetPlData(
+			$line,
+			{   dir  => $dir,
+				file => $name,
+				line => $row->[0],
+				msg  => $row->[1],
+			}
 		);
 	}
 
 	# Update statistics
+	$self->{matches} += $lines;
 	$self->{files}   += 1;
-	$self->{matches} += $num_results;
+
+	# Ensure both the root and the new file are expanded
+	$self->Expand($root);
+	$self->Expand($file);
 
 	return 1;
 }
@@ -207,11 +214,15 @@ sub search_finish {
 			)
 		);
 	} else {
-		$self->SetItemText( $root, sprintf( Wx::gettext(q{No results found for '%s' inside '%s'}), $term, $dir ) );
+		$self->SetItemText(
+			$root,
+			sprintf(
+				Wx::gettext(q{No results found for '%s' inside '%s'}),
+				$term,
+				$dir,
+			)
+		);
 	}
-
-	$self->ExpandAllChildren($root);
-	$self->EnsureVisible($root);
 
 	return 1;
 }
@@ -286,7 +297,8 @@ sub view_label {
 }
 
 sub view_close {
-	shift->main->show_findinfiles(0);
+	$_[0]->task_reset;
+	$_[0]->main->show_findinfiles(0);
 }
 
 
@@ -323,7 +335,7 @@ sub clear {
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

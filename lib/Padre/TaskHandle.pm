@@ -11,7 +11,7 @@ use Storable                 ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION  = '0.76';
+our $VERSION  = '0.78';
 our $SEQUENCE = 0;
 
 
@@ -187,7 +187,13 @@ sub prepare {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = $self->{task};
-	my $rv   = eval { $task->prepare; };
+
+	unless ( defined $task ) {
+		TRACE("Exception: task not defined") if DEBUG;
+		return !1;
+	}
+
+	my $rv = eval { $task->prepare; };
 	if ($@) {
 		TRACE("Exception in task during 'prepare': $@") if DEBUG;
 		return !1;
@@ -279,6 +285,13 @@ sub started {
 sub stopped {
 	TRACE( $_[0] ) if DEBUG;
 	$_[0]->message( 'STOPPED', $_[0]->{task} );
+}
+
+# Set the parent status bar to some string (or blank if null)
+sub status {
+	my $self = shift;
+	my $string = @_ ? shift : '';
+	$self->message( STATUS => $string );
 }
 
 # Has this task been cancelled by the parent?
@@ -377,7 +390,7 @@ sub dequeue_nb {
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

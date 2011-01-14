@@ -37,7 +37,7 @@ use Padre::Wx::Dialog     ();
 use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 our @ISA     = qw{
 	Padre::Role::Task
 	Wx::Dialog
@@ -488,7 +488,7 @@ L<Padre::Browser> L<Padre::Task::Browser>
 
 =cut
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

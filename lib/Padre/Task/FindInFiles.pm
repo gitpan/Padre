@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 our @ISA     = 'Padre::Task';
 
 
@@ -50,6 +50,10 @@ sub new {
 	return $self;
 }
 
+sub root {
+	$_[0]->{root};
+}
+
 
 
 
@@ -70,6 +74,15 @@ sub run {
 
 	# Recursively scan for files
 	while (@queue) {
+
+		# Abort the task if we've been cancelled
+		if ( $self->cancel ) {
+			TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+			$self->handle->status;
+			return 1;
+
+		}
+
 		my $parent = shift @queue;
 		my @path   = $parent->path;
 		my $dir    = File::Spec->catdir( $root, @path );
@@ -82,13 +95,22 @@ sub run {
 		closedir DIRECTORY;
 
 		# Notify our parent we are working on this directory
-		$self->handle->message( STATUS => "Searching... " . $parent->unix );
+		$self->handle->status( "Searching... " . $parent->unix );
 
 		foreach my $file (@list) {
 			my $skip = 0;
 			next if $file =~ /^\.+\z/;
 			next if $file =~ /^\.svn$/;
 			next if $file =~ /^\.git$/;
+
+			# Abort the task if we've been cancelled
+			if ( $self->cancel ) {
+				TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+				$self->handle->status;
+				return 1;
+			}
+
+			# Confirm the file still exists and get stat details
 			my $fullname = File::Spec->catdir( $dir, $file );
 			my @fstat = stat($fullname);
 			unless ( -e _ ) {
@@ -110,7 +132,7 @@ sub run {
 			}
 
 			# This is a file
-			my $object = Padre::Wx::Directory::Path->file($fullname);
+			my $object = Padre::Wx::Directory::Path->file( @path, $file );
 			next if $rule->skipped( $object->unix );
 
 			# Skip if the file is too big
@@ -138,14 +160,14 @@ sub run {
 	}
 
 	# Notify our parent we are finished searching
-	$self->handle->message( STATUS => '' );
+	$self->handle->status;
 
 	return 1;
 }
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

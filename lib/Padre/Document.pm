@@ -137,7 +137,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 
 
 
@@ -252,10 +252,11 @@ sub new {
 				my $ret = Wx::MessageBox(
 					sprintf(
 						Wx::gettext(
-							"The file %s you are trying to open is over the arbitrary file size limit of Padre which is currently %s. Opening this file may reduce performance. Do you still want to open the file?"
+							"The file %s you are trying to open is %s bytes large. It is over the arbitrary file size limit of Padre which is currently %s. Opening this file may reduce performance. Do you still want to open the file?"
 						),
 						$self->{file}->{filename},
-						$config->editor_file_size_limit
+						_commafy( -s $self->{file}->{filename} ),
+						_commafy( $config->editor_file_size_limit )
 					),
 					Wx::gettext("Warning"),
 					Wx::wxYES_NO | Wx::wxCENTRE,
@@ -915,7 +916,7 @@ sub text_like {
 
 sub text_with_one_nl {
 	my $self   = shift;
-	my $text   = $self->text_get;
+	my $text   = $self->text_get or return;
 	my $nlchar = "\n";
 	if ( $self->newline_type eq 'WIN' ) {
 		$nlchar = "\r\n";
@@ -1579,9 +1580,15 @@ sub get_help_provider {
 	return;
 }
 
+sub _commafy {
+	my $number = reverse shift;
+	$number =~ s/(\d{3})(?=\d)/$1,/g;
+	return scalar reverse $number;
+}
+
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

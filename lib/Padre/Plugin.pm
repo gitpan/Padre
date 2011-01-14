@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.76';
+our $VERSION    = '0.78';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -891,7 +891,7 @@ L<Padre>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl 5 itself.

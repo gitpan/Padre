@@ -2,6 +2,7 @@
 Artistic
 Changes
 COPYING
+dev
 eg/hello.pasm
 eg/perl5/cmd.pl
 eg/perl5/cyrillic_test.pl
@@ -274,6 +275,7 @@ lib/Padre/Wx/Syntax.pm
 lib/Padre/Wx/TodoList.pm
 lib/Padre/Wx/ToolBar.pm
 lib/Padre/Wx/TreeCtrl.pm
+lib/Padre/Wx/TreeCtrl/ScrollLock.pm
 lib/Padre/Wx/Wizard.pm
 lib/Padre/Wx/WizardLibrary.pm
 Makefile.PL
@@ -304,6 +306,7 @@ share/examples/wx/05_button_with_event_and_message_box.pl
 share/examples/wx/21_progress_bar.pl
 share/examples/wx/22_notebook.pl
 share/examples/wx/23_menu.pl
+share/examples/wx/24_simple_editor_window.pl
 share/examples/wx/30_editor.pl
 share/examples/wx/31_repl.pl
 share/examples/wx/40_draw.pl

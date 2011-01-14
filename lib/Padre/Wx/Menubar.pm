@@ -14,12 +14,12 @@ use Padre::Wx::Menu::View     ();
 use Padre::Wx::Menu::Perl     ();
 use Padre::Wx::Menu::Refactor ();
 use Padre::Wx::Menu::Run      ();
-use Padre::Wx::Menu::Debug    ();
 use Padre::Wx::Menu::Tools    ();
 use Padre::Wx::Menu::Window   ();
 use Padre::Wx::Menu::Help     ();
 
-our $VERSION = '0.76';
+
+our $VERSION = '0.78';
 
 
 
@@ -52,6 +52,7 @@ use Class::XSAccessor {
 sub new {
 	my $class = shift;
 	my $main  = shift;
+	my $debug = $main->config->feature_debugger;
 
 	# Create the basic object
 	my $self = bless {
@@ -67,10 +68,13 @@ sub new {
 	$self->{refactor} = Padre::Wx::Menu::Refactor->new($main);
 	$self->{perl}     = Padre::Wx::Menu::Perl->new($main);
 	$self->{run}      = Padre::Wx::Menu::Run->new($main);
-	$self->{debug}    = Padre::Wx::Menu::Debug->new($main);
-	$self->{plugins}  = Padre::Wx::Menu::Tools->new($main);
-	$self->{window}   = Padre::Wx::Menu::Window->new($main);
-	$self->{help}     = Padre::Wx::Menu::Help->new($main);
+	if ($debug) {
+		require Padre::Wx::Menu::Debug;
+		$self->{debug} = Padre::Wx::Menu::Debug->new($main);
+	}
+	$self->{plugins} = Padre::Wx::Menu::Tools->new($main);
+	$self->{window}  = Padre::Wx::Menu::Window->new($main);
+	$self->{help}    = Padre::Wx::Menu::Help->new($main);
 
 	# Add the mimetype agnostic menus to the menu bar
 	$self->append( $self->{file} );
@@ -112,6 +116,7 @@ sub refresh {
 	my $plugins = shift;
 	my $current = Padre::Current::_CURRENT(@_);
 	my $menu    = $self->wx->GetMenuCount ne $self->{default};
+	my $debug   = $current->config->feature_debugger;
 	my $perl    = !!(
 		   Params::Util::_INSTANCE( $current->document, 'Padre::Document::Perl' )
 		or Params::Util::_INSTANCE( $current->project, 'Padre::Project::Perl' )
@@ -121,11 +126,11 @@ sub refresh {
 	if ( $perl and not $menu ) {
 		$self->insert( 4, $self->perl );
 		$self->insert( 5, $self->refactor );
-		$self->insert( 7, $self->debug );
+		$self->insert( 7, $self->debug ) if $debug;
 	} elsif ( $menu and not $perl ) {
-		$self->remove(7); # debug
-		$self->remove(5); # refactor
-		$self->remove(4); # perl
+		$self->remove(7) if $debug; # debug
+		$self->remove(5);           # refactor
+		$self->remove(4);           # perl
 	}
 
 	# Refresh individual menus
@@ -140,7 +145,7 @@ sub refresh {
 	if ($perl) {
 		$self->perl->refresh($current);
 		$self->refactor->refresh($current);
-		$self->debug->refresh($current);
+		$self->debug->refresh($current) if $debug;
 	}
 
 	$self->plugins->refresh($current);
@@ -152,7 +157,7 @@ sub refresh {
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

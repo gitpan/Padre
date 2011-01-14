@@ -1,6 +1,52 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
 
+0.78 2011.01.14
+    - The nytprof.out and nytprof HTML report directories are added to the
+      default ignore logic for Perl project (ADAMK)
+    - Fix a rare crash condition when TaskHandle had no task (SEWI)
+    - Fix #833: Syntax error crash padre when trying to debug (AZAWAWI)
+    - Perl error diagnostics is properly shown in a help panel instead
+      of being a child of an issue (AZAWAWI)
+    - On a slow filesystem where the directory browser is slow to fill
+      directory expansion controls, the fill will no longer be aborted if
+      you quickly expand a subdirectory. Both will occur in parallel (ADAMK)
+    - FindInFiles was using path objects incorrectly when communicating
+      between the task and the parent (ADAMK)
+    - FindInFiles was trying to use a directory node, but wasn't merging the
+      file nodes together under it. Removed directory nodes until a better
+      implementation is written (ADAMK)
+    - Created Padre::Wx::TreeCtrl::ScrollLock to abstract the workaround
+      you need to use to update trees without them snapping to nodes
+      that you ->Expand, and applied it to the directory tree and
+      the Find in Files result tree (ADAMK)
+    - When closing panels that do background tasks, do a last-minute task
+      reset operation to cancel any active background tasks (ADAMK)
+    - The Find in Files and directory tree background tasks now supports
+      cancel messages properly, both per-directory and per-file (ADAMK)
+    - The directory tree background search now correctly clears the status
+      bar when it is cancelled (ADAMK)
+    - Additional fixes for maximise-at-startup issues on Windows, which
+      now should FINALLY work properly everywhere (ADAMK)
+    - When shutting down the task manager, force-empty the queue early and
+      send a 'cancel' message to any workers still actively running before
+      we send the final 'stop' message (ADAMK)
+    - Fixed a massive performance bug in directory tree ->refill method,
+      which was triggering one background thread for every expanded tree
+      node. This was leading to thread storms, major leakage, and hanging
+      of the editor when changing between projects (ADAMK)
+    - When exiting directory tree search mode, we now restore the tree
+      correctly from the stashed results instead of scanning again (ADAMK)
+    - Open selection can now find executable programs in the current PATH
+      (AZAWAWI)
+    - Update German translation (ZENOG)
+    - If open selection finds a Module/Name.pm in the lib of your current
+      project, it stops looking for other possibilities since the version
+      in your project is almost certainly the one you want. (ADAMK)
+    - Updated the Copyright notice to reflect the new year. (PLAVEN)
+    - Added additional test to copyright.t to check all copyright notices
+      have the current year.
+
 0.76 2010.12.08
     - Fix #636: Filter too strict (Padre CPAN module installer) (ZENOG)
     - Fix #1032: Regex Editor: Escape sequences don't work in

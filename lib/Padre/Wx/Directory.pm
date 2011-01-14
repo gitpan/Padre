@@ -12,7 +12,7 @@ use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
 use Padre::Logger;
 
-our $VERSION = '0.76';
+our $VERSION = '0.78';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -50,11 +50,15 @@ sub new {
 		Wx::wxDefaultSize,
 	);
 
-	# Modes
-	$self->{searching} = 0;
-
 	# Where is the current root directory of the tree
 	$self->{root} = '';
+
+	# Modes (browse or search)
+	$self->{searching} = 0;
+
+	# Flag to ignore tree events when an automated process is
+	# making large numbers of automated changes.
+	$self->{ignore} = 0;
 
 	# Create the search control
 	my $search = $self->{search} = Wx::SearchCtrl->new(
@@ -74,6 +78,7 @@ sub new {
 	Wx::Event::EVT_TEXT(
 		$self, $search,
 		sub {
+			return if $_[0]->{ignore};
 			shift->on_text(@_);
 		},
 	);
@@ -81,6 +86,7 @@ sub new {
 	Wx::Event::EVT_SEARCHCTRL_CANCEL_BTN(
 		$self, $search,
 		sub {
+			return if $_[0]->{ignore};
 			shift->{search}->SetValue('');
 		},
 	);
@@ -109,6 +115,7 @@ sub new {
 		$self,
 		$self->{tree},
 		sub {
+			return if $_[0]->{ignore};
 			shift->on_expand(@_);
 		}
 	);
@@ -168,7 +175,8 @@ sub view_label {
 
 sub view_close {
 	TRACE( $_[0] ) if DEBUG;
-	shift->main->show_directory(0);
+	$_[0]->task_reset;
+	$_[0]->main->show_directory(0);
 }
 
 
@@ -185,18 +193,24 @@ sub on_text {
 	my $self   = shift;
 	my $search = $self->{search};
 
+	# Operations in here often trigger secondary event triggers that
+	# we definitely don't want to fire. Temporarily suppress them.
+	$self->{ignore}++;
+
 	if ( $self->{searching} ) {
 		if ( $search->IsEmpty ) {
 
 			# Leaving search mode
+			TRACE("Leaving search mode") if DEBUG;
 			$self->{searching} = 0;
 			$self->task_reset;
 			$self->clear;
 			$self->refill;
-			$self->browse;
+			$self->rebrowse;
 		} else {
 
 			# Changing search term
+			TRACE("Changing search term") if DEBUG;
 			$self->find;
 		}
 	} else {
@@ -204,15 +218,21 @@ sub on_text {
 
 			# Nothing to do
 			# NOTE: Why would this even fire?
+			TRACE("WARNING: This should never fire") if DEBUG;
 		} else {
 
 			# Entering search mode
-			$self->{expand}    = $self->tree->GetExpandedPlData;
+			TRACE("Entering search mode") if DEBUG;
+			$self->{files}     = $self->tree->GetChildrenPlData;
+			$self->{expand}    = $self->tree->expanded;
 			$self->{searching} = 1;
 			$search->ShowCancelButton(1);
 			$self->find;
 		}
 	}
+
+	# Stop ignoring user events
+	$self->{ignore}--;
 
 	return 1;
 }
@@ -270,6 +290,9 @@ sub refill {
 	my @stack  = ();
 	shift @$files;
 
+	# Suppress events while rebuilding the tree
+	$self->{ignore}++;
+
 	foreach my $path (@$files) {
 		while (@stack) {
 
@@ -314,6 +337,9 @@ sub refill {
 	# If we moved during the fill, move back
 	my $first = ( $tree->GetFirstChild($root) )[0];
 	$tree->ScrollTo($first) if $first->IsOk;
+
+	# End suppressing events
+	$self->{ignore}--;
 
 	return 1;
 }
@@ -390,11 +416,16 @@ sub refresh {
 				$self->{files}  = $stash->{files};
 				$self->{expand} = $stash->{expand};
 				$self->refill;
+				$self->rebrowse;
+			} else {
+				$self->task_reset;
+				$self->browse;
 			}
-		}
 
-		# Flush the search box and restart
-		$self->browse;
+		} else {
+			$self->task_reset;
+			$self->browse;
+		}
 	}
 
 	return 1;
@@ -414,6 +445,7 @@ sub rebrowse {
 	TRACE( $_[0] ) if DEBUG;
 	my $self     = shift;
 	my $expanded = $self->{tree}->GetExpandedPlData;
+	$self->task_reset;
 	$self->browse(@$expanded);
 }
 
@@ -423,7 +455,6 @@ sub browse {
 	return if $self->searching;
 
 	# Switch tasks to the browse task
-	$self->task_reset;
 	$self->task_request(
 		task       => 'Padre::Wx::Directory::Browse',
 		on_message => 'browse_message',
@@ -605,11 +636,8 @@ sub find_message {
 	# Because this should never be called from inside some larger
 	# update locker, lets risk the use of our own more targetted locking
 	# instead of using the official main->lock functionality.
-	# NOTE: It will HOPEFULLY be faster than the main one.
-	# NOTE: If we could avoid the scrollback snapping around on its own,
-	# we probably wouldn't need this lock at all.
-	my $scroll = $tree->GetScrollPos(Wx::wxVERTICAL);
-	my $lock   = Wx::WindowUpdateLocker->new($tree);
+	# Allow the lock to release naturally at the end of the method.
+	my $lock = $tree->scroll_lock;
 
 	# Create any new child directories
 	while (@dirs) {
@@ -637,9 +665,6 @@ sub find_message {
 
 	# Expand anything we created.
 	$tree->ExpandAllChildren($expand) if $expand;
-
-	# Make sure the scroll position has not changed
-	$tree->SetScrollPos( Wx::wxVERTICAL, 0, 0 );
 
 	return 1;
 }
@@ -706,7 +731,7 @@ sub compare {
 
 1;
 
-# Copyright 2008-2010 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
