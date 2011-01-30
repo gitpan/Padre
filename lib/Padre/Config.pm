@@ -10,7 +10,8 @@ package Padre::Config;
 use 5.008;
 use strict;
 use warnings;
-use Carp                   ();
+use Carp ();
+use File::Spec 3.21 (); # 3.21 needed for volume-safe abs2rel call
 use YAML::Tiny             ();
 use Params::Util           ();
 use Padre::Constant        ();
@@ -23,7 +24,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -44,6 +45,9 @@ BEGIN {
 
 	# Storage for the default config object
 	$SINGLETON = undef;
+
+	# Load Portable Perl support if needed
+	require Padre::Portable if Padre::Constant::PORTABLE;
 }
 
 # Accessor generation
@@ -215,35 +219,49 @@ sub set {
 	}
 
 	# We don't need to do additional checks on Padre::Constant::ASCII
-	my $type = $setting->type;
+	my $type  = $setting->type;
+	my $store = $setting->store;
 	if ( $type == Padre::Constant::BOOLEAN ) {
 		$value = 0 if $value eq '';
 		if ( $value ne '1' and $value ne '0' ) {
-			Carp::croak("Tried to change setting '$name' to non-boolean '$value'");
+			Carp::croak("Setting '$name' to non-boolean '$value'");
 		}
 	}
 	if ( $type == Padre::Constant::POSINT and not Params::Util::_POSINT($value) ) {
-		Carp::croak("Tried to change setting '$name' to non-posint '$value'");
+		Carp::croak("Setting '$name' to non-posint '$value'");
 	}
 	if ( $type == Padre::Constant::INTEGER and not _INTEGER($value) ) {
-		Carp::croak("Tried to change setting '$name' to non-integer '$value'");
+		Carp::croak("Setting '$name' to non-integer '$value'");
 	}
 	if ( $type == Padre::Constant::PATH ) {
 		if ( Padre::Constant::WIN32 and utf8::is_utf8($value) ) {
 			require Win32;
-			$value = Win32::GetLongPathName($value);
+			my $long = Win32::GetLongPathName($value);
+
+			# GetLongPathName returns undef if it doesn't exist.
+			unless ( defined $long ) {
+				Carp::croak("Setting '$name' to non-existant path '$value'");
+			}
+			$value = $long;
 
 			#Wx::DirPickerCtrl upgrades data to utf8.
 			#Perl on Windows cannot handle utf8 in file names, so this hack converts
 			#path back
 		}
 		if ( not -e $value ) {
-			Carp::croak("Tried to change setting '$name' to non-existant path '$value'");
+			Carp::croak("Setting '$name' to non-existant path '$value'");
+		}
+
+		# If we are in Portable mode convert the path to dist relative if
+		# the setting is going into the host backend.
+		if ( Padre::Constant::PORTABLE and $store == Padre::Constant::HOST ) {
+
+			# NOTE: Even though this says "directory" it is safe for files too
+			$value = Padre::Portable::freeze_directory($value);
 		}
 	}
 
-	# Set the value into the appropriate backend
-	my $store = $SETTING{$name}->store;
+	# Now we can stash the variable
 	$self->[$store]->{$name} = $value;
 
 	return 1;
@@ -263,9 +281,7 @@ sub apply {
 
 	# Does this setting have an apply hook
 	my $code = $SETTING{$name}->apply;
-	if ($code) {
-		$code->( $current->main, $value );
-	}
+	$code->( $current->main, $value ) if $code;
 
 	return 1;
 }
@@ -470,7 +486,7 @@ setting(
 
 		# (Ticket #668)
 
-		if ($Padre::Wx::Toolbar::DOCKABLE) {
+		if ($Padre::Wx::ToolBar::DOCKABLE) {
 			$main->rebuild_toolbar;
 		}
 

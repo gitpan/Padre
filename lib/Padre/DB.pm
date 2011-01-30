@@ -11,6 +11,15 @@ use Padre::Constant ();
 use Padre::Current  ();
 use Padre::Logger;
 
+BEGIN {
+
+	# Trap and warn in any situations where the database API is
+	# loaded in a background thread. This should never happen.
+	if ( $threads::threads and threads->tid ) {
+		warn "Padre::DB illegally loaded in background thread";
+	}
+}
+
 # Need truncate
 use ORLite 1.36 ();
 
@@ -24,6 +33,9 @@ use Padre::DB::Migrate {
 		File::ShareDir::dist_dir('Padre'),
 		'timeline',
 	),
+
+	# Allow overlay classes to override methods fully
+	shim => 1,
 
 	# Acceleration options (remove these if they cause trouble)
 	array      => 1,
@@ -39,7 +51,7 @@ use Padre::DB::LastPositionInFile ();
 use Padre::DB::Session            ();
 use Padre::DB::SessionFile        ();
 
-our $VERSION    = '0.78';
+our $VERSION    = '0.80';
 our $COMPATIBLE = '0.26';
 
 

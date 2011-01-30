@@ -11,7 +11,7 @@ use Storable                 ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION  = '0.78';
+our $VERSION  = '0.80';
 our $SEQUENCE = 0;
 
 
@@ -58,7 +58,7 @@ sub worker {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	$self->{worker} = shift if @_;
-	return $self->{worker};
+	$self->{worker};
 }
 
 sub queue {
@@ -71,6 +71,20 @@ sub inbox {
 
 	# TRACE( $_[0] ) if DEBUG;
 	$_[0]->{inbox};
+}
+
+sub start_time {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	$self->{start_time} = $self->{idle_time} = shift if @_;
+	$self->{start_time};
+}
+
+sub idle_time {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	$self->{idle_time} = shift if @_;
+	$self->{idle_time};
 }
 
 

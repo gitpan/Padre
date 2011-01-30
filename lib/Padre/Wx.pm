@@ -21,7 +21,7 @@ use Wx::STC    ();
 use Wx::AUI    ();
 use Wx::Locale ();
 
-our $VERSION        = '0.78';
+our $VERSION        = '0.80';
 our $BACKCOMPATIBLE = '0.43';
 
 # Hard version lock on a new-enough Wx.pm
@@ -51,17 +51,16 @@ use constant {
 
 
 #####################################################################
-# Defines for object IDs
+# Allocation of Timer IDs
 
 use constant {
-	ID_TIMER_SYNTAX      => 30001,
-	ID_TIMER_FILECHECK   => 30002,
-	ID_TIMER_POSTINIT    => 30003,
-	ID_TIMER_OUTLINE     => 30004,
-	ID_TIMER_ACTIONQUEUE => 30005,
-	ID_TIMER_LASTRESORT  => 30006,
-	ID_TIMER_NTH         => 30007,
-	ID_TIMER_DIRECTORY   => 30008,
+	ID_TIMER_FILECHECK   => Wx::NewId(),
+	ID_TIMER_POSTINIT    => Wx::NewId(),
+	ID_TIMER_OUTLINE     => Wx::NewId(),
+	ID_TIMER_ACTIONQUEUE => Wx::NewId(),
+	ID_TIMER_LASTRESORT  => Wx::NewId(),
+	ID_TIMER_NTH         => Wx::NewId(),
+	ID_TIMER_DIRECTORY   => Wx::NewId(),
 };
 
 

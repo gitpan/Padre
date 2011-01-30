@@ -12,7 +12,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
@@ -299,7 +299,29 @@ sub on_key_up {
 sub padre_setup_plain {
 	my $self   = shift;
 	my $config = $self->main->ide->config;
-	$self->set_font;
+
+	# Code always lays out left to right
+	if ( $self->can('SetLayoutDirection') ) {
+		$self->SetLayoutDirection(Wx::wxLayout_LeftToRight);
+	}
+
+	# Create the right margin if desired
+	if ( $config->editor_right_margin_enable ) {
+		$self->SetEdgeColumn( $config->editor_right_margin_column );
+		$self->SetEdgeMode(Wx::wxSTC_EDGE_LINE);
+	} else {
+		$self->SetEdgeMode(Wx::wxSTC_EDGE_NONE);
+	}
+
+	# Set the font
+	my $font = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
+	if ( defined $config->editor_font && length $config->editor_font > 0 ) {
+		$font->SetNativeFontInfoUserDesc( $config->editor_font );
+	}
+	$self->SetFont($font);
+	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
+
+	# Flush the style colouring and apply from scratch
 	$self->StyleClearAll;
 
 	if ( defined $data->{plain}->{current_line_foreground} ) {
@@ -320,15 +342,6 @@ sub padre_setup_plain {
 		$self->StyleSetForeground( $k, _color( $data->{plain}->{foregrounds}->{$k} ) );
 	}
 
-	# Apply tag style for selected lexer (blue)
-	#$self->StyleSetSpec( Wx::wxSTC_H_TAG, "fore:#0000ff" );
-
-	if ( $self->can('SetLayoutDirection') ) {
-		$self->SetLayoutDirection(Wx::wxLayout_LeftToRight);
-	}
-
-	$self->SetEdgeColumn( $config->editor_right_margin_column );
-	$self->SetEdgeMode( $config->editor_right_margin_enable ? Wx::wxSTC_EDGE_LINE : Wx::wxSTC_EDGE_NONE );
 
 	$self->setup_style_from_config('plain');
 
@@ -720,18 +733,6 @@ sub show_folding {
 	return;
 }
 
-sub set_font {
-	my $self   = shift;
-	my $config = $self->main->ide->config;
-	my $font   = Wx::Font->new( 10, Wx::wxTELETYPE, Wx::wxNORMAL, Wx::wxNORMAL );
-	if ( defined $config->editor_font && length $config->editor_font > 0 ) { # empty default...
-		$font->SetNativeFontInfoUserDesc( $config->editor_font );
-	}
-	$self->SetFont($font);
-	$self->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
-	return;
-}
-
 sub set_preferences {
 	my $self   = shift;
 	my $config = $self->main->ide->config;
@@ -984,8 +985,6 @@ sub on_focus {
 			$self->Colourise( 0, $self->GetLength );
 		}
 		$self->needs_manual_colorize(0);
-	} else {
-		TRACE("no need to colorize") if DEBUG;
 	}
 
 	# NOTE: This is so the cursor will show up
@@ -1180,14 +1179,21 @@ sub on_mousewheel {
 	my $self  = shift;
 	my $event = shift;
 
-	# Behave normally if Ctrl isn't down
-	unless ( $event->ControlDown and not $self->config->feature_fontsize ) {
+	# Ignore this handler if it's a normal wheel movement
+	unless ( $event->ControlDown ) {
 		$event->Skip(1);
 		return;
 	}
 
-	# Behave as if Ctrl wasn't down
-	$self->ScrollLines( $event->GetLinesPerAction * int( $event->GetWheelRotation / $event->GetWheelDelta * -1 ) );
+	if ( $self->config->feature_fontsize ) {
+
+		# The default handler zooms in the wrong direction
+		$self->SetZoom( $self->GetZoom + int( $event->GetWheelRotation / $event->GetWheelDelta ) );
+	} else {
+
+		# Behave as if Ctrl wasn't down
+		$self->ScrollLines( $event->GetLinesPerAction * int( $event->GetWheelRotation / $event->GetWheelDelta * -1 ) );
+	}
 
 	return;
 }

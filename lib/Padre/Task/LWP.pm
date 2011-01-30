@@ -26,12 +26,10 @@ Sending and receiving data via HTTP.
 use 5.008005;
 use strict;
 use warnings;
-use Params::Util   ();
-use HTTP::Request  ();
-use HTTP::Response ();
-use Padre::Task    ();
+use Params::Util ();
+use Padre::Task  ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Task';
 
 use Class::XSAccessor {
@@ -123,6 +121,7 @@ sub run {
 	if ( $method eq 'GET' and defined $query ) {
 		$url .= '?' . $query;
 	}
+	require HTTP::Request;
 	my $request = HTTP::Request->new( $method, $url );
 	if ( $method eq 'POST' ) {
 		$request->content_type( $self->{content_type} || 'application/x-www-form-urlencoded' );

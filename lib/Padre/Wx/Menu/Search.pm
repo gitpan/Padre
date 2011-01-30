@@ -5,12 +5,11 @@ package Padre::Wx::Menu::Search;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Search   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -110,6 +109,7 @@ sub refresh {
 	$self->{replace}->Enable($doc);
 	$self->{quick_find_next}->Enable($doc);
 	$self->{quick_find_previous}->Enable($doc);
+
 	return;
 }
 

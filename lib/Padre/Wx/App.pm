@@ -35,7 +35,7 @@ use Padre::Wx ();
 
 # use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Wx::App';
 
 
@@ -50,8 +50,7 @@ my $SINGLETON = undef;
 sub new {
 
 	# TRACE($_[0]) if DEBUG;
-	$SINGLETON
-		or $SINGLETON = shift->SUPER::new;
+	$SINGLETON or $SINGLETON = shift->SUPER::new;
 }
 
 

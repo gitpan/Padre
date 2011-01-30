@@ -10,7 +10,7 @@ use File::Path ();
 use File::Spec ();
 use File::HomeDir 0.91 ();
 
-our $VERSION        = '0.78';
+our $VERSION        = '0.80';
 our $BACKCOMPATIBLE = '0.57';
 
 our $DISTRO;
@@ -89,6 +89,9 @@ use constant {
 	PADRE_CRIMSON  => 7,
 	PADRE_BROWN    => 8,
 };
+
+# Portable Perl Support
+use constant PORTABLE => ( $Portable::ENABLED and Portable->default->dist_root );
 
 # Padre's home dir
 use constant PADRE_HOME => $ENV{PADRE_HOME};

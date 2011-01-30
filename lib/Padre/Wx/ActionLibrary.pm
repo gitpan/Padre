@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 
 
@@ -546,11 +546,11 @@ sub init {
 		id          => Wx::wxID_UNDO,
 		need_editor => 1,
 
-		#		need        => sub {
-		#			my %objects = @_;
-		#			return 0 if !defined( $objects{editor} );
-		#			return $objects{editor}->CanUndo;
-		#		},
+		# need => sub {
+		#     my $current = shift;
+		#     my $editor  = $current->editor or return 0;
+		#     return $editor->CanUndo;
+		# },
 		label      => _T('&Undo'),
 		comment    => _T('Undo last change in current file'),
 		shortcut   => 'Ctrl-Z',
@@ -566,11 +566,11 @@ sub init {
 		id          => Wx::wxID_REDO,
 		need_editor => 1,
 
-		#		need        => sub {
-		#			my %objects = @_;
-		#			return 0 if !defined( $objects{editor} );
-		#			return $objects{editor}->CanRedo;
-		#		},
+		# need => sub {
+		#     my $current = shift;
+		#     my $editor  = $current->editor or return 0;
+		#     return $editor->CanRedo;
+		# },
 		label      => _T('&Redo'),
 		comment    => _T('Redo last undo'),
 		shortcut   => 'Ctrl-Y',
@@ -1136,7 +1136,11 @@ sub init {
 		shortcut    => 'Ctrl-F',
 		toolbar     => 'actions/edit-find',
 		menu_event  => sub {
-			$_[0]->find->find;
+			require Padre::Wx::Dialog::Find;
+			my $dialog = Padre::Wx::Dialog::Find->new( $_[0] );
+			$dialog->run;
+			$dialog->Destroy;
+			return;
 		},
 	);
 
@@ -1164,6 +1168,7 @@ sub init {
 
 			# Special case. Make and save a non-regex
 			# case-insensitive search and advance to the next hit.
+			require Padre::Search;
 			my $search = Padre::Search->new(
 				find_case    => 0,
 				find_regex   => 0,
@@ -1390,10 +1395,11 @@ sub init {
 
 		foreach my $mime_type ( keys %mime ) {
 			Padre::Wx::Action->new(
-				name       => "view.mime.$mime_type",
-				label      => $mime{$mime_type},
-				comment    => _T('Switch document type'),
-				menu_event => sub {
+				name        => "view.mime.$mime_type",
+				label       => $mime{$mime_type},
+				comment     => _T('Switch document type'),
+				menu_method => 'AppendRadioItem',
+				menu_event  => sub {
 					$_[0]->set_mimetype($mime_type);
 				},
 			);
@@ -1582,10 +1588,11 @@ sub init {
 
 		foreach my $name ( sort keys %styles ) {
 			Padre::Wx::Action->new(
-				name       => "view.style.$name",
-				label      => $styles{$name},
-				comment    => _T('Switch highlighting colours'),
-				menu_event => sub {
+				name        => "view.style.$name",
+				label       => $styles{$name},
+				comment     => _T('Switch highlighting colours'),
+				menu_method => 'AppendRadioItem',
+				menu_event  => sub {
 					$_[0]->change_style($name);
 				},
 			);
@@ -1597,10 +1604,11 @@ sub init {
 
 		foreach my $name (@styles) {
 			Padre::Wx::Action->new(
-				name       => "view.style.$name",
-				label      => $name,
-				comment    => _T('Switch highlighting colours'),
-				menu_event => sub {
+				name        => "view.style.$name",
+				label       => $name,
+				comment     => _T('Switch highlighting colours'),
+				menu_method => 'AppendRadioItem',
+				menu_event  => sub {
 					$_[0]->change_style( $name, 1 );
 				},
 			);
@@ -1941,10 +1949,9 @@ sub init {
 		need_runable => 1,
 		need_file    => 1,
 		need         => sub {
-			my %objects = @_;
-			return 0 unless defined $objects{document};
-			return 0 unless defined $objects{document}->{file};
-			return $objects{document}->{file}->{filename} =~ /\.t$/;
+			my $current = shift;
+			my $filename = $current->filename or return 0;
+			return $filename =~ /\.t$/;
 		},
 		label      => _T('Run This Test'),
 		comment    => _T('Run the current test if the current document is a test. (prove -bv)'),
@@ -1956,8 +1963,7 @@ sub init {
 	Padre::Wx::Action->new(
 		name => 'run.stop',
 		need => sub {
-			my %objects = @_;
-			return $main->{command} ? 1 : 0;
+			$_[0]->main->{command};
 		},
 		label      => _T('Stop Execution'),
 		comment    => _T('Stop a running task.'),
@@ -1993,8 +1999,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_step_in;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_step_in;
 			},
 		);
 
@@ -2011,8 +2017,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_step_over;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_step_over;
 			},
 		);
 
@@ -2027,8 +2033,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_step_out;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_step_out;
 			},
 		);
 
@@ -2043,8 +2049,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_run;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_run;
 			},
 		);
 
@@ -2058,8 +2064,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_jumpt_to;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_jumpt_to;
 			},
 		);
 
@@ -2074,8 +2080,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_set_breakpoint;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_set_breakpoint;
 			},
 		);
 
@@ -2089,8 +2095,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_remove_breakpoint;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_remove_breakpoint;
 			},
 		);
 
@@ -2104,8 +2110,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_list_breakpoints;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_list_breakpoints;
 			},
 		);
 
@@ -2119,8 +2125,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_run_to_cursor;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_run_to_cursor;
 			},
 		);
 
@@ -2134,8 +2140,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_show_stack_trace;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_show_stack_trace;
 			},
 		);
 
@@ -2150,8 +2156,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_display_value;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_display_value;
 			},
 		);
 
@@ -2165,8 +2171,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_show_value;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_show_value;
 			},
 		);
 
@@ -2180,8 +2186,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_evaluate_expression;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_evaluate_expression;
 			},
 		);
 
@@ -2196,8 +2202,8 @@ sub init {
 
 			#shortcut     => 'Shift-F5',
 			menu_event => sub {
-				$_[0]->{_debugger_} or return;
-				$_[0]->{_debugger_}->debug_perl_quit;
+				$_[0]->{debugger} or return;
+				$_[0]->{debugger}->debug_perl_quit;
 			},
 		);
 

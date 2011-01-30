@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Task';
 
 
@@ -30,6 +30,9 @@ sub new {
 	}
 
 	# Property defaults
+	unless ( defined $self->{binary} ) {
+		$self->{binary} = 0;
+	}
 	unless ( defined $self->{skip} ) {
 		$self->{skip} = [];
 	}
@@ -97,6 +100,7 @@ sub run {
 		# Notify our parent we are working on this directory
 		$self->handle->status( "Searching... " . $parent->unix );
 
+		my @children = ();
 		foreach my $file (@list) {
 			my $skip = 0;
 			next if $file =~ /^\.+\z/;
@@ -123,7 +127,7 @@ sub run {
 			if ( -d _ ) {
 				my $object = Padre::Wx::Directory::Path->directory( @path, $file );
 				next if $rule->skipped( $object->unix );
-				unshift @queue, $object;
+				push @children, $object;
 				next;
 			}
 			unless ( -f _ ) {
@@ -138,6 +142,11 @@ sub run {
 			# Skip if the file is too big
 			if ( $fstat[7] > $self->{maxsize} ) {
 				TRACE("Skipped $fullname: File size $fstat[7] exceeds maximum of $self->{maxsize}") if DEBUG;
+				next;
+			}
+
+			# Unless specifically told otherwise, only read text files
+			unless ( $self->{binary} or -T _ ) {
 				next;
 			}
 
@@ -157,6 +166,7 @@ sub run {
 			# Found results, inform our owner
 			$self->handle->message( OWNER => $object, @lines );
 		}
+		unshift @queue, @children;
 	}
 
 	# Notify our parent we are finished searching

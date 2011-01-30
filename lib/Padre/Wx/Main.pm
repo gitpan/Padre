@@ -26,50 +26,42 @@ use 5.008005;
 use strict;
 use warnings;
 use FindBin;
-use Cwd                           ();
-use Carp                          ();
-use Config                        ();
-use IPC::Open3                    ();
-use File::Spec                    ();
-use File::HomeDir                 ();
-use File::Basename                ();
-use File::Temp                    ();
-use List::Util                    ();
-use List::MoreUtils               ();
-use Scalar::Util                  ();
-use Params::Util                  ();
-use Time::HiRes                   ();
-use Padre::Wx::Action             ();
-use Padre::Wx::ActionLibrary      ();
-use Padre::Wx::WizardLibrary      ();
-use Padre::Constant               ();
-use Padre::Util                   ('_T');
-use Padre::Perl                   ();
-use Padre::Locale                 ();
-use Padre::Current                ();
-use Padre::Document               ();
-use Padre::DB                     ();
-use Padre::Locker                 ();
-use Padre::Util::Template         ();
-use Padre::Wx                     ();
-use Padre::Wx::Icon               ();
-use Padre::Wx::Debugger           ();
-use Padre::Wx::Display            ();
-use Padre::Wx::Editor             ();
-use Padre::Wx::Menubar            ();
-use Padre::Wx::ToolBar            ();
-use Padre::Wx::Notebook           ();
-use Padre::Wx::StatusBar          ();
-use Padre::Wx::AuiManager         ();
-use Padre::Wx::FileDropTarget     ();
-use Padre::Wx::Dialog::Text       ();
-use Padre::Wx::Dialog::FilterTool ();
-use Padre::Wx::Role::Conduit      ();
-use Padre::Wx::Role::Dialog       ();
-use Padre::Wx::Dialog::WindowList ();
+use Cwd                       ();
+use Carp                      ();
+use Config                    ();
+use File::Spec                ();
+use File::HomeDir             ();
+use File::Basename            ();
+use File::Temp                ();
+use List::Util                ();
+use Scalar::Util              ();
+use Params::Util              ();
+use Time::HiRes               ();
+use Padre::Wx::Action         ();
+use Padre::Wx::ActionLibrary  ();
+use Padre::Wx::WizardLibrary  ();
+use Padre::Constant           ();
+use Padre::Util               ('_T');
+use Padre::Perl               ();
+use Padre::Locale             ();
+use Padre::Current            ();
+use Padre::Document           ();
+use Padre::DB                 ();
+use Padre::Locker             ();
+use Padre::Wx                 ();
+use Padre::Wx::Icon           ();
+use Padre::Wx::Display        ();
+use Padre::Wx::Editor         ();
+use Padre::Wx::Menubar        ();
+use Padre::Wx::Notebook       ();
+use Padre::Wx::StatusBar      ();
+use Padre::Wx::AuiManager     ();
+use Padre::Wx::FileDropTarget ();
+use Padre::Wx::Role::Conduit  ();
+use Padre::Wx::Role::Dialog   ();
 use Padre::Logger;
 
-our $VERSION        = '0.78';
+our $VERSION        = '0.80';
 our $BACKCOMPATIBLE = '0.58';
 our @ISA            = qw{
 	Padre::Wx::Role::Conduit
@@ -217,6 +209,7 @@ sub new {
 
 	# Create the tool bar
 	if ( $config->main_toolbar ) {
+		require Padre::Wx::ToolBar;
 		$self->SetToolBar( Padre::Wx::ToolBar->new($self) );
 		$self->GetToolBar->Realize;
 	}
@@ -284,9 +277,12 @@ sub new {
 	# Lock the panels if needed
 	$self->aui->lock_panels( $config->main_lockinterface );
 
-	$self->{_debugger_} = Padre::Wx::Debugger->new;
+	# This require is only here so it can follow this constructor
+	# when it moves to being created on demand.
+	require Padre::Wx::Debugger;
+	$self->{debugger} = Padre::Wx::Debugger->new;
 
-	# we need an event immediately after the window opened
+	# We need an event immediately after the window opened
 	# (we had an issue that if the default of main_statusbar was false it did
 	# not show the status bar which is ok, but then when we selected the menu
 	# to show it, it showed at the top) so now we always turn the status bar on
@@ -617,11 +613,11 @@ sub syntax {
 
 sub debugger {
 	my $self = shift;
-	unless ( defined $self->{debugger} ) {
-		require Padre::Wx::Debugger::View;
-		$self->{debugger} = Padre::Wx::Debugger::View->new($self);
+	unless ( defined $self->{debug} ) {
+		require Padre::Wx::Debug;
+		$self->{debug} = Padre::Wx::Debug->new($self);
 	}
-	return $self->{debugger};
+	return $self->{debug};
 }
 
 sub outline {
@@ -1056,6 +1052,8 @@ $file> and C<focus>.
 
 =cut
 
+my $single_instance_raised = 0;
+
 sub single_instance_command {
 	my $self   = shift;
 	my $line   = shift;
@@ -1069,19 +1067,32 @@ sub single_instance_command {
 
 	if ( $1 eq 'focus' ) {
 
-		# try to give focus to padre ide. it might not work,
+		# Try to give focus to Padre IDE. It might not work,
 		# since some window manager implement some kind of focus-
 		# stealing prevention.
 
-		# first, let's deiconize padre if needed
+		# First, let's deiconize Padre if needed
 		$self->Iconize(0) if $self->IsIconized;
 
-		# now, let's raise padre
-
+		# Now let's raise Padre
 		# We have to do both or (on Win32 at least)
 		# the Raise call only works the first time.
-		$self->Lower;
-		$self->Raise;
+		if (Padre::Constant::WIN32) {
+			if ( $single_instance_raised++ ) {
+
+				# After the first time, this seems to work
+				$self->Lower;
+				$self->Raise;
+			} else {
+
+				# The first time this behaves weirdly
+				$self->Raise;
+			}
+		} else {
+
+			# We trust non-Windows to behave sanely
+			$self->Raise;
+		}
 
 	} elsif ( $1 eq 'open' ) {
 		if ( -f $line ) {
@@ -1202,6 +1213,7 @@ individual refresh methods)
 =cut
 
 sub refresh {
+	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	return if $self->locked('REFRESH');
 
@@ -1209,17 +1221,27 @@ sub refresh {
 	my $lock    = $self->lock('UPDATE');
 	my $current = $self->current;
 
-	# Refresh the highest and quickest things first,
-	# and work downwards and slower from there.
-	# Humans tend to look at the top of the screen first.
-	$self->refresh_title($current);
+	# Although it would be nice to do this later, some of the
+	# optimisations in the other refresh subsections depend on the
+	# checked-state of the menu entries being accurate. So alas, we need
+	# to do this one first and delay the background jobs a little.
 	$self->refresh_menu($current);
-	$self->refresh_toolbar($current);
-	$self->refresh_functions($current);
+
+	# Refresh elements that generate background tasks first,
+	# so those tasks will run while we do the other things.
+	# Tasks that run more often go before those that don't,
+	# which has a slightly positive effect on specialisation
+	# of background workers.
 	$self->refresh_directory($current);
-	$self->refresh_status($current);
-	$self->refresh_outline($current);
 	$self->refresh_syntaxcheck($current);
+	$self->refresh_functions($current);
+	$self->refresh_outline($current);
+
+	# Refresh the remaining elements while the background tasks
+	# are running for the other elements.
+	$self->refresh_title($current);
+	$self->refresh_toolbar($current);
+	$self->refresh_status($current);
 
 	# Now signal the refresh to all remaining listeners
 	# weed out expired weak references
@@ -1555,7 +1577,7 @@ sub refresh_directory {
 	my $self = shift;
 	return unless $self->has_directory;
 	return if $self->locked('REFRESH');
-	$self->directory->refresh(@_);
+	$self->directory->refresh( $_[0] or $self->current );
 	return;
 }
 
@@ -1776,14 +1798,15 @@ recreate it from scratch.
 =cut
 
 sub rebuild_toolbar {
-	my $self = shift;
-
+	my $self    = shift;
 	my $toolbar = $self->GetToolBar;
 	$toolbar->Destroy if $toolbar;
 
+	require Padre::Wx::ToolBar;
 	$self->SetToolBar( Padre::Wx::ToolBar->new($self) );
 	$self->GetToolBar->refresh;
 	$self->GetToolBar->Realize;
+
 	return 1;
 }
 
@@ -1920,36 +1943,33 @@ sub _show_outline {
 
 =pod
 
-=head3 C<show_debugger>
+=head3 C<show_debug>
 
-    $main->show_debugger( $visible );
+    $main->show_debug($visible);
 
 =cut
 
-sub show_debugger {
+sub show_debug {
 	my $self = shift;
-	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock('UPDATE');
+	$self->_show_debug($on);
+	$self->aui->Update;
+	return;
+}
 
-	#	unless ( $on == $self->menu->view->{debugger}->IsChecked ) {
-	#		$self->menu->view->{debugger}->Check($on);
-	#	}
-	#	$self->config->set( main_debugger => $on );
-	#	$self->config->write;
-
-	if ($on) {
+sub _show_debug {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+	if ( $_[0] ) {
 		my $debugger = $self->debugger;
 		$self->right->show($debugger);
 	} elsif ( $self->has_debugger ) {
 		my $debugger = $self->debugger;
 		$self->right->hide($debugger);
 	}
-
-	$self->aui->Update;
-	$self->ide->save_config;
-
-	return;
+	return 1;
 }
-
 
 =pod
 
@@ -3218,7 +3238,7 @@ sub on_close_window {
 	# part of the shutdown which will mess it up.
 	$self->update_last_session;
 
-	$self->{_debugger_}->quit;
+	$self->{debugger}->quit;
 
 	TRACE("went over list of files") if DEBUG;
 
@@ -3612,7 +3632,7 @@ sub on_open_selection {
 		# Try relative to the dir we started in?
 		SCOPE: {
 			my $filename = File::Spec->catfile( $self->ide->{original_cwd}, $text, );
-			if ( -e $filename ) {
+			if ( -f $filename ) {
 				push @files, $filename;
 			}
 		}
@@ -3620,7 +3640,7 @@ sub on_open_selection {
 		# Try relative to the current file
 		if ( $current->filename ) {
 			my $filename = File::Spec->catfile( File::Basename::dirname( $current->filename ), $text, );
-			if ( -e $filename ) {
+			if ( -f $filename ) {
 				push @files, $filename;
 			}
 		}
@@ -3639,12 +3659,13 @@ sub on_open_selection {
 	}
 
 	# Pick a file
-	@files = List::MoreUtils::uniq @files;
+	require List::MoreUtils;
+	@files = List::MoreUtils::uniq(@files);
 	if ( @files > 1 ) {
 		my $file = $self->single_choice(
 			Wx::gettext('Choose File'),
 			'',
-			[ List::MoreUtils::uniq @files ],
+			[@files],
 		);
 		$self->setup_editors($file) if defined $file;
 	} else {
@@ -3669,7 +3690,7 @@ sub on_open_all_recent_files {
 
 	# debatable: "reverse" keeps order in "recent files" submenu
 	# but editor tab ordering may "feel" wrong
-	$_[0]->setup_editors( reverse @$files );
+	$_[0]->setup_editors( reverse grep { -e $_ } @$files );
 }
 
 =pod
@@ -3684,9 +3705,7 @@ Prompt user for a command to filter the selection/document.
 
 sub on_filter_tool {
 	require Padre::Wx::Dialog::FilterTool;
-	my $self   = shift;
-	my $filter = Padre::Wx::Dialog::FilterTool->new($self);
-	$filter->show;
+	Padre::Wx::Dialog::FilterTool->new( $_[0] )->show;
 }
 
 =head3 C<on_open_url>
@@ -3946,6 +3965,7 @@ sub on_reload_some {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 
+	require Padre::Wx::Dialog::WindowList;
 	Padre::Wx::Dialog::WindowList->new(
 		$self,
 		title      => Wx::gettext('Reload some files'),
@@ -4162,6 +4182,50 @@ sub on_save_as {
 		$self->{cwd} = $dialog->GetDirectory;
 		my $saveto = $dialog->GetPath;
 
+
+		# feature request: http://padre.perlide.org/trac/ticket/1027
+		# work out if we have an extension to the file name
+		#print "The file name is: " . $dialog->GetFilename . "\n";
+		#print "The mimetype is: " . $document->mimetype . "\n";
+
+		my @file_extensions = Padre::MimeTypes->get_extensions_by_mime_type( $document->mimetype );
+
+		my $ext_string = "'" . join( "', '", @file_extensions ) . "'";
+
+		#print "file extensions: $ext_string\n"; # .  join( "\n", @file_extensions ) . "\n";
+
+		# now lets check if we have a file extension that suits the current mimetype:
+		my $fileName = $dialog->GetFilename;
+		my $ext      = "";
+		$fileName =~ m/\.([^\.]+)$/;
+		$ext = $1;
+
+		#print "File Extension is: $ext\n";
+
+		if ( !defined($ext) || $ext eq '' ) {
+
+			#show dialog that the file extension is missing for the mimetype
+			my $ret = Wx::MessageBox(
+				sprintf(
+					Wx::gettext(
+						"You have tried to save a file without a suitable file extension based on the current document's mimetype.\n\nBased on the current mimetype, suitable file extensions are:\n\n%s.\n\n\nDo you wish to continue?"
+					),
+					$ext_string
+				),
+				Wx::gettext("File extension missing warning"),
+				Wx::wxYES_NO | Wx::wxCENTRE,
+				$self,
+			);
+
+			# bit blunt really as this will return them back to the editor
+			# it would probably be nicer to return the dialog back
+			#return 0  if $ret == Wx::wxNO;
+			# this works better:
+			next; # because we are in a while(1) loop
+
+		}
+
+
 		#my $path = File::Spec->catfile( $self->cwd, $filename );
 		my $path = File::Spec->catfile($saveto);
 		if ( -e $path ) {
@@ -4227,8 +4291,9 @@ Only do this for new documents, otherwise behave like a regular save.
 =cut
 
 sub on_save_intuition {
-	my $self = shift;
-	my $document = $self->current->document or return;
+	my $self     = shift;
+	my $current  = $self->current;
+	my $document = $current->document or return;
 
 	# We only use Save Intuition for new files
 	unless ( $document->is_new ) {
@@ -4245,6 +4310,12 @@ sub on_save_intuition {
 
 	# Empty files get done via the normal save
 	if ( $document->is_unused ) {
+		return $self->on_save_as(@_);
+	}
+
+	# Don't use Save Intuition in null projects
+	my $project = $current->project;
+	unless ($project) {
 		return $self->on_save_as(@_);
 	}
 
@@ -4415,9 +4486,13 @@ sub on_close {
 	}
 	$self->close;
 
-	# Transaction-wrap the session saving, and trigger a full refresh
-	# once we are finished the current action.
-	my $lock = $self->lock( 'DB', 'update_last_session', 'refresh' );
+	# Transaction-wrap the session saving.
+	# If we are closing the last document we need to trigger a full
+	# refresh. If not, closing this file results in a focus event
+	# on the next remaining document, which does the refresh for us.
+	my @methods = ('update_last_session');
+	push @methods, 'refresh' unless $self->editors;
+	my $lock = $self->lock( 'DB', @methods );
 
 	if ( $self->ide->{session_autosave} ) {
 		$self->save_current_session;
@@ -4581,6 +4656,7 @@ sub on_close_some {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 
+	require Padre::Wx::Dialog::WindowList;
 	Padre::Wx::Dialog::WindowList->new(
 		$self,
 		title      => Wx::gettext('Close some files'),
@@ -5796,6 +5872,7 @@ sub timer_check_overwrite {
 	#	}
 
 	# Show dialog for file reload selection
+	require Padre::Wx::Dialog::WindowList;
 	my $winlist = Padre::Wx::Dialog::WindowList->new(
 		$self,
 		title      => Wx::gettext('Reload some files'),
@@ -5916,15 +5993,17 @@ sub on_new_from_template {
 		$self->error("Failed to find template '$file'");
 	}
 
-	my $data = {
-		config => $self->{config},
-		util   => Padre::Util::Template->new,
-	};
-
 	# Generate the full file content
 	require Template::Tiny;
+	require Padre::Util::Template;
 	my $output = '';
-	Template::Tiny->new->process( $template, $data, \$output );
+	Template::Tiny->new->process(
+		$template,
+		{   config => $self->{config},
+			util   => Padre::Util::Template->new,
+		},
+		\$output,
+	);
 
 	# Create the file from the content
 	require Padre::MimeTypes;
@@ -6280,6 +6359,7 @@ sub _filter_tool_run {
 	my $filter_out;
 	my $filter_err;
 
+	require IPC::Open3;
 	unless ( IPC::Open3::open3( $filter_in, $filter_out, $filter_err, $cmd ) ) {
 		$self->error( sprintf( Wx::gettext("Error running filter tool:\n%s"), $! ) );
 		return;

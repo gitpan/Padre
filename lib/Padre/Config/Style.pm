@@ -1,19 +1,22 @@
 package Padre::Config::Style;
 
-# Interface to the Padre editor look and feel files
+# Interface to the Padre editor look and feel files.
+# Note, this module deals only with the style configuration files,
+# it does not attempt style compilation or any form of integration
+# with the Wx modules.
 
 use 5.008;
 use strict;
 use warnings;
 use Carp            ();
 use File::Spec      ();
-use File::Glob      ();
 use File::Basename  ();
 use Params::Util    ();
 use Padre::Constant ();
 use Padre::Util     ('_T');
 
-our $VERSION = '0.78';
+our $VERSION    = '0.80';
+our $COMPATIBLE = '0.79';
 
 
 
@@ -22,20 +25,32 @@ our $VERSION = '0.78';
 ######################################################################
 # Style Library
 
-# Define the core style library
-our %CORE_STYLES = (
-	default   => _T('Padre'),
-	evening   => _T('Evening'),
-	night     => _T('Night'),
-	ultraedit => _T('Ultraedit'),
-	notepad   => _T('Notepad++'),
-);
+use vars qw{ %CORE_STYLES $USER_DIRECTORY @USER_STYLES };
 
-# Locate any custom user styles
-our $USER_DIRECTORY = File::Spec->catdir( Padre::Constant::CONFIG_DIR, 'styles' );
-our @USER_STYLES =
-	map { substr( File::Basename::basename($_), 0, -4 ) }
-	File::Glob::glob( File::Spec->catdir( $USER_DIRECTORY, '*.yml' ) );
+BEGIN {
+
+	# Define the core style library
+	%CORE_STYLES = (
+		default   => _T('Padre'),
+		evening   => _T('Evening'),
+		night     => _T('Night'),
+		ultraedit => _T('Ultraedit'),
+		notepad   => _T('Notepad++'),
+	);
+
+	# Locate any custom user styles
+	@USER_STYLES    = ();
+	$USER_DIRECTORY = File::Spec->catdir(
+		Padre::Constant::CONFIG_DIR,
+		'styles',
+	);
+	if ( -d $USER_DIRECTORY ) {
+		local *STYLEDIR;
+		opendir( STYLEDIR, $USER_DIRECTORY ) or die "Failed to read '$USER_DIRECTORY'";
+		@USER_STYLES = sort map { substr( File::Basename::basename($_), 0, -4 ) } grep { /\.yml$/ } readdir STYLEDIR;
+		closedir STYLEDIR;
+	}
+}
 
 sub core_styles {
 	return %CORE_STYLES;

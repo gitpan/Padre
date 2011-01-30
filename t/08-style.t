@@ -4,10 +4,22 @@
 
 use strict;
 use warnings;
-use Test::More tests => 32;
+use Test::More;
+
+
+BEGIN {
+	unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
+		plan skip_all => 'Needs DISPLAY';
+		exit 0;
+	}
+}
+
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
 use t::lib::Padre;
+
+plan( tests => 33 );
+
 
 my $dir = catdir( 'share', 'styles' );
 ok( -d $dir, "Found style directory $dir" );
@@ -54,4 +66,7 @@ foreach my $name (@styles) {
 
 
 
-1;
+######################################################################
+# Ensure the new style API loads as well
+
+use_ok('Padre::Wx::Style');

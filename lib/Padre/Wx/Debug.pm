@@ -1,4 +1,4 @@
-package Padre::Wx::Debugger::View;
+package Padre::Wx::Debug;
 
 use 5.008;
 use strict;
@@ -8,16 +8,28 @@ use Padre::Wx       ();
 use Padre::Wx::Icon ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
-our @ISA     = 'Wx::ListView';
+our $VERSION = '0.80';
+our @ISA     = qw{
+	Padre::Wx::Role::View
+	Padre::Wx::Role::Main
+	Wx::ListView
+};
+
+
+
+
+
+#####################################################################
+# Constructor
 
 sub new {
 	my $class = shift;
 	my $main  = shift;
+	my $panel = shift || $main->right;
 
 	# Create the underlying object
 	my $self = $class->SUPER::new(
-		$main->bottom,
+		$panel,
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
@@ -47,41 +59,36 @@ sub new {
 	return $self;
 }
 
-sub bottom {
-	$_[0]->GetParent;
+
+
+
+
+######################################################################
+# Padre::Wx::Role::View Methods
+
+sub view_panel {
+	return 'right';
 }
 
-sub main {
-	$_[0]->GetGrandParent;
+sub view_label {
+	shift->gettext_label;
 }
 
-sub gettext_label {
-	Wx::gettext('Debugger');
+sub view_close {
+	$_[0]->main->show_debug(0);
 }
 
-sub clear {
-	my $self = shift;
 
-	# Remove all items from the tool
-	$self->DeleteAllItems;
 
-	return;
-}
 
-sub set_column_widths {
-	my $self      = shift;
-	my $ref_entry = shift;
 
-	return;
-}
-
-#####################################################################
+######################################################################
 # Event Handlers
 
 sub on_list_item_activated {
 	my $self   = shift;
 	my $event  = shift;
-	my $editor = Padre::Current->main($self)->current->editor;
+	my $editor = $self->main->current->editor;
 	my $line   = $event->GetItem->GetText;
 
 	if (   not defined($line)
@@ -96,15 +103,23 @@ sub on_list_item_activated {
 	return;
 }
 
-sub _get_title {
-	my $c = shift;
 
-	return Wx::gettext('Variable') if $c == 0;
-	return Wx::gettext('Value')    if $c == 1;
 
-	die "invalid value '$c'";
+
+######################################################################
+# General Methods
+
+sub gettext_label {
+	Wx::gettext('Debugger');
 }
 
+sub clear {
+	$_[0]->DeleteAllItems;
+}
+
+sub set_column_widths {
+	return;
+}
 
 sub relocale {
 	my $self = shift;
@@ -118,8 +133,11 @@ sub relocale {
 	return;
 }
 
-sub view_close {
-	shift->main->show_debugger(0);
+sub _get_title {
+	my $c = shift;
+	return Wx::gettext('Variable') if $c == 0;
+	return Wx::gettext('Value')    if $c == 1;
+	die "invalid value '$c'";
 }
 
 1;

@@ -10,7 +10,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -223,6 +223,7 @@ sub refresh {
 	my $document = $current->document;
 	my $search   = $self->{search};
 	my $list     = $self->{list};
+	my $lock     = $self->main->lock('UPDATE');
 
 	# Hide the widgets when no files are open
 	unless ($document) {
@@ -247,6 +248,7 @@ sub refresh {
 
 	# Nothing to do if there is no content
 	if ( $document->is_unused ) {
+		$list->Clear;
 		return 1;
 	}
 

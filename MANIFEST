@@ -30,8 +30,10 @@ eg/tcl/hello_tcl
 eg/tcl/portable_tcl
 eg/xml/xml_example
 fbp/feedback.fbp
+fbp/Find.fbp
 fbp/findinfiles.fbp
-fbp/sync.fbp
+fbp/Preferences.fbp
+fbp/WhereFrom.fbp
 inc/Module/Install.pm
 inc/Module/Install/Base.pm
 inc/Module/Install/Can.pm
@@ -107,7 +109,6 @@ lib/Padre/MimeTypes.pm
 lib/Padre/Perl.pm
 lib/Padre/Plugin.pm
 lib/Padre/Plugin/Devel.pm
-lib/Padre/Plugin/Devel/Crash.pm
 lib/Padre/Plugin/My.pm
 lib/Padre/Plugin/PopularityContest.pm
 lib/Padre/Plugin/PopularityContest/Ping.pm
@@ -115,6 +116,7 @@ lib/Padre/PluginBuilder.pm
 lib/Padre/PluginHandle.pm
 lib/Padre/PluginManager.pm
 lib/Padre/Pod2HTML.pm
+lib/Padre/Portable.pm
 lib/Padre/PPI.pm
 lib/Padre/PPI/EndifyPod.pm
 lib/Padre/PPI/Transform.pm
@@ -176,8 +178,8 @@ lib/Padre/Wx/Browser.pm
 lib/Padre/Wx/Command.pm
 lib/Padre/Wx/CPAN.pm
 lib/Padre/Wx/CPAN/Listview.pm
+lib/Padre/Wx/Debug.pm
 lib/Padre/Wx/Debugger.pm
-lib/Padre/Wx/Debugger/View.pm
 lib/Padre/Wx/Dialog.pm
 lib/Padre/Wx/Dialog/Advanced.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
@@ -229,6 +231,7 @@ lib/Padre/Wx/Directory/Search.pm
 lib/Padre/Wx/Directory/TreeCtrl.pm
 lib/Padre/Wx/Display.pm
 lib/Padre/Wx/Editor.pm
+lib/Padre/Wx/FBP/Find.pm
 lib/Padre/Wx/FBP/FindInFiles.pm
 lib/Padre/Wx/FBP/Sync.pm
 lib/Padre/Wx/FBP/WhereFrom.pm
@@ -267,10 +270,12 @@ lib/Padre/Wx/Progress.pm
 lib/Padre/Wx/Right.pm
 lib/Padre/Wx/Role/Conduit.pm
 lib/Padre/Wx/Role/Dialog.pm
+lib/Padre/Wx/Role/Dwell.pm
 lib/Padre/Wx/Role/Form.pm
 lib/Padre/Wx/Role/Main.pm
 lib/Padre/Wx/Role/View.pm
 lib/Padre/Wx/StatusBar.pm
+lib/Padre/Wx/Style.pm
 lib/Padre/Wx/Syntax.pm
 lib/Padre/Wx/TodoList.pm
 lib/Padre/Wx/ToolBar.pm

@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -120,7 +120,7 @@ sub _content_about {
     </p>
     <p><small>"$splash_name" - $splash_description Jerry Charlotte (blackbutterfly)</small></p>
     <p>
-      Copyright 2008 - 2010 $padre_dev_team<br>
+      Copyright 2008&ndash;2011 $padre_dev_team<br>
       $license_info
     </p>
   </body>

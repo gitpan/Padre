@@ -15,7 +15,6 @@ use File::Spec    ();
 use File::HomeDir ();
 use List::Util    ();
 use Scalar::Util  ();
-use Getopt::Long  ();
 use YAML::Tiny    ();
 use DBI           ();
 use DBD::SQLite   ();
@@ -24,7 +23,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -64,11 +63,11 @@ sub import {
 	# Find everything under Padre:: with a matching version,
 	# which almost certainly means it is part of the main Padre release.
 	require File::Find::Rule;
-	require ExtUtils::MakeMaker;
+	require Padre::Util;
 	my @children = grep { not $INC{$_} }
 		map {"Padre/$_->[0]"}
 		grep { defined( $_->[1] ) and $_->[1] eq $VERSION }
-		map { [ $_, ExtUtils::MM_Unix->parse_version( File::Spec->catfile( $parent, $_ ) ) ] }
+		map { [ $_, Padre::Util::parse_variable( File::Spec->catfile( $parent, $_ ) ) ] }
 		File::Find::Rule->name('*.pm')->file->relative->in($parent);
 
 	# Load all of them (ignoring errors)
@@ -143,10 +142,6 @@ sub new {
 
 	# Wizard registry
 	$self->wizards( {} );
-
-	# Load a few more bits and pieces now we know
-	# that we'll need them
-	require Padre::Project;
 
 	# Create the plugin manager
 	require Padre::PluginManager;
@@ -265,9 +260,11 @@ sub save_config {
 sub project {
 	my $self = shift;
 	my $root = shift;
-	unless ( $self->{project}->{$root} ) {
-		my $nofile = File::Spec->catfile( $root, 'a' );
-		$self->{project}->{$root} = Padre::Project->from_file($nofile);
+	unless ( ref $self->{project}->{$root} ) {
+		require Padre::Project;
+		$self->{project}->{$root} = Padre::Project->from_file(
+			File::Spec->catfile( $root, 'a' ),
+		);
 	}
 	return $self->{project}->{$root};
 }

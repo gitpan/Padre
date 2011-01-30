@@ -54,7 +54,7 @@ use warnings;
 # Because this is sometimes used outside the Padre codebase,
 # don't put any dependencies on other Padre modules in here.
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 my $perl = undef;
 
@@ -78,8 +78,6 @@ sub perl {
 
 	# Find the exact Perl used to launch Padre
 	return $perl if defined $perl;
-	require Probe::Perl;
-	require File::Which;
 
 	# Use the most correct method first
 	require Probe::Perl;

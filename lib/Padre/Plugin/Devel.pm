@@ -4,9 +4,10 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Wx     ();
+use Padre::Util   ();
 use Padre::Plugin ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -37,9 +38,6 @@ sub plugin_icon {
 
 sub plugin_enable {
 	my $self = shift;
-
-	# Load our non-core dependencies
-	require Devel::Dumpvar;
 
 	# Load our configuration
 	# (Used for testing purposes)
@@ -82,9 +80,10 @@ sub menu_plugins_simple {
 
 		'---' => undef,
 
-		Wx::gettext('Load All Padre Modules')    => 'load_everything',
-		Wx::gettext('Simulate Crash')            => 'simulate_crash',
-		Wx::gettext('Simulate Crashing Bg Task') => 'simulate_task_crash',
+		Wx::gettext('Load All Padre Modules')        => 'load_everything',
+		Wx::gettext('Simulate Crash')                => 'simulate_crash',
+		Wx::gettext('Simulate Background Exception') => 'simulate_task_exception',
+		Wx::gettext('Simulate Background Crash')     => 'simulate_task_crash',
 
 		'---' => undef,
 
@@ -158,9 +157,7 @@ sub dump_taskmanager {
 	return $self->_dump( $self->current->ide->task_manager );
 }
 
-#
 # Dumps the current Perl 5 PPI document to the current output window
-#
 sub dump_ppi {
 	my $self     = shift;
 	my $current  = $self->current;
@@ -187,12 +184,13 @@ sub dump_ppi {
 }
 
 sub dump_padre {
-	my $self = shift;
-	return $self->_dump( $self->current->ide );
+	$_[0]->_dump( $_[0]->current->ide );
 }
 
+# Copy %INC and @INC before passing them to _dump,
+# so changes during the _dump process aren't in the output.
 sub dump_inc {
-	$_[0]->_dump( \%INC, \@INC );
+	$_[0]->_dump( {%INC}, [@INC] );
 }
 
 sub dump_display {
@@ -268,9 +266,22 @@ sub simulate_crash {
 	POSIX::_exit();
 }
 
+# Simulate a background thread that does an uncaught exception/die
+sub simulate_task_exception {
+	require Padre::Task::Eval;
+	Padre::Task::Eval->new(
+		run    => 'sleep 5; die "This is a debugging task that simply crashes after running for 5 seconds!";',
+		finish => 'warn "This should never be reached";',
+	)->schedule;
+}
+
+# Simulate a background thread that does a hard exit/segfault
 sub simulate_task_crash {
-	require Padre::Plugin::Devel::Crash;
-	Padre::Plugin::Devel::Crash->new->schedule;
+	require Padre::Task::Eval;
+	Padre::Task::Eval->new(
+		run    => 'sleep 5; exit(1);',
+		finish => 'warn "This should never be reached";',
+	)->schedule;
 }
 
 sub show_about {
@@ -292,11 +303,10 @@ sub load_everything {
 
 	# Find everything under Padre:: with a matching version
 	require File::Find::Rule;
-	require ExtUtils::MakeMaker;
 	my @children = grep { not $INC{$_} }
 		map {"Padre/$_->[0]"}
 		grep { defined( $_->[1] ) and $_->[1] eq $VERSION }
-		map { [ $_, ExtUtils::MM_Unix->parse_version( File::Spec->catfile( $parent, $_ ) ) ] }
+		map { [ $_, Padre::Util::parse_variable( File::Spec->catfile( $parent, $_ ) ) ] }
 		File::Find::Rule->name('*.pm')->file->relative->in($parent);
 	$main->message( sprintf( Wx::gettext('Found %s unloaded modules'), scalar @children ) );
 	return unless @children;
@@ -333,6 +343,7 @@ sub _dump {
 	my $main = $self->current->main;
 
 	# Generate the dump string and set into the output window
+	require Devel::Dumpvar;
 	$main->output->SetValue( Devel::Dumpvar->new( to => 'return' )->dump(@_) );
 	$main->output->SetSelection( 0, 0 );
 	$main->show_output(1);

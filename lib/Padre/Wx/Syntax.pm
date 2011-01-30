@@ -13,13 +13,15 @@ use Padre::Wx::TreeCtrl   ();
 use Padre::Wx::HtmlWindow ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
 	Wx::Panel
 };
+
+use constant TIMER => Wx::NewId();
 
 # perldiag error message classification
 my %MESSAGE = (
@@ -148,6 +150,10 @@ sub new {
 	return $self;
 }
 
+
+
+
+
 ######################################################################
 # Padre::Wx::Role::View Methods
 
@@ -190,13 +196,9 @@ sub start {
 		$self->on_timer( undef, 1 );
 	} else {
 		TRACE('Creating new timer') if DEBUG;
-		$self->{timer} = Wx::Timer->new(
-			$self,
-			Padre::Wx::ID_TIMER_SYNTAX
-		);
+		$self->{timer} = Wx::Timer->new( $self, TIMER );
 		Wx::Event::EVT_TIMER(
-			$self,
-			Padre::Wx::ID_TIMER_SYNTAX,
+			$self, TIMER,
 			sub {
 				$self->on_timer( $_[1], $_[2] );
 			},

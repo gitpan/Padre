@@ -5,10 +5,9 @@ package Padre::Project;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec   ();
-use Padre::Cache ();
+use File::Spec ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 
 
@@ -142,6 +141,7 @@ sub from_file {
 		# Fall back to looking for null projects
 		my $padre_yml = File::Spec->catpath( $v, $dir, 'padre.yml' );
 		if ( -f $padre_yml ) {
+			require Padre::Project;
 			return Padre::Project->new(
 				root      => File::Spec->catpath( $v, $dir, '' ),
 				padre_yml => $padre_yml,
@@ -221,6 +221,11 @@ sub config {
 
 # Locate the "primary" file, if the project has one
 sub headline {
+	return undef;
+}
+
+# Intuit the distribution version if possible
+sub version {
 	return undef;
 }
 
@@ -314,9 +319,10 @@ sub name {
 ######################################################################
 # Padre::Cache Integration
 
+# The detection of VERSION allows us to make this call without having
+# to load modules at project destruction time if it isn't needed.
 sub DESTROY {
-	if ( defined $_[0]->{root} ) {
-		require Padre::Cache;
+	if ( defined $_[0]->{root} and $Padre::Cache::VERSION ) {
 		Padre::Cache->release( $_[0]->{root} );
 	}
 }

@@ -118,7 +118,7 @@ use Scalar::Util    ();
 use Padre::Plugin   ();
 use Padre::Constant ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Plugin';
 
 # Track the number of times actions are used
@@ -299,6 +299,7 @@ sub report_show {
 	my $yaml = YAML::Tiny::Dump($report);
 
 	# Show the result in a text box
+	require Padre::Wx::Dialog::Text;
 	Padre::Wx::Dialog::Text->show(
 		$self->main,
 		Wx::gettext('Popularity Contest Report'),

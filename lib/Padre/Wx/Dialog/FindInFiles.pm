@@ -5,9 +5,14 @@ use strict;
 use warnings;
 use Padre::Wx::FBP::FindInFiles ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Wx::FBP::FindInFiles
+};
+
+use constant SAVE => qw{
+	find_case
+	find_regex
 };
 
 
@@ -36,7 +41,7 @@ sub new {
 		$self,
 		$self->{find_term},
 		sub {
-			shift->_refresh;
+			shift->refresh;
 		}
 	);
 
@@ -83,9 +88,8 @@ sub directory {
 
 # Makes sure the find button is only enabled when the field
 # values are valid
-sub _refresh {
+sub refresh {
 	my $self = shift;
-
 	$self->{find}->Enable( $self->{find_term}->GetValue ne '' );
 }
 
@@ -102,7 +106,7 @@ sub run {
 	$self->{find_term}->SetFocus;
 
 	# refresh
-	$self->_refresh;
+	$self->refresh;
 
 	# Show the dialog
 	my $result = $self->ShowModal;
@@ -123,7 +127,7 @@ sub run {
 	# Run the search in the Find in Files tool
 	$self->main->show_findinfiles;
 	$self->main->findinfiles->search(
-		root   => $self->{find_directory}->GetValue,
+		root   => $self->{find_directory}->SaveValue,
 		search => $self->as_search,
 	);
 
@@ -137,7 +141,7 @@ sub save {
 	my $config  = $self->current->config;
 	my $changed = 0;
 
-	foreach my $name ( 'find_case', 'find_regex' ) {
+	foreach my $name (SAVE) {
 		my $value = $self->{$name}->GetValue;
 		next if $config->$name() == $value;
 		$config->set( $name => $value );
@@ -152,8 +156,9 @@ sub save {
 # Generate a search object for the current dialog state
 sub as_search {
 	my $self = shift;
+	require Padre::Search;
 	Padre::Search->new(
-		find_term  => $self->{find_term}->GetValue,
+		find_term  => $self->{find_term}->SaveValue,
 		find_case  => $self->{find_case}->GetValue,
 		find_regex => $self->{find_regex}->GetValue,
 	);

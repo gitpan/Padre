@@ -1,6 +1,51 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
 
+0.80 2011.01.29
+    - use Text::FindIndent 0.10 to eliminate some warnings #1089 (SZABGAB)
+    - Update German translation (ZENOG)
+    - Added a dwell timer via Padre::Wx::Role::Dwell (ADAMK)
+    - The directory tree search box now has a 1/3rd second dwell (ADAMK)
+    - Find in Files results convert tabs to 4 spaces to avoid the ugly
+      squares in the results (ADAMK)
+    - Delay loading some modules and removed some other entirely, reducing
+      startup memory cost and IO by 10-15% when few features are on (ADAMK)
+    - Upgraded Plugin compatibility detection to avoid having to load the
+      dependencies and read variables from the files instead. Saves 2-3meg
+      of RAM and allows better scaling of the plugin system (ADAMK) 
+    - Fixed Padre::Util::parse_variable so we no longer need to make use
+      of ExtUtils::MakeMaker and ExtUtils::MM_Unix->parse_version (ADAMK)
+    - Support for more extensive Padre::DB customisation via ORLite 1.48
+      and its new shim => 1 option (ADAMK)
+    - Completed first-generation Portable Perl support for Padre (ADAMK)
+    - Add support in Padre::Project for intuiting project versions (ADAMK)
+    - Prevent history boxes writing a history entry for every character
+      instead of every search in Find/FindInFiles dialogs (ADAMK)
+    - Port the Find Dialog as is to wxFormBuilder (ADAMK)
+    - Prevent directory tasks running on bad or missing paths (ADAMK)
+    - Found a workaround to weird Win32 window Raise/Lower bugs, so now
+      Padre always raises to the foreground correctly when using the
+      single instance server (ADAMK)
+    - Save Intuition is disabled in null projects to prevent creating files
+      like ".../My Documents/lib/Foo/Bar.pm" (ADAMK)
+    - The Task Manager will now attempt to maximise background worker
+      specialisation so we need to load less total modules, hopefully
+      reducing memory consumption (ADAMK)
+    - Closing files is faster (and the task manager is stressed less) as
+      we no longer accidentally do a full refresh twice when closing
+      documents other than the last one (ADAMK)
+    - Enhancement, ticket #1027 When saving a file without a file extension 
+      you are now prompted and provided a list of suitable extensions to 
+      name your file. (PLAVEN)
+    - Restored radio select indicator to Style and View Document As...
+      menus, they were lost in the move to the ActionLibrary (ADAMK)
+    - Fixed #1093. The natural zoom of a scintilla window is around the wrong
+      way, hijack ctrl-scroll and reverse it to the right way (ADAMK)
+    - Find in Files directory recursion now happens ordered (ADAMK)
+
+0.79 not released
+    - Padre::Util::parse_version is now Padre::Util::parse_variable (ADAMK)
+
 0.78 2011.01.14
     - The nytprof.out and nytprof HTML report directories are added to the
       default ignore logic for Perl project (ADAMK)
@@ -45,7 +90,10 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
       in your project is almost certainly the one you want. (ADAMK)
     - Updated the Copyright notice to reflect the new year. (PLAVEN)
     - Added additional test to copyright.t to check all copyright notices
-      have the current year.
+      have the current year. (PLAVEN)
+
+0.75 not released
+    - No incompatible API changes during the 0.78 release cycle
 
 0.76 2010.12.08
     - Fix #636: Filter too strict (Padre CPAN module installer) (ZENOG)
@@ -124,6 +172,9 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
     - In F2 help search, core module since-Perl-version string is now a v-string
       (e.g. v5.8.9 instead of v5.008009) (AZAWAWI)
     - Correctly start up maximized if we were closed maximized (ADAMK)
+
+0.73 not released
+    - No incompatible API changes during the 0.76 release cycle
 
 0.74 2010.11.14
     - Fix #926 completely: Esc key does not always work in regex editor (ZENOG)

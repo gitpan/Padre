@@ -24,8 +24,7 @@ use warnings;
 use URI                   ();
 use Encode                ();
 use Scalar::Util          ();
-use List::MoreUtils       ();
-use Params::Util          (qw{ _INSTANCE _INVOCANT _HASH _STRING });
+use Params::Util          ();
 use Padre::Util           ('_T');
 use Padre::Browser        ();
 use Padre::Task::Browser  ();
@@ -37,7 +36,7 @@ use Padre::Wx::Dialog     ();
 use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Role::Task
 	Wx::Dialog
@@ -209,16 +208,16 @@ sub help {
 	my $document = shift;
 	my $hint     = shift;
 
-	if ( _INSTANCE( $document, 'Padre::Document' ) ) {
+	if ( Params::Util::_INSTANCE( $document, 'Padre::Document' ) ) {
 		$document = $self->padre2docbrowser($document);
 	}
 
 	my %hints = (
 		$self->_hints,
-		_HASH($hint) ? %$hint : (),
+		Params::Util::_HASH($hint) ? %$hint : (),
 	);
 
-	if ( _INVOCANT($document) and $document->isa('Padre::Browser::Document') ) {
+	if ( Params::Util::_INVOCANT($document) and $document->isa('Padre::Browser::Document') ) {
 		if ( $self->viewer_for( $document->guess_mimetype ) ) {
 			return $self->display($document);
 		}
@@ -292,7 +291,7 @@ sub display {
 	my $docs  = shift;
 	my $query = shift;
 
-	if ( _INSTANCE( $docs, 'Padre::Browser::Document' ) ) {
+	if ( Params::Util::_INSTANCE( $docs, 'Padre::Browser::Document' ) ) {
 
 		# if doc is html just display it
 		# TO DO, a means to register other wx display windows such as ?!
@@ -335,7 +334,7 @@ sub show_page {
 	my $docs  = shift;
 	my $query = shift;
 
-	unless ( _INSTANCE( $docs, 'Padre::Browser::Document' ) ) {
+	unless ( Params::Util::_INSTANCE( $docs, 'Padre::Browser::Document' ) ) {
 		return $self->not_found($query);
 	}
 
@@ -344,11 +343,11 @@ sub show_page {
 
 	# Best effort to title the tab ANYTHING more useful
 	# than 'Untitled'
-	if ( _INSTANCE( $query, 'Padre::Browser::Document' ) ) {
+	if ( Params::Util::_INSTANCE( $query, 'Padre::Browser::Document' ) ) {
 		$title = $query->title;
 	} elsif ( $docs->title ) {
 		$title = $docs->title;
-	} elsif ( _STRING($query) ) {
+	} elsif ( Params::Util::_STRING($query) ) {
 		$title = $query;
 	}
 

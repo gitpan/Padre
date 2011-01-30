@@ -14,7 +14,7 @@ use Padre::Wx::ActionLibrary ();
 use Padre::Wx::Menu          ();
 use Padre::Locale            ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Wx::Menu';
 
 my @GUI_ELEMENTS = qw{
@@ -84,7 +84,11 @@ sub new {
 		);
 
 		my %mimes = Padre::MimeTypes::menu_view_mimes();
-		foreach my $name ( sort { Wx::gettext( $mimes{$a} ) cmp Wx::gettext( $mimes{$b} ) } keys %mimes ) {
+		my @names = sort {
+			( $b eq 'text/plain' ) <=> ( $a eq 'text/plain' )
+				or Wx::gettext( $mimes{$a} ) cmp Wx::gettext( $mimes{$b} )
+		} keys %mimes;
+		foreach my $name (@names) {
 			my $radio = $self->add_menu_action(
 				$self->{view_as_highlighting},
 				"view.mime.$name",

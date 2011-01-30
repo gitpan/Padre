@@ -23,7 +23,7 @@ use Padre::DB                    ();
 use Padre::Wx                    ();
 use Padre::Wx::Role::Main        ();
 use Padre::Wx::History::ComboBox ();
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -610,6 +610,7 @@ dialog does not result in a valid search.
 
 sub as_search {
 	my $self = shift;
+	require Padre::Search;
 	Padre::Search->new(
 		find_term    => $self->{find_text}->GetValue,
 		find_case    => $self->{find_case}->GetValue,

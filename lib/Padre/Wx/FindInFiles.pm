@@ -16,7 +16,7 @@ use Padre::Wx             ();
 use Padre::Wx::TreeCtrl   ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -167,6 +167,9 @@ sub search_message {
 
 	# Add the lines nodes to the tree
 	foreach my $row (@_) {
+
+		# Tabs don't display properly
+		$row->[1] =~ s/\t/    /g;
 		my $line = $self->AppendItem(
 			$file,
 			$row->[0] . ': ' . $row->[1],

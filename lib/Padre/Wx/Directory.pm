@@ -4,17 +4,19 @@ use 5.008;
 use strict;
 use warnings;
 use Params::Util                   ();
-use Padre::Cache                   ();
+use Padre::Current                 ();
 use Padre::Role::Task              ();
+use Padre::Wx::Role::Dwell         ();
 use Padre::Wx::Role::View          ();
 use Padre::Wx::Role::Main          ();
 use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = qw{
 	Padre::Role::Task
+	Padre::Wx::Role::Dwell
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -73,13 +75,16 @@ sub new {
 	# This line is causing an error on Ubuntu due to some Wx problems.
 	# see https://bugs.launchpad.net/ubuntu/+source/padre/+bug/485012
 	# Supporting Ubuntu seems to be more important than having this text:
-	$search->SetDescriptiveText( Wx::gettext('Search') ) if Padre::Constant::DISTRO ne 'UBUNTU';
+	if ( Padre::Constant::DISTRO ne 'UBUNTU' ) {
+		$search->SetDescriptiveText( Wx::gettext('Search') );
+	}
 
+	# Use a long and obvious 3 second dwell timer for text events
 	Wx::Event::EVT_TEXT(
 		$self, $search,
 		sub {
 			return if $_[0]->{ignore};
-			shift->on_text(@_);
+			$_[0]->dwell_start( 'on_text', 333 );
 		},
 	);
 
@@ -87,7 +92,12 @@ sub new {
 		$self, $search,
 		sub {
 			return if $_[0]->{ignore};
-			shift->{search}->SetValue('');
+			$_[0]->{search}->SetValue('');
+
+			# Don't wait for dwell in this case,
+			# shortcut and trigger immediately.
+			$_[0]->dwell_stop('on_text');
+			$_[0]->on_text;
 		},
 	);
 
@@ -176,6 +186,7 @@ sub view_label {
 sub view_close {
 	TRACE( $_[0] ) if DEBUG;
 	$_[0]->task_reset;
+	$_[0]->dwell_stop('on_text'); # Just in case
 	$_[0]->main->show_directory(0);
 }
 
@@ -217,8 +228,10 @@ sub on_text {
 		if ( $search->IsEmpty ) {
 
 			# Nothing to do
-			# NOTE: Why would this even fire?
-			TRACE("WARNING: This should never fire") if DEBUG;
+			# NOTE: I don't understand why this should ever fire,
+			# but it does seem to fire very late when the directory
+			# browser changes projects directories.
+			# TRACE("WARNING: This should never fire") if DEBUG;
 		} else {
 
 			# Entering search mode
@@ -356,12 +369,12 @@ sub refill {
 # Called outside Directory.pm, on directory browser focus and item dragging
 sub refresh {
 	TRACE( $_[0] ) if DEBUG;
-	my $self = shift;
+	my $self    = shift;
+	my $current = Padre::Current::_CURRENT(@_);
 
 	# NOTE: Without a file open, Padre does not consider itself to
 	# have a "current project". We should probably try to find a way
 	# to correct this in future.
-	my $current = $self->current;
 	my $config  = $current->config;
 	my $project = $current->project;
 	my $root    = $project ? $project->root : $config->main_directory_root;
@@ -376,6 +389,7 @@ sub refresh {
 		# Save the current model data to the cache
 		# if we potentially need it again later.
 		if ( $ide->project_exists( $self->{root} ) ) {
+			require Padre::Cache;
 			my $stash = Padre::Cache->stash(
 				__PACKAGE__ => $ide->project( $self->{root} ),
 			);
@@ -407,6 +421,7 @@ sub refresh {
 		# Do we have an (out of date) cached state we can use?
 		# If so, display it immediately and update it later on.
 		if ($project) {
+			require Padre::Cache;
 			my $stash = Padre::Cache->stash(
 				__PACKAGE__ => $project,
 			);

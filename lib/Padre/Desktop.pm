@@ -25,7 +25,7 @@ use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 =pod
 
@@ -41,13 +41,12 @@ Returns C<undef> if not found.
 sub find_padre_exe {
 	return unless Padre::Constant::WXWIN32;
 
-	my $self = shift;
 	require File::Which;
-	require File::Basename;
 	my $padre_exe = File::Which::which('padre.exe');
 
 	#exit if we could not find Padre's executable in PATH
 	if ($padre_exe) {
+		require File::Basename;
 		my $padre_exe_dir = File::Basename::dirname($padre_exe);
 		return ( $padre_exe, $padre_exe_dir );
 	} else {

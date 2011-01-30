@@ -9,7 +9,7 @@ use Scalar::Util      ();
 use Padre::TaskThread ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::TaskThread';
 
 
@@ -23,7 +23,7 @@ sub new {
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
 
-	# Initialise task execution tracking
+	# Initialise task statistics
 	$self->{seen} = {};
 
 	return $self;

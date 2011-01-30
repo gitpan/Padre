@@ -11,8 +11,12 @@ use Padre::Wx                ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION        = '0.78';
+our $VERSION        = '0.80';
 our $BACKCOMPATIBLE = '0.66';
+
+# Timeout values
+use constant MAX_START_TIMEOUT => 10;
+use constant MAX_IDLE_TIMEOUT  => 30;
 
 # Set up the primary integration event
 our $THREAD_SIGNAL : shared;
@@ -133,46 +137,45 @@ sub stop_thread {
 	return 1;
 }
 
-# Get the next available free child
-sub next_thread {
-	TRACE( $_[0] ) if DEBUG;
-	my $self    = shift;
-	my $workers = $self->{workers};
-
-	# Find the first free worker of any kind
-	foreach my $worker (@$workers) {
-		next if $worker->handle;
-		return $worker;
-	}
-
-	# Create a new worker if we can
-	if ( @$workers < $self->maximum ) {
-		return $self->start_thread( scalar @$workers );
-	}
-
-	return undef;
-}
-
 # Get the best available child for a particular task
 sub best_thread {
 	TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
 	my $handle  = shift;
+	my $task    = $handle->class;
 	my $workers = $self->{workers};
 	my @unused  = grep { not $_->handle } @$workers;
+	my @seen    = grep { $_->{seen}->{$task} } @unused;
 
-	# First try to find a specialist.
-	# Any of them will do at this point, no futher work needed.
-	foreach my $worker (@unused) {
-		next unless $worker->{seen}->{ $handle->class };
-		return $worker;
+	# Our basic strategy is to reuse an existing worker that
+	# has done this task before to prevent loading more modules.
+	if (@seen) {
+
+		# Try to concentrate reuse as much as possible.
+		# Pick the worker that has done the least other things.
+		# Break a tie by awarding the task to the worker that has
+		# done this type of task the most often to prevent flipping
+		# between multiple with similar %seen diversity.
+		@seen = sort {
+			scalar( keys %{ $a->{seen} } ) <=> scalar( keys %{ $b->{seen} } )
+				or $b->{seen}->{$task} <=> $a->{seen}->{$task}
+		} @seen;
+		return $seen[0];
 	}
 
-	# Bias towards maximum reuse of a smaller number of threads.
-	# This will (hopefully) allow the most stale threads to swap
-	# better, and will simplify decisions on when to clean up
-	# excessive threads.
-	if ( defined $unused[0] ) {
+	### TODO: In future, we could also try to check for workers which
+	# have seen the superclasses of our class so something which has
+	# seen another LWP-based task will also be chosen for a new
+	# LWP-based task.
+
+	# If nothing has seen this task before, bias towards the least
+	# specialised thread. The idea here is to try and create one
+	# big generalist worker, which will maximise the likelyhood that
+	# the other threads will specialise and minimise memory load by
+	# having all the rare stuff in one big thread where they will
+	# hopefully have shared dependencies.
+	if (@unused) {
+		@unused = sort { scalar( keys %{ $b->{seen} } ) <=> scalar( keys %{ $a->{seen} } ) } @unused;
 		return $unused[0];
 	}
 
@@ -181,6 +184,7 @@ sub best_thread {
 		return $self->start_thread( scalar @$workers );
 	}
 
+	# This task will have to wait for another worker to become free
 	return undef;
 }
 
@@ -219,7 +223,7 @@ sub step {
 	# Shortcut if there is nowhere to run the task
 	if ( $self->{threads} ) {
 		if ( scalar keys %$handles >= $self->{maximum} ) {
-			if ( Padre::Current->main->config->feature_restart_hung_task_manager ) {
+			if ( Padre::Current->config->feature_restart_hung_task_manager ) {
 
 				# Restart hung task manager!
 				TRACE('PANIC: Restarting task manager') if DEBUG;
@@ -254,6 +258,9 @@ sub step {
 
 	# Find the next/best worker for the task
 	my $worker = $self->best_thread($handle) or return;
+
+	# Prepare handle timing
+	$handle->start_time(time);
 
 	# Send the task to the worker for execution
 	$worker->send_task($handle);
@@ -315,6 +322,9 @@ sub on_signal {
 	# Fine the task handle for the task
 	my $hid = shift @$message;
 	my $handle = $self->{handles}->{$hid} or return;
+
+	# Update idle thread tracking so we don't force-kill this thread
+	$handle->idle_time(time);
 
 	# Handle the special startup message
 	my $method = shift @$message;

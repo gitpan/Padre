@@ -11,7 +11,7 @@ use Padre::Task                ();
 use Padre::Wx::Directory::Path ();
 use Padre::Logger;
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 our @ISA     = 'Padre::Task';
 
 use constant NO_WARN => 1;
@@ -54,6 +54,16 @@ sub new {
 
 ######################################################################
 # Padre::Task Methods
+
+# If somehow we tried to run with a non-existint root, skip
+sub prepare {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	return 0 unless defined $self->{root};
+	return 0 unless length $self->{root};
+	return 0 unless -d $self->{root};
+	return 1;
+}
 
 sub run {
 	TRACE( $_[0] ) if DEBUG;
@@ -122,7 +132,7 @@ sub run {
 			my @fstat = stat($fullname);
 			next if $#fstat == -1;
 
-			if ( $dev != $fstat[0] ) {
+			unless ( $dev == $fstat[0] ) {
 				warn "DirectoryBrowser root-dir $root is on a different device than $fullname, skipping (FIX REQUIRED!)"
 					unless NO_WARN;
 				next;

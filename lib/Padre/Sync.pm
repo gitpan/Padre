@@ -19,7 +19,6 @@ class for user interface display.
 use 5.008;
 use strict;
 use warnings;
-use lib            ();
 use Carp           ();
 use File::Spec     ();
 use Scalar::Util   ();
@@ -27,12 +26,12 @@ use Params::Util   ();
 use JSON::XS       ();
 use LWP::UserAgent ();
 use HTTP::Cookies  ();
-use HTTP::Request::Common qw/GET POST PUT DELETE/;
+use HTTP::Request::Common qw/GET POST DELETE/;
 use Padre::Util     ();
 use Padre::Current  ();
 use Padre::Constant ();
 
-our $VERSION = '0.78';
+our $VERSION = '0.80';
 
 
 
