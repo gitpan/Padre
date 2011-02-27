@@ -14,7 +14,7 @@ use Padre::Wx::Icon   ();
 use Padre::Wx::Editor ();
 use Padre::Constant   ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::ToolBar
@@ -152,8 +152,7 @@ sub refresh {
 	my $document = $current->document;
 	my $modified = ( defined $document and $document->is_modified );
 	my $text     = defined Params::Util::_STRING( $current->text );
-	my $file =
-		( defined $document and defined $document->{file} and defined $document->file->{filename} );
+	my $file     = ( defined $document and defined $document->{file} and defined $document->file->{filename} );
 
 	foreach my $item ( keys( %{ $self->{item_list} } ) ) {
 		my $action = $self->{item_list}->{$item};

@@ -22,10 +22,11 @@ CPAN spinoff later).
 use 5.008;
 use strict;
 use warnings;
+use Storable  ();
 use Padre::Wx ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 
 our $SIGNAL : shared;
 
@@ -50,13 +51,28 @@ sub conduit_init {
 
 sub signal {
 	TRACE( $_[0] ) if DEBUG;
-	$CONDUIT->AddPendingEvent( Wx::PlThreadEvent->new( -1, $SIGNAL, $_[1] ) ) if $CONDUIT;
+	if ($CONDUIT) {
+		$CONDUIT->AddPendingEvent( Wx::PlThreadEvent->new( -1, $SIGNAL, $_[1] ) );
+	} elsif (DEBUG) {
+		TRACE("Cannot send Wx::PlThreadEvent as \$CONDUIT is undef");
+	}
 }
 
 # Pass the event through to the event handler
 sub on_signal {
 	TRACE( $_[1] ) if DEBUG;
-	$HANDLER->on_signal( $_[1] ) if $HANDLER;
+	return 1 unless $HANDLER;
+
+	# Deserialise the message from the Wx event so that our handler does not
+	# need to be aware we are implemented via Wx.
+	my $frozen = $_[1]->GetData;
+	my $message = eval { Storable::thaw($frozen); };
+	if ($@) {
+		TRACE("Exception deserialising message '$frozen'") if DEBUG;
+		return;
+	}
+
+	$HANDLER->on_signal($message);
 	return 1;
 }
 

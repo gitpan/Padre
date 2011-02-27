@@ -8,12 +8,14 @@ use Time::HiRes               ();
 use Padre::Constant           ();
 use Padre::Util               ();
 use Padre::Current            ();
+use Padre::DB                 ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
-our @ISA     = 'Wx::StyledTextCtrl';
+our $VERSION    = '0.82';
+our $COMPATIBLE = '0.81';
+our @ISA        = 'Wx::StyledTextCtrl';
 
 # End-Of-Line modes:
 # MAC is actually Mac classic.
@@ -441,6 +443,19 @@ sub _color {
 		#Carp::cluck("invalid color '$rgb'");
 	}
 	return Wx::Colour->new(@c);
+}
+
+sub remove_color {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+
+	# TO DO this is strange, do we really need to do it with all?
+	foreach my $i ( 0 .. 31 ) {
+		$self->StartStyling( 0, $i );
+		$self->SetStyling( $self->GetLength, 0 );
+	}
+
+	return;
 }
 
 
@@ -981,7 +996,7 @@ sub on_focus {
 		if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 			$document->colorize;
 		} else {
-			$document->remove_color;
+			$self->remove_color;
 			$self->Colourise( 0, $self->GetLength );
 		}
 		$self->needs_manual_colorize(0);
@@ -1659,6 +1674,46 @@ sub needs_manual_colorize {
 		$_[0]->{needs_manual_colorize} = $_[1];
 	}
 	return $_[0]->{needs_manual_colorize};
+}
+
+
+
+
+
+######################################################################
+# Cursor Memory
+
+#
+# $doc->store_cursor_position()
+#
+# store document's current cursor position in padre's db.
+# no params, no return value.
+#
+sub store_cursor_position {
+	my $self     = shift;
+	my $document = $self->{Document} or return;
+	my $file     = $document->{file} or return;
+	Padre::DB::LastPositionInFile->set_last_pos(
+		$file->filename,
+		$self->GetCurrentPos,
+	);
+}
+
+#
+# $doc->restore_cursor_position()
+#
+# restore document's cursor position from padre's db.
+# no params, no return value.
+#
+sub restore_cursor_position {
+	my $self     = shift;
+	my $document = $self->{Document} or return;
+	my $file     = $document->{file} or return;
+	my $filename = $file->filename;
+	my $position = Padre::DB::LastPositionInFile->get_last_pos($filename);
+	return unless defined $position;
+	$self->SetCurrentPos($position);
+	$self->SetSelection( $position, $position );
 }
 
 1;

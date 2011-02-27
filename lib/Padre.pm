@@ -23,7 +23,8 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION = '0.80';
+our $VERSION    = '0.82';
+our $COMPATIBLE = '0.81';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -35,12 +36,13 @@ use Padre::Logger;
 # Generate faster accessors
 use Class::XSAccessor 1.05 {
 	getters => {
-		original_cwd   => 'original_cwd',
-		opts           => 'opts',
-		config         => 'config',
-		wx             => 'wx',
-		task_manager   => 'task_manager',
-		plugin_manager => 'plugin_manager',
+		original_cwd    => 'original_cwd',
+		opts            => 'opts',
+		config          => 'config',
+		wx              => 'wx',
+		task_manager    => 'task_manager',
+		plugin_manager  => 'plugin_manager',
+		project_manager => 'project_manager',
 	},
 	accessors => {
 		actions     => 'actions',
@@ -49,7 +51,6 @@ use Class::XSAccessor 1.05 {
 		instance_id => 'instance_id',
 	},
 };
-
 
 sub import {
 	unless ( $_[1] and $_[1] eq ':everything' ) {
@@ -114,11 +115,11 @@ sub new {
 		# Wx Attributes
 		wx => undef,
 
-		# Plug-in Attributes
-		plugin_manager => undef,
+		# Project Storage
+		project_manager => undef,
 
-		# Project Attributes
-		project => {},
+		# Plugin Storage
+		plugin_manager => undef,
 
 	}, $class;
 
@@ -142,6 +143,10 @@ sub new {
 
 	# Wizard registry
 	$self->wizards( {} );
+
+	# Create the project manager
+	require Padre::ProjectManager;
+	$self->{project_manager} = Padre::ProjectManager->new;
 
 	# Create the plugin manager
 	require Padre::PluginManager;
@@ -171,6 +176,9 @@ sub run {
 	local $ENV{PADRE_VERSION} = $VERSION;
 
 	TRACE("Padre->run was called version $VERSION") if DEBUG;
+
+	# make WxWidgets translate the default buttons etc.
+	$ENV{LANGUAGE} = $self->config->locale if Padre::Constant::UNIX;
 
 	# Clean arguments (with a bad patch for saving URLs)
 	if (Padre::Constant::WIN32) {
@@ -257,20 +265,9 @@ sub save_config {
 #####################################################################
 # Project Management
 
+# Temporary pass-through
 sub project {
-	my $self = shift;
-	my $root = shift;
-	unless ( ref $self->{project}->{$root} ) {
-		require Padre::Project;
-		$self->{project}->{$root} = Padre::Project->from_file(
-			File::Spec->catfile( $root, 'a' ),
-		);
-	}
-	return $self->{project}->{$root};
-}
-
-sub project_exists {
-	defined $_[0]->{project}->{ $_[1] };
+	$_[0]->project_manager->project( $_[1] );
 }
 
 1;

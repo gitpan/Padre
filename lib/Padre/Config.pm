@@ -24,7 +24,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -244,11 +244,11 @@ sub set {
 			}
 			$value = $long;
 
-			#Wx::DirPickerCtrl upgrades data to utf8.
-			#Perl on Windows cannot handle utf8 in file names, so this hack converts
-			#path back
+			# Wx::DirPickerCtrl upgrades data to utf8.
+			# Perl on Windows cannot handle utf8 in file names,
+			# so this hack converts path back.
 		}
-		if ( not -e $value ) {
+		unless ( -e $value ) {
 			Carp::croak("Setting '$name' to non-existant path '$value'");
 		}
 
@@ -398,6 +398,7 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 	startup => 1,
+	help    => _T('Showing the splash image during start-up'),
 );
 
 # Startup mode, if no files given on the command line this can be
@@ -436,10 +437,14 @@ setting(
 
 # Window
 setting(
-	name    => 'main_title',
-	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
-	default => 'Padre [%p]',
+	name  => 'main_title',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HUMAN,
+	default => ( Padre::Constant::PORTABLE ? 'Padre Portable' : 'Padre' ) . ' [%p]',
+	apply => sub {
+		my $main = shift;
+		$main->refresh_title;
+	},
 );
 
 setting(

@@ -61,9 +61,9 @@ use Padre::Wx::Role::Conduit  ();
 use Padre::Wx::Role::Dialog   ();
 use Padre::Logger;
 
-our $VERSION        = '0.80';
-our $BACKCOMPATIBLE = '0.58';
-our @ISA            = qw{
+our $VERSION    = '0.82';
+our $COMPATIBLE = '0.58';
+our @ISA        = qw{
 	Padre::Wx::Role::Conduit
 	Padre::Wx::Role::Dialog
 	Wx::Frame
@@ -820,19 +820,6 @@ sub load_files {
 	return;
 }
 
-sub _xy_on_screen {
-
-	# Returns true if the initial xy coordinate is on the screen
-	# See ticket #822
-	my $self   = shift;
-	my $config = $self->config;
-	if ( $config->main_top < 0 or $config->main_left < 0 ) {
-		return 0;
-	}
-
-	return 1;
-}
-
 =pod
 
 =head2 C<lock>
@@ -912,7 +899,44 @@ sub locked {
 Padre embeds a small network server to handle single instance. Here are
 the methods that allow to control this embedded server.
 
+=head3 C<single_instance_address>
+
+    $main->single_instance_address;
+
+Determines the location of the single instance server for this instance of
+L<Padre>.
+
 =cut
+
+sub single_instance_address {
+	my $self   = shift;
+	my $config = $self->config;
+
+	require Wx::Socket;
+	if (Padre::Constant::WXWIN32) {
+
+		# Since using a Wx::IPv4address doesn't seem to work,
+		# for now just return the two-value host/port list.
+		# my $address = Wx::IPV4address->new;
+		# $address->SetHostname('127.0.0.1');
+		# $address->SetService('4444');
+		# return $address;
+		return (
+			'127.0.0.1',
+			$config->main_singleinstance_port,
+		);
+	} else {
+		my $file = File::Spec->catfile(
+			Padre::Constant::CONFIG_DIR,
+			'single_instance.socket',
+		);
+		my $address = Wx::UNIXaddress->new;
+		$address->SetFilename($file);
+		return $address;
+	}
+}
+
+=pod
 
 my $single_instance_port = 4444;
 
@@ -936,8 +960,8 @@ sub single_instance_start {
 	# Create the server
 	require Wx::Socket;
 	$self->{single_instance} = Wx::SocketServer->new(
-		'127.0.0.1' => $single_instance_port,
-		Wx::wxSOCKET_NOWAIT Wx::wxSOCKET_REUSEADDR,
+		$self->single_instance_address,
+		Wx::wxSOCKET_NOWAIT | Wx::wxSOCKET_REUSEADDR,
 	);
 	unless ( $self->{single_instance}->Ok ) {
 		delete $self->{single_instance_server};
@@ -1305,70 +1329,78 @@ Sets or updates the Window title.
 =cut
 
 sub refresh_title {
-	my $self     = shift;
-	my $config   = $self->{config};
-	my $current  = $self->current;
+	my $self = shift;
+	return if $self->locked('REFRESH');
+
+	# Get the window title template string
+	my $current = Padre::Current::_CURRENT(@_);
+	my $config  = $current->config;
+	my $title   = $config->main_title || 'Padre %v';
+
+	# Populate any variables used in the template on demand,
+	# avoiding potentially expensive operations unless needed.
 	my %variable = (
 		'%' => '%',
 		'v' => $Padre::VERSION,
-		'f' => '',             # Initialize space for filename
-		'b' => '',             # Initialize space for filename - basename
-		'd' => '',             # Initialize space for filename - dirname
-		'F' => '',             # Initialize space for filename relative to project dir
-		'p' => '',             # Initialize space for project name
 	);
+	foreach my $char ( $title =~ /\%(.)/g ) {
+		next if exists $variable{$char};
+		if ( $char eq 'p' ) {
 
-	# We may run within window start-up, there may be no "current" or
-	# "document" or "document->file":
-	if (    defined $current
-		and defined $current->document
-		and defined $current->document->file )
-	{
-		my $document = $current->document;
-		my $file     = $document->file;
-		$variable{'f'} = $file->{filename};
-		$variable{'b'} = $file->basename;
-		$variable{'d'} = $file->dirname;
-		$variable{'F'} = $file->{filename};
-		my $project_dir = $document->project_dir;
-		if ( defined $project_dir ) {
-			$project_dir = quotemeta $project_dir;
-			$variable{'F'} =~ s/^$project_dir//;
+			# Fill in the session name, if any
+			if ( defined $self->ide->{session} ) {
+				my ($session) = Padre::DB::Session->select(
+					'where id = ?', $self->ide->{session},
+				);
+				$variable{p} = $session->name;
+			} else {
+				$variable{p} = '';
+			}
+			next;
+		}
+
+		# The other variables are all based on the filename
+		my $document = $current->document or next;
+		my $file = $document->file;
+		next unless defined $file;
+
+		if ( $char eq 'b' ) {
+			$variable{b} = $file->basename;
+		} elsif ( $char eq 'd' ) {
+			$variable{d} = $file->dirname;
+		} elsif ( $char eq 'f' ) {
+			$variable{f} = $file->{filename};
+		} elsif ( $char eq 'F' ) {
+
+			# Filename relative to the project root
+			$variable{F} = $file->{filename};
+			my $project_dir = $document->project_dir;
+			if ( defined $project_dir ) {
+				$project_dir = quotemeta $project_dir;
+				$variable{F} =~ s/^$project_dir//;
+			}
+		} else {
+			$variable{$char} = '%' . $char;
 		}
 	}
 
-	# Fill in the session, if any
-	if ( defined $self->ide->{session} ) {
-		my ($session) = Padre::DB::Session->select(
-			'where id = ?', $self->ide->{session},
-		);
-		$variable{'p'} = $session->name;
-	}
+	# Process the template into the final string
+	$title =~ s/\%(.)/$variable{$1}/g;
 
-	# Keep it for later usage
-	$self->{title} = $config->main_title;
-
-	my $variables = join '', keys %variable;
-
-	$self->{title} =~ s/\%([$variables])/$variable{$1}/g if $variables;
-
-	unless ( defined $self->{title} ) {
-		$self->{title} = "Padre $Padre::VERSION";
-	}
-
+	# Additional information if we are running the developer version.
 	require Padre::Util::SVN;
 	my $revision = Padre::Util::SVN::padre_revision();
 	if ( defined $revision ) {
-		$self->{title} .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
+		$title .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
 	}
 
-	if ( $self->GetTitle ne $self->{title} ) {
+	unless ( $self->GetTitle eq $title ) {
 
 		# Push the title to the window
-		$self->SetTitle( $self->{title} );
+		$self->SetTitle($title);
 
 		# Push the title to the process list for better identification
-		$0 = $self->{title}; ## no critic (RequireLocalizedPunctuationVars)
+		$0 = $title; ## no critic (RequireLocalizedPunctuationVars)
 	}
 
 	return;
@@ -2948,12 +2980,12 @@ sub search_next {
 	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
 		$self->{search} = shift;
 	} elsif (@_) {
-		die("Invalid argument to search_next");
+		die 'Invalid argument to search_next';
 	}
 	if ( $self->search ) {
 		$self->search->search_next($editor);
 	} else {
-		$self->find->find;
+		$self->find->find_next;
 	}
 }
 
@@ -3550,7 +3582,7 @@ sub setup_editor {
 	# $editor->padre_setup;
 
 	if ( $config->feature_cursormemory ) {
-		$document->restore_cursor_position;
+		$editor->restore_cursor_position;
 	}
 
 	# Update and refresh immediately if not locked
@@ -4039,10 +4071,11 @@ sub reload_file {
 	}
 
 	my $pos = $self->config->feature_cursormemory;
-	$document->store_cursor_position if $pos;
+	$editor->store_cursor_position if $pos;
 	if ( $document->reload ) {
-		$document->editor->configure_editor($document);
-		$document->restore_cursor_position if $pos;
+		$editor = $document->editor;
+		$editor->configure_editor($document);
+		$editor->restore_cursor_position if $pos;
 	} else {
 		$self->error(
 			sprintf(
@@ -4183,47 +4216,52 @@ sub on_save_as {
 		my $saveto = $dialog->GetPath;
 
 
-		# feature request: http://padre.perlide.org/trac/ticket/1027
-		# work out if we have an extension to the file name
-		#print "The file name is: " . $dialog->GetFilename . "\n";
-		#print "The mimetype is: " . $document->mimetype . "\n";
-
-		my @file_extensions = Padre::MimeTypes->get_extensions_by_mime_type( $document->mimetype );
-
-		my $ext_string = "'" . join( "', '", @file_extensions ) . "'";
-
-		#print "file extensions: $ext_string\n"; # .  join( "\n", @file_extensions ) . "\n";
-
-		# now lets check if we have a file extension that suits the current mimetype:
-		my $fileName = $dialog->GetFilename;
-		my $ext      = "";
-		$fileName =~ m/\.([^\.]+)$/;
-		$ext = $1;
-
-		#print "File Extension is: $ext\n";
-
-		if ( !defined($ext) || $ext eq '' ) {
-
-			#show dialog that the file extension is missing for the mimetype
-			my $ret = Wx::MessageBox(
-				sprintf(
-					Wx::gettext(
-						"You have tried to save a file without a suitable file extension based on the current document's mimetype.\n\nBased on the current mimetype, suitable file extensions are:\n\n%s.\n\n\nDo you wish to continue?"
-					),
-					$ext_string
-				),
-				Wx::gettext("File extension missing warning"),
-				Wx::wxYES_NO | Wx::wxCENTRE,
-				$self,
-			);
-
-			# bit blunt really as this will return them back to the editor
-			# it would probably be nicer to return the dialog back
-			#return 0  if $ret == Wx::wxNO;
-			# this works better:
-			next; # because we are in a while(1) loop
-
-		}
+		# PJL - waxhead 10/02/2011
+		# commenting out the file extension check
+		# for now until a better implimentation is sorted out.
+		# As this will be revisited again, don't remove this block of
+		# code unless it's totally bit rotted.
+		#
+		#		# feature request: http://padre.perlide.org/trac/ticket/1027
+		#		# work out if we have an extension to the file name
+		#		#print "The file name is: " . $dialog->GetFilename . "\n";
+		#		#print "The mimetype is: " . $document->mimetype . "\n";
+		#
+		#		my @file_extensions = Padre::MimeTypes->get_extensions_by_mime_type( $document->mimetype );
+		#
+		#		my $ext_string = "'" . join( "', '", @file_extensions ) . "'";
+		#
+		#		#print "file extensions: $ext_string\n"; # .  join( "\n", @file_extensions ) . "\n";
+		#
+		#		# now lets check if we have a file extension that suits the current mimetype:
+		#		my $fileName = $dialog->GetFilename;
+		#		my $ext      = "";
+		#		$fileName =~ m/\.([^\.]+)$/;
+		#		$ext = $1;
+		#
+		#		#print "File Extension is: $ext\n";
+		#
+		#		if ( !defined($ext) || $ext eq '' ) {
+		#
+		#			#show dialog that the file extension is missing for the mimetype
+		#			my $ret = Wx::MessageBox(
+		#				sprintf(
+		#					Wx::gettext(
+		#						"You have tried to save a file without a suitable file extension based on the current document's mimetype.\n\nBased on the current mimetype, suitable file extensions are:\n\n%s.\n\n\nDo you wish to continue?"
+		#					),
+		#					$ext_string
+		#				),
+		#				Wx::gettext("File extension missing warning..."),
+		#				Wx::wxYES_NO | Wx::wxCENTRE,
+		#				$self,
+		#			);
+		#
+		#
+		#			# return back to the save as dialog when we click No.
+		#			if( $ret == Wx::wxNO ) {
+		#				next; # because we are in a while(1) loop
+		#			}
+		#		}
 
 
 		#my $path = File::Spec->catfile( $self->cwd, $filename );
@@ -4521,9 +4559,9 @@ sub close {
 	}
 	return if $id == -1;
 
-	my $editor = $notebook->GetPage($id) or return;
-	my $doc    = $editor->{Document}     or return;
-	my $lock   = $self->lock(
+	my $editor   = $notebook->GetPage($id) or return;
+	my $document = $editor->{Document}     or return;
+	my $lock     = $self->lock(
 		qw{
 			REFRESH DB
 			refresh_directory
@@ -4531,17 +4569,17 @@ sub close {
 			refresh_windowlist
 			}
 	);
-	TRACE( join ' ', "Closing ", ref $doc, $doc->filename || 'Unknown' ) if DEBUG;
+	TRACE( join ' ', "Closing ", ref $document, $document->filename || 'Unknown' ) if DEBUG;
 
-	if ( $doc->is_modified and not $doc->is_unused ) {
+	if ( $document->is_modified and not $document->is_unused ) {
 		my $ret = Wx::MessageBox(
 			Wx::gettext("File changed. Do you want to save it?"),
-			$doc->filename || Wx::gettext("Unsaved File"),
+			$document->filename || Wx::gettext("Unsaved File"),
 			Wx::wxYES_NO | Wx::wxCANCEL | Wx::wxCENTRE,
 			$self,
 		);
 		if ( $ret == Wx::wxYES ) {
-			$self->on_save($doc);
+			$self->on_save($document);
 		} elsif ( $ret == Wx::wxNO ) {
 
 			# just close it
@@ -4558,20 +4596,20 @@ sub close {
 
 	# Also, if any padre-client or other listeners to this file exist,
 	# notify it that we're done with it:
-	my $fn = $doc->filename;
+	my $fn = $document->filename;
 	if ($fn) {
 		@{ $self->{on_close_watchers}->{$fn} } = map {
 			warn "Calling on_close() callback";
-			my $remove = $_->($doc);
+			my $remove = $_->($document);
 			$remove ? () : $_
 		} @{ $self->{on_close_watchers}->{$fn} };
 	}
 
 	if ( $self->config->feature_cursormemory ) {
-		$doc->store_cursor_position;
+		$editor->store_cursor_position;
 	}
-	if ( $doc->tempfile ) {
-		$doc->remove_tempfile;
+	if ( $document->tempfile ) {
+		$document->remove_tempfile;
 	}
 
 	# Now we are past the confirmation, apply an update lock as well
@@ -4956,7 +4994,42 @@ sub open_regex_editor {
 		require Padre::Wx::Dialog::RegexEditor;
 		$self->{regex_editor} = Padre::Wx::Dialog::RegexEditor->new($self);
 	}
+
+	unless ( defined $self->{regex_editor} ) {
+		$self->error( Wx::gettext('Error loading regex editor.') );
+		return;
+	}
+
 	$self->{regex_editor}->show;
+
+	return;
+}
+
+
+=pod
+
+=head3 C<open_perl_filter>
+
+    $main->open_perl_filter;
+
+Open Padre's filter-through-perl. No return value.
+
+=cut
+
+sub open_perl_filter {
+	my $self = shift;
+
+	unless ( defined $self->{perl_filter} ) {
+		require Padre::Wx::Dialog::PerlFilter;
+		$self->{perl_filter} = Padre::Wx::Dialog::PerlFilter->new($self);
+	}
+
+	unless ( defined $self->{perl_filter} ) {
+		$self->error( Wx::gettext('Error loading perl filter dialog.') );
+		return;
+	}
+
+	$self->{perl_filter}->show;
 
 	return;
 }
@@ -5988,9 +6061,7 @@ sub on_new_from_template {
 	);
 	my $template = Padre::Util::slurp($file);
 	unless ($template) {
-
-		# Rare failure, no need to translate
-		$self->error("Failed to find template '$file'");
+		$self->error( sprintf( Wx::gettext("Failed to find template file '%s'"), $file ) );
 	}
 
 	# Generate the full file content

@@ -6,16 +6,9 @@ use warnings;
 use Padre::Search        ();
 use Padre::Wx::FBP::Find ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = qw{
 	Padre::Wx::FBP::Find
-};
-
-use constant SAVE => qw{
-	find_case
-	find_regex
-	find_first
-	find_reverse
 };
 
 
@@ -29,11 +22,11 @@ sub new {
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
 
-	# Prepare to be shown
+	# Prepare to be shown.
 	$self->CenterOnParent;
 
 	# As the user types the search term, make sure the find button
-	# enabled status is correct
+	# enabled status is correct.
 	Wx::Event::EVT_TEXT(
 		$self,
 		$self->{find_term},
@@ -78,7 +71,10 @@ sub find_next {
 
 	} elsif ( not $result ) {
 		$main->info(
-			Wx::gettext('No matches found'),
+			sprintf(
+				Wx::gettext('No matches found for "%s".'),
+				$self->{find_term}->GetValue,
+			),
 			Wx::gettext('Search')
 		);
 
@@ -97,8 +93,7 @@ sub find_next {
 ######################################################################
 # Main Methods
 
-# Makes sure the find button is only enabled when the field
-# values are valid
+# Ensure the find button is only enabled if the field values are valid
 sub refresh {
 	my $self = shift;
 	my $enable = $self->{find_term}->GetValue ne '';
@@ -147,7 +142,15 @@ sub save {
 	my $config  = $self->current->config;
 	my $changed = 0;
 
-	foreach my $name (SAVE) {
+	foreach my $name (
+		qw{
+		find_case
+		find_regex
+		find_first
+		find_reverse
+		}
+		)
+	{
 		my $value = $self->{$name}->GetValue;
 		next if $config->$name() == $value;
 		$config->set( $name => $value );

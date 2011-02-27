@@ -7,50 +7,8 @@ use strict;
 use warnings;
 use File::Spec ();
 
-our $VERSION = '0.80';
-
-
-
-
-
-######################################################################
-# Class Methods
-
-sub class {
-	my $class = shift;
-	my $root  = shift;
-	unless ( -d $root ) {
-
-		# Carp::croak("Project directory '$root' does not exist");
-		# Project root doesn't exist, this might cause problems
-		# but croaking completly crashs Padre. Fix for #819
-		require Padre::Current;
-		Padre::Current->main->error(
-			sprintf(
-				Wx::gettext(
-					      'Project directory %s does not exist (any longer). '
-						. 'This is fatal and will cause problems, please close or '
-						. 'save-as this file unless you know what you are doing.'
-				),
-				$root
-			)
-		);
-		return 'Padre::Project::Null';
-	}
-	if ( -f File::Spec->catfile( $root, 'Makefile.PL' ) ) {
-		return 'Padre::Project::Perl';
-	}
-	if ( -f File::Spec->catfile( $root, 'Build.PL' ) ) {
-		return 'Padre::Project::Perl';
-	}
-	if ( -f File::Spec->catfile( $root, 'dist.ini' ) ) {
-		return 'Padre::Project::Perl';
-	}
-	if ( -f File::Spec->catfile( $root, 'padre.yml' ) ) {
-		return 'Padre::Project';
-	}
-	return 'Padre::Project::Null';
-}
+our $VERSION    = '0.82';
+our $COMPATIBLE = '0.81';
 
 
 
@@ -63,14 +21,16 @@ sub new {
 	my $class = shift;
 	my $self = bless {@_}, $class;
 
+	# Flag to indicate this root is specifically provided by a user
+	# and is not intuited.
+	$self->{explicit} = !!$self->{explicit};
+
 	# Check the root directory
 	unless ( defined $self->root ) {
 		Carp::croak("Did not provide a root directory");
 	}
 	unless ( -d $self->root ) {
 		return undef;
-
-		# Carp::croak( "Root directory " . $self->root . " does not exist" );
 	}
 
 	# Check for a padre.yml file
@@ -85,79 +45,18 @@ sub new {
 	return $self;
 }
 
+### DEPRECATED
 sub from_file {
-	my $class = shift;
-	my $file  = shift;
-
-	# Split and scan
-	my ( $v, $d, $f ) = File::Spec->splitpath($file);
-	my @d = File::Spec->splitdir($d);
-	if ( defined $d[-1] and $d[-1] eq '' ) {
-		pop @d;
-	}
-	foreach ( reverse 0 .. $#d ) {
-		my $dir = File::Spec->catdir( @d[ 0 .. $_ ] );
-
-		# Check for Dist::Zilla support
-		my $dist_ini = File::Spec->catpath( $v, $dir, 'dist.ini' );
-		if ( -f $dist_ini ) {
-			require Padre::Project::Perl::DZ;
-			return Padre::Project::Perl::DZ->new(
-				root     => File::Spec->catpath( $v, $dir, '' ),
-				dist_ini => $dist_ini,
-			);
-		}
-
-		# Check for Module::Build support
-		my $build_pl = File::Spec->catpath( $v, $dir, 'Build.PL' );
-		if ( -f $build_pl ) {
-			require Padre::Project::Perl::MB;
-			return Padre::Project::Perl::MB->new(
-				root     => File::Spec->catpath( $v, $dir, '' ),
-				build_pl => $build_pl,
-			);
-		}
-
-		# Check for ExtUtils::MakeMaker and Module::Install support
-		my $makefile_pl = File::Spec->catpath( $v, $dir, 'Makefile.PL' );
-		if ( -f $makefile_pl ) {
-
-			# Differentiate between Module::Install and ExtUtils::MakeMaker
-			if (0) {
-				require Padre::Project::Perl::MI;
-				return Padre::Project::Perl::MI->new(
-					root        => File::Spec->catpath( $v, $dir, '' ),
-					makefile_pl => $makefile_pl,
-				);
-			} else {
-				require Padre::Project::Perl::EUMM;
-				return Padre::Project::Perl::EUMM->new(
-					root        => File::Spec->catpath( $v, $dir, '' ),
-					makefile_pl => $makefile_pl,
-				);
-			}
-		}
-
-		# Fall back to looking for null projects
-		my $padre_yml = File::Spec->catpath( $v, $dir, 'padre.yml' );
-		if ( -f $padre_yml ) {
-			require Padre::Project;
-			return Padre::Project->new(
-				root      => File::Spec->catpath( $v, $dir, '' ),
-				padre_yml => $padre_yml,
-			);
-		}
+	if ( $VERSION > 0.84 ) {
+		warn "Deprecated Padre::Util::get_project_rcs called by " . scalar caller();
 	}
 
-	# This document is part of the null project
-	require Padre::Project::Null;
-	return Padre::Project::Null->new(
-		root => File::Spec->catpath(
-			$v,
-			File::Spec->catdir(@d),
-			'',
-		),
-	);
+	require Padre::Current;
+	Padre::Current->ide->project_manager->from_file( $_[1] );
+}
+
+sub explicit {
+	$_[0]->{explicit};
 }
 
 sub root {
@@ -226,6 +125,40 @@ sub headline {
 
 # Intuit the distribution version if possible
 sub version {
+	return undef;
+}
+
+# What is the logical name of the version control system we are using.
+# Identifying the version control flavour is the only support we provide.
+# Anything more details needs to be in the version control plugin.
+# Returns a name or undef if no version control.
+sub vcs {
+	my $self = shift;
+	unless ( exists $self->{vcs} ) {
+		my $class = ref $self;
+		$self->{vcs} = $class->_vcs( $self->root );
+	}
+	return $self->{vcs};
+}
+
+sub _vcs {
+	my $class = shift;
+	my $root  = shift;
+	if ( -d File::Spec->catdir( $root, '.svn' ) ) {
+		return 'SVN';
+	}
+	if ( -d File::Spec->catdir( $root, '.git' ) ) {
+		return 'Git';
+	}
+	if ( -d File::Spec->catdir( $root, '.hg' ) ) {
+		return 'Mercurial';
+	}
+	if ( -d File::Spec->catdir( $root, '.bzr' ) ) {
+		return 'Bazaar';
+	}
+	if ( -f File::Spec->catfile( $root, 'CVS', 'Repository' ) ) {
+		return 'CVS';
+	}
 	return undef;
 }
 

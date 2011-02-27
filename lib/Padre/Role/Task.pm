@@ -21,8 +21,8 @@ use Scalar::Util   ();
 use Padre::Current ();
 use Padre::Logger;
 
-our $VERSION        = '0.80';
-our $BACKCOMPATIBLE = '0.69';
+our $VERSION    = '0.82';
+our $COMPATIBLE = '0.69';
 
 # Use a shared sequence for object revisioning greatly
 # simplifies the indexing process.

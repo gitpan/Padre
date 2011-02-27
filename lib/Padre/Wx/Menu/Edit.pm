@@ -9,7 +9,7 @@ use Padre::Current  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -316,6 +316,11 @@ sub new {
 	$self->{filter_tool} = $self->add_menu_action(
 		$self,
 		'edit.filter_tool',
+	);
+
+	$self->{filter_tool} = $self->add_menu_action(
+		$self,
+		'edit.perl_filter',
 	);
 
 	$self->AppendSeparator;

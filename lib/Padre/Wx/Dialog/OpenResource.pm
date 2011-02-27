@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::MimeTypes      ();
 use Padre::Role::Task     ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Main
@@ -53,15 +53,17 @@ sub init_search {
 	my $current  = $self->current;
 	my $document = $current->document;
 	my $filename = $current->filename;
+	my $project  = $current->project;
 
 	# Check if we have an open file so we can use its directory
 	my $directory = $filename
 
 		# Current document's project or base directory
-		? Padre::Util::get_project_dir($filename)
-		|| File::Basename::dirname($filename)
+		? $project
+			? $project->root
+			: File::Basename::dirname($filename)
 
-		# Current working directory
+			# Current working directory
 		: Cwd::getcwd();
 
 	# Restart search if the project/current directory is different

@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -64,7 +64,7 @@ sub ppi_set {
 	my $self = shift;
 	my $document = Params::Util::_INSTANCE( shift, 'PPI::Document' );
 	unless ($document) {
-		Carp::croak("Did not provide a PPI::Document");
+		Carp::croak('Did not provide a PPI::Document');
 	}
 
 	# Serialize and overwrite the current text
@@ -395,69 +395,6 @@ sub pre_process {
 	return 1;
 }
 
-# Checks the syntax of a Perl document.
-# Documented in Padre::Document!
-# Implemented as a task. See Padre::Document::Perl::Syntax
-sub check_syntax {
-	shift->_check_syntax_internals(
-
-		# Passing all arguments is ok, but critic complains
-		{   @_, ## no critic (ProhibitCommaSeparatedStatements)
-			background => 0
-		}
-	);
-}
-
-sub check_syntax_in_background {
-	shift->_check_syntax_internals(
-
-		# Passing all arguments is ok, but critic complains
-		{   @_, ## no critic (ProhibitCommaSeparatedStatements)
-			background => 1
-		}
-	);
-}
-
-sub _check_syntax_internals {
-	my $self = shift;
-	my $args = shift;
-	my $text = $self->text_get;
-	unless ( defined $text and $text ne '' ) {
-		return [];
-	}
-
-	# Do we really need an update?
-	require Digest::MD5;
-	my $md5 = Digest::MD5::md5_hex( Encode::encode_utf8($text) );
-	unless ( $args->{force} ) {
-		if ( defined( $self->{last_syncheck_md5} )
-			and $self->{last_syncheck_md5} eq $md5 )
-		{
-			return;
-		}
-	}
-	$self->{last_syncheck_md5} = $md5;
-
-	require Padre::Document::Perl::Syntax;
-	my $task = Padre::Document::Perl::Syntax->new(
-		document => $self,
-	);
-
-	if ( $args->{background} ) {
-
-		# asynchroneous execution (see on_finish hook)
-		$task->schedule;
-		return;
-	} else {
-
-		# serial execution, returning the result
-		$task->prepare or return;
-		$task->run;
-		$task->finish;
-		return $task->{model};
-	}
-}
-
 =pod
 
 =head2 beginner_check
@@ -732,7 +669,9 @@ sub find_method_declaration {
 # Arguments: A method name, optionally a class name
 # Returns: Success-Bit, Filename
 sub _find_method {
-	my ( $self, $name, $class ) = @_;
+	my $self  = shift;
+	my $name  = shift;
+	my $class = shift;
 
 	# Use tags parser if it's configured, return a match
 	my $parser = $self->perltags_parser;
@@ -762,13 +701,19 @@ sub _find_method {
 	# Fallback: Search for methods in source
 	# TO DO: unify with code in Padre::Wx::FunctionList
 	# TO DO: lots of improvement needed here
-	if ( not $self->{_methods_}{$name} ) {
+	unless ( $self->{_methods_}->{$name} ) {
+
+		# Consume the basic function list
 		my $filename = $self->filename;
-		$self->{_methods_}{$_} = $filename for $self->get_functions;
-		my $project_dir = Padre::Util::get_project_dir($filename);
-		if ($project_dir) {
+		$self->{_methods_}->{$_} = $filename for $self->get_functions;
+
+		# Scan for declarations in all module files.
+		# TODO: This is horrendously slow to be running in the foreground.
+		# TODO: This is pretty crude and doesn't integrate with the project system.
+		my $project = $self->current->project;
+		if ($project) {
 			require File::Find::Rule;
-			my @files = File::Find::Rule->file->name('*.pm')->in( File::Spec->catfile( $project_dir, 'lib' ) );
+			my @files = File::Find::Rule->file->name('*.pm')->in( File::Spec->catfile( $project->root, 'lib' ) );
 			foreach my $f (@files) {
 				if ( open my $fh, '<', $f ) {
 					my $lines = do { local $/ = undef; <$fh> };
@@ -782,35 +727,27 @@ sub _find_method {
 						my @subs = $lines =~ /\b(?:method|func)\s+(\w+)/g;
 					}
 
-
-					#use Data::Dumper;
-					#print Dumper \@subs;
-					$self->{_methods_}{$_} = $f for @subs;
+					$self->{_methods_}->{$_} = $f for @subs;
 				}
 			}
 
 		}
 	}
 
-	#use Data::Dumper;
-	#print Dumper $self->{_methods_};
-
 	if ( $self->{_methods_}{$name} ) {
 		return ( 1, $self->{_methods_}{$name} );
 	}
+
 	return;
 }
 
 #scan text for sub declaration
 sub _find_sub_decl_line_number {
-	my ( $name, $text ) = @_;
-
+	my $name  = shift;
+	my $text  = shift;
 	my @lines = split /\n/, $text;
 
-	#print "Name '$name'\n";
-	foreach my $i ( 0 .. @lines - 1 ) {
-
-		#print "L: $lines[$i]\n";
+	foreach my $i ( 0 .. $#lines ) {
 		if ($lines[$i] =~ /sub \s+ $name\b
 		 (?!;)
 		 (?! \([\$;\@\%\\]+ \);)
@@ -820,6 +757,7 @@ sub _find_sub_decl_line_number {
 			return $i;
 		}
 	}
+
 	return -1;
 }
 
@@ -841,6 +779,7 @@ sub goto_sub {
 		$self->editor->goto_line_centerize($line);
 		return 1;
 	}
+
 	return;
 }
 
@@ -855,20 +794,16 @@ sub has_sub {
 # Returns the line number of a sub (or undef if it doesn't exist) based on the outline data
 sub get_sub_line_number {
 	my $self = shift;
-	my $sub  = shift;
+	my $sub  = shift or return;
+	my $data = $self->outline_data or return;
 
-	return unless $sub;
-
-	return unless $self->outline_data;
-
-	foreach my $package ( @{ $self->outline_data } ) {
+	foreach my $package (@$data) {
 		foreach my $method ( @{ $package->{methods} } ) {
 			return $method->{line} if $method->{name} eq $sub;
 		}
 	}
 
 	return;
-
 }
 
 #####################################################################
@@ -1537,8 +1472,7 @@ sub autocomplete {
 }
 
 sub newline_keep_column {
-	my $self = shift;
-
+	my $self   = shift;
 	my $editor = $self->editor or return;
 	my $pos    = $editor->GetCurrentPos;
 	my $line   = $editor->LineFromPosition($pos);
@@ -1585,7 +1519,8 @@ sub event_on_char {
 
 	if ( $config->autocomplete_brackets ) {
 		$self->autocomplete_matching_char(
-			$editor, $event,
+			$editor,
+			$event,
 			34  => 34,  # " "
 			39  => 39,  # ' '
 			40  => 41,  # ( )
@@ -1734,7 +1669,7 @@ sub event_on_right_down {
 	# PLEASE DO NOT use the mouse event position
 	# You will get inconsistent results regarding refactor tools
 	# when pressing Windows context "right click" key
-	my $pos = $editor->GetCurrentPos();
+	my $pos = $editor->GetCurrentPos;
 
 	my $introduced_separator = 0;
 
@@ -1796,7 +1731,9 @@ sub event_on_right_down {
 
 	my $select_start = $editor->GetSelectionStart;
 	my $select_end   = $editor->GetSelectionEnd;
-	if ( $select_start != $select_end ) { # if something's selected
+
+	# Is something selected
+	if ( $select_start != $select_end ) {
 		$menu->AppendSeparator if not $introduced_separator++;
 
 		$menu->add_menu_action(
@@ -1808,7 +1745,7 @@ sub event_on_right_down {
 			$menu,
 			'perl.edit_with_regex_editor',
 		);
-	} # end if something's selected
+	}
 }
 
 sub event_on_left_up {
@@ -1828,7 +1765,7 @@ sub event_on_left_up {
 		elsif ( defined $location && $self->has_sub($token) ) {
 			$self->goto_sub($token);
 		}
-	} # end if control-click
+	}
 }
 
 sub event_mouse_moving {
@@ -1938,12 +1875,8 @@ document.
 
 sub project_tagsfile {
 	my $self = shift;
-
-	my $project_dir = $self->project_dir;
-
-	return if !defined($project_dir);
-
-	return File::Spec->catfile( $project_dir, 'perltags' );
+	my $project = $self->project or return;
+	return File::Spec->catfile( $project->root, 'perltags' );
 }
 
 =pod
@@ -1960,15 +1893,12 @@ sub project_create_tagsfile {
 
 	# First try is using the perl-tags command, next version should so this
 	# internal using Padre::File and should skip at least the "blip" dir.
-
-	#	print STDERR join(' ','perl-tags','-o',$self->project_tagsfile,$self->project_dir)."\n";
 	system 'perl-tags', '-o', $self->project_tagsfile, $self->project_dir;
 
 }
 
 sub find_help_topic {
-	my $self = shift;
-
+	my $self   = shift;
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
 

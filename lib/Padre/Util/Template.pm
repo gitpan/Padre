@@ -23,7 +23,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 
 # This is a Padre::Util module where the subs should be called as functions,
 # but Template::Tiny requires us to use a blessed package and we could use
@@ -50,7 +50,7 @@ Return the user replied value on subsequent calls.
 sub new_modulename {
 	my $self = shift;
 
-	$self->{_modulename} ||= Padre->ide->wx->main->prompt( Wx::gettext('New module'), Wx::gettext('Module name:') )
+	$self->{_modulename} ||= Padre->ide->wx->main->prompt( Wx::gettext('Module name:'), Wx::gettext('New Module') )
 		|| 'New::Module';
 
 	return $self->{_modulename};

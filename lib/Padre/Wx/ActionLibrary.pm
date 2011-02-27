@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 
 
 
@@ -1106,6 +1106,15 @@ sub init {
 	);
 
 	Padre::Wx::Action->new(
+		name       => 'edit.perl_filter',
+		label      => _T('Filter through Perl'),
+		comment    => _T('Use Perl source as filter'),
+		menu_event => sub {
+			shift->open_perl_filter(@_);
+		},
+	);
+
+	Padre::Wx::Action->new(
 		name        => 'edit.show_as_hex',
 		need_editor => 1,
 		label       => _T('Show as Hexadecimal'),
@@ -1727,22 +1736,6 @@ sub init {
 		},
 	);
 
-	Padre::Wx::Action->new(
-		name        => 'perl.autocomplete_brackets',
-		need_editor => 1,
-		label       => _T('Automatic Bracket Completion'),
-		comment     => _T('When typing { insert a closing } automatically'),
-		menu_method => 'AppendCheckItem',
-		menu_event  => sub {
-
-			# Update the saved config setting
-			my $checked = $_[1]->IsChecked ? 1 : 0;
-			$_[0]->config->set(
-				autocomplete_brackets => $checked,
-			);
-		}
-	);
-
 	# Perl-Specific Refactoring
 
 	Padre::Wx::Action->new(
@@ -2319,7 +2312,9 @@ sub init {
 		comment    => _T('Reset the My plug-in to the default'),
 		menu_event => sub {
 			my $ret = Wx::MessageBox(
-				Wx::gettext("Reset My plug-in"),
+				Wx::gettext(
+					"Warning! This will delete all the changes you made to 'My plug-in' and replace it with the default code that comes with your installation of Padre"
+				),
 				Wx::gettext("Reset My plug-in"),
 				Wx::wxOK | Wx::wxCANCEL | Wx::wxCENTRE,
 				$main,

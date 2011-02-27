@@ -2,11 +2,10 @@
 
 use strict;
 use warnings;
-use constant CONFIG_OPTIONS => 126;
+use constant NUMBER_OF_CONFIG_OPTIONS => 126;
 
 # Move of Debug to Run Menu
-# TODO can someone who knows what *2 + 21 means explain it in a comment please.
-use Test::More tests => CONFIG_OPTIONS * 2 + 21;
+use Test::More tests => NUMBER_OF_CONFIG_OPTIONS * 3 + 21;
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
 use File::Temp ();
@@ -38,11 +37,132 @@ is( $config->human->version, undef, '->human->version is undef' );
 # Loading the config file should not result in Wx loading
 is( $Wx::VERSION, undef, 'Wx was not loaded during config read' );
 
+my $preferences = do {
+	open my $fh, 'lib/Padre/Wx/Dialog/Preferences.pm' or die;
+	local $/ = undef;
+	<$fh>;
+};
+
+# szabgab:
+# We check each configuration option if it is also visible on
+# the Preference window. As some of them don't yet appear there
+# we have a list of config options here that are known to NOT appear
+# in the Preference window.
+# We don't have to put every option in the Preference window, after
+# all the Advanced window should be also used for something
+# but at least it can be useful to know which one don't have such view.
+# Probably it would be even better if we had a mapping of each config option
+# and the subwindow it appears in.
+my %NOT_IN_PREFERENCES = map { $_ => 1 } qw(
+	autocomplete_always
+	autocomplete_method
+	autocomplete_subroutine
+
+	begerror_DB
+	begerror_map
+	begerror_map2
+	begerror_chomp
+	begerror_close
+	begerror_perl6
+	begerror_split
+	begerror_elseif
+	begerror_regexq
+	begerror_pipe2open
+	begerror_warning
+	begerror_ifsetvar
+	begerror_pipeopen
+	builder
+
+	config_perlcritic
+	config_sync_server
+	config_perltidy
+	config_sync_username
+	config_sync_password
+
+	editor_eol
+	editor_style
+	editor_folding
+	editor_file_size_limit
+	editor_linenumbers
+	editor_calltips
+	editor_whitespace
+	editor_brace_expression_highlighting
+	editor_indentationguides
+
+	feature_wizard_selector
+	feature_restart_hung_task_manager
+	feature_session
+	feature_bookmark
+	feature_debugger
+	feature_fontsize
+	file_ftp_passive
+	file_ftp_timeout
+	feature_cursormemory
+	feedback_done
+	find_nohidden
+	find_case
+	find_first
+	find_regex
+	find_nomatch
+	find_reverse
+	feature_quick_fix
+	file_http_timeout
+
+	identity_name
+	identity_email
+	identity_nickname
+
+	license
+
+	main_directory_order
+	main_top
+	main_left
+	main_todo
+	main_width
+	main_height
+	main_outline
+	main_toolbar
+	main_directory
+	main_maximized
+	main_statusbar
+	main_directory_order
+	main_directory_root
+	main_directory_panel
+	main_command_line
+	main_lockinterface
+	main_toolbar_items
+	module_start_directory
+	main_syntaxcheck
+	main_singleinstance_port
+
+	perl_ppi_lexer_limit
+	perl_autocomplete_min_chars
+	perl_autocomplete_max_suggestions
+	perl_autocomplete_min_suggestion_len
+
+	run_save
+	run_stacktrace
+
+	startup_count
+	session_autosave
+	sessionmanager_sortorder
+
+	threads
+
+	xs_calltips_perlapi_version
+);
+
 # Check that the defaults work
 my @names =
 	sort { length($a) <=> length($b) or $a cmp $b } keys %Padre::Config::SETTING;
-is( scalar(@names), CONFIG_OPTIONS, 'Expected number of config options' );
+is( scalar(@names), NUMBER_OF_CONFIG_OPTIONS, 'Expected number of config options' );
 foreach my $name (@names) {
+
+	# simple way to check if config option is in the preferences window
+	SKIP: {
+		skip "'$name' is known to be missing from the preferences window", 1 if $NOT_IN_PREFERENCES{$name};
+		ok $preferences =~ m/$name/, "'$name' is in the preferences window";
+	}
 	ok( defined( $config->$name() ), "->$name is defined" );
 	is( $config->$name(),
 		$Padre::Config::DEFAULT{$name},

@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use Padre::Project::Perl ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = 'Padre::Project::Perl';
 
 use Class::XSAccessor {

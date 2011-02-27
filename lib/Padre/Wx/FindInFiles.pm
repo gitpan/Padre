@@ -16,7 +16,7 @@ use Padre::Wx             ();
 use Padre::Wx::TreeCtrl   ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -109,7 +109,7 @@ sub search {
 	# is precisely the root of a project, switch so that the search
 	# will automatically pick up the manifest/skip rules for it.
 	if ( defined $param{root} and not exists $param{project} ) {
-		my $project = $self->ide->project( $param{root} );
+		my $project = $self->ide->project_manager->project( $param{root} );
 		$param{project} = $project if $project;
 	}
 

@@ -10,7 +10,7 @@ use Padre::Wx       ();
 use Padre::Wx::Icon ();
 use Padre::Current  ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -352,7 +352,7 @@ sub _refresh_list {
 	foreach my $session ( reverse @sessions ) {
 		my $name   = $session->name;
 		my $descr  = $session->description;
-		my $update = strftime( '%F %T', localtime( $session->last_update ) );
+		my $update = strftime( '%Y-%m-%d %H:%M:%S', localtime( $session->last_update ) );
 
 		# inserting the session in the list
 		my $item = Wx::ListItem->new;

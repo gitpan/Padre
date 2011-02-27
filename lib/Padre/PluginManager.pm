@@ -39,7 +39,7 @@ use Padre::PluginHandle    ();
 use Padre::Wx              ();
 use Padre::Wx::Menu::Tools ();
 
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 
 
 
@@ -118,6 +118,16 @@ use Class::XSAccessor {
 		plugins_with_context_menu => 'plugins_with_context_menu',
 	},
 };
+
+=head2 current
+
+Gets a L<Padre::Current> context for the plugin manager.
+
+=cut
+
+sub current {
+	Padre::Current->new( ide => $_[0]->{parent} );
+}
 
 =head2 C<main>
 
@@ -233,8 +243,8 @@ sub reset_my_plugin {
 # Save the plug-in enable/disable states for the next start-up.
 sub shutdown {
 	my $self = shift;
+	my $lock = $self->main->lock('DB');
 
-	my $transaction = $self->main->lock('DB');
 	foreach my $module ( $self->plugin_order ) {
 		my $plugin = $self->_plugin($module);
 		if ( $plugin->enabled ) {
@@ -850,8 +860,6 @@ sub _error {
 	my @callerinfo  = caller(0);
 	my @callerinfo1 = caller(1);
 
-	#	print STDERR 'Plugin '.$plugin. ' error at '. $callerinfo[1]. ' line '. $callerinfo[2].
-	#			' in '. $callerinfo[0]. '::'. $callerinfo1[3]. ': '. $text."\n";
 	print STDERR 'Plugin ', $plugin, ' error at ', $callerinfo[1] . ' line ' . $callerinfo[2],
 		' in ' . $callerinfo[0] . '::' . $callerinfo1[3], ': ' . $text . "\n";
 
@@ -859,7 +867,7 @@ sub _error {
 	$self->main->error( sprintf( Wx::gettext('Plugin %s'), $plugin ) . ': ' . $text );
 }
 
-# enable all the plug-ins for a single editor
+# Enable all the plug-ins for a single editor
 sub editor_enable {
 	my $self   = shift;
 	my $editor = shift;
@@ -957,34 +965,35 @@ This call and the appropriate menu option should be able to load
 
 =cut
 
+# TODO: Move this into the developer plugin, nobody needs this unless they
+# are actively working on a Padre plugin.
 sub reload_current_plugin {
-	my $self    = shift;
-	my $main    = $self->main;
-	my $config  = $self->parent->config;
-	my $plugins = $self->plugins;
+	my $self     = shift;
+	my $current  = $self->current;
+	my $main     = $current->main;
+	my $filename = $current->filename;
+	my $project  = $current->project;
 
-	unless ( $main->current ) {
-		return $main->error( Wx::gettext('No document open') );
-	}
-	my $filename = $main->current->filename;
+	# Do we have what we need?
 	unless ($filename) {
 		return $main->error( Wx::gettext('No filename') );
 	}
-
-	# TO DO: locate project
-	my $dir = Padre::Util::get_project_dir($filename);
-	return $main->error( Wx::gettext('Could not locate project directory.') ) if not $dir;
+	unless ($project) {
+		return $main->error( Wx::gettext('Could not locate project directory.') );
+	}
 
 	# TO DO shall we relax the assumption of a lib subdir?
-	$dir = File::Spec->catdir( $dir, 'lib' );
-	local @INC = ( $dir, grep { $_ ne $dir } @INC );
+	my $root = $project->root;
+	$root = File::Spec->catdir( $root, 'lib' );
+	local @INC = ( $root, grep { $_ ne $root } @INC );
 
-	my ($plugin_filename) = glob File::Spec->catdir( $dir, 'Padre', 'Plugin', '*.pm' );
+	my ($plugin_filename) = glob File::Spec->catdir( $root, 'Padre', 'Plugin', '*.pm' );
 
 	# Load plug-in
 	my $plugin = 'Padre::Plugin::' . File::Basename::basename($plugin_filename);
 	$plugin =~ s/\.pm$//;
 
+	my $plugins = $self->plugins;
 	if ( $plugins->{$plugin} ) {
 		$self->reload_plugin($plugin);
 	} else {
@@ -1107,6 +1116,7 @@ sub test_a_plugin {
 sub _plugin {
 	my $self = shift;
 	my $it   = shift;
+
 	if ( Params::Util::_INSTANCE( $it, 'Padre::PluginHandle' ) ) {
 		my $current = $self->{plugins}->{ $it->class };
 		unless ( defined $current ) {
@@ -1125,6 +1135,7 @@ sub _plugin {
 		}
 		return $self->{plugins}->{$it};
 	}
+
 	Carp::croak("Missing or invalid plug-in provided to Padre::PluginManager");
 }
 

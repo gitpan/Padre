@@ -23,7 +23,7 @@ use Padre::DB                    ();
 use Padre::Wx                    ();
 use Padre::Wx::Role::Main        ();
 use Padre::Wx::History::ComboBox ();
-our $VERSION = '0.80';
+our $VERSION = '0.82';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -534,7 +534,7 @@ sub replace_button {
 	my $changed = $main->replace_next($search);
 	unless ($changed) {
 		$main->message(
-			Wx::gettext('No matches found'),
+			sprintf( Wx::gettext('No matches found for "%s".'), $self->{find_text}->GetValue ),
 			Wx::gettext('Search and Replace'),
 		);
 	}
@@ -583,7 +583,7 @@ sub replace_all {
 		);
 	} else {
 		$main->info(
-			Wx::gettext('No matches found'),
+			sprintf( Wx::gettext('No matches found for "%s".'), $self->{find_text}->GetValue ),
 			Wx::gettext('Search and Replace'),
 		);
 	}

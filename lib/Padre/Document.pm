@@ -131,12 +131,12 @@ use Padre::Constant  ();
 use Padre::Current   ();
 use Padre::Util      ();
 use Padre::Wx        ();
-use Padre            ();
 use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION = '0.80';
+our $VERSION    = '0.82';
+our $COMPATIBLE = '0.81';
 
 
 
@@ -223,9 +223,7 @@ sub new {
 		$self->{file} = Padre::File->new(
 			$self->{filename},
 			info_handler => sub {
-				my $self    = shift;
-				my $message = shift;
-				Padre->ide->wx->main->info($message);
+				$self->current->main->info( $_[1] );
 			}
 		);
 
@@ -245,8 +243,9 @@ sub new {
 
 		if ( $self->{file}->exists ) {
 
-			# Test script must be able to pass an alternate config object:
-			my $config = $self->{config} || Padre->ide->config;
+			# Test script must be able to pass an alternate config object
+			# NOTE: Since when do we support per-document configuration objects?
+			my $config = $self->{config} || $self->current->config;
 			if ( defined( $self->{file}->size ) and ( $self->{file}->size > $config->editor_file_size_limit ) ) {
 				my $ret = Wx::MessageBox(
 					sprintf(
@@ -259,7 +258,7 @@ sub new {
 					),
 					Wx::gettext("Warning"),
 					Wx::wxYES_NO | Wx::wxCENTRE,
-					Padre->ide->wx->main,
+					$self->current->main,
 				);
 				if ( $ret != Wx::wxYES ) {
 					return;
@@ -288,9 +287,11 @@ sub new {
 
 	$self->rebless;
 
-	Padre->ide->{_popularity_contest}->count( 'mime.' . $self->mimetype )
-		if ( !defined( $ENV{PADRE_IS_TEST} ) )
-		and defined( Padre->ide->{_popularity_contest} );
+	# NOTE: Hacky support for the Padre Popularity Contest
+	unless ( defined $ENV{PADRE_IS_TEST} ) {
+		my $popcon = $self->current->ide->{_popularity_contest};
+		$popcon->count( 'mime.' . $self->mimetype ) if $popcon;
+	}
 
 	return $self;
 }
@@ -364,7 +365,7 @@ sub colourize {
 	$editor->SetLexer($lexer);
 	TRACE("coloUrize called") if DEBUG;
 
-	$self->remove_color;
+	$editor->remove_color;
 	if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
 		$self->colorize;
 	} else {
@@ -409,16 +410,6 @@ sub colorize {
 	return;
 }
 
-sub timestamp_now {
-	my $self = shift;
-	my $file = $self->file;
-	return 0 unless defined $file;
-
-	# It's important to return undef if there is no ->mtime for this filetype
-	return unless $file->can('mtime');
-	return $file->mtime;
-}
-
 # For ts without a newline type
 # TO DO: get it from config
 sub default_newline_type {
@@ -446,7 +437,7 @@ button. No return value.
 # TO DO: A globally used error/message box function may be better instead
 #       of replicating the same function in many files:
 sub error {
-	Padre->ide->wx->main->message( $_[1], Wx::gettext('Error') );
+	$_[0]->current->main->message( $_[1], Wx::gettext('Error') );
 }
 
 
@@ -455,6 +446,7 @@ sub error {
 
 #####################################################################
 # Disk Interaction Methods
+
 # These methods implement the interaction between the document and the
 # filesystem.
 
@@ -519,6 +511,16 @@ sub has_changed_on_disk {
 	return $self->timestamp < $timestamp_now ? 1 : 0;
 }
 
+sub timestamp_now {
+	my $self = shift;
+	my $file = $self->file;
+	return 0 unless defined $file;
+
+	# It's important to return undef if there is no ->mtime for this filetype
+	return undef unless $file->can('mtime');
+	return $file->mtime;
+}
+
 # Generate MD5-checksum for current file stored on disk
 sub checksum_on_file {
 	warn join( ',', caller ) . ' called Document::checksum_on_file which is out-of-service.';
@@ -555,7 +557,7 @@ Returns true on success false on failure. Sets C<< $doc->errstr >>.
 =cut
 
 sub load_file {
-	my ($self) = @_;
+	my $self = shift;
 	my $file = $self->file;
 
 	if (DEBUG) {
@@ -659,49 +661,42 @@ sub autocomplete_matching_char {
 	my $editor = shift;
 	my $event  = shift;
 	my %table  = @_;
-
-	my $config = Padre->ide->config;
-	my $main   = Padre->ide->wx->main;
-
-	my $selection_exists = 0;
-	my $text             = $editor->GetSelectedText;
-	if ( defined($text) && length($text) > 0 ) {
-		$selection_exists = 1;
+	my $key    = $event->GetUnicodeKey;
+	unless ( $table{$key} ) {
+		return 0;
 	}
 
-	my $key = $event->GetUnicodeKey;
+	# Is autocomplete enabled
+	my $current = $self->current;
+	my $config  = $current->config;
+	unless ( $config->autocomplete_brackets ) {
+		return 0;
+	}
 
-	my $pos   = $editor->GetCurrentPos;
-	my $line  = $editor->LineFromPosition($pos);
-	my $first = $editor->PositionFromLine($line);
-	my $last  = $editor->PositionFromLine( $line + 1 ) - 1;
+	# Is something selected?
+	my $pos  = $editor->GetCurrentPos;
+	my $text = $editor->GetSelectedText;
+	if ( defined $text and length $text ) {
+		my $start = $editor->GetSelectionStart;
+		my $end   = $editor->GetSelectionEnd;
+		$editor->GotoPos($end);
+		$editor->AddText( chr( $table{$key} ) );
+		$editor->GotoPos($start);
 
-	if ( $config->autocomplete_brackets ) {
-		if ( $table{$key} ) {
-			if ($selection_exists) {
-				my $start = $editor->GetSelectionStart;
-				my $end   = $editor->GetSelectionEnd;
-				$editor->GotoPos($end);
-				$editor->AddText( chr( $table{$key} ) );
-				$editor->GotoPos($start);
-			} else {
-				my $nextChar;
-				if ( $editor->GetTextLength > $pos ) {
-					$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
-				}
-				unless ( defined($nextChar) && ord($nextChar) == $table{$key}
-					and ( !$config->autocomplete_multiclosebracket ) )
-				{
-					$editor->AddText( chr( $table{$key} ) );
-					$editor->CharLeft;
-				}
-			}
-			return 1;
+	} else {
+		my $nextChar;
+		if ( $editor->GetTextLength > $pos ) {
+			$nextChar = $editor->GetTextRange( $pos, $pos + 1 );
+		}
+		unless ( defined($nextChar) && ord($nextChar) == $table{$key}
+			and ( !$config->autocomplete_multiclosebracket ) )
+		{
+			$editor->AddText( chr( $table{$key} ) );
+			$editor->CharLeft;
 		}
 	}
 
-	return 0;
-
+	return 1;
 }
 
 sub set_filename {
@@ -724,7 +719,6 @@ sub set_filename {
 	delete $self->{filename};
 	delete $self->{file};
 	delete $self->{project_dir};
-	delete $self->{is_project};
 
 	# Save the new filename
 	$self->{file} = Padre::File->new($filename);
@@ -749,7 +743,6 @@ sub save_file {
 	# If padre is run on files that have no project
 	# I.E Padre foo.pl &
 	# The assumption of $self->project as defined will cause a fail
-	# Please be more careful mkkkay!
 	my $config;
 	$config = $self->project->config if $self->project;
 	$self->set_errstr('');
@@ -775,7 +768,7 @@ sub save_file {
 			),
 			Wx::gettext("Save Warning"),
 			Wx::wxYES_NO | Wx::wxCENTRE,
-			Padre->ide->wx->main,
+			$self->main,
 		);
 
 		return 0 if $ret == Wx::wxYES;
@@ -928,38 +921,6 @@ sub text_with_one_nl {
 	return $text;
 }
 
-#
-# $doc->store_cursor_position()
-#
-# store document's current cursor position in padre's db.
-# no params, no return value.
-#
-sub store_cursor_position {
-	my $self     = shift;
-	my $filename = defined( $self->{file} ) ? $self->{file}->filename : undef;
-	my $editor   = $self->editor;
-	return unless $filename && $editor;
-	my $pos = $editor->GetCurrentPos;
-	Padre::DB::LastPositionInFile->set_last_pos( $filename, $pos );
-}
-
-#
-# $doc->restore_cursor_position()
-#
-# restore document's cursor position from padre's db.
-# no params, no return value.
-#
-sub restore_cursor_position {
-	my $self     = shift;
-	my $filename = defined( $self->{file} ) ? $self->{file}->filename : undef;
-	my $editor   = $self->editor;
-	return unless $filename && $editor;
-	my $pos = Padre::DB::LastPositionInFile->get_last_pos($filename);
-	return unless $pos;
-	$editor->SetCurrentPos($pos);
-	$editor->SetSelection( $pos, $pos );
-}
-
 
 
 
@@ -1006,28 +967,10 @@ sub get_title {
 	}
 }
 
-sub remove_color {
-	my ($self) = @_;
-
-	TRACE("remove_color called (@_)") if DEBUG;
-
-	my $editor = $self->editor;
-
-	TRACE("editor '$editor'") if DEBUG;
-
-	# TO DO this is strange, do we really need to do it with all?
-	foreach my $i ( 0 .. 31 ) {
-		$editor->StartStyling( 0, $i );
-		$editor->SetStyling( $editor->GetLength, 0 );
-	}
-
-	return;
-}
-
 # TO DO: experimental
 sub get_indentation_style {
 	my $self   = shift;
-	my $config = Padre->ide->config;
+	my $config = $self->current->config;
 
 	# TO DO: (document >) project > config
 
@@ -1167,45 +1110,42 @@ Returns nothing.
 # Project Integration Methods
 
 sub project {
-	my $self = shift;
-	my $root = $self->project_dir;
-	if ( defined $root ) {
-		return Padre->ide->project($root);
-	} else {
-		return;
+	my $self    = shift;
+	my $manager = $self->current->ide->project_manager;
+
+	# If we have a cached project_dir return the object based on that
+	if ( defined $self->{project_dir} ) {
+		return $manager->project( $self->{project_dir} );
 	}
+
+	# Anonymous files don't have a project
+	my $file = $self->file or return;
+
+	# Currently no project support for remote files
+	return unless $file->{protocol} eq 'local';
+
+	# Find the project for this document's filename
+	my $project = $manager->from_file( $file->{filename} );
+	return undef unless defined $project;
+
+	# To prevent the creation of tons of references to the project object,
+	# cache the project by it's root directory.
+	$self->{project_dir} = $project->root;
+
+	return $project;
 }
 
 sub project_dir {
 	my $self = shift;
-	unless ( $self->{project_dir} ) {
+	unless ( defined $self->{project_dir} ) {
 
-		# Load the project object and project_dir in one step
-		my $project = $self->project_find;
-		return unless defined($project);
-		my $project_dir = $project->root;
-		my $ide         = $self->current->ide;
-		$self->{project_dir} = $project_dir;
-		$ide->{project}->{$project_dir} = $project;
-		unless ( $project->isa('Padre::Project::Null') ) {
-			$self->{is_project} = 1;
-		}
+		# Find the project, which slightly bizarely caches the
+		# location of the project via it's root.
+		# NOTE: Yes this looks weird, but it is significantly
+		# less weird than the code it replaced.
+		$self->project;
 	}
 	return $self->{project_dir};
-}
-
-sub project_find {
-	my $self = shift;
-
-	# Anonymous files don't have a project
-	return unless defined $self->file;
-
-	# Currently no project support for remote files
-	return unless $self->{file}->{protocol} eq 'local';
-
-	# Search upwards from the file to find the project root
-	require Padre::Project;
-	Padre::Project->from_file( $self->{file}->{filename} );
 }
 
 # Find the project-relative file name
@@ -1435,79 +1375,6 @@ sub stats {
 		$self->{encoding}
 	);
 }
-
-=pod
-
-=head2 C<check_syntax>
-
-NOT IMPLEMENTED IN THE BASE CLASS
-
-See also: C<check_syntax_in_background>!
-
-By default, this method will only check the syntax if
-the document has changed since the last check. Specify
-the C<force =E<gt> 1> parameter to override this.
-
-An implementation in a derived class needs to return an array reference of
-syntax problems.
-
-Each entry in the array has to be an anonymous hash with the
-following keys:
-
-=over 4
-
-=item * C<line>
-
-The line where the problem resides
-
-=item * C<msg>
-
-A short description of the problem
-
-=item * C<severity>
-
-A flag indicating the problem class: Either 'B<W>' (warning) or 'B<E>' (error)
-
-=item * C<desc>
-
-A longer description with more information on the error (currently
-not used but intended to be)
-
-=back
-
-Returns an empty array reference if no problems can be found.
-
-Returns C<undef> if nothing has changed since the last invocation.
-
-Must return the problem list even if nothing has changed when a
-parameter is present which evaluates to B<true>.
-
-=head2 C<check_syntax_in_background>
-
-NOT IMPLEMENTED IN THE BASE CLASS
-
-Checking the syntax of documents can take a long time.
-Therefore, this method essentially works the same as
-C<check_syntax>, but works its magic in a background task
-instead. That means it cannot return the syntax-check
-structure but instead optionally calls a callback
-you pass in as the C<on_finish> parameter.
-
-If you don't specify that parameter, the default
-syntax-check-pane updating code will be run after finishing
-the check. If you do specify a callback, the first parameter
-will be the task object. You can
-run the default updating code by executing the
-C<update_gui()> method of the task object.
-
-By default, this method will only check the syntax if
-the document has changed since the last check. Specify
-the C<force =E<gt> 1> parameter to override this.
-
-=cut
-
-
-
 
 
 #####################################################################

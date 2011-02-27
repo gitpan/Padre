@@ -130,6 +130,7 @@ lib/Padre/Project/Perl/MB.pm
 lib/Padre/Project/Perl/MI.pm
 lib/Padre/Project/Perl/Temp.pm
 lib/Padre/Project/Temp.pm
+lib/Padre/ProjectManager.pm
 lib/Padre/QuickFix.pm
 lib/Padre/Role/Task.pm
 lib/Padre/Search.pm
@@ -196,6 +197,7 @@ lib/Padre/Wx/Dialog/KeyBindings.pm
 lib/Padre/Wx/Dialog/ModuleStart.pm
 lib/Padre/Wx/Dialog/OpenResource.pm
 lib/Padre/Wx/Dialog/OpenURL.pm
+lib/Padre/Wx/Dialog/PerlFilter.pm
 lib/Padre/Wx/Dialog/PluginManager.pm
 lib/Padre/Wx/Dialog/Positions.pm
 lib/Padre/Wx/Dialog/Preferences.pm
@@ -395,6 +397,7 @@ share/ppm/README.txt
 share/README.txt
 share/styles/default.yml
 share/styles/evening.yml
+share/styles/mc.yml
 share/styles/night.yml
 share/styles/notepad.yml
 share/styles/ultraedit.yml
