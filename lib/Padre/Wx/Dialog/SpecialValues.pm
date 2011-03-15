@@ -9,7 +9,7 @@ use Padre::Wx         ();
 use Padre::Wx::Dialog ();
 use Padre::Current    ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 my $categories = {
 	Wx::gettext('Date/Time') => [

@@ -8,7 +8,7 @@ use Padre::Config         ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -869,9 +869,7 @@ sub show {
 	$self->_resize_columns;
 
 	# If it is not shown, show the dialog
-	$self->ShowModal;
-
-	return;
+	return $self->ShowModal;
 }
 
 1;

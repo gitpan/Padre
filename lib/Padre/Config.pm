@@ -10,21 +10,18 @@ package Padre::Config;
 use 5.008;
 use strict;
 use warnings;
-use Carp ();
-use File::Spec 3.21 (); # 3.21 needed for volume-safe abs2rel call
-use YAML::Tiny             ();
+use Carp                   ();
 use Params::Util           ();
 use Padre::Constant        ();
 use Padre::Util            ('_T');
 use Padre::Current         ();
 use Padre::Config::Setting ();
 use Padre::Config::Human   ();
-use Padre::Config::Project ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -416,6 +413,10 @@ setting(
 		'nothing' => _T('No open files'),
 		'session' => _T('Open session'),
 	},
+	help => _T('"Open session" will ask which session (set of files) to open when you launch Padre.')
+		. _T(
+		'"Previous open files" will remember the open files when you close Padre and open the same files next time you launch Padre.'
+		),
 );
 
 # How many times has the user run Padre?
@@ -445,6 +446,19 @@ setting(
 		my $main = shift;
 		$main->refresh_title;
 	},
+	help => _T('Contents of the window title') . _T('Several placeholders like the filename can be used'),
+);
+
+setting(
+	name    => 'main_statusbar_template',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => '%m %f',
+	apply   => sub {
+		my $main = shift;
+		$main->refresh_from_template;
+	},
+	help => _T('Contents of the status bar') . _T('Several placeholders like the filename can be used'),
 );
 
 setting(
@@ -606,6 +620,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	help    => _T('Show or hide the status bar at the bottom of the window.'),
 );
 setting(
 	name  => 'main_toolbar',
@@ -677,19 +692,13 @@ setting(
 );
 
 # Editor Settings
-my $default_editor_font = '';
-if (Padre::Constant::WIN32) {
 
-	# The default editor font should be Consolas 10pt on Vista and Windows 7
-	require Win32;
-	my $os = Win32::GetOSName;
-	$default_editor_font = 'Consolas 10' if $os eq 'WinVista' or $os eq 'Win7';
-}
+# The default editor font should be Consolas 10pt on Vista and Windows 7
 setting(
-	name    => 'editor_font',
-	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
-	default => $default_editor_font,
+	name  => 'editor_font',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HUMAN,
+	default => Padre::Constant::DISTRO =~ /^WIN(?:VISTA|7)$/ ? 'Consolas 10' : '',
 );
 setting(
 	name    => 'editor_linenumbers',
@@ -959,6 +968,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	help    => _T('Show low-priority info messages on statusbar (not in a popup)'),
 );
 
 # Move of stacktrace to run menu: will be removed (run_stacktrace)

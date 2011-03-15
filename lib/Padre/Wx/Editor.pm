@@ -13,7 +13,7 @@ use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Logger;
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.81';
 our @ISA        = 'Wx::StyledTextCtrl';
 
@@ -1547,7 +1547,7 @@ sub goto_line_centerize {
 	my $self = shift;
 	my $line = shift;
 
-	$self->goto_pos_centerize( $self->PositionFromLine($line) );
+	$self->goto_pos_centerize( $self->GetLineIndentPosition($line) );
 }
 
 # borrowed from Kephra

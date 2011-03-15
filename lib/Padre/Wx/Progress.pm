@@ -26,9 +26,9 @@ Shows a progress bar dialog to tell the user that we're doing something.
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx;
+use Padre::Wx ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 =pod
 

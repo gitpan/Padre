@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 
 
@@ -1107,7 +1107,7 @@ sub init {
 
 	Padre::Wx::Action->new(
 		name       => 'edit.perl_filter',
-		label      => _T('Filter through Perl'),
+		label      => _T('Filter through Perl...'),
 		comment    => _T('Use Perl source as filter'),
 		menu_event => sub {
 			shift->open_perl_filter(@_);
@@ -1262,8 +1262,8 @@ sub init {
 
 	Padre::Wx::Action->new(
 		name       => 'search.open_resource',
-		label      => _T('Open Resource...'),
-		comment    => _T('Type in a filter to select a file'),
+		label      => _T('Open Resources...'),
+		comment    => _T('Use a filter to select one or more files'),
 		shortcut   => 'Ctrl-Shift-R',
 		toolbar    => 'places/folder-saved-search',
 		menu_event => sub {

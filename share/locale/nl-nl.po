@@ -1182,7 +1182,7 @@ msgstr "Module"
 
 #: lib/Padre/Wx/WizardLibrary.pm:21
 msgid "Perl 5"
-msgstr "Perl 5 "
+msgstr "Perl 5"
 
 #: lib/Padre/Wx/WizardLibrary.pm:22
 msgid "Opens the Perl 5 module wizard"

@@ -60,7 +60,7 @@ use Padre::TaskHandle ();
 use Padre::TaskWorker ();
 use Padre::Logger;
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.81';
 
 # Timeout values
@@ -343,6 +343,7 @@ sub cancel {
 		foreach my $worker ( grep { defined $_ } @{ $self->{workers} } ) {
 			TRACE("Worker wid = $worker->{wid}")    if DEBUG;
 			TRACE("Handle wid = $handle->{worker}") if DEBUG;
+			next unless defined $handle->{worker};
 			next unless $worker->{wid} == $handle->{worker};
 			TRACE("Sending 'cancel' message") if DEBUG;
 			$worker->send('cancel');

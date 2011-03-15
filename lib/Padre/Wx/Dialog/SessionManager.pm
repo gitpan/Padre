@@ -5,12 +5,11 @@ package Padre::Wx::Dialog::SessionManager;
 use 5.008;
 use strict;
 use warnings;
-use POSIX qw{ strftime };
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 use Padre::Current  ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -258,7 +257,7 @@ sub _create_options {
 	$self->{autosave} = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext('Save session automatically'),
+		Wx::gettext('&Save session automatically'),
 	);
 	$self->{autosave}->SetValue( $config->session_autosave ? 1 : 0 );
 
@@ -288,9 +287,9 @@ sub _create_buttons {
 	$self->_vbox->Add( $hbox, 0, Wx::wxALL | Wx::wxEXPAND, 5 );
 
 	# the buttons
-	my $bo = Wx::Button->new( $self, -1,              Wx::gettext('Open') );
-	my $bd = Wx::Button->new( $self, -1,              Wx::gettext('Delete') );
-	my $bc = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('Close') );
+	my $bo = Wx::Button->new( $self, -1,              Wx::gettext('&Open') );
+	my $bd = Wx::Button->new( $self, -1,              Wx::gettext('&Delete') );
+	my $bc = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('&Close') );
 	$self->_butopen($bo);
 	$self->_butdelete($bd);
 	Wx::Event::EVT_BUTTON( $self, $bo, \&_on_butopen_clicked );
@@ -350,9 +349,13 @@ sub _refresh_list {
 	my $list = $self->_list;
 	$list->DeleteAllItems;
 	foreach my $session ( reverse @sessions ) {
-		my $name   = $session->name;
-		my $descr  = $session->description;
-		my $update = strftime( '%Y-%m-%d %H:%M:%S', localtime( $session->last_update ) );
+		my $name  = $session->name;
+		my $descr = $session->description;
+		require POSIX;
+		my $update = POSIX::strftime(
+			'%Y-%m-%d %H:%M:%S',
+			localtime $session->last_update,
+		);
 
 		# inserting the session in the list
 		my $item = Wx::ListItem->new;

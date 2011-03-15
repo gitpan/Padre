@@ -53,7 +53,7 @@ use Class::XSAccessor {
 	}
 };
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::StatusBar
@@ -223,7 +223,10 @@ sub refresh {
 	{
 		$self->SetStatusText( $main->{infomessage}, FILENAME );
 	} else {
-		$self->SetStatusText( "$modified $filename", FILENAME );
+		my $config = $self->config;
+		$self->{_template_} = $main->process_template( $config->main_statusbar_template );
+		my $status = $main->process_template_frequent( $self->{_template_} );
+		$self->SetStatusText( $status, FILENAME );
 	}
 	$self->SetStatusText( $highlighter,    HIGHLIGHTER );
 	$self->SetStatusText( $mime_type_name, MIMETYPE );
@@ -339,6 +342,21 @@ sub update_pos {
 
 	$self->SetStatusText( $postring, POSTRING );
 
+
+}
+
+# this sub is called frequently, on every key stroke or mouse movement
+# TODO speed should be improved
+sub refresh_from_template {
+	my $self = shift;
+
+	return unless $self->{_template_};
+
+	my $main   = $self->{main};
+	my $status = $main->process_template_frequent( $self->{_template_} );
+	$self->SetStatusText( $status, FILENAME );
+
+	return;
 }
 
 #####################################################################

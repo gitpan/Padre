@@ -36,3 +36,4 @@ is( $res,                          undef, '->change_locale(ar)' );
 is( $main->change_locale('de'),    undef, '->change_locale(de)' );
 is( $main->change_locale('en-au'), undef, '->change_locale(en-au)' );
 lives_ok { $main->change_locale } '->change_locale()';
+

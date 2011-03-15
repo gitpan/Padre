@@ -26,7 +26,7 @@ use Storable  ();
 use Padre::Wx ();
 use Padre::Logger;
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 our $SIGNAL : shared;
 

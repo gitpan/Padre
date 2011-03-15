@@ -140,6 +140,7 @@ lib/Padre/Task.pm
 lib/Padre/Task/Addition.pm
 lib/Padre/Task/Browser.pm
 lib/Padre/Task/Eval.pm
+lib/Padre/Task/File.pm
 lib/Padre/Task/FindInFiles.pm
 lib/Padre/Task/FindUnmatchedBrace.pm
 lib/Padre/Task/FindVariableDeclaration.pm
@@ -151,6 +152,7 @@ lib/Padre/Task/LWP.pm
 lib/Padre/Task/OpenResource.pm
 lib/Padre/Task/Outline.pm
 lib/Padre/Task/PPI.pm
+lib/Padre/Task/RecentFiles.pm
 lib/Padre/Task/Run.pm
 lib/Padre/Task/Syntax.pm
 lib/Padre/TaskHandle.pm
@@ -426,6 +428,7 @@ t/07-version.t
 t/08-style.t
 t/14-warnings.t
 t/15-locale.t
+t/16-messages.t
 t/20_task_queue.t
 t/21_task_thread.t
 t/22_task_worker.t
@@ -529,6 +532,7 @@ xt/critic-util.t
 xt/eol.t
 xt/files/broken.bin
 xt/files/rename_variable_stress_test.pl
+xt/files/TODO_test.pm
 xt/meta.t
 xt/mimetype.t
 xt/perl-beginner.t

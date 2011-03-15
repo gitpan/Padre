@@ -23,7 +23,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.81';
 
 # Since everything is used OO-style, we will be require'ing
@@ -178,7 +178,9 @@ sub run {
 	TRACE("Padre->run was called version $VERSION") if DEBUG;
 
 	# make WxWidgets translate the default buttons etc.
-	$ENV{LANGUAGE} = $self->config->locale if Padre::Constant::UNIX;
+	if (Padre::Constant::UNIX) {
+		$ENV{LANGUAGE} = $self->config->locale; ## no critic (RequireLocalizedPunctuationVars)
+	}
 
 	# Clean arguments (with a bad patch for saving URLs)
 	if (Padre::Constant::WIN32) {

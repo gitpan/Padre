@@ -5,11 +5,11 @@ package Padre::Portable;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec      ();
+use File::Spec 3.21 (); # 3.21 needed for volume-safe abs2rel
 use Params::Util    ();
 use Padre::Constant ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 sub freeze {
 	return shift unless defined Params::Util::_STRING( $_[0] );

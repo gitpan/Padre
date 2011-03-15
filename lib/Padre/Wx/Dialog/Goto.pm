@@ -6,7 +6,7 @@ use warnings;
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -191,16 +191,22 @@ sub _on_ok_button {
 
 	# Fetch values
 	my $line_mode = $self->{line_mode}->GetStringSelection eq Wx::gettext('Line number');
-	my $value     = $self->{goto_text}->GetValue;
-	my $editor    = $self->current->editor;
+	my $value = $self->{goto_text}->GetValue;
+
+	# Destroy the dialog
+	$self->Hide;
+
+	if ( $value !~ m{^\d+$} ) {
+		Padre::Current::_CURRENT->main->error( Wx::gettext('Not a positive number!') );
+		return;
+	}
+
+	my $editor = $self->current->editor;
 
 	# Bounds checking
 	my $max_value = $line_mode ? $self->{max_line_number} : $self->{max_position};
 	$value = $max_value if $value > $max_value;
 	$value--;
-
-	# Destroy the dialog
-	$self->Hide;
 
 	require Padre::Wx::Dialog::Positions;
 	Padre::Wx::Dialog::Positions->set_position();

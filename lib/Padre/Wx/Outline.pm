@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -436,9 +436,7 @@ sub select_line_in_editor {
 		&& ( $line <= $editor->GetLineCount ) )
 	{
 		$line--;
-		$editor->EnsureVisible($line);
-		$editor->goto_pos_centerize( $editor->GetLineIndentPosition($line) );
-		$editor->SetFocus;
+		$editor->goto_line_centerize($line);
 	}
 	return;
 }

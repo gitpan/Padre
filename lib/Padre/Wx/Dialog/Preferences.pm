@@ -11,7 +11,7 @@ use Padre::Wx::Editor                      ();
 use Padre::Wx::Dialog::Preferences::Editor ();
 use Padre::MimeTypes                       ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = 'Padre::Wx::Dialog';
 
 our %PANELS = (
@@ -440,6 +440,11 @@ sub _appearance_panel {
 		'%d' => Wx::gettext("Current file's dirname"),
 		'%b' => Wx::gettext("Current file's basename"),
 		'%F' => Wx::gettext('Current filename relative to project'),
+
+		# frequently changing, should not be used in title as it
+		# is only update on rare events
+		'%m' => Wx::gettext('Indication if current file was modified'),
+		'%s' => Wx::gettext('Name of the current subroutine'),
 	);
 	my @main_title_keys = sort { lc($a) cmp lc($b); } ( keys(%main_title_vars) );
 	my $main_title_left;
@@ -462,6 +467,9 @@ sub _appearance_panel {
 	my $table = [
 		[   [ 'Wx::StaticText', 'undef',      Wx::gettext('Window title:') ],
 			[ 'Wx::TextCtrl',   'main_title', $config->main_title ],
+		],
+		[   [ 'Wx::StaticText', 'undef',                   Wx::gettext('Statusbar:') ],
+			[ 'Wx::TextCtrl',   'main_statusbar_template', $config->main_statusbar_template ],
 		],
 		[   [ 'Wx::StaticText', 'undef', $main_title_left ],
 			[ 'Wx::StaticText', 'undef', $main_title_right ],
@@ -1035,6 +1043,7 @@ sub run {
 	my $ret = $self->{dialog}->ShowModal;
 
 	if ( $ret eq Wx::wxID_CANCEL ) {
+		return 1 if $self->{_had_advanced};
 		return;
 	}
 
@@ -1129,6 +1138,10 @@ sub run {
 	$config->set(
 		'main_title',
 		$data->{main_title}
+	);
+	$config->set(
+		'main_statusbar_template',
+		$data->{main_statusbar_template}
 	);
 	$config->set(
 		'editor_right_margin_enable',
@@ -1287,7 +1300,14 @@ sub _show_advanced_settings {
 	#show the advanced settings dialog instead
 	require Padre::Wx::Dialog::Advanced;
 	my $advanced = Padre::Wx::Dialog::Advanced->new( Padre->ide->{wx}->main );
-	$advanced->show;
+	my $ret      = $advanced->show;
+
+	#Indicate that we used the advanced editor and
+	#there were changes so the caller
+	#will update the editors with the new settings
+	if ( $ret != Wx::wxID_CANCEL ) {
+		$self->{_had_advanced} = 1;
+	}
 
 	return;
 }

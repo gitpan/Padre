@@ -7,7 +7,7 @@ use Padre::Constant          ();
 use Padre::Task::Syntax      ();
 use Parse::ErrorString::Perl ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = 'Padre::Task::Syntax';
 
 sub new {
@@ -61,7 +61,7 @@ sub syntax {
 			$file->print("BEGIN {\n");
 			$file->print("\t\$INC{'$module_file'} = '$file';\n");
 			$file->print("}\n");
-			$file->print("#line 0\n");
+			$file->print("#line 1\n");
 		}
 
 		$file->print($text);
@@ -111,10 +111,6 @@ sub syntax {
 		local $/ = undef;
 		$stderr = <$fh>;
 		close $fh;
-
-		# ...and delete it
-		require File::Remove;
-		File::Remove::remove( $err->filename );
 	}
 
 	# Shortcut: Handle the "no errors or warnings" case

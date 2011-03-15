@@ -10,7 +10,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -73,36 +73,53 @@ sub new {
 	$self->SetSizerAndFit($sizerh);
 	$sizerh->SetSizeHints($self);
 
-	# Grab the kill focus to prevent deselection
-	Wx::Event::EVT_KILL_FOCUS(
-		$self->{list},
-		sub {
-			return;
-		},
-	);
-
-	# Double-click a function name
+	# Handle double-click on a function name
 	Wx::Event::EVT_LISTBOX_DCLICK(
 		$self,
 		$self->{list},
 		sub {
-			$self->on_list_item_activated( $_[1] );
+			my ( $this, $event ) = @_;
+			$self->on_list_item_activated($event);
+			return;
 		}
 	);
 
-	# Handle key events
+	# Handle double click on list.
+	# Overwrite to avoid stealing the focus back from the editor.
+	# On Windows this appears to kill the double-click feature entirely.
+	unless (Padre::Constant::WXWIN32) {
+		Wx::Event::EVT_LEFT_DCLICK(
+			$self->{list},
+			sub {
+				return;
+			}
+		);
+	}
+
+	# Handle key events in list
 	Wx::Event::EVT_KEY_UP(
 		$self->{list},
 		sub {
 			my ( $this, $event ) = @_;
-			if ( $event->GetKeyCode == Wx::WXK_RETURN ) {
+
+			my $code = $event->GetKeyCode;
+			if ( $code == Wx::WXK_RETURN ) {
 				$self->on_list_item_activated($event);
+			} elsif ( $code == Wx::WXK_ESCAPE ) {
+
+				# Escape key clears search and returns focus
+				# to the editor
+				$self->{search}->SetValue('');
+				my $editor = $self->current->editor;
+				$editor->SetFocus if $editor;
 			}
+
 			$event->Skip(1);
+			return;
 		}
 	);
 
-	# Handle key events
+	# Handle char events in search box
 	Wx::Event::EVT_CHAR(
 		$self->{search},
 		sub {
@@ -118,7 +135,6 @@ sub new {
 					$selection = 0;
 				}
 				$self->{list}->Select($selection);
-
 			} elsif ( $code == Wx::WXK_ESCAPE ) {
 
 				# Escape key clears search and returns focus
@@ -129,6 +145,7 @@ sub new {
 			}
 
 			$event->Skip(1);
+			return;
 		}
 	);
 

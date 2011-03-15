@@ -10,7 +10,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -73,14 +73,6 @@ sub new {
 	$self->SetSizerAndFit($sizer);
 	$sizer->SetSizeHints($self);
 
-	# Grab the kill focus to prevent deselection
-	Wx::Event::EVT_KILL_FOCUS(
-		$self->{list},
-		sub {
-			return;
-		},
-	);
-
 	# Double-click a function name
 	Wx::Event::EVT_LISTBOX_DCLICK(
 		$self,
@@ -90,16 +82,33 @@ sub new {
 		}
 	);
 
+	# Handle double click on list
+	# overwrite this handler to avoid stealing the focus back from the editor
+	Wx::Event::EVT_LEFT_DCLICK(
+		$self->{list},
+		sub { return; }
+	);
+
 	# Handle key events
 	Wx::Event::EVT_KEY_UP(
 		$self->{list},
 		sub {
-			if ( $_[1]->GetKeyCode == Wx::WXK_RETURN ) {
+			my ( $this, $event ) = @_;
 
-				# EVT_KEY_UP always binds to a single thing
-				$_[0]->GetParent->on_list_item_activated( $_[1] );
+			my $code = $event->GetKeyCode;
+			if ( $code == Wx::WXK_RETURN ) {
+				$self->on_list_item_activated($event);
+			} elsif ( $code == Wx::WXK_ESCAPE ) {
+
+				# Escape key clears search and returns focus
+				# to the editor
+				$self->{search}->SetValue('');
+				my $editor = $self->current->editor;
+				$editor->SetFocus if $editor;
 			}
-			$_[1]->Skip(1);
+
+			$event->Skip(1);
+			return;
 		}
 	);
 
@@ -126,7 +135,7 @@ sub new {
 				# Escape key clears search and returns the
 				# focus to the editor.
 				$self->{search}->SetValue('');
-				my $editor = $this->current->editor;
+				my $editor = $self->current->editor;
 				$editor->SetFocus if $editor;
 			}
 
@@ -184,6 +193,7 @@ sub on_list_item_activated {
 
 	# Move the selection to where we last saw it
 	$editor->goto_pos_centerize( $todo->{pos} );
+	$editor->SetFocus;
 
 	return;
 }
@@ -238,9 +248,13 @@ sub refresh {
 	my $regexp = $current->config->todo_regexp;
 	my $text   = $document->text_get;
 	my @items  = ();
-	while ( $text =~ /$regexp/gim ) {
-		push @items, { text => $1 || '<no text>', 'pos' => pos($text) };
-	}
+	eval {
+		while ( $text =~ /$regexp/gim )
+		{
+			push @items, { text => $1 || '<no text>', 'pos' => pos($text) };
+		}
+	};
+	$self->main->error( sprintf( Wx::gettext('%s in TODO regex, check your config.'), $@ ) ) if $@;
 	while ( $text =~ /#\s*(Ticket #\d+.*?)$/gim ) {
 		push @items, { text => $1, 'pos' => pos($text) };
 	}

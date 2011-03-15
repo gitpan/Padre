@@ -36,7 +36,7 @@ use Padre::Wx::Dialog     ();
 use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Role::Task
 	Wx::Dialog
@@ -353,7 +353,7 @@ sub show_page {
 
 	# Bashing on Indicies in the attempt to replace an open
 	# tab with the same title.
-	my $found = $self->notebook->GetPageCount;
+	my $found = $self->{notebook}->GetPageCount;
 	my @opened;
 	my $i = 0;
 	while ( $i < $found ) {

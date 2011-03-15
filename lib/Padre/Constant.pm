@@ -10,7 +10,7 @@ use File::Path ();
 use File::Spec ();
 use File::HomeDir 0.91 ();
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.57';
 
 our $DISTRO;
@@ -114,11 +114,9 @@ use constant CONFIG_HOST    => File::Spec->catfile( CONFIG_DIR, 'config.db' );
 use constant CONFIG_HUMAN   => File::Spec->catfile( CONFIG_DIR, 'config.yml' );
 use constant CONFIG_STARTUP => File::Spec->catfile( CONFIG_DIR, 'startup.txt' );
 
-# Do the initialisation in a function,
-# so we can run it again later if needed.
+# Do initialisation in a function so we can run it again later if needed.
+# Check and create the directories that need to exist.
 sub init {
-
-	# Check and create the directories that need to exist
 	unless ( -e CONFIG_DIR or File::Path::mkpath(CONFIG_DIR) ) {
 		Carp::croak( "Cannot create config directory '" . CONFIG_DIR . "': $!" );
 	}
@@ -132,30 +130,40 @@ BEGIN {
 }
 
 sub DISTRO {
-	return $DISTRO if defined($DISTRO);
+	return $DISTRO if defined $DISTRO;
 
 	if (WIN32) {
-		$DISTRO = 'WIN';
+
+		# Inherit from the main Windows classification
+		require Win32;
+		$DISTRO = uc Win32::GetOSName();
+
 	} elsif (MAC) {
 		$DISTRO = 'MAC';
+
 	} else {
 
-		# Try to identify the distro
-		if ( open my $lsb_file, '<', '/etc/lsb-release' ) {
-			while (<$lsb_file>) {
-				next unless /^DISTRIB_ID\=(.+?)[\r\n]/;
-				if ( $1 eq 'Ubuntu' ) {
-					$DISTRO = 'UBUNTU';
+		# Try to identify a more specific linux distribution
+		local $@;
+		eval {
+			if ( open my $lsb_file, '<', '/etc/lsb-release' )
+			{
+				while (<$lsb_file>) {
+					next unless /^DISTRIB_ID\=(.+?)[\r\n]/;
+					if ( $1 eq 'Ubuntu' ) {
+						$DISTRO = 'UBUNTU';
+					}
+					last;
 				}
-				last;
 			}
-		}
+		};
 	}
 
 	$DISTRO ||= 'UNKNOWN';
 
-	return $DISTRO if defined($DISTRO);
+	return $DISTRO;
 }
+
 
 
 
@@ -215,9 +223,14 @@ Operating Systems.
 
 Padre targets the three largest Wx back-ends and maps to the OS constants.
 
-	WXWIN32 => WIN32,
-	WXMAC   => MAC,
-	WXGTK   => UNIX,
+These are superficially identical to the current operation system constants,
+but are reserved to specifically differentiate between the operating system
+in general and the Wx backend implementation, in case the distinction becomes
+important at some point in the future.
+
+    WXWIN32 => WIN32,
+    WXMAC   => MAC,
+    WXGTK   => UNIX,
 
 =head2 C<BOOLEAN>, C<POSINT>, C<INTEGER>, C<ASCII>, C<PATH>
 

@@ -67,7 +67,7 @@ requires:
   Cwd: 3.2701
   DBD::SQLite: 1.27
   DBI: 1.58
-  Data::Dumper: 0
+  Data::Dumper: 2.101
   Debug::Client: 0.11
   Devel::Dumpvar: 0.04
   Devel::Refactor: 0.05
@@ -81,7 +81,7 @@ requires:
   File::Glob: 0
   File::HomeDir: 0.91
   File::Path: 2.08
-  File::Remove: 1.42
+  File::Remove: 1.40
   File::ShareDir: 1.00
   File::Spec: 3.2701
   File::Spec::Functions: 3.2701
@@ -143,4 +143,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.82
+version: 0.84

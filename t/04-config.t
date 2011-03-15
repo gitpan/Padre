@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use constant NUMBER_OF_CONFIG_OPTIONS => 126;
+use constant NUMBER_OF_CONFIG_OPTIONS => 127;
 
 # Move of Debug to Run Menu
 use Test::More tests => NUMBER_OF_CONFIG_OPTIONS * 3 + 21;
@@ -38,9 +38,11 @@ is( $config->human->version, undef, '->human->version is undef' );
 is( $Wx::VERSION, undef, 'Wx was not loaded during config read' );
 
 my $preferences = do {
-	open my $fh, 'lib/Padre/Wx/Dialog/Preferences.pm' or die;
+	open( my $fh, '<', 'lib/Padre/Wx/Dialog/Preferences.pm' ) or die;
 	local $/ = undef;
-	<$fh>;
+	my $line = <$fh>;
+	close $fh;
+	$line;
 };
 
 # szabgab:

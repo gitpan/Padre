@@ -5,9 +5,10 @@ package Padre::Project;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec ();
+use File::Spec      ();
+use Padre::Constant ();
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.81';
 
 
@@ -220,17 +221,52 @@ sub ignore_rule {
 	return sub {
 		if ( $_->{name} =~ /^\./ ) {
 			return 0;
-		} else {
-			return 1;
 		}
+		if (Padre::Constant::WIN32) {
+
+			# On Windows only ignore files or directories that
+			# begin or end with a dollar sign as "hidden". This is
+			# mainly relevant if we are opening some project across
+			# a UNC path on more recent versions of Windows.
+			if ( $_->{name} =~ /^\$/ ) {
+				return 0;
+			}
+			if ( $_->{name} =~ /\$$/ ) {
+				return 0;
+			}
+
+			# Likewise, desktop.ini files are stupid files used
+			# by windows to make a folder behave weirdly.
+			# Ignore them too.
+			if ( $_->{name} eq 'desktop.ini' ) {
+				return 0;
+			}
+		}
+		return 1;
 	};
 }
 
 # Alternate form
 sub ignore_skip {
-	return [
+	my $rule = [
 		'(?:^|\\/)\\.',
 	];
+
+	if (Padre::Constant::WIN32) {
+
+		# On Windows only ignore files or directories that begin or end
+		# with a dollar sign as "hidden". This is mainly relevant if
+		# we are opening some project across a UNC path on more recent
+		# versions of Windows.
+		push @$rule, "(?:^|\\/)\\\$";
+		push @$rule, "\\\$\$";
+
+		# Likewise, desktop.ini files are stupid files used by windows
+		# to make a folder behave weirdly. Ignore them too.
+		push @$rule, "(?:^|\\/)desktop.ini\$";
+	}
+
+	return $rule;
 }
 
 sub name {

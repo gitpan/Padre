@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::MimeTypes      ();
 use Padre::Role::Task     ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Main
@@ -27,7 +27,7 @@ sub new {
 	my $self = $class->SUPER::new(
 		$main,
 		-1,
-		Wx::gettext('Open Resource'),
+		Wx::gettext('Open Resources'),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 		Wx::wxDEFAULT_FRAME_STYLE | Wx::wxTAB_TRAVERSAL,
@@ -73,7 +73,7 @@ sub init_search {
 	}
 
 	$self->{directory} = $directory;
-	$self->SetLabel( Wx::gettext('Open Resource') . ' - ' . $directory );
+	$self->SetLabel( Wx::gettext('Open Resources') . ' - ' . $directory );
 }
 
 # -- event handler
@@ -212,6 +212,14 @@ sub _create_controls {
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 	);
+	$self->{search_text}->SetToolTip( Wx::gettext('Enter parts of the resource name to find it') );
+
+	$self->{popup_button} = Wx::BitmapButton->new(
+		$self,
+		-1,
+		Padre::Wx::Icon::find("actions/down")
+	);
+	$self->{popup_button}->SetToolTip( Wx::gettext('Click on the arrow for filter settings') );
 
 	# matches result list
 	my $matches_label = Wx::StaticText->new(
@@ -228,6 +236,7 @@ sub _create_controls {
 		[],
 		Wx::wxLB_EXTENDED,
 	);
+	$self->{matches_list}->SetToolTip( Wx::gettext('Select one or more resources to open') );
 
 	# Shows how many items are selected and information about what is selected
 	$self->{status_text} = Wx::TextCtrl->new(
@@ -250,12 +259,7 @@ sub _create_controls {
 		-1,
 		Padre::Wx::Icon::find("actions/edit-copy"),
 	);
-
-	$self->{popup_button} = Wx::BitmapButton->new(
-		$self,
-		-1,
-		Padre::Wx::Icon::find("actions/down")
-	);
+	$self->{copy_button}->SetToolTip( Wx::gettext('Copy filename to clipboard') );
 
 	$self->{popup_menu}     = Wx::Menu->new;
 	$self->{skip_vcs_files} = $self->{popup_menu}->AppendCheckItem(
@@ -310,7 +314,29 @@ sub _setup_events {
 				if ( $code == Wx::WXK_DOWN )
 				or ( $code == Wx::WXK_UP )
 				or ( $code == Wx::WXK_NUMPAD_PAGEDOWN )
-				or ( $code == Wx::WXK_PAGEDOWN );
+				or ( $code == Wx::WXK_PAGEDOWN )
+				or ( $code == Wx::WXK_NUMPAD_PAGEUP )
+				or ( $code == Wx::WXK_PAGEUP );
+
+
+			$event->Skip(1);
+		}
+	);
+
+	Wx::Event::EVT_CHAR(
+		$self->{matches_list},
+		sub {
+			my $this  = shift;
+			my $event = shift;
+			my $code  = $event->GetKeyCode;
+
+			$self->{search_text}->SetFocus
+				unless ( $code == Wx::WXK_DOWN )
+				or ( $code == Wx::WXK_UP )
+				or ( $code == Wx::WXK_NUMPAD_PAGEDOWN )
+				or ( $code == Wx::WXK_PAGEDOWN )
+				or ( $code == Wx::WXK_NUMPAD_PAGEUP )
+				or ( $code == Wx::WXK_PAGEUP );
 
 			$event->Skip(1);
 		}
@@ -534,9 +560,19 @@ sub render {
 	# Save user selections for later
 	my @matches = $self->{matches_list}->GetSelections;
 
-	#Populate the list box now
+	# prepare more general search expression
+	my $is_perl_package_expr = 0;
+	if ( $search_expr =~ s/\\:\\:/\//g ) { # undo quotemeta and substitute / for ::
+		$is_perl_package_expr = 1;
+	}
+	if ( $search_expr =~ s/\\:/\//g ) {    # undo quotemeta and substitute / for :
+		$is_perl_package_expr = 1;
+	}
+
+	# Populate the list box
 	$self->{matches_list}->Clear;
 	my $pos = 0;
+	my %contains_file;
 	foreach my $file ( @{ $self->{matched_files} } ) {
 		my $filename = File::Basename::fileparse($file);
 		if ( $filename =~ /^$search_expr/i ) {
@@ -551,12 +587,37 @@ sub render {
 				}
 			}
 			$self->{matches_list}->Insert( $filename . $pkg, $pos, $file );
+			$contains_file{ $filename . $pkg } = 1;
 			$pos++;
 		}
 	}
+
+	foreach my $file ( @{ $self->{matched_files} } ) {
+		if ( $file =~ /^$self->{directory}.+$search_expr/i ) {
+			my $filename = File::Basename::fileparse($file);
+
+			# Display package name if it is a Perl file
+			my $pkg = '';
+			my $mime_type = Padre::MimeTypes->guess_mimetype( undef, $file );
+			if ( $mime_type eq 'application/x-perl' or $mime_type eq 'application/x-perl6' ) {
+				my $contents = Padre::Util::slurp($file);
+				if ( $contents && $$contents =~ /\s*package\s+(.+);/ ) {
+					$pkg = "  ($1)";
+				}
+			} else {
+				next if $is_perl_package_expr; # do nothing if input contains : or ::
+			}
+
+			unless ( exists $contains_file{ $filename . $pkg } ) {
+				$self->{matches_list}->Insert( $filename . $pkg, $pos, $file );
+				$pos++;
+			}
+		}
+	}
+
 	if ( $pos > 0 ) {
 
-		#Keep the old user selection if it is possible
+		# Keep the old user selection if it is possible
 		$self->{matches_list}->Select( scalar @matches > 0 ? $matches[0] : 0 );
 		$self->{status_text}->ChangeValue( $self->_path( $self->{matches_list}->GetClientData(0) ) );
 		$self->{status_text}->Enable(1);
@@ -592,7 +653,7 @@ __END__
 
 =head1 NAME
 
-Padre::Wx::Dialog::OpenResource - Open Resource dialog
+Padre::Wx::Dialog::OpenResource - Open Resources dialog
 
 =head1 DESCRIPTION
 

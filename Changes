@@ -1,6 +1,60 @@
 Changes for Perl Application Development and Refactoring Environment
 NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
 
+Padre version numbers follow an odd/even pattern, where the even numbers are
+used for the production releases of the distribution. The even versions below
+details visible changes or bug fixes for the Padre IDE.
+
+The odd versions are used during development and the change entries for them
+list API changes that may break compatibility for components of Padre, most
+notably for plugins. This allows plugins to update compatibility before the
+next production release, and synchronise their release to the Padre schedule.
+
+0.84 2011.03.10
+    - Function and TODO list: also handle Esc when focus is on the list (ZENOG)
+    - Function and TODO list: remove unnecessary EVT_KILL_FOCUS handler (ZENOG)
+    - Outline: simplify method 'select_line_in_editor' (ZENOG)
+    - Fix #967: Reset Focus (ZENOG)
+    - Added Padre::Task::File to allow non-blocking deletion of temporary
+      directories in the background once they are of no further use (ADAMK)
+    - The Recent Files menu now supports UNC paths on Windows (ADAMK)
+    - The Recent Files menu is now generated in a background task to prevent
+      long IDE blocking, such as when checking -f over a network mount (ADAMK)
+    - Fix #1140: RegEx editor reversed flags when inserting (SEWI)
+    - Padre::PluginHandle will parse_variable the version of crashed or
+      incompatible plugins rather than return '???' (ADAMK)
+    - The PluginManager dialog can now correctly distinguish between broken
+      plugins and merely incompatible plugins (ADAMK)
+    - The ProjectManager won't shortcut the file->project detection for
+      previously intuited projects without secondary evidence such as a 
+      padre.yml file or a Makefile.PL (ADAMK)
+    - Padre crashed on error in TODO list regex, fixed (FENDERSON, SEWI)
+    - Eliminate crash in PPI Standard Syntax highlighter #1109 (SZABGAB)
+    - Eliminate crash when opening recent file #1148 (SZABGAB)
+    - Stop jumping to first character when Goto "string" #1149 (SZABGAB)
+    - After the making changes in the Advanced Preference Editor
+      apply those changes. (fixing #1150) (SZABGAB)
+    - Fix #1153: %p, %f, etc. do not work for in window title (ZENOG)
+    - Add configuration option main_statusbar_template to allow the
+      user to fine tune the status bar #1104 (SZABGAB)
+    - Center the highlighted search term so that the context is visible (ZENOG)
+    - Find the cpanm also if it is "only" in the PATH. 
+      e.g. when using local::lib (SZABGAB)
+    - Fixed #1136: The syntax checker often marks the wrong line in a package
+      (AZAWAWI)
+    - Add tooltips to "Open Resource" dialog (ZENOG)
+    - Fix #1078: 'Open Resource' should find things like 'Wx::Dialog' (ZENOG)
+    - 'Open Resource': set focus to text field on character input in the list
+      box, fix tab order (ZENOG)
+    - Rename 'Open Resource' to 'Open Resources' to reflect the fact that it
+      can open several files at once (ZENOG)
+    - Remove unnecessary file deletion in Document::Perl::Syntax - this is done
+      automagically by File::Temp (ZENOG)
+    - Update German translation (ZENOG)
+
+0.83 Development version, not released
+    - No incompatible API changes during the 0.84 release cycle
+
 0.82 2011.02.15
     - Remove methods that are not used any more: check_syntax_in_background and
       check_syntax (ZENOG)
@@ -39,10 +93,10 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
     - Added version control system intuition via the ->vcs method in
       Padre::Project (ADAMK)
 
-0.81 not released
+0.81 Development version, not released
     - Padre::TaskManager now uses the term "worker" exclusively in API methods
       instead of "thread" (e.g. start_thread becomes start_worker). This
-      future-proofs the API against a future alternative task manager backend
+      future-proofs the API against potential alternative task manager backend
       implementations that do not use threads. All existing Padre::Task code
       should continue to work, but plugin authors may be impacted by the
       $COMPATIBLE bump. An unchanged new release with the dependency version
@@ -96,7 +150,7 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
       way, hijack ctrl-scroll and reverse it to the right way (ADAMK)
     - Find in Files directory recursion now happens ordered (ADAMK)
 
-0.79 not released
+0.79 Development version, not released
     - Padre::Util::parse_version is now Padre::Util::parse_variable (ADAMK)
 
 0.78 2011.01.14
@@ -145,7 +199,7 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
     - Added additional test to copyright.t to check all copyright notices
       have the current year. (PLAVEN)
 
-0.75 not released
+0.77 Development version, not released
     - No incompatible API changes during the 0.78 release cycle
 
 0.76 2010.12.08
@@ -226,7 +280,7 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
       (e.g. v5.8.9 instead of v5.008009) (AZAWAWI)
     - Correctly start up maximized if we were closed maximized (ADAMK)
 
-0.73 not released
+0.75 Development version, not released
     - No incompatible API changes during the 0.76 release cycle
 
 0.74 2010.11.14
@@ -264,7 +318,7 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
     - Directory tree: support deletion of directories (ZENOG)
     - Update German translation (ZENOG)
 
-0.73 not released
+0.73 Development version, not released
     - No incompatible API changes during the 0.74 release cycle
 
 0.72 2010.10.10
@@ -329,7 +383,7 @@ NOTE: Do NOT "tidy" or change the indenting here, or we break svn annotate
     - Add "Create directory" and "remove file" to the directory browser. (SZABGAB) 
     - Aff "Goto Last position" (SZABGAB)
 
-0.71 not released
+0.71 Development version, not released
     - No incompatible API changes during the 0.72 release cycle
 
 0.70 2010.09.09

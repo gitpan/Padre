@@ -32,7 +32,7 @@ use Encode       ();
 use List::Util   ();
 use Params::Util ();
 
-our $VERSION = '0.82';
+our $VERSION = '0.84';
 
 sub new {
 	my $class = shift;
@@ -234,6 +234,7 @@ sub editor_search_down {
 	return unless defined $start;
 
 	# Highlight the found item
+	$editor->goto_pos_centerize($start);
 	$editor->SetSelection( $start, $end );
 	return 1;
 }
@@ -255,6 +256,7 @@ sub editor_search_up {
 	return unless defined $start;
 
 	# Highlight the found item
+	$editor->goto_pos_centerize($start);
 	$editor->SetSelection( $start, $end );
 	return 1;
 }

@@ -61,13 +61,14 @@ use Padre::Wx::Role::Conduit  ();
 use Padre::Wx::Role::Dialog   ();
 use Padre::Logger;
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.58';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
 	Padre::Wx::Role::Dialog
 	Wx::Frame
 };
+
 
 use constant SECONDS => 1000;
 
@@ -1247,8 +1248,8 @@ sub refresh {
 
 	# Although it would be nice to do this later, some of the
 	# optimisations in the other refresh subsections depend on the
-	# checked-state of the menu entries being accurate. So alas, we need
-	# to do this one first and delay the background jobs a little.
+	# checked-state of the menu entries being accurate. So alas, we must
+	# do this one first and delay the background jobs a little.
 	$self->refresh_menu($current);
 
 	# Refresh elements that generate background tasks first,
@@ -1333,9 +1334,89 @@ sub refresh_title {
 	return if $self->locked('REFRESH');
 
 	# Get the window title template string
+	my $current  = Padre::Current::_CURRENT(@_);
+	my $config   = $current->config;
+	my $template = $config->main_title || 'Padre %v';
+
+	my $title = $self->process_template($template);
+
+	# Additional information if we are running the developer version
+	require Padre::Util::SVN;
+	my $revision = Padre::Util::SVN::padre_revision();
+	if ( defined $revision ) {
+		$title .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
+	}
+
+	unless ( $self->GetTitle eq $title ) {
+
+		# Push the title to the window
+		$self->SetTitle($title);
+
+		# Push the title to the process list for better identification
+		$0 = $title; ## no critic (RequireLocalizedPunctuationVars)
+	}
+
+	return;
+}
+
+# this sub is called frequently, on every key stroke or mouse movement
+# TODO speed should be improved
+sub process_template_frequent {
+	my $self     = shift;
+	my $template = shift;
+
 	my $current = Padre::Current::_CURRENT(@_);
-	my $config  = $current->config;
-	my $title   = $config->main_title || 'Padre %v';
+
+	my $document = $current->document;
+
+	if ( $template =~ /\%m/ ) {
+		if ($document) {
+			my $modified = $document->editor->GetModify ? '*' : '';
+			$template =~ s/\%m/$modified/;
+		} else {
+			$template =~ s/\%m/*/; # maybe set to '' if document is empty?
+		}
+	}
+
+
+	if ( $template =~ /\%s/ ) {
+		my $sub = '';
+		if ($document) {
+			my $text = $document->text_get;
+
+			my $editor = $document->editor;
+			my $pos    = $editor->GetCurrentPos;
+			my $first  = $editor->PositionFromLine(0);
+			my $prefix = $editor->GetTextRange( $first, $pos );
+
+			my ( $start, $end ) = Padre::Util::get_matches(
+				$prefix,
+				$document->get_function_regex(qr/\w+/),
+				0, length($prefix),
+				1
+			);
+			if ( defined $start and defined $end ) {
+				my $match = substr( $prefix, $start, ( $end - $start ) );
+				my ( $p, $name ) = split /\s+/, $match;
+				$sub = $name;
+			} else {
+				$sub = '';
+			}
+		} else {
+			$sub = '';
+		}
+		$template =~ s/\%s/$sub/;
+	}
+
+
+	return $template;
+}
+
+sub process_template {
+	my $self     = shift;
+	my $template = shift;
+
+	my $current = Padre::Current::_CURRENT(@_);
 
 	# Populate any variables used in the template on demand,
 	# avoiding potentially expensive operations unless needed.
@@ -1343,8 +1424,9 @@ sub refresh_title {
 		'%' => '%',
 		'v' => $Padre::VERSION,
 	);
-	foreach my $char ( $title =~ /\%(.)/g ) {
+	foreach my $char ( $template =~ /\%(.)/g ) {
 		next if exists $variable{$char};
+
 		if ( $char eq 'p' ) {
 
 			# Fill in the session name, if any
@@ -1360,9 +1442,18 @@ sub refresh_title {
 		}
 
 		# The other variables are all based on the filename
-		my $document = $current->document or next;
-		my $file = $document->file;
-		next unless defined $file;
+		my $document = $current->document;
+		my $file;
+		$file = $document->file if defined $document;
+
+		unless ( defined $file ) {
+			if ( $char =~ m/^[fbdF]$/ ) {
+				$variable{$char} = '';
+			} else {
+				$variable{$char} = '%' . $char;
+			}
+			next;
+		}
 
 		if ( $char eq 'b' ) {
 			$variable{b} = $file->basename;
@@ -1385,26 +1476,11 @@ sub refresh_title {
 	}
 
 	# Process the template into the final string
-	$title =~ s/\%(.)/$variable{$1}/g;
+	$template =~ s/\%(.)/$variable{$1}/g;
 
-	# Additional information if we are running the developer version.
-	require Padre::Util::SVN;
-	my $revision = Padre::Util::SVN::padre_revision();
-	if ( defined $revision ) {
-		$title .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
-	}
-
-	unless ( $self->GetTitle eq $title ) {
-
-		# Push the title to the window
-		$self->SetTitle($title);
-
-		# Push the title to the process list for better identification
-		$0 = $title; ## no critic (RequireLocalizedPunctuationVars)
-	}
-
-	return;
+	return $template;
 }
+
 
 =pod
 
@@ -1539,6 +1615,22 @@ sub refresh_status {
 	$self->GetStatusBar->refresh( $_[0] or $self->current );
 }
 
+
+=head3 C<refresh_status_template>
+
+    $main->refresh_status_templat;
+
+Force a refresh of Padre's status bar. 
+The part that is driven by a template.
+
+=cut
+
+sub refresh_status_template {
+	my $self = shift;
+	return if $self->locked('REFRESH');
+	$self->GetStatusBar->refresh_from_template( $_[0] or $self->current );
+}
+
 =pod
 
 =head3 C<refresh_cursorpos>
@@ -1571,29 +1663,39 @@ Force a refresh of the function list on the right.
 
 =cut
 
-# TO DO now on every ui change (move of the mouse) we refresh
-# this even though that should not be necessary can that be
-# eliminated ?
 sub refresh_functions {
 	my $self = shift;
+
 	return unless $self->has_functions;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{functions}->IsChecked;
+
 	my @windows = @_;
 	push @windows, $self->current unless @windows;
 	$self->functions->refresh(@windows);
+
 	return;
 }
 
-# TO DO now on every ui change (move of the mouse) we refresh
-# this even though that should not be necessary can that be
-# eliminated ?
+=pod
+
+=head3 C<refresh_todo>
+
+    $main->refresh_todo;
+
+Force a refresh of the TODO list on the right.
+
+=cut
+
 sub refresh_todo {
 	my $self = shift;
+
 	return unless $self->has_todo;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{todo}->IsChecked;
+
 	$self->todo->refresh(@_);
+
 	return;
 }
 
@@ -1918,7 +2020,7 @@ sub show_todo {
 	return;
 }
 
-# XXX This should be merged with _show_functions again
+# TODO This should be merged with _show_functions again
 sub _show_todo {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
@@ -3515,7 +3617,7 @@ sub setup_editor {
 		if ( -d $file_obj->{filename} ) {
 			$self->error(
 				sprintf(
-					Wx::gettext("Cannot open a Directory: %s"),
+					Wx::gettext("Cannot open a directory: %s"),
 					$file
 				)
 			);
@@ -5052,8 +5154,8 @@ sub on_preferences {
 	my %old_highlighters = Padre::MimeTypes->get_current_highlighters;
 
 	require Padre::Wx::Dialog::Preferences;
-	my $prefDlg = Padre::Wx::Dialog::Preferences->new;
-	if ( $prefDlg->run($self) ) {
+	my $preferences_dialog = Padre::Wx::Dialog::Preferences->new;
+	if ( $preferences_dialog->run($self) ) {
 		my %mime_types; # all the mime-types of currently open files
 		foreach my $editor ( $self->editors ) {
 			$editor->set_preferences;
@@ -5642,6 +5744,7 @@ sub on_stc_update_ui {
 	$self->refresh_toolbar($current);
 
 	# $self->refresh_status($current);
+	$self->refresh_status_template($current);
 	$self->refresh_cursorpos($current);
 
 	# This call makes live filesystem calls every time the cursor moves

@@ -12,7 +12,7 @@ BEGIN {
 		plan skip_all => 'Needs DISPLAY';
 		exit 0;
 	}
-	plan( tests => $] <= 5.008009 ? 63 : 73 );
+	plan( tests => $] <= 5.008009 ? 72 : 82 );
 }
 
 use t::lib::Padre;
@@ -122,7 +122,7 @@ print(
 END_PERL
 	is_model_ok(
 		model     => $module->{model},
-		line      => 3,
+		line      => 4,
 		message   => 'syntax error, at EOF',
 		type      => 'F',
 		test_name => 'Error at the nth line of a module',
@@ -135,7 +135,7 @@ SCOPE: {
 	my $module = execute($win32);
 	is_model_ok(
 		model     => $module->{model},
-		line      => 3,
+		line      => 4,
 		message   => 'syntax error, at EOF',
 		type      => 'F',
 		test_name => 'Error at the nth line of a module',
@@ -149,7 +149,7 @@ SCOPE: {
 	my $module = execute($win32);
 	is_model_ok(
 		model     => $module->{model},
-		line      => 3,
+		line      => 4,
 		message   => 'syntax error, at EOF',
 		type      => 'F',
 		test_name => 'Error at the nth line of a module',
@@ -158,6 +158,21 @@ SCOPE: {
 }
 
 
+# Ticket 1136: The syntax checker often marks the wrong line in a package
+SCOPE: {
+	my $module = execute( <<'END_PERL' );
+package TestClass;
+use strict;
+lala; #error
+END_PERL
+	is_model_ok(
+		model     => $module->{model},
+		line      => 3,
+		message   => 'Bareword "lala" not allowed while "strict subs" in use',
+		type      => 'F',
+		test_name => 'The syntax checker often marks the wrong line in a package',
+	);
+}
 
 
 

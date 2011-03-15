@@ -124,8 +124,8 @@ or to set it to "Default by extension".
 use 5.008;
 use strict;
 use warnings;
-use Carp             ();
-use File::Spec       ();
+use Carp ();
+use File::Spec 3.21 (); # 3.21 needed for volume-safe abs2rel
 use File::Temp       ();
 use Padre::Constant  ();
 use Padre::Current   ();
@@ -135,7 +135,7 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION    = '0.82';
+our $VERSION    = '0.84';
 our $COMPATIBLE = '0.81';
 
 

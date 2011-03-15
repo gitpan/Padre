@@ -29,18 +29,14 @@ use Exporter        ();
 use FindBin         ();
 use Cwd             ();
 use File::Spec      ();
-use File::Basename  ();
 use List::Util      ();
-use POSIX           ();
 use Padre::Constant (); ### NO more Padre:: dependencies
-
-
 
 # If we make $VERSION an 'our' variable the parse_variable() function breaks
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.82';
+	$VERSION    = '0.84';
 	$COMPATIBLE = '0.81';
 }
 
@@ -197,7 +193,8 @@ sub parse_variable {
 			$result = $1;
 		} elsif (m{(?<!\\) ([\$*]) (([\w\:\']*) \b$variable)\b .* =}x) {
 			my $eval = qq{
-				package ExtUtils::MakeMaker::_version;
+				package # Hide from PAUSE
+                                  ExtUtils::MakeMaker::_version;
 				no strict;
 				BEGIN { eval {
 					# Ensure any version() routine which might have leaked
