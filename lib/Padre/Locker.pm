@@ -11,11 +11,12 @@ Padre::Locker - The Padre Multi-Resource Lock Manager
 use 5.008;
 use strict;
 use warnings;
-use Padre::Lock ();
-use Padre::DB   ();
+use Padre::Lock     ();
+use Padre::DB       ();
+use Padre::Constant ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 
 sub new {
 	my $class = shift;
@@ -143,13 +144,26 @@ sub update_increment {
 	my $self = shift;
 	unless ( $self->{update_depth}++ ) {
 
-		# When a Wx application quits with ->Update locked, windows will segfault.
-		# During shutdown, do not allow the application to enable an update lock.
-		# This should be pointless anyway, because the window shouldn't be visible.
+		# When a Wx application quits with ->Update locked, windows will
+		# segfault. During shutdown, do not allow the application to
+		# enable an update lock. This should be pointless anyway,
+		# because the window shouldn't be visible.
 		return if $self->{shutdown};
 
 		# Locking for the first time
+		# Version 2.8.12  of wxWidgets introduces some improvements to
+		# wxAuiNotebook. The window will no longer carry out updates if
+		# it is Frozen on win32 platform (Mark Dootson)
+		### TODO This is an crude emergency hack, we need to find
+		### something better than disabling all render optimisation.
+		### Commented out to record for posterity, the forced Layout
+		### solution below evades the bug but without the flickering.
+		# if ( Wx::wxVERSION() >= 2.008012 and Padre::Constant::WXWIN32 ) {
+		# $self->{update_locker} = 1;
+		# } else {
 		$self->{update_locker} = Wx::WindowUpdateLocker->new( $self->{owner} );
+
+		# }
 	}
 	return;
 }
@@ -161,6 +175,12 @@ sub update_decrement {
 
 		# Unlocked for the final time
 		$self->{update_locker} = undef;
+
+		# On Windows, we need to force layouts down to notebooks
+		if ( Wx::wxVERSION() >= 2.008012 and Padre::Constant::WXWIN32 ) {
+			my @notebook = grep { $_->isa('Wx::AuiNotebook') } $self->{owner}->GetChildren;
+			$_->Layout foreach @notebook;
+		}
 	}
 	return;
 }

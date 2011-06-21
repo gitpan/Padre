@@ -16,12 +16,13 @@ use Padre::Constant        ();
 use Padre::Util            ('_T');
 use Padre::Current         ();
 use Padre::Config::Setting ();
+use Padre::Config::Style   ();
 use Padre::Config::Human   ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -198,6 +199,19 @@ sub default {
 	return $DEFAULT{$name};
 }
 
+sub changed {
+	my $self = shift;
+	my $name = shift;
+	my $new  = shift;
+	my $old  = $self->$name();
+	my $type = $self->meta($name)->type;
+	if ( $type == Padre::Constant::ASCII or $type == Padre::Constant::PATH ) {
+		return $new ne $old;
+	} else {
+		return $new != $old;
+	}
+}
+
 sub set {
 	TRACE( $_[1] ) if DEBUG;
 	my $self  = shift;
@@ -218,6 +232,9 @@ sub set {
 	# We don't need to do additional checks on Padre::Constant::ASCII
 	my $type  = $setting->type;
 	my $store = $setting->store;
+	if ( !defined($type) ) {
+		Carp::croak("Setting '$name' has undefined type");
+	}
 	if ( $type == Padre::Constant::BOOLEAN ) {
 		$value = 0 if $value eq '';
 		if ( $value ne '1' and $value ne '0' ) {
@@ -333,22 +350,47 @@ setting(
 
 # Support for Module::Starter
 setting(
-	name    => 'license',
+	name    => 'module_starter_directory',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => '',
 );
 setting(
-	name    => 'builder',
+	name    => 'module_starter_builder',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
-	default => '',
+	default => 'ExtUtils::MakeMaker',
+	options => {
+		'ExtUtils::MakeMaker' => 'ExtUtils::MakeMaker',
+		'Module::Build'       => 'Module::Build',
+		'Module::Install'     => 'Module::Install',
+	},
 );
 setting(
-	name    => 'module_start_directory',
+	name    => 'module_starter_license',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
-	default => '',
+	default => 'perl',
+
+	# licenses list taken from
+	# http://search.cpan.org/dist/Module-Build/lib/Module/Build/API.pod
+	# even though it should be in http://module-build.sourceforge.net/META-spec.html
+	# and we should fetch it from Module::Start or maybe Software::License.
+	# (but don't load them in this module, it adds bloat)
+	options => {
+		'apache'       => _T('Apache License'),
+		'artistic'     => _T('Artistic License 1.0'),
+		'artistic_2'   => _T('Artistic License 2.0'),
+		'bsd'          => _T('Revised BSD License'),
+		'gpl'          => _T('GPL 2 or later'),
+		'lgpl'         => _T('LGPL 2.1 or later'),
+		'mit'          => _T('MIT License'),
+		'mozilla'      => _T('Mozilla Public License'),
+		'perl'         => _T('The same as Perl itself'),
+		'open_source'  => _T('Other Open Source'),
+		'unrestricted' => _T('Other Unrestricted'),
+		'restrictive'  => _T('Proprietary/Restrictive'),
+	},
 );
 
 # Indent settings
@@ -441,10 +483,9 @@ setting(
 	name  => 'main_title',
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HUMAN,
-	default => ( Padre::Constant::PORTABLE ? 'Padre Portable' : 'Padre' ) . ' [%p]',
+	default => ( Padre::Constant::PORTABLE ? 'Padre Portable' : 'Padre' ),
 	apply => sub {
-		my $main = shift;
-		$main->refresh_title;
+		$_[0]->lock('refresh_title');
 	},
 	help => _T('Contents of the window title') . _T('Several placeholders like the filename can be used'),
 );
@@ -455,8 +496,7 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => '%m %f',
 	apply   => sub {
-		my $main = shift;
-		$main->refresh_from_template;
+		$_[0]->lock('refresh_title');
 	},
 	help => _T('Contents of the status bar') . _T('Several placeholders like the filename can be used'),
 );
@@ -485,6 +525,16 @@ setting(
 	store   => Padre::Constant::HOST,
 	default => Padre::Constant::DEFAULT_SINGLEINSTANCE_PORT,
 	startup => 1,
+	apply   => sub {
+		my $main = shift;
+		if ( $main->config->main_singleinstance ) {
+
+			# Restart on the new port or the next attempt
+			# to use it will produce a new instance.
+			$main->single_instance_stop;
+			$main->single_instance_start;
+		}
+	},
 );
 
 setting(
@@ -517,6 +567,14 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{functions};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_functions($on);
+		$main->aui->Update;
+	},
 );
 setting(
 	name    => 'main_functions_order',
@@ -528,12 +586,23 @@ setting(
 		'alphabetical'              => _T('Alphabetical Order'),
 		'alphabetical_private_last' => _T('Alphabetical Order (Private Last)'),
 	},
+	apply => sub {
+		$_[0]->lock('refresh_functions');
+	}
 );
 setting(
 	name    => 'main_outline',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{outline};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_outline($on);
+		$main->aui->Update;
+	},
 );
 setting(
 	name    => 'main_todo',
@@ -546,6 +615,14 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{directory};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_directory($on);
+		$main->aui->Update;
+	},
 );
 setting(
 	name    => 'main_directory_order',
@@ -555,6 +632,9 @@ setting(
 	options => {
 		first => _T('Directories First'),
 		mixed => _T('Directories Mixed'),
+	},
+	apply => sub {
+		$_[0]->lock('refresh_directory');
 	},
 );
 setting(
@@ -590,12 +670,23 @@ setting(
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HOST,
 	default => File::HomeDir->my_documents || '',
+	apply => sub {
+		$_[0]->lock('refresh_directory');
+	},
 );
 setting(
 	name    => 'main_output',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{output};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_output($on);
+		$main->aui->Update;
+	},
 );
 setting(
 	name    => 'main_command_line',
@@ -614,6 +705,14 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{syntaxcheck};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_syntaxcheck($on);
+		$main->aui->Update;
+	},
 );
 setting(
 	name    => 'main_statusbar',
@@ -698,7 +797,7 @@ setting(
 	name  => 'editor_font',
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HUMAN,
-	default => Padre::Constant::DISTRO =~ /^WIN(?:VISTA|7)$/ ? 'Consolas 10' : '',
+	default => Padre::Constant::DISTRO =~ /^WIN(?:VISTA|7)$/ ? 'consolas 10' : '',
 );
 setting(
 	name    => 'editor_linenumbers',
@@ -780,12 +879,6 @@ setting(
 	default => 'FFFF04',
 );
 setting(
-	name    => 'editor_beginner',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 1,
-);
-setting(
 	name    => 'editor_wordwrap',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -861,7 +954,12 @@ setting(
 	name    => 'default_line_ending',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
-	default => Padre::Constant::NEWLINE
+	default => Padre::Constant::NEWLINE,
+	options => {
+		'UNIX' => 'UNIX',
+		'WIN'  => 'WIN',
+		'MAC'  => 'MAC',
+	},
 );
 setting(
 	name    => 'update_file_from_disk_interval',
@@ -896,25 +994,25 @@ setting(
 	default => 0,
 );
 setting(
-	name    => 'perl_autocomplete_max_suggestions',
+	name    => 'lang_perl5_autocomplete_max_suggestions',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 20,
 );
 setting(
-	name    => 'perl_autocomplete_min_chars',
+	name    => 'lang_perl5_autocomplete_min_chars',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
 );
 setting(
-	name    => 'perl_autocomplete_min_suggestion_len',
+	name    => 'lang_perl5_autocomplete_min_suggestion_len',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 3,
 );
 setting(
-	name    => 'perl_ppi_lexer_limit',
+	name    => 'lang_perl5_lexer_ppi_limit',
 	type    => Padre::Constant::POSINT,
 	store   => Padre::Constant::HUMAN,
 	default => 4000,
@@ -947,12 +1045,24 @@ setting(
 );
 
 setting(
-	name  => 'perl_tags_file',
+	name  => 'lang_perl5_tags_file',
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HOST,
 
 	# Don't save a default to allow future updates
 	default => '',
+);
+
+setting(
+	name    => 'lang_perl5_lexer',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HOST,
+	default => 'stc',
+	options => {
+		'stc'                             => _T('Scintilla'),
+		'Padre::Document::Perl::Lexer'    => _T('PPI Experimental'),
+		'Padre::Document::Perl::PPILexer' => _T('PPI Standard'),
+	},
 );
 
 setting(
@@ -1004,7 +1114,6 @@ setting(
 	default => "0,0",
 );
 
-
 # By default use background threads unless profiling
 # TO DO - Make the default actually change
 
@@ -1036,6 +1145,7 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HOST,
 	default => 'default',
+	options => Padre::Config::Style->styles,
 );
 
 # Window Geometry
@@ -1153,6 +1263,12 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 1,
 );
+setting(
+	name    => 'feature_wx_scintilla',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
 
 # Window menu list shorten common path
 setting(
@@ -1162,93 +1278,100 @@ setting(
 	default => 1,
 );
 
-# Beginner error checks configuration
+# Perl 5 Beginner Mode
 setting(
-	name    => 'begerror_split',
+	name    => 'lang_perl5_beginner',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+);
+
+setting(
+	name    => 'lang_perl5_beginner_split',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_warning',
+	name    => 'lang_perl5_beginner_warning',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_map',
+	name    => 'lang_perl5_beginner_map',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_DB',
+	name    => 'lang_perl5_beginner_debugger',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_chomp',
+	name    => 'lang_perl5_beginner_chomp',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_map2',
+	name    => 'lang_perl5_beginner_map2',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_perl6',
+	name    => 'lang_perl5_beginner_perl6',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_ifsetvar',
+	name    => 'lang_perl5_beginner_ifsetvar',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_pipeopen',
+	name    => 'lang_perl5_beginner_pipeopen',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_pipe2open',
+	name    => 'lang_perl5_beginner_pipe2open',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_regexq',
+	name    => 'lang_perl5_beginner_regexq',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_elseif',
+	name    => 'lang_perl5_beginner_elseif',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
 
 setting(
-	name    => 'begerror_close',
+	name    => 'lang_perl5_beginner_close',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HOST,
 	default => 1,

@@ -13,7 +13,7 @@ use Padre::Wx::TreeCtrl   ();
 use Padre::Wx::HtmlWindow ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -167,7 +167,7 @@ sub view_label {
 
 sub view_close {
 	$_[0]->task_reset;
-	$_[0]->main->show_syntax(0);
+	$_[0]->main->show_syntaxcheck(0);
 }
 
 
@@ -331,7 +331,14 @@ sub refresh {
 	my $self = shift;
 	my $document = $self->current->document or return;
 
-	# allows us to check when an empty or unsaved document is open
+	# If the document is unused, shortcut to avoid pointless tasks
+	if ( $document->is_unused ) {
+		my $lock = $self->main->lock('UPDATE');
+		$self->clear;
+		return;
+	}
+
+	# Allows us to check when an empty or unsaved document is open
 	my $filename = defined( $document->filename ) ? $document->filename : '';
 
 	my $length = $document->text_length;

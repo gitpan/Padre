@@ -50,7 +50,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 
 =pod
 
@@ -167,6 +167,8 @@ sub yes_no {
 
 Generates a standard L<Wx> single-choice dialog, using the standard
 internal L<Wx::SingleChoiceDialog> class.
+
+Returns the selected string, or C<undef> if the user selects C<Cancel>.
 
 =cut
 

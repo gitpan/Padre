@@ -1,13 +1,15 @@
 package Padre::Wx::Dialog::Positions;
 
+# TODO: This has no place as a separate class, and shouldn't be under dialogs,
+# and shouldn't store local class data. Move into Padre::Wx::Main???
+
 use 5.008;
 use strict;
 use warnings;
-use Padre::DB         ();
-use Padre::Wx         ();
-use Padre::Wx::Dialog ();
+use Padre::DB ();
+use Padre::Wx ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 
 my @positions;
 
@@ -63,8 +65,6 @@ before/after goto search result
 # TO DO reset the rest of the history when someone moves forward from the middle
 #    A, B, C,  -> goto(B), D  then the history should be A, B, D   I think.
 
-
-# a lot copied from Padre::Wx::Dialog::Bookmarks::set_position
 sub set_position {
 	my $class = shift;
 
@@ -150,14 +150,14 @@ sub goto_position {
 	# Is the file already open
 	my $file   = $positions[$pos]{file};
 	my $line   = $positions[$pos]{line};
-	my $pageid = $main->find_editor_of_file($file);
+	my $pageid = $main->editor_of_file($file);
 
 	unless ( defined $pageid ) {
 
 		# Load the file
 		if ( -e $file ) {
 			$main->setup_editor($file);
-			$pageid = $main->find_editor_of_file($file);
+			$pageid = $main->editor_of_file($file);
 		}
 	}
 

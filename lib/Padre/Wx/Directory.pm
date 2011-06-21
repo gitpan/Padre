@@ -13,7 +13,7 @@ use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Dwell
@@ -21,6 +21,8 @@ our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
 };
+
+use constant TIMER_DIRECTORY => Wx::NewId();
 
 use Class::XSAccessor {
 	getters => {
@@ -53,11 +55,7 @@ sub new {
 	);
 
 	# Where is the current root directory of the tree
-	#$self->{root} = '';
-	$self->{root} =
-		( defined $main->config->main_directory_root )
-		? $main->config->main_directory_root
-		: '';
+	$self->{root} = '';
 
 	# Modes (browse or search)
 	$self->{searching} = 0;
@@ -513,8 +511,14 @@ sub browse_message {
 
 				# TODO: this should never happen, but it does and it crashes padre in the compare method
 				# when calling is_directory on the object.
-				warn "Something is wrong as one of the directory objects is undef";
-				next;
+				warn
+					"Something is wrong as one of the directory objects is undef (position=$position, child=$child, chd=$chd)";
+				$self->main->error(
+					Wx::gettext(
+						'The directory browser got an undef object and may stop working now. Please save your work and restart Padre.'
+					)
+				);
+				last;
 			}
 			my $compare = $self->compare( $_[0], $chd );
 			if ( $compare > 0 ) {
@@ -602,11 +606,11 @@ sub find {
 	# Create the find timer
 	$self->{find_timer} = Wx::Timer->new(
 		$self,
-		Padre::Wx::ID_TIMER_DIRECTORY
+		TIMER_DIRECTORY
 	);
 	Wx::Event::EVT_TIMER(
 		$self,
-		Padre::Wx::ID_TIMER_ACTIONQUEUE,
+		TIMER_DIRECTORY,
 		sub {
 			$self->find_timer( $_[1], $_[2] );
 		},

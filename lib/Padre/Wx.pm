@@ -21,7 +21,7 @@ use Wx::STC    ();
 use Wx::AUI    ();
 use Wx::Locale ();
 
-our $VERSION    = '0.84';
+our $VERSION    = '0.86';
 our $COMPATIBLE = '0.43';
 
 # Hard version lock on a new-enough Wx.pm
@@ -51,17 +51,18 @@ use constant {
 
 
 #####################################################################
-# Allocation of Timer IDs
+# Wx Version Methods
 
-use constant {
-	ID_TIMER_FILECHECK   => Wx::NewId(),
-	ID_TIMER_POSTINIT    => Wx::NewId(),
-	ID_TIMER_OUTLINE     => Wx::NewId(),
-	ID_TIMER_ACTIONQUEUE => Wx::NewId(),
-	ID_TIMER_LASTRESORT  => Wx::NewId(),
-	ID_TIMER_NTH         => Wx::NewId(),
-	ID_TIMER_DIRECTORY   => Wx::NewId(),
-};
+sub version_perl {
+	Wx::wxVERSION();
+}
+
+sub version_human {
+	my $string = Wx::wxVERSION();
+	$string =~ s/(\d\d\d)(\d\d\d)/$1.$2/;
+	$string =~ s/\.0+(\d)/.$1/g;
+	return $string;
+}
 
 
 

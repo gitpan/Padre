@@ -61,16 +61,22 @@ use Padre::Wx::Role::Conduit  ();
 use Padre::Wx::Role::Dialog   ();
 use Padre::Logger;
 
-our $VERSION    = '0.84';
-our $COMPATIBLE = '0.58';
+our $VERSION    = '0.86';
+our $COMPATIBLE = '0.85';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
 	Padre::Wx::Role::Dialog
 	Wx::Frame
 };
 
-
 use constant SECONDS => 1000;
+
+# Wx timer ids
+use constant {
+	TIMER_FILECHECK => Wx::NewId(),
+	TIMER_POSTINIT  => Wx::NewId(),
+	TIMER_NTH       => Wx::NewId(),
+};
 
 =pod
 
@@ -273,7 +279,7 @@ sub new {
 	$self->_show_directory( $config->main_directory );
 	$self->_show_output( $config->main_output );
 	$self->_show_command_line( $config->main_command_line );
-	$self->_show_syntax( $config->main_syntaxcheck );
+	$self->_show_syntaxcheck( $config->main_syntaxcheck );
 
 	# Lock the panels if needed
 	$self->aui->lock_panels( $config->main_lockinterface );
@@ -290,10 +296,10 @@ sub new {
 	# at the beginning and hide it in the timer, if it was not needed
 	# TO DO: there might be better ways to fix that issue...
 	#$statusbar->Show;
-	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT );
+	my $timer = Wx::Timer->new( $self, TIMER_POSTINIT );
 	Wx::Event::EVT_TIMER(
 		$self,
-		Padre::Wx::ID_TIMER_POSTINIT,
+		TIMER_POSTINIT,
 		sub {
 			$_[0]->timer_start;
 		},
@@ -386,10 +392,10 @@ sub timer_start {
 	$manager->alert_new;
 
 	# Start the change detection timer
-	my $timer1 = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_FILECHECK );
+	my $timer1 = Wx::Timer->new( $self, TIMER_FILECHECK );
 	Wx::Event::EVT_TIMER(
 		$self,
-		Padre::Wx::ID_TIMER_FILECHECK,
+		TIMER_FILECHECK,
 		sub {
 			$_[0]->timer_check_overwrite;
 		},
@@ -400,10 +406,10 @@ sub timer_start {
 	$self->ide->task_manager->start;
 
 	# Give a chance for post-start code to run, then do the nth-start logic
-	my $timer2 = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_NTH );
+	my $timer2 = Wx::Timer->new( $self, TIMER_NTH );
 	Wx::Event::EVT_TIMER(
 		$self,
-		Padre::Wx::ID_TIMER_NTH,
+		TIMER_NTH,
 		sub {
 			$_[0]->timer_nth;
 		},
@@ -507,6 +513,7 @@ use Class::XSAccessor {
 		has_todo         => 'todo',
 		has_debugger     => 'debugger',
 		has_find         => 'find',
+		has_findfast     => 'findfast',
 		has_replace      => 'replace',
 		has_outline      => 'outline',
 		has_directory    => 'directory',
@@ -531,6 +538,16 @@ use Class::XSAccessor {
 	},
 };
 
+=pod
+
+=head3 C<about>
+
+    my $dialog = $main->about;
+
+Returns the About Padre dialog, creating it if needed.
+
+=cut
+
 sub about {
 	my $self = shift;
 	unless ( defined $self->{about} ) {
@@ -539,6 +556,16 @@ sub about {
 	}
 	return $self->{about};
 }
+
+=pod
+
+=head3 C<left>
+
+    my $panel = $main->left;
+
+Returns the left toolbar container panel, creating it if needed.
+
+=cut
 
 sub left {
 	my $self = shift;
@@ -549,6 +576,16 @@ sub left {
 	return $self->{left};
 }
 
+=pod
+
+=head3 C<right>
+
+    my $panel = $main->right;
+
+Returns the right toolbar container panel, creating it if needed.
+
+=cut
+
 sub right {
 	my $self = shift;
 	unless ( defined $self->{right} ) {
@@ -557,6 +594,16 @@ sub right {
 	}
 	return $self->{right};
 }
+
+=pod
+
+=head3 C<bottom>
+
+    my $panel = $main->bottom;
+
+Returns the bottom toolbar container panel, creating it if needed.
+
+=cut
 
 sub bottom {
 	my $self = shift;
@@ -699,21 +746,21 @@ sub find {
 
 =pod
 
-=head3 C<fast_find>
+=head3 C<findfast>
 
-    my $find = $main->fast_find;
+    my $find = $main->findfast;
 
 Return current quick find dialog. Create a new one if needed.
 
 =cut
 
-sub fast_find {
+sub findfast {
 	my $self = shift;
-	unless ( defined $self->{fast_find} ) {
-		require Padre::Wx::Dialog::Search;
-		$self->{fast_find} = Padre::Wx::Dialog::Search->new;
+	unless ( defined $self->{findfast} ) {
+		require Padre::Wx::Dialog::FindFast;
+		$self->{findfast} = Padre::Wx::Dialog::FindFast->new;
 	}
-	return $self->{fast_find};
+	return $self->{findfast};
 }
 
 =pod
@@ -927,6 +974,14 @@ sub single_instance_address {
 			$config->main_singleinstance_port,
 		);
 	} else {
+
+		# Fix for #1138, remove the part following the return once the
+		# fix has been tested propably
+		return (
+			'127.0.0.1',
+			$config->main_singleinstance_port
+		);
+
 		my $file = File::Spec->catfile(
 			Padre::Constant::CONFIG_DIR,
 			'single_instance.socket',
@@ -1378,7 +1433,6 @@ sub process_template_frequent {
 		}
 	}
 
-
 	if ( $template =~ /\%s/ ) {
 		my $sub = '';
 		if ($document) {
@@ -1407,7 +1461,6 @@ sub process_template_frequent {
 		}
 		$template =~ s/\%s/$sub/;
 	}
-
 
 	return $template;
 }
@@ -1497,7 +1550,7 @@ sub refresh_syntaxcheck {
 	my $self = shift;
 	return unless $self->has_syntax;
 	return if $self->locked('REFRESH');
-	return unless $self->menu->view->{show_syntaxcheck}->IsChecked;
+	return unless $self->menu->view->{syntaxcheck}->IsChecked;
 	$self->syntax->on_timer( undef, 1 );
 	return;
 }
@@ -1615,6 +1668,7 @@ sub refresh_status {
 	$self->GetStatusBar->refresh( $_[0] or $self->current );
 }
 
+=pod
 
 =head3 C<refresh_status_template>
 
@@ -1709,9 +1763,12 @@ Force a refresh of the directory tree
 
 sub refresh_directory {
 	my $self = shift;
+
 	return unless $self->has_directory;
 	return if $self->locked('REFRESH');
+
 	$self->directory->refresh( $_[0] or $self->current );
+
 	return;
 }
 
@@ -1911,7 +1968,7 @@ sub reconfig {
 	$self->show_directory( $config->main_directory );
 	$self->show_output( $config->main_output );
 	$self->show_command_line( $config->main_command_line );
-	$self->show_syntax( $config->main_syntaxcheck );
+	$self->show_syntaxcheck( $config->main_syntaxcheck );
 
 	# Finally refresh the menu to clean it up
 	$self->menu->refresh;
@@ -2185,6 +2242,25 @@ sub _show_output {
 
 =pod
 
+=head2 C<show_findfast>
+
+    $main->show_findfast( $visible );
+
+Show the Fast Find panel at the bottom of the editor area if C<$visible> is
+true. Hide it otherwise. If C<$visible> is not provided, the method defaults
+to show the panel.
+
+=cut
+
+sub show_findfast {
+	my $self = shift;
+	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+
+	return;
+}
+
+=pod
+
 =head3 C<show_findinfiles>
 
     $main->show_findinfiles( $visible );
@@ -2258,9 +2334,9 @@ sub _show_command_line {
 
 =pod
 
-=head3 C<show_syntax>
+=head3 C<show_syntaxcheck>
 
-    $main->show_syntax( $visible );
+    $main->show_syntaxcheck( $visible );
 
 Show the syntax panel at the bottom if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -2268,30 +2344,32 @@ the panel.
 
 =cut
 
-sub show_syntax {
+sub show_syntaxcheck {
 	my $self = shift;
 	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
 	my $lock = $self->lock( 'UPDATE', 'refresh_syntaxcheck' );
-	unless ( $on == $self->menu->view->{show_syntaxcheck}->IsChecked ) {
-		$self->menu->view->{show_syntaxcheck}->Check($on);
+	unless ( $on == $self->menu->view->{syntaxcheck}->IsChecked ) {
+		$self->menu->view->{syntaxcheck}->Check($on);
 	}
 
 	$self->config->set( main_syntaxcheck => $on );
-	$self->_show_syntax($on);
+	$self->_show_syntaxcheck($on);
 	$self->aui->Update;
 	$self->ide->save_config;
 
 	return;
 }
 
-sub _show_syntax {
+sub _show_syntaxcheck {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
 		my $syntax = $self->syntax;
 		$self->bottom->show(
 			$syntax,
-			sub { $self->show_syntax(0) },
+			sub {
+				$self->show_syntaxcheck(0);
+			},
 		);
 		$syntax->start unless $syntax->running;
 	} elsif ( $self->has_syntax ) {
@@ -2300,6 +2378,33 @@ sub _show_syntax {
 		$syntax->stop if $syntax->running;
 		delete $self->{syntax};
 	}
+}
+
+=pod
+
+=head2 Search and Replace
+
+=head2 find_dialog
+
+    $main->find_dialog;
+
+Show the find dialog, escalating from the fast find if needed
+
+=cut
+
+sub find_dialog {
+	my $self = shift;
+	my $term = '';
+
+	# Close the fast find panel if it was open
+	if ( $self->has_findfast ) {
+
+	}
+
+	# Create the find dialog.
+	my $find = $self->find;
+
+
 }
 
 =pod
@@ -2939,6 +3044,8 @@ sub save_session {
 		$file->insert;
 	}
 
+	Padre::DB->do( 'UPDATE session SET last_update=? WHERE id=?', {}, time, $session->id );
+
 }
 
 sub save_current_session {
@@ -3361,6 +3468,12 @@ sub on_close_window {
 
 	TRACE("on_close_window") if DEBUG;
 
+	# Terminate any currently running debugger session before we start
+	# to do anything significant.
+	if ( $self->{debugger} ) {
+		$self->{debugger}->quit;
+	}
+
 	# Wrap one big database transaction around this entire shutdown process.
 	# If the user aborts the shutdown, then the resulting commit will
 	# just save some basic parts like the last session and so on.
@@ -3371,8 +3484,6 @@ sub on_close_window {
 	# Capture the current session, before we start the interactive
 	# part of the shutdown which will mess it up.
 	$self->update_last_session;
-
-	$self->{debugger}->quit;
 
 	TRACE("went over list of files") if DEBUG;
 
@@ -3425,14 +3536,16 @@ sub on_close_window {
 
 	TRACE("Files saved (or not), hiding window") if DEBUG;
 
-	# Immediately hide the window so that the user perceives the application
-	# as closing faster. This knocks about quarter of a second off the speed
-	# at which Padre appears to close compared to letting it close naturally.
+	# A number of things don't like being destroyed while they are locked.
+	# Potential segfaults and what not. Instructing the locker to shutdown
+	# will make it release all locks and silently suppress all attempts to
+	# make new locks.
 	$self->locker->shutdown;
-	$self->Show(0);
 
-	# Save the window geometry
-	#$config->set( main_auilayout => $self->aui->SavePerspective );
+	# Save the window geometry before we hide the window. There's some
+	# weak evidence that capturing position while not showing might be
+	# flaky in some situations, and this is pretty cheap so doing it before
+	# rather than after the ->Show(0) shouldn't hurt much.
 	$config->set( main_maximized => $self->IsMaximized ? 1 : 0 );
 	unless ( $self->IsMaximized ) {
 		my ( $main_width, $main_height ) = $self->GetSizeWH;
@@ -3442,6 +3555,14 @@ sub on_close_window {
 		$config->set( main_left   => $main_left );
 		$config->set( main_top    => $main_top );
 	}
+
+	# Hide the window before any of the following slow/intensive stuff so
+	# that the user perceives the application as closing faster. This knocks
+	# at least quarter of a second off the speed at which Padre appears to
+	# close compared to letting it close naturally.
+	# It probably also makes it shut actually faster as well, as Wx won't
+	# try to do any updates or painting as we shut things down.
+	$self->Show(0);
 
 	# Clean up our secondary windows
 	if ( $self->has_about ) {
@@ -3468,8 +3589,12 @@ sub on_close_window {
 	TRACE("Shutting down Task Manager") if DEBUG;
 	$self->ide->task_manager->stop;
 
+	# The AUI manager requires a manual UnInit. The documentation for it
+	# says that if we don't do this it may segfault the process on exit.
+	$self->aui->UnInit;
+
 	# Vacuum database on exit so that it does not grow.
-	# Since you can't VACUUM inside a transaction, finish it here.
+	# Since you can't VACUUM inside a transaction, end it first.
 	undef $transaction;
 	Padre::DB->vacuum;
 
@@ -3592,7 +3717,7 @@ sub setup_editor {
 		# Use Padre::File to get the real filenames
 		my $file_obj = Padre::File->new($file);
 		if ( defined($file_obj) and ref($file_obj) and $file_obj->exists ) {
-			my $id = $self->find_editor_of_file( $file_obj->{filename} );
+			my $id = $self->editor_of_file( $file_obj->{filename} );
 			if ( defined $id ) {
 				$self->on_nth_pane($id);
 				return;
@@ -3737,8 +3862,8 @@ No return value.
 sub on_open_selection {
 	my $self    = shift;
 	my $current = $self->current;
+	my $text    = shift || $current->text;
 	my $editor  = $current->editor or return;
-	my $text    = $current->text;
 
 	# get selection, ask for it if needed
 	unless ( length $text ) {
@@ -4239,7 +4364,7 @@ sub on_save {
 
 	#print $document->filename, "\n";
 
-	my $pageid = $self->find_id_of_editor( $document->editor );
+	my $pageid = $self->editor_id( $document->editor );
 	if ( $document->is_new ) {
 
 		# move focus to document to be saved
@@ -4879,6 +5004,87 @@ sub close_where {
 
 =pod
 
+=head3 C<on_delete>
+
+    $main->on_delete;
+
+Close the current tab and remove the associated file from disk.
+No return value.
+
+=cut
+
+sub on_delete {
+	my $self = shift;
+
+	$self->delete;
+}
+
+=pod
+
+=head3 C<delete>
+
+    my $success = $main->delete( $id );
+
+Request to close document in tab C<$id>, or current one if no C<$id>
+provided and DELETE THE FILE FROM DISK. Return true if closed, false otherwise.
+
+=cut
+
+sub delete {
+	my $self     = shift;
+	my $notebook = $self->notebook;
+	my $id       = shift;
+	unless ( defined $id ) {
+		$id = $notebook->GetSelection;
+	}
+	return if $id == -1;
+
+	my $editor   = $notebook->GetPage($id) or return;
+	my $document = $editor->{Document}     or return;
+
+	# We need those even when the document is already closed:
+	my $file     = $document->file;
+	my $filename = $document->filename;
+
+	if ( !$file->can_delete ) {
+		$self->error( Wx::gettext('This type of file (URL) is missing delete support.') );
+		return 1;
+	}
+
+	if ( !$filename ) {
+		$self->error( Wx::gettext("File was never saved and has no filename - can't delete from disk") );
+		return 1;
+	}
+
+	my $ret = Wx::MessageBox(
+		sprintf(
+			Wx::gettext("Do you really want to close and delete %s from disk?"),
+			$filename
+		),
+		Wx::wxYES_NO | Wx::wxCANCEL | Wx::wxCENTRE,
+		$self,
+	);
+	return 1 unless $ret == Wx::wxYES;
+
+	TRACE( join ' ', "Deleting ", ref $document, $filename || 'Unknown' ) if DEBUG;
+
+	$self->close($id);
+
+	my $manager = $self->{ide}->plugin_manager;
+	return unless $manager->hook( 'before_delete', $file );
+
+	if ( !$file->delete ) {
+		$self->error( sprintf( Wx::gettext("Error deleting %s:\n%s"), $filename, $file->error ) );
+		return 1;
+	}
+
+	$manager->hook( 'after_delete', $file );
+
+	return 1;
+}
+
+=pod
+
 =head3 C<on_nth_path>
 
     $main->on_nth_pane( $id );
@@ -4905,6 +5111,9 @@ sub on_nth_pane {
 
 		return 1;
 	}
+
+	$self->current->editor->SetFocus();
+
 	return;
 }
 
@@ -4931,6 +5140,9 @@ sub on_next_pane {
 	} else {
 		$self->on_nth_pane(0);
 	}
+
+	$self->current->editor->SetFocus();
+
 	return;
 }
 
@@ -4957,6 +5169,9 @@ sub on_prev_pane {
 	} else {
 		$self->on_nth_pane( $count - 1 );
 	}
+
+	$self->current->editor->SetFocus();
+
 	return;
 }
 
@@ -5136,49 +5351,6 @@ sub open_perl_filter {
 	return;
 }
 
-
-=pod
-
-=head3 C<on_preferences>
-
-    $main->on_preferences;
-
-Open Padre's preferences dialog. No return value.
-
-=cut
-
-sub on_preferences {
-	my $self = shift;
-
-	require Padre::MimeTypes;
-	my %old_highlighters = Padre::MimeTypes->get_current_highlighters;
-
-	require Padre::Wx::Dialog::Preferences;
-	my $preferences_dialog = Padre::Wx::Dialog::Preferences->new;
-	if ( $preferences_dialog->run($self) ) {
-		my %mime_types; # all the mime-types of currently open files
-		foreach my $editor ( $self->editors ) {
-			$editor->set_preferences;
-			$mime_types{ $editor->{Document}->mimetype } = 1;
-		}
-
-		my %new_highlighters = Padre::MimeTypes->get_current_highlighters;
-
-		foreach my $mime_type ( keys %mime_types ) {
-			my $old_highlighter = $old_highlighters{$mime_type};
-			my $new_highlighter = $new_highlighters{$mime_type};
-			if ( $old_highlighter ne $new_highlighter ) {
-				$self->change_highlighter( $mime_type, $new_highlighter );
-			}
-		}
-
-		$self->refresh_functions( $self->current );
-	}
-	$self->ide->save_config;
-
-	return;
-}
-
 =pod
 
 =head3 C<on_key_bindings>
@@ -5249,6 +5421,8 @@ sub on_toggle_code_folding {
 	}
 
 	$config->write;
+
+	$self->menu->view->refresh;
 
 	return;
 }
@@ -5568,34 +5742,22 @@ C<UNIX>, or C<MAC>). No return value.
 sub convert_to {
 	my $self    = shift;
 	my $newline = shift;
-	my $current = $self->current;
-	my $editor  = $current->editor;
-
-	# Convert and Set the EOL mode for pastes to work correctly
-	my $mode = $Padre::Wx::Editor::mode{$newline};
-	$editor->ConvertEOLs($mode);
-	$editor->SetEOLMode($mode);
-
-	# TO DO: include the changing of file type in the undo/redo actions
-	# or better yet somehow fetch it from the document when it is needed.
-	my $document = $current->document or return;
-	$document->set_newline_type($newline);
-
+	$self->current->editor->convert_eols($newline);
 	$self->refresh;
 }
 
 =pod
 
-=head3 C<find_editor_of_file>
+=head3 C<editor_of_file>
 
-    my $editor = $main->find_editor_of_file( $file );
+    my $editor = $main->editor_of_file( $file );
 
 Return the editor (a C<Padre::Wx::Editor> object) containing the wanted
 C<$file>, or C<undef> if file is not opened currently.
 
 =cut
 
-sub find_editor_of_file {
+sub editor_of_file {
 	my $self     = shift;
 	my $filename = shift;
 	my $file     = Padre::File->new($filename); # This reformats our filename
@@ -5612,9 +5774,9 @@ sub find_editor_of_file {
 
 =pod
 
-=head3 C<find_id_of_editor>
+=head3 C<editor_id>
 
-    my $id = $main->find_id_of_editor( $editor );
+    my $id = $main->editor_id( $editor );
 
 Given C<$editor>, return the tab id holding it, or C<undef> if it was
 not found.
@@ -5623,7 +5785,7 @@ Note: can this really work? What happens when we split a window?
 
 =cut
 
-sub find_id_of_editor {
+sub editor_id {
 	my $self     = shift;
 	my $editor   = shift;
 	my $notebook = $self->notebook;
@@ -6100,6 +6262,9 @@ sub on_last_visited_pane {
 		$self->refresh_status( $self->current );
 		$self->refresh_toolbar( $self->current );
 	}
+
+	$self->current->editor->SetFocus();
+
 }
 
 =pod
@@ -6140,6 +6305,25 @@ sub on_oldest_visited_pane {
 		$self->refresh_status( $self->current );
 		$self->refresh_toolbar( $self->current );
 	}
+}
+
+=pod
+
+=head3 C<on_new_from_current>
+
+    $main->on_new_from_current();
+
+Create a new document and copy the contents of the current file.
+No return value.
+
+=cut
+
+sub on_new_from_current {
+	my $self = shift;
+
+	my $document = $self->current->document;
+
+	return $self->new_document_from_string( $document->text_get, $document->mimetype );
 }
 
 =pod
@@ -6559,8 +6743,50 @@ sub _filter_tool_run {
 	return $newtext;
 }
 
+# Encode the current document to some character set
+sub encode {
+	my $self     = shift;
+	my $charset  = shift;
+	my $document = $self->current->document;
+	$document->{encoding} = $charset;
+	if ( $document->filename ) {
+		$document->save_file;
+	}
+	$self->message(
+		sprintf(
+			Wx::gettext('Document encoded to (%s)'),
+			$charset,
+		)
+	);
+	return;
+}
 
+sub encode_utf8 {
+	$_[0]->encode('utf-8');
+}
 
+sub encode_default {
+	$_[0]->encode( Padre::Locale::encoding_system_default() || 'utf-8' );
+}
+
+sub encode_dialog {
+	my $self = shift;
+
+	# Select an encoding
+	require Encode;
+	my $charset = $self->single_choice(
+		Wx::gettext('Encode to:'),
+		Wx::gettext("Encode document to..."),
+		[ Encode->encodings(":all") ],
+	);
+
+	# Change to the selected encoding
+	if ( defined $charset ) {
+		$self->encode($charset);
+	}
+
+	return;
+}
 
 1;
 

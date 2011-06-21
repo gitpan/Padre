@@ -7,7 +7,7 @@ use Padre::Document ();
 use Padre::Util     ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 
 sub colorize {
 	TRACE("PPILexer colorize called") if DEBUG;
@@ -20,16 +20,12 @@ sub colorize {
 	# Flush old colouring
 	$editor->remove_color;
 
-	# Parse the file
-	require PPI::Document;
-	my $ppi = PPI::Document->new( \$text );
-	if ( not defined $ppi ) {
-		if (DEBUG) {
-			TRACE( 'PPI::Document Error %s', PPI::Document->errstr );
-			TRACE( 'Original text: %s',      $text );
-		}
-		return;
-	}
+	lexer( $text, sub { put_color( $editor, @_ ) } );
+
+	return;
+}
+
+sub get_colors {
 
 	my %colors = (
 		keyword      => 4, # dark green
@@ -74,89 +70,51 @@ sub colorize {
 		'Version'       => 0,
 	);
 
-	my @tokens = $ppi->tokens;
-	$ppi->index_locations;
-	my $first = $editor->GetFirstVisibleLine;
-	my $lines = $editor->LinesOnScreen;
-
-	#print "First $first lines $lines\n";
-	foreach my $t (@tokens) {
-
-		#print $t->content;
-		my ( $row, $rowchar, $col ) = @{ $t->location };
-
-		#		next if $row < $first;
-		#		next if $row > $first + $lines;
-		my $css = $self->_css_class($t);
-
-		#		if ($row > $first and $row < $first + 5) {
-		#			print "$row, $rowchar, ", $t->length, "  ", $t->class, "  ", $css, "  ", $t->content, "\n";
-		#		}
-		#		last if $row > 10;
-		my $color = $colors{$css};
-		if ( not defined $color ) {
-			TRACE("Missing definition for '$css'\n") if DEBUG;
-			next;
-		}
-		next if not $color;
-
-		my $start = $editor->PositionFromLine( $row - 1 ) + $rowchar - 1;
-		my $len   = $t->length;
-
-		$editor->StartStyling( $start, $color );
-		$editor->SetStyling( $len, $color );
-	}
+	return \%colors;
 }
 
-sub _css_class {
-	my $self  = shift;
-	my $Token = shift;
+sub put_color {
+	my ( $editor, $css, $row, $rowchar, $len ) = @_;
 
-	if ( $Token->isa('PPI::Token::Word') ) {
+	my $color = get_colors()->{$css};
+	if ( not defined $color ) {
+		TRACE("Missing definition for '$css'\n") if DEBUG;
+		return;
+	}
+	return if not $color;
 
-		# There are some words we can be very confident are
-		# being used as keywords
-		unless ( $Token->snext_sibling and $Token->snext_sibling->content eq '=>' ) {
-			if ( $Token->content =~ /^(?:sub|return)$/ ) {
-				return 'keyword';
-			} elsif ( $Token->content =~ /^(?:undef|shift|defined|bless)$/ ) {
-				return 'core';
-			}
+	my $start = $editor->PositionFromLine( $row - 1 ) + $rowchar - 1;
+	$editor->StartStyling( $start, $color );
+	$editor->SetStyling( $len, $color );
+
+	return;
+}
+
+sub lexer {
+	my $text   = shift;
+	my $markup = shift;
+
+	# Parse the file
+	require PPI::Document;
+	my $ppi = PPI::Document->new( \$text );
+	if ( not defined $ppi ) {
+		if (DEBUG) {
+			TRACE( 'PPI::Document Error %s', PPI::Document->errstr );
+			TRACE( 'Original text: %s',      $text );
 		}
-		if ( $Token->previous_sibling and $Token->previous_sibling->content eq '->' ) {
-			if ( $Token->content =~ /^(?:new)$/ ) {
-				return 'core';
-			}
-		}
-		if ( $Token->parent->isa('PPI::Statement::Include') ) {
-			if ( $Token->content =~ /^(?:use|no)$/ ) {
-				return 'keyword';
-			}
-			if ( $Token->content eq $Token->parent->pragma ) {
-				return 'pragma';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Variable') ) {
-			if ( $Token->content =~ /^(?:my|local|our)$/ ) {
-				return 'keyword';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Compound') ) {
-			if ( $Token->content =~ /^(?:if|else|elsif|unless|for|foreach|while|my)$/ ) {
-				return 'keyword';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Package') ) {
-			if ( $Token->content eq 'package' ) {
-				return 'keyword';
-			}
-		} elsif ( $Token->parent->isa('PPI::Statement::Scheduled') ) {
-			return 'keyword';
-		}
+		return;
 	}
 
-	# Normal coloring
-	my $css = ref $Token;
-	$css =~ s/^.+:://;
-	$css;
+	require PPIx::EditorTools::Lexer;
+	PPIx::EditorTools::Lexer->new->lexer(
+		ppi         => $ppi,
+		highlighter => $markup,
+	);
+
+	return;
 }
+
+
 
 1;
 

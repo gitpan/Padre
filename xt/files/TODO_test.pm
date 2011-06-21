@@ -244,7 +244,7 @@ sub new {
 	$self->_show_directory( $config->main_directory );
 	$self->_show_output( $config->main_output );
 	$self->_show_command_line( $config->main_command_line );
-	$self->_show_syntax( $config->main_syntaxcheck );
+	$self->_show_syntaxcheck( $config->main_syntaxcheck );
 
 	# Lock the panels if needed
 	$self->aui->lock_panels( $config->main_lockinterface );
@@ -260,10 +260,10 @@ sub new {
 	# to show it, it showed at the top) so now we always turn the status bar on
 	# at the beginning and hide it in the timer, if it was not needed
 	#$statusbar->Show;
-	my $timer = Wx::Timer->new( $self, Padre::Wx::ID_TIMER_POSTINIT );
+	my $timer = Wx::Timer->new( $self, Padre::Wx::Main::TIMER_POSTINIT );
 	Wx::Event::EVT_TIMER(
 		$self,
-		Padre::Wx::ID_TIMER_POSTINIT,
+		Padre::Wx::Main::TIMER_POSTINIT,
 		sub {
 			$_[0]->timer_start;
 		},

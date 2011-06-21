@@ -7,15 +7,28 @@ use YAML::Tiny                ();
 use Time::HiRes               ();
 use Padre::Constant           ();
 use Padre::Util               ();
-use Padre::Current            ();
 use Padre::DB                 ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
+use Padre::Wx::Role::Main     ();
 use Padre::Logger;
 
-our $VERSION    = '0.84';
+our $VERSION    = '0.86';
 our $COMPATIBLE = '0.81';
-our @ISA        = 'Wx::StyledTextCtrl';
+
+# NOTE: Wx::ScintillaTextCtrl (Wx::Scintilla) or Wx::StyledTextCtrl (Wx::STC) is added later
+# before object construction
+our @ISA = qw {	Padre::Wx::Role::Main };
+
+# Convenience colour constants
+use constant {
+
+	# NOTE: DO NOT USE "orange" string since it is actually red on win32
+	ORANGE => Wx::Colour->new( 255, 165, 0 ),
+	RED    => Wx::Colour->new("red"),
+	GREEN  => Wx::Colour->new("green"),
+	BLUE   => Wx::Colour->new("blue"),
+};
 
 # End-Of-Line modes:
 # MAC is actually Mac classic.
@@ -23,7 +36,7 @@ our @ISA        = 'Wx::StyledTextCtrl';
 #
 # Please note that WIN32 is the API. DO NOT change it to that :)
 #
-our %mode = (
+my %WXEOL = (
 	WIN  => Wx::wxSTC_EOL_CRLF,
 	MAC  => Wx::wxSTC_EOL_CR,
 	UNIX => Wx::wxSTC_EOL_LF,
@@ -66,13 +79,24 @@ sub new {
 		$main = $main->GetParent;
 	}
 
+	# Figure out what to use as this editor instance super class
+	# Wx::ScintillaTextCtrl which needs to be installed (i.e. cpanm Wx::Scintilla),
+	# or Wx::StyledTextCtrl which comes by default with Wx and is very *old*
+	my $editor_super_class = 'Wx::StyledTextCtrl';
+	if ( $main->config->feature_wx_scintilla ) {
+		eval "use Wx::Scintilla";
+		$editor_super_class = 'Wx::ScintillaTextCtrl' unless $@;
+	}
+
+	# Push the appropriate editor super class to inheritance list :)
+	push @ISA, $editor_super_class;
+
 	# Create the underlying Wx object
 	my $lock = $main->lock( 'UPDATE', 'refresh_windowlist' );
 	my $self = $class->SUPER::new($parent);
 
-	# TO DO: Make this suck less
-	my $config = $main->config;
-	$data = data( $config->editor_style );
+	# Integration with the rest of Padre
+	$self->SetDropTarget( Padre::Wx::FileDropTarget->new($main) );
 
 	# Set the code margins a little larger than the default.
 	# This seems to noticably reduce eye strain.
@@ -84,9 +108,57 @@ sub new {
 	$self->SetMarginWidth( 1, 0 );
 	$self->SetMarginWidth( 2, 0 );
 
-	# Set word chars to match Perl variables
-	$self->SetWordChars( join '', ( '$@%&_:[]{}', 0 .. 9, 'A' .. 'Z', 'a' .. 'z' ) );
+	# Set the colour scheme for syntax highlight markers
+	$self->MarkerDefine(
+		Padre::Wx::MarkError(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		RED,
+		RED,
+	);
+	$self->MarkerDefine(
+		Padre::Wx::MarkWarn(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		ORANGE,
+		ORANGE,
+	);
+	$self->MarkerDefine(
+		Padre::Wx::MarkLocation(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		GREEN,
+		GREEN,
+	);
+	$self->MarkerDefine(
+		Padre::Wx::MarkBreakpoint(),
+		Wx::wxSTC_MARK_SMALLRECT,
+		BLUE,
+		BLUE,
+	);
 
+	# Set word chars to match Perl variables
+	### This should probably move somewhere Perl-specific
+	$self->SetWordChars( join '', '$@%&_:[]{}', 0 .. 9, 'A' .. 'Z', 'a' .. 'z' );
+
+	# No more unsafe CTRL-L for you :)
+	# CTRL-L or line cut should only work when there is no empty line
+	# This prevents the accidental destruction of the clipboard
+	$self->CmdKeyClear( ord('L'), Wx::wxSTC_SCMOD_CTRL );
+
+	# Disable CTRL keypad -/+. These seem to emit wrong scan codes
+	# on some laptop keyboards. (e.g. CTRL-Caps lock is the same as CTRL -)
+	# Please see bug #790
+	$self->CmdKeyClear( Wx::wxSTC_KEY_SUBTRACT, Wx::wxSTC_SCMOD_CTRL );
+	$self->CmdKeyClear( Wx::wxSTC_KEY_ADD,      Wx::wxSTC_SCMOD_CTRL );
+
+	# Apply settings based on configuration
+	# TO DO: Make this suck less (because it really does suck a lot)
+	my $config = $main->config;
+	$data = data( $config->editor_style );
+	if ( $config->editor_wordwrap ) {
+		$self->SetWrapMode(Wx::wxSTC_WRAP_WORD);
+	}
+	$self->SetCaretPeriod( $config->editor_cursor_blink );
+
+	# Generate event bindings
 	Wx::Event::EVT_RIGHT_DOWN( $self, \&on_right_down );
 	Wx::Event::EVT_LEFT_UP( $self, \&on_left_up );
 	Wx::Event::EVT_CHAR( $self, \&on_char );
@@ -105,81 +177,21 @@ sub new {
 	Wx::Event::EVT_LEFT_DOWN( $self, \&on_smart_highlight_end );
 	Wx::Event::EVT_KEY_DOWN( $self, \&on_smart_highlight_end );
 
-	# No more unsafe CTRL-L for you :)
-	# CTRL-L or line cut should only work when there is no empty line
-	# This prevents the accidental destruction of the clipboard
-	$self->CmdKeyClear( ord('L'), Wx::wxSTC_SCMOD_CTRL );
-
 	# Setup EVT_KEY_UP for smart highlighting and non-destructive CTRL-L
 	Wx::Event::EVT_KEY_UP( $self, \&on_key_up );
 
-	if ( $config->editor_wordwrap ) {
-		$self->SetWrapMode(Wx::wxSTC_WRAP_WORD);
-	}
-
-	$self->SetDropTarget( Padre::Wx::FileDropTarget->new( $self->main ) );
-
-	# Disable CTRL keypad -/+. These seem to emit wrong scan codes
-	# on some laptop keyboards. (e.g. CTRL-Caps lock is the same as CTRL -)
-	# Please see bug #790
-	$self->CmdKeyClear( Wx::wxSTC_KEY_SUBTRACT, Wx::wxSTC_SCMOD_CTRL );
-	$self->CmdKeyClear( Wx::wxSTC_KEY_ADD,      Wx::wxSTC_SCMOD_CTRL );
-
-	my $green = Wx::Colour->new("green");
-	my $red   = Wx::Colour->new("red");
-	my $blue  = Wx::Colour->new("blue");
-
-	#NOTE: DO NOT USE "orange" string since it is actually red on win32
-	my $orange = Wx::Colour->new( 255, 165, 0 );
-
-	$self->MarkerDefine(
-		Padre::Wx::MarkError(),
-		Wx::wxSTC_MARK_SMALLRECT,
-		$red,
-		$red,
-	);
-	$self->MarkerDefine(
-		Padre::Wx::MarkWarn(),
-		Wx::wxSTC_MARK_SMALLRECT,
-		$orange,
-		$orange,
-	);
-	$self->MarkerDefine(
-		Padre::Wx::MarkLocation(),
-		Wx::wxSTC_MARK_SMALLRECT,
-		$green,
-		$green,
-	);
-	$self->MarkerDefine(
-		Padre::Wx::MarkBreakpoint(),
-		Wx::wxSTC_MARK_SMALLRECT,
-		$blue,
-		$blue,
-	);
-
 	return $self;
-}
-
-sub main {
-	$_[0]->GetGrandParent;
-}
-
-# convenience accessor method (and to ensure consistency)
-# return the Padre::Config instance
-sub config {
-	$_[0]->main->config;
 }
 
 # convenience methods
 # return the character at a given position as a perl string
 sub get_character_at {
-	my ( $self, $pos ) = @_;
-	return chr( $self->GetCharAt($pos) );
+	return chr $_[0]->GetCharAt( $_[1] );
 }
 
-
-
-
+# private is undefined if we don't know and need to search for it
+# private is 0 if this is a standard style
+# private is 1 if this is a private style
 sub data {
 	my $name    = shift;
 	my $private = shift;
@@ -187,13 +199,24 @@ sub data {
 	return $data if not defined $name;
 	return $data if defined $data and $name eq $data_name;
 
+	my $private_file = File::Spec->catfile( Padre::Constant::CONFIG_DIR, 'styles', "$name.yml" );
+	my $standard_file = Padre::Util::sharefile( 'styles', "$name.yml" );
+
+	if ( not defined $private ) {
+		if ( -e $private_file ) {
+			$private = 1;
+		} elsif ( -e $standard_file ) {
+			$private = 0;
+		} else {
+			warn "style $name could not be found in either places: '$standard_file' and '$private_file'\n";
+			return $data;
+		}
+	}
+
 	my $file =
-		$private
-		? File::Spec->catfile(
-		Padre::Constant::CONFIG_DIR,
-		'styles', "$name.yml"
-		)
-		: Padre::Util::sharefile( 'styles', "$name.yml" );
+		  $private
+		? $private_file
+		: $standard_file;
 	my $tdata;
 	eval { $tdata = YAML::Tiny::LoadFile($file); };
 	if ($@) {
@@ -224,7 +247,9 @@ sub padre_setup {
 	my $self = shift;
 
 	TRACE("before setting the lexer") if DEBUG;
-	$self->SetLexer( $self->{Document}->lexer );
+	if ( $self->{Document} ) {
+		$self->SetLexer( $self->{Document}->lexer );
+	}
 
 	# the next line will change the ESC key to cut the current selection
 	# See: http://www.yellowbrain.com/stc/keymap.html
@@ -234,13 +259,16 @@ sub padre_setup {
 	# and Wx::wxUNICODE or wxUSE_UNICODE should be on
 	$self->SetCodePage(65001);
 
-	my $mimetype = $self->{Document}->mimetype || 'text/plain';
+	my $mimetype = $self->{Document} ? $self->{Document}->mimetype : '';
+	$mimetype ||= 'text/plain';
+
 	if ( $MIME_STYLE{$mimetype} ) {
 		$self->padre_setup_style( $MIME_STYLE{$mimetype} );
 
 	} elsif ( $mimetype eq 'text/plain' ) {
 		$self->padre_setup_plain;
-		my $filename = $self->{Document}->filename || q{};
+		my $filename = $self->{Document} ? $self->{Document}->filename : '';
+		$filename ||= '';
 		if ( $filename and $filename =~ /\.([^.]+)$/ ) {
 			my $ext = lc $1;
 
@@ -289,7 +317,7 @@ sub on_key_up {
 	}
 
 	# Doc specific processing
-	my $doc = $self->{Document};
+	my $doc = $self->{Document} or return;
 	if ( $doc->can('event_key_up') ) {
 		$doc->event_key_up( $self, $event );
 	}
@@ -761,7 +789,9 @@ sub set_preferences {
 
 	$self->padre_setup;
 
-	$self->{Document}->set_indentation_style;
+	if ( $self->{Document} ) {
+		$self->{Document}->set_indentation_style;
+	}
 
 	return;
 }
@@ -779,7 +809,7 @@ sub show_calltip {
 		$self->CallTipCancel;
 	}
 
-	my $doc      = Padre::Current->document or return;
+	my $doc      = $self->current->document or return;
 	my $keywords = $doc->keywords;
 	my $regex    = join '|', sort { length $a <=> length $b } keys %$keywords;
 
@@ -933,6 +963,28 @@ sub _get_line_by_number {
 	return $self->GetTextRange( $start, $end );
 }
 
+sub fold_this {
+	my ($self) = @_;
+
+	my $currentLine = $self->GetCurrentLine;
+
+	if ( !$self->GetFoldExpanded($currentLine) ) {
+		$self->ToggleFold($currentLine);
+		return;
+	}
+
+	while ( $currentLine >= 0 ) {
+		if ( ( my $parentLine = $self->GetFoldParent($currentLine) ) > 0 ) {
+			$self->ToggleFold($parentLine);
+			return;
+		} else {
+			$currentLine--;
+		}
+	}
+
+	return;
+}
+
 sub fold_all {
 	my ($self) = @_;
 
@@ -1011,7 +1063,7 @@ sub on_focus {
 sub on_char {
 	my $self     = shift;
 	my $event    = shift;
-	my $document = $self->{Document};
+	my $document = $self->{Document} or return;
 	if ( $document->can('event_on_char') ) {
 		$document->event_on_char( $self, $event );
 	}
@@ -1108,7 +1160,7 @@ sub on_left_up {
 	}
 
 	my $doc = $self->{Document};
-	if ( $doc->can('event_on_left_up') ) {
+	if ( $doc and $doc->can('event_on_left_up') ) {
 		$doc->event_on_left_up( $self, $event );
 	}
 
@@ -1120,7 +1172,7 @@ sub on_mouse_moving {
 	my ( $self, $event ) = @_;
 
 	if ( $event->Moving ) {
-		my $doc = $self->{Document};
+		my $doc = $self->{Document} or return;
 		if ( $doc->can('event_mouse_moving') ) {
 			$doc->event_mouse_moving( $self, $event );
 		}
@@ -1146,7 +1198,9 @@ sub on_middle_up {
 		if $config->mid_button_paste;
 
 	if ( Padre::Constant::WIN32 or ( !$config->mid_button_paste ) ) {
-		Padre::Current->editor->Paste;
+
+		# NOTE: Editor->Current->Editor? Circular loop?
+		$self->current->editor->Paste;
 	}
 
 	my $doc = $self->{Document};
@@ -1290,6 +1344,24 @@ sub current_paragraph {
 	my $begin = $editor->PositionFromLine( $para1 + 1 );
 	my $end   = $editor->PositionFromLine($para2);
 	return ( $begin, $end );
+}
+
+# TO DO: include the changing of file type in the undo/redo actions
+# or better yet somehow fetch it from the document when it is needed.
+sub convert_eols {
+	my $self    = shift;
+	my $newline = shift;
+	my $mode    = $WXEOL{$newline};
+
+	# Apply the change to the underlying document
+	my $document = $self->{Document} or return;
+	$document->set_newline_type($newline);
+
+	# Convert and Set the EOL mode in the editor
+	$self->ConvertEOLs($mode);
+	$self->SetEOLMode($mode);
+
+	return 1;
 }
 
 sub Paste {
@@ -1523,22 +1595,15 @@ sub fold_pod {
 }
 
 sub configure_editor {
-	my ( $self, $doc ) = @_;
+	my $self     = shift;
+	my $document = shift;
 
-	my $newline_type = $doc->newline_type;
+	$self->SetEOLMode( $WXEOL{ $document->newline_type } );
 
-	$self->SetEOLMode( $mode{$newline_type} or $mode{ $self->main->config->default_line_ending } );
-
-	if ( defined $doc->{original_content} ) {
-		$self->SetText( $doc->{original_content} );
+	if ( defined $document->{original_content} ) {
+		$self->SetText( $document->{original_content} );
 	}
 	$self->EmptyUndoBuffer;
-
-	$doc->{newline_type} = $newline_type;
-
-	# Set the cursor blink rate
-	$self->SetCaretPeriod( $self->main->config->editor_cursor_blink );
-
 
 	return;
 }

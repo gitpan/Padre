@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Icon ();
 use Padre::Current  ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = 'Wx::Dialog';
 
 use Class::XSAccessor {
@@ -99,10 +99,22 @@ sub _on_butdelete_clicked {
 sub _on_butopen_clicked {
 	my $self = shift;
 
+	my $main = $self->GetParent;
+
 	# prevents crash if user double-clicks on list
 	# item and tries to click buttons
 	$self->_butdelete->Disable;
 	$self->_butopen->Disable;
+
+	if ( !defined( $self->_current_session ) ) {
+		$main->error(
+			sprintf(
+				Wx::gettext("Something is wrong with your Padre database:\nSession %s is listed but there is no data"),
+				$self->_curname
+			)
+		);
+		return;
+	}
 
 	# Save autosave setting
 	my $config = Padre->ide->config;
@@ -113,7 +125,6 @@ sub _on_butopen_clicked {
 	$config->write;
 
 	# Open session
-	my $main = $self->GetParent;
 	$main->open_session( $self->_current_session, $self->{autosave}->GetValue ? 1 : 0 );
 	$self->Destroy();
 }
@@ -309,10 +320,25 @@ sub _create_buttons {
 #
 sub _current_session {
 	my $self = shift;
+
 	my ($current) = Padre::DB::Session->select(
 		'where name = ?',
 		$self->_curname
 	);
+
+	# The session name may get some spaces around it even if they are not in the database
+	# This workaround removes all leading/following spaces and tries loading again
+	if ( !defined($current) ) {
+		my $curname = $self->_curname;
+		$curname =~ s/^\s*(.+?)\s*$/$1/;
+
+		($current) = Padre::DB::Session->select(
+			'where name = ?',
+			$curname
+		);
+
+	}
+
 	return $current;
 }
 
@@ -351,13 +377,22 @@ sub _refresh_list {
 	foreach my $session ( reverse @sessions ) {
 		my $name  = $session->name;
 		my $descr = $session->description;
+
+		# adjust name and description length (fix #1124)
+		if ( length $name < 10 ) {
+			$name .= ' ' x ( 10 - length $name );
+		}
+		if ( length $descr < 30 ) {
+			$descr .= ' ' x ( 30 - length $descr );
+		}
+
 		require POSIX;
 		my $update = POSIX::strftime(
 			'%Y-%m-%d %H:%M:%S',
 			localtime $session->last_update,
 		);
 
-		# inserting the session in the list
+		# insert the session in the list
 		my $item = Wx::ListItem->new;
 		$item->SetId(0);
 		$item->SetColumn(0);

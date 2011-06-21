@@ -18,12 +18,11 @@ use 5.008;
 use strict;
 use warnings;
 use Params::Util qw{_STRING};
-use Padre::Current               ();
 use Padre::DB                    ();
 use Padre::Wx                    ();
 use Padre::Wx::Role::Main        ();
 use Padre::Wx::History::ComboBox ();
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -37,7 +36,6 @@ our @ISA     = qw{
 Create and return a C<Padre::Wx::Dialog::Replace> search and replace widget.
 
 =cut
-
 
 sub new {
 	my $class = shift;
@@ -389,7 +387,6 @@ of the search and not as the string to be used.
 
 =cut
 
-
 sub find {
 	my $self = shift;
 	my $text = $self->current->text;
@@ -419,6 +416,11 @@ sub find {
 	}
 	return;
 }
+
+
+
+
+
 ######################################################################
 # Button Events
 
@@ -470,7 +472,6 @@ Hide dialog.
 
 =cut
 
-
 sub close {
 	my $self = shift;
 	$self->Hide;
@@ -501,7 +502,6 @@ If search window is still open, run C<search> on the whole text,
 again.
 
 =cut
-
 
 # TO DO: The change to this function that turned it into a dual-purpose function
 #       unintentionally transfered responsibility for the implementation of
@@ -557,7 +557,6 @@ Replace all appearances of given string in the current document.
 
 =cut
 
-
 sub replace_all {
 	my $self   = shift;
 	my $main   = $self->main;
@@ -593,6 +592,11 @@ sub replace_all {
 	$self->{find_text}->SetFocus;
 	return;
 }
+
+
+
+
+
 #####################################################################
 # Support Methods
 
@@ -662,6 +666,7 @@ sub save {
 	$config->write if $changed;
 	return $config;
 }
+
 1;
 
 =pod
@@ -675,7 +680,6 @@ The full text of the license can be found in the
 LICENSE file included with this module.
 
 =cut
-
 
 # Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE

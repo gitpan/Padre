@@ -1,4 +1,4 @@
-package Padre::Wx::Dialog::Search;
+package Padre::Wx::Dialog::FindFast;
 
 # Incremental search
 
@@ -8,7 +8,11 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
+
+
+
+
 
 ######################################################################
 # Constructor
@@ -24,6 +28,10 @@ sub new {
 	return $self;
 }
 
+
+
+
+
 ######################################################################
 # Main Methods
 
@@ -36,7 +44,8 @@ sub search {
 	my $self      = shift;
 	my $direction = shift;
 
-	return if not Padre->ide->wx->main->current->editor; # avoid crash if no file open
+	# Avoid crash if no file open
+	return if not Padre->ide->wx->main->current->editor;
 
 	$self->{backward} = $direction eq 'previous';
 	unless ( $self->{panel} ) {
@@ -185,11 +194,16 @@ sub _create_panel {
 	Wx::Event::EVT_CHECKBOX( $main, $self->{regex}, sub { $self->_on_regex_checked } );
 
 	# Place all controls
-	foreach my $element (qw{ close label entry previous previous_text next next_text case regex }) {
-		$self->{hbox}->Add( 10, 0 );
-		$self->{hbox}->Add( $self->{$element}, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALIGN_LEFT, 0 );
-	}
-	$self->{hbox}->Add( 0, 1, Wx::wxEXPAND, 5 );
+	$self->{hbox}->Add( $self->{close},         0, Wx::wxALIGN_CENTER_VERTICAL,              0 );
+	$self->{hbox}->Add( $self->{label},         0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxLEFT, 10 );
+	$self->{hbox}->Add( $self->{entry},         0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( $self->{previous},      0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( $self->{previous_text}, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( $self->{next},          0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( $self->{next_text},     0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( $self->{case},          0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( $self->{regex},         0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL,  5 );
+	$self->{hbox}->Add( 0,                      1, Wx::wxEXPAND,                             5 );
 
 	$self->{panel}->SetSizer( $self->{hbox} );
 	$self->{panel}->Layout;
@@ -209,6 +223,7 @@ sub _create_panel {
 			Name           => 'find',
 			CaptionVisible => 0,
 			Layer          => 1,
+			PaneBorder     => 0,
 			)->Bottom->Fixed->Hide,
 	);
 
@@ -222,6 +237,10 @@ sub _hide_panel {
 	my $auimngr = Padre->ide->wx->main->aui;
 	$auimngr->GetPane('find')->Hide;
 	$auimngr->Update;
+
+	$self->{visible} = 0;
+
+	Padre->ide->wx->main->current->editor->SetFocus();
 
 	return 1;
 }
@@ -240,11 +259,20 @@ sub _show_panel {
 	$self->{case}->SetValue( $config->find_case   ? 0 : 1 );
 	$self->{regex}->SetValue( $config->find_regex ? 0 : 1 );
 
-	# You probably want to use the Find
+	# You probably want to use the Find (and with a fresh term)
+	$self->{entry}->SetValue('');
 	$self->{entry}->SetFocus;
+
+	$self->{visible} = 1;
 
 	return 1;
 }
+
+sub visible {
+	my $self = shift;
+	return $self->{visible} || 0;
+}
+
 
 # -- Event handlers
 
@@ -273,8 +301,11 @@ sub _on_case_checked {
 # case, we'll start searching from the start of the document.
 #
 sub _on_entry_changed {
-	$_[0]->{restart} = 1;
-	$_[0]->_find;
+	my $self = shift;
+	unless ( $self->{entry}->GetValue eq '' ) {
+		$self->{restart} = 1;
+		$self->_find;
+	}
 	return;
 }
 
@@ -292,7 +323,7 @@ sub _on_key_pressed {
 	my $mod   = $event->GetModifiers || 0;
 	my $code  = $event->GetKeyCode;
 
-	# remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
+	# Remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
 	$mod = $mod & ( Wx::wxMOD_ALT + Wx::wxMOD_CMD + Wx::wxMOD_SHIFT );
 
 	if ( $code == Wx::WXK_ESCAPE ) {

@@ -8,7 +8,7 @@ use File::Spec      ();
 use Padre::Constant ();
 use Padre::File     ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = 'Padre::File';
 
 sub _reformat_filename {
@@ -60,6 +60,13 @@ sub can_clone {
 
 sub can_run {
 	return 1;
+}
+
+sub can_delete {
+	my $self = shift;
+
+	# Can't delete readonly files
+	return $self->readonly ? 0 : 1;
 }
 
 sub stat {
@@ -209,6 +216,15 @@ sub browse_url_join {
 
 	return File::Spec->catfile( $server, $path, $filename );
 }
+
+sub delete {
+	my $self = shift;
+
+	return 1 if unlink $self->{filename};
+
+	$self->{error} = $!;
+}
+
 
 1;
 

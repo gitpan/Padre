@@ -9,7 +9,7 @@ use File::Spec     ();
 use Padre::Util    ();
 use Padre::Project ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = 'Padre::Project';
 
 
@@ -80,7 +80,7 @@ sub version {
 
 	# The first approach is to look for a version declaration in the
 	# headline module for the project.
-	my $file = $self->{headline} or return undef;
+	my $file = $self->headline or return undef;
 	Padre::Util::parse_variable( $file, 'VERSION' );
 }
 

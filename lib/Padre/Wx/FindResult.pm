@@ -21,7 +21,7 @@ use Padre::Wx;
 use Wx::Event qw( EVT_BUTTON );
 
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = 'Wx::ListView';
 
 use Class::XSAccessor {
@@ -120,7 +120,7 @@ sub on_list_item_activated {
 	my ( $self, $event, $main, $editor ) = @_;
 
 	#If the user has closed the editor the search was originally performed on
-	if ( !defined $main->find_id_of_editor($editor) ) {
+	if ( !defined $main->editor_id($editor) ) {
 		$self->DeleteAllItems;
 		my $message_item->[0]->{line} = Wx::gettext('Related editor has been closed');
 		$message_item->[0]->{lineNumber} = '*';

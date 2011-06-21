@@ -17,7 +17,7 @@ use Padre::File       ();
 use Padre::Role::Task ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -28,7 +28,7 @@ our @ISA     = qw{
 
 
 #####################################################################
-# Task Integration
+# Padre::Document Task Integration
 
 sub task_functions {
 	return 'Padre::Document::Perl::FunctionList';
@@ -141,7 +141,7 @@ sub set_highlighter {
 	# configuration variable
 	my $limit;
 	if ( $module eq 'Padre::Document::Perl::PPILexer' ) {
-		$limit = $self->current->config->perl_ppi_lexer_limit;
+		$limit = $self->current->config->lang_perl5_lexer_ppi_limit;
 	} elsif ( $module eq 'Padre::Document::Perl::Lexer' ) {
 		$limit = 4000;
 	} elsif ( $module eq 'Padre::Plugin::Kate' ) {
@@ -179,8 +179,45 @@ sub guess_filename {
 		return $self->SUPER::guess_filename;
 	}
 
+	my $text    = $self->text_get;
+	my $project = $self->current->project;
+
+	# Is this a test?
+	if ( $text =~ /(?:use Test::|plan \=\>)/ ) {
+		my $fn = eval {
+			die unless defined($project);
+
+			my $t_path = File::Spec->catfile( $project->root, 't' );
+
+			die unless -d $t_path;
+
+			opendir my $t_dh, $t_path or die;
+			my %t_num;
+			my $nulls = 1; # default
+			for ( readdir($t_dh) ) {
+				next unless /^(\d+)/;
+
+				# Convert 1, 01 and 001 to 1 and mark the number as used:
+				$t_num{ $1 + 0 } = 1;
+				$nulls = length($1);
+			}
+
+			my $free_num = 0;
+			while ( $t_num{ ++$free_num } ) { }
+
+			my $t_format = '%0' . $nulls . 'd';
+
+			# Return filename relative to project
+			return sprintf( $t_format, $free_num ) . '_unnamed.t';
+
+		};
+
+		return 'unnamed_test.t' if $@;
+		warn $fn;
+		return $fn if defined($fn);
+	}
+
 	# Is this a script?
-	my $text = $self->text_get;
 	if ( $text =~ /^\#\![^\n]*\bperl\b/s ) {
 
 		# It's impossible to predict the name of a script in
@@ -210,16 +247,17 @@ sub guess_subpath {
 		return $self->SUPER::guess_subpath;
 	}
 
-	# Is this a script?
 	my $text = $self->text_get;
+
+	# Is this a test?
+	if ( $text =~ /(?:use Test::|plan \=\>)/ ) {
+		return 't';
+	}
+
+	# Is this a script?
 	if ( $text =~ /^\#\![^\n]*\bperl\b/s ) {
 
-		# Is this a test?
-		if ( $text =~ /use Test::/ ) {
-			return 't';
-		} else {
-			return 'script';
-		}
+		return 'script';
 	}
 
 	# Is this a module?
@@ -268,9 +306,9 @@ sub find_functions {
 	my $n = "\\cM?\\cJ";
 	return grep { defined $_ } $_[1] =~ m/
 		(?:
-		(?:$n)*__(?:DATA|END)__\b.*
+		${n}__(?:DATA|END)__\b.*
 		|
-		$n$n=\w+.*?$n$n=cut\b(?=.*?$n$n)
+		$n$n=\w+.*?$n\s*?$n=cut\b(?=.*?$n)
 		|
 		(?:^|$n)\s*(?:sub|func|method)\s+(\w+(?:::\w+)*)
 		)
@@ -329,13 +367,19 @@ sub get_command {
 
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
+	my $shortname = File::Basename::basename($filename);
 
 	my @commands = (qq{"$perl"});
 	push @commands, '-d'                        if $debug;
 	push @commands, '-Mdiagnostics(-traceonly)' if $trace;
 	push @commands, "$run_args{interpreter}";
-	push @commands, qq{"$filename"$script_args};
+	if (Padre::Constant::WIN32) {
+		push @commands, qq{"$shortname"$script_args};
+	} else {
 
+		# Use single quote to allow spaces in the shortname of the file #1219
+		push @commands, qq{'$shortname'$script_args};
+	}
 	return join ' ', @commands;
 }
 
@@ -381,7 +425,7 @@ sub get_interpreter {
 sub pre_process {
 	my $self = shift;
 
-	if ( Padre->ide->config->editor_beginner ) {
+	if ( Padre->ide->config->lang_perl5_beginner ) {
 		require Padre::Document::Perl::Beginner;
 		my $b = Padre::Document::Perl::Beginner->new( document => $self );
 		if ( $b->check( $self->text_get ) ) {
@@ -648,7 +692,7 @@ sub find_method_declaration {
 		my $main = Padre->ide->wx->main;
 
 		# open or switch to file
-		my $id = $main->find_editor_of_file($filename);
+		my $id = $main->editor_of_file($filename);
 		if ( not defined $id ) {
 			$id = $main->setup_editor($filename);
 		}
@@ -1116,11 +1160,11 @@ sub perltags_parser {
 	# Use the configured file (if any) or the old default, reset on config change
 	if (   not defined $perltags_file
 		or not defined $self->{_perltags_config}
-		or $self->{_perltags_config} ne $config->perl_tags_file )
+		or $self->{_perltags_config} ne $config->lang_perl5_tags_file )
 	{
 
 		foreach my $candidate (
-			$self->project_tagsfile, $config->perl_tags_file,
+			$self->project_tagsfile, $config->lang_perl5_tags_file,
 			File::Spec->catfile( $ENV{PADRE_HOME}, 'perltags' )
 			)
 		{
@@ -1165,7 +1209,7 @@ sub perltags_parser {
 		}
 
 		# Remember current value for later checks
-		$self->{_perltags_config} = $config->perl_tags_file;
+		$self->{_perltags_config} = $config->lang_perl5_tags_file;
 
 		$perltags_file = $self->{_perltags_file};
 
@@ -1229,6 +1273,13 @@ Returns the prefix length and an array of suggestions. C<prefix_length> is the
 number of characters left to the cursor position which need to be replaced if
 a suggestion is accepted.
 
+If there are no suggestions, the functions returns an empty list.
+
+In case of error the function returns the error string as the first parameter.
+Hence users of this subroution need to check if the value returned in the first
+position is undef meaning no result or a string (including non digits) which
+means a failure or a number which means the prefix length.
+
 WARNING: This method runs very often (on each keypress), keep it as efficient
          and fast as possible!
 
@@ -1239,7 +1290,7 @@ sub autocomplete {
 	my $event = shift;
 
 	my $config    = Padre->ide->config;
-	my $min_chars = $config->perl_autocomplete_min_chars;
+	my $min_chars = $config->lang_perl5_autocomplete_min_chars;
 
 	my $editor = $self->editor;
 	my $pos    = $editor->GetCurrentPos;
@@ -1259,216 +1310,42 @@ sub autocomplete {
 	# One char may be added by the current event
 	return if length($prefix) < ( $min_chars - 1 );
 
-	my $suffix = $editor->GetTextRange( $pos, $pos + 15 );
-	$suffix = $1 if $suffix =~ /^(\w*)/; # Cut away any non-word chars
-
 	# The second parameter may be a reference to the current event or the next
 	# char which will be added to the editor:
-	my $nextchar = '';                   # Use empty instead of undef
+	my $nextchar = ''; # Use empty instead of undef
 	if ( defined($event) and ( ref($event) eq 'Wx::KeyEvent' ) ) {
 		my $key = $event->GetUnicodeKey;
 		$nextchar = chr($key);
 	} elsif ( defined($event) and ( !ref($event) ) ) {
 		$nextchar = $event;
 	}
-	return if ord($nextchar) == 27;      # Close on escape
+	return if ord($nextchar) == 27; # Close on escape
 	$nextchar = '' if ord($nextchar) < 32;
 
-	# WARNING: This is totally not done, but Gabor made me commit it.
-	# TO DO:
-	# a) complete this list
-	# b) make the path configurable
-	# c) make the whole thing optional and/or pluggable
-	# d) make it not suck
-	# e) make the types of auto-completion configurable
-	# f) remove the old auto-comp code or at least let the user choose to use the new
-	#    *or* the old code via configuration
-	# g) hack STC so that we can get more information in the autocomp. window,
-	# h) hack STC so we can start populating the autocompletion choices and continue to do so in the background
-	# i) hack Perl::Tags to be better (including inheritance)
-	# j) add inheritance support
-	# k) figure out how to do method auto-comp. on objects
-	# (Ticket #676)
-
 	# check for variables
+	my $parser = $self->perltags_parser;
 
-	if ( $prefix =~ /([\$\@\%\*])(\w+(?:::\w+)*)$/ ) {
-		my $prefix = $2;
-		my $type   = $1;
-		my $parser = $self->perltags_parser;
-		if ( defined $parser ) {
-			my $tag = $parser->findTag( $prefix, partial => 1 );
-			my @words;
-			my %seen;
-			while ( defined($tag) ) {
+	my $last = $editor->GetLength();
 
-				# TO DO check file scope?
-				if ( !defined( $tag->{kind} ) ) {
+	my $pre_text  = $editor->GetTextRange( 0,    $first );
+	my $post_text = $editor->GetTextRange( $pos, $last );
 
-					# This happens with some tagfiles which have no kind
-				} elsif ( $tag->{kind} eq 'v' ) {
+	require Padre::Document::Perl::Autocomplete;
+	my $ac = Padre::Document::Perl::Autocomplete->new(
+		minimum_prefix_length        => $min_chars,
+		maximum_number_of_choices    => $config->lang_perl5_autocomplete_max_suggestions,
+		minimum_length_of_suggestion => $config->lang_perl5_autocomplete_min_suggestion_len,
 
-					# TO DO potentially don't skip depending on circumstances.
-					if ( not $seen{ $tag->{name} }++ ) {
-						push @words, $tag->{name};
-					}
-				}
-				$tag = $parser->findNextTag();
-			}
-			return ( length($prefix), @words );
-		}
-	}
+		prefix    => $prefix,
+		nextchar  => $nextchar,
+		pre_text  => $pre_text,
+		post_text => $post_text,
+	);
 
-	# check for hashs
-	elsif ( $prefix =~ /(\$\w+(?:\-\>)?)\{([\'\"]?)([\$\&]?\w*)$/ ) {
-		my $hashname   = $1;
-		my $textmarker = $2;
-		my $keyprefix  = $3;
+	my @ret = $ac->run($parser);
+	return @ret if @ret;
 
-		my $last = $editor->GetLength();
-		my $text = $editor->GetTextRange( 0, $last );
-
-		my %words;
-		while ( $text =~ /\Q$hashname\E\{(([\'\"]?)\Q$keyprefix\E.+?\2)\}/g ) {
-			$words{$1} = 1;
-		}
-
-		return (
-			length( $textmarker . $keyprefix ),
-			sort {
-				my $a1 = $a;
-				my $b1 = $b;
-				$a1 =~ s/^([\'\"])(.+)\1/$2/;
-				$b1 =~ s/^([\'\"])(.+)\1/$2/;
-				$a1 cmp $b1;
-				} ( keys(%words) )
-		);
-
-	}
-
-	# check for methods
-	elsif ( $prefix =~ /(?![\$\@\%\*])(\w+(?:::\w+)*)\s*->\s*(\w*)$/ ) {
-		my $class  = $1;
-		my $prefix = $2;
-		$prefix = '' if not defined $prefix;
-		my $parser = $self->perltags_parser;
-		if ( defined $parser ) {
-			my $tag = ( $prefix eq '' ) ? $parser->firstTag() : $parser->findTag( $prefix, partial => 1 );
-			my @words;
-
-			# TO DO: INHERITANCE!
-			while ( defined($tag) ) {
-				if ( !defined( $tag->{kind} ) ) {
-
-					# This happens with some tagfiles which have no kind
-				} elsif ( $tag->{kind} eq 's'
-					and defined $tag->{extension}{class}
-					and $tag->{extension}{class} eq $class )
-				{
-					push @words, $tag->{name};
-				}
-				$tag = ( $prefix eq '' ) ? $parser->nextTag() : $parser->findNextTag();
-			}
-			return ( length($prefix), @words );
-		}
-	}
-
-	# check for packages
-	elsif ( $prefix =~ /(?![\$\@\%\*])(\w+(?:::\w+)*)/ ) {
-		my $prefix = $1;
-		my $parser = $self->perltags_parser;
-
-		if ( defined $parser ) {
-			my $tag = $parser->findTag( $prefix, partial => 1 );
-			my @words;
-			my %seen;
-			while ( defined($tag) ) {
-
-				# TO DO check file scope?
-				if ( !defined( $tag->{kind} ) ) {
-
-					# This happens with some tagfiles which have no kind
-				} elsif ( $tag->{kind} eq 'p' ) {
-
-					# TO DO potentially don't skip depending on circumstances.
-					if ( not $seen{ $tag->{name} }++ ) {
-						push @words, $tag->{name};
-					}
-				}
-				$tag = $parser->findNextTag();
-			}
-			return ( length($prefix), @words );
-		}
-	}
-
-	$prefix =~ s{^.*?((\w+::)*\w+)$}{$1};
-
-	if ( defined($nextchar) ) {
-		return if ( length($prefix) + 1 ) < $min_chars;
-	} else {
-		return if length($prefix) < $min_chars;
-	}
-
-	my $last      = $editor->GetLength();
-	my $text      = $editor->GetTextRange( 0, $last );
-	my $pre_text  = $editor->GetTextRange( 0, $first + length($prefix) );
-	my $post_text = $editor->GetTextRange( $first, $last );
-
-	my $regex;
-	eval { $regex = qr{\b(\Q$prefix\E\w+(?:::\w+)*)\b} };
-	if ($@) {
-		return ("Cannot build regular expression for '$prefix'.");
-	}
-
-	my %seen;
-	my @words;
-	push @words, grep { !$seen{$_}++ } reverse( $pre_text =~ /$regex/g );
-	push @words, grep { !$seen{$_}++ } ( $post_text =~ /$regex/g );
-
-	my $max_length = $config->perl_autocomplete_max_suggestions;
-	if ( @words > $max_length ) {
-		@words = @words[ 0 .. ( $max_length - 1 ) ];
-	}
-
-	# Suggesting the current word as the only solution doesn't help
-	# anything, but your need to close the suggestions window before
-	# you may press ENTER/RETURN.
-	if ( ( $#words == 0 ) and ( $prefix eq $words[0] ) ) {
-		return;
-	}
-
-	# While typing within a word, the rest of the word shouldn't be
-	# inserted.
-	if ( defined($suffix) ) {
-		for ( 0 .. $#words ) {
-			$words[$_] =~ s/\Q$suffix\E$//;
-		}
-	}
-
-	# This is the final result if there is no char which hasn't been
-	# saved to the editor buffer until now
-	#	return ( length($prefix), @words ) if !defined($nextchar);
-
-	my $min_length = $config->perl_autocomplete_min_suggestion_len;
-
-	# Finally cut out all words which do not match the next char
-	# which will be inserted into the editor (by the current event)
-	# and remove all which are too short
-	my @final_words;
-	for (@words) {
-
-		# Filter out everything which is too short
-		next if length($_) < $min_length;
-
-		# Accept everything which has prefix + next char + at least one other char
-		# (check only if any char is pending)
-		next if defined($nextchar) and ( !/^\Q$prefix$nextchar\E./ );
-
-		# All checks passed, add to the final list
-		push @final_words, $_;
-	}
-
-	return ( length($prefix), @final_words );
+	return $ac->auto();
 }
 
 sub newline_keep_column {
@@ -1764,6 +1641,11 @@ sub event_on_left_up {
 		# Does it look like a function?
 		elsif ( defined $location && $self->has_sub($token) ) {
 			$self->goto_sub($token);
+		}
+
+		# Does it look like a path or module?
+		elsif ( defined($token) and ( $token =~ /(?:\/|\:\:)/ ) ) {
+			Padre->ide->wx->main->on_open_selection($token);
 		}
 	}
 }

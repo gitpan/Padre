@@ -5,11 +5,15 @@ use strict;
 use warnings;
 use Padre::Wx::FBP::FindInFiles ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Wx::FBP::FindInFiles
 };
 
+use constant CONFIG => qw{
+	find_case
+	find_regex
+};
 
 
 
@@ -24,20 +28,17 @@ sub new {
 	# Default the search directory to the root of the current project
 	my $project = $self->current->project;
 	if ( defined $project ) {
-		$self->{find_directory}->SetValue( $project->root );
+		$self->find_directory->SetValue( $project->root );
 	}
 
 	# Prepare to be shown
 	$self->CenterOnParent;
 
-	# As the user types the search term, make sure the find button
-	# enabled status is correct
-	Wx::Event::EVT_TEXT(
+	Wx::Event::EVT_KEY_UP(
 		$self,
-		$self->{find_term},
 		sub {
-			shift->refresh;
-		}
+			shift->key_up(@_);
+		},
 	);
 
 	return $self;
@@ -52,7 +53,7 @@ sub new {
 
 sub directory {
 	my $self    = shift;
-	my $default = $self->{find_directory}->GetValue;
+	my $default = $self->find_directory->GetValue;
 	unless ($default) {
 		$default = $self->config->default_projects_directory;
 	}
@@ -68,7 +69,7 @@ sub directory {
 
 	# Update the dialog
 	unless ( $result == Wx::wxID_CANCEL ) {
-		$self->{find_directory}->SetValue( $dialog->GetPath );
+		$self->find_directory->SetValue( $dialog->GetPath );
 	}
 
 	return;
@@ -81,25 +82,27 @@ sub directory {
 ######################################################################
 # Main Methods
 
-# Makes sure the find button is only enabled when the field
-# values are valid
-sub refresh {
-	my $self = shift;
-	$self->{find}->Enable( $self->{find_term}->GetValue ne '' );
-}
-
 sub run {
 	my $self    = shift;
 	my $current = $self->current;
+	my $config  = $current->config;
+
+	# Clear
+	$self->{cycle_ctrl_f} = 0;
 
 	# Do they have a specific search term in mind?
 	my $text = $current->text;
 	$text = '' if $text =~ /\n/;
 
 	# Clear out and reset the search term box
-	$self->{find_term}->refresh;
-	$self->{find_term}->SetValue($text) if length $text;
-	$self->{find_term}->SetFocus;
+	$self->find_term->refresh;
+	$self->find_term->SetValue($text) if length $text;
+	$self->find_term->SetFocus;
+
+	# Load search preferences
+	foreach my $name (CONFIG) {
+		$self->$name()->SetValue( $config->$name() );
+	}
 
 	# Update the user interface
 	$self->refresh;
@@ -123,11 +126,18 @@ sub run {
 	# Run the search in the Find in Files tool
 	$self->main->show_findinfiles;
 	$self->main->findinfiles->search(
-		root   => $self->{find_directory}->SaveValue,
+		root   => $self->find_directory->SaveValue,
 		search => $self->as_search,
 	);
 
 	return;
+}
+
+# Makes sure the find button is only enabled when the field
+# values are valid
+sub refresh {
+	my $self = shift;
+	$self->find->Enable( $self->find_term->GetValue ne '' );
 }
 
 # Save the dialog settings to configuration.
@@ -137,14 +147,8 @@ sub save {
 	my $config  = $self->current->config;
 	my $changed = 0;
 
-	foreach my $name (
-		qw{
-		find_case
-		find_regex
-		}
-		)
-	{
-		my $value = $self->{$name}->GetValue;
+	foreach my $name (CONFIG) {
+		my $value = $self->$name()->GetValue;
 		next if $config->$name() == $value;
 		$config->set( $name => $value );
 		$changed = 1;
@@ -160,10 +164,30 @@ sub as_search {
 	my $self = shift;
 	require Padre::Search;
 	Padre::Search->new(
-		find_term  => $self->{find_term}->SaveValue,
-		find_case  => $self->{find_case}->GetValue,
-		find_regex => $self->{find_regex}->GetValue,
+		find_term  => $self->find_term->SaveValue,
+		find_case  => $self->find_case->GetValue,
+		find_regex => $self->find_regex->GetValue,
 	);
+}
+
+sub key_up {
+	my $self  = shift;
+	my $event = shift;
+
+	my $mod = $event->GetModifiers || 0;
+	my $code = $event->GetKeyCode;
+
+	# A fixed key binding isn't good at all.
+	# TODO: Change this to the action's keybinding
+
+	# Handle Ctrl-F only
+	return unless ( $mod == 2 ) and ( $code == 70 );
+
+	$self->{cycle_ctrl_f} = 1;
+
+	$self->Hide;
+
+	return;
 }
 
 1;

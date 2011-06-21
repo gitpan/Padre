@@ -16,7 +16,7 @@ use Padre::Wx             ();
 use Padre::Wx::TreeCtrl   ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -42,7 +42,7 @@ sub new {
 		-1,
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		Wx::wxTR_SINGLE | Wx::wxTR_FULL_ROW_HIGHLIGHT | Wx::wxTR_HAS_BUTTONS | Wx::wxCLIP_CHILDREN | Wx::wxVSCROLL
+		Wx::wxTR_SINGLE | Wx::wxTR_FULL_ROW_HIGHLIGHT | Wx::wxTR_HAS_BUTTONS | Wx::wxCLIP_CHILDREN
 	);
 
 	# Create the image list
@@ -260,11 +260,11 @@ sub open_file_at_line {
 
 	# Try to open the file now
 	my $editor;
-	if ( defined( my $page_id = $main->find_editor_of_file($file) ) ) {
+	if ( defined( my $page_id = $main->editor_of_file($file) ) ) {
 		$editor = $main->notebook->GetPage($page_id);
 	} else {
 		$main->setup_editor($file);
-		if ( defined( my $page_id = $main->find_editor_of_file($file) ) ) {
+		if ( defined( my $page_id = $main->editor_of_file($file) ) ) {
 			$editor = $main->notebook->GetPage($page_id);
 		}
 	}

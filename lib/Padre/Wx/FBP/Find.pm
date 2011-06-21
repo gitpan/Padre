@@ -7,11 +7,11 @@ package Padre::Wx::FBP::Find;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx                    ();
-use Padre::Wx::Role::Main        ();
+use Padre::Wx ();
+use Padre::Wx::Role::Main ();
 use Padre::Wx::History::ComboBox ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -33,15 +33,26 @@ sub new {
 	my $m_staticText2 = Wx::StaticText->new(
 		$self,
 		-1,
-		Wx::gettext("Search Term:"),
+		Wx::gettext("Search &Term:"),
 	);
 
-	$self->{find_term} = Padre::Wx::History::ComboBox->new(
-		$self, -1, "",
+	my $find_term = Padre::Wx::History::ComboBox->new(
+		$self,
+		-1,
+		"",
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
-		[   "search",
+		[
+			"search",
 		],
+	);
+
+	Wx::Event::EVT_TEXT(
+		$self,
+		$find_term,
+		sub {
+			shift->refresh(@_);
+		},
 	);
 
 	my $m_staticline2 = Wx::StaticLine->new(
@@ -52,34 +63,34 @@ sub new {
 		Wx::wxLI_HORIZONTAL,
 	);
 
-	$self->{find_regex} = Wx::CheckBox->new(
+	my $find_regex = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("Regular Expression"),
+		Wx::gettext("&Regular Expression"),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 	);
 
-	$self->{find_reverse} = Wx::CheckBox->new(
+	my $find_reverse = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("Search Backwards"),
+		Wx::gettext("Search &Backwards"),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 	);
 
-	$self->{find_case} = Wx::CheckBox->new(
+	my $find_case = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("Case Sensitive"),
+		Wx::gettext("&Case Sensitive"),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 	);
 
-	$self->{find_first} = Wx::CheckBox->new(
+	my $find_first = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("Close Window on Hit"),
+		Wx::gettext("Cl&ose Window on Hit"),
 		Wx::wxDefaultPosition,
 		Wx::wxDefaultSize,
 	);
@@ -92,28 +103,28 @@ sub new {
 		Wx::wxLI_HORIZONTAL,
 	);
 
-	$self->{find_next} = Wx::Button->new(
+	my $find_next = Wx::Button->new(
 		$self,
 		Wx::wxID_OK,
-		Wx::gettext("Find Next"),
+		Wx::gettext("Find &Next"),
 	);
-	$self->{find_next}->SetDefault;
+	$find_next->SetDefault;
 
 	Wx::Event::EVT_BUTTON(
 		$self,
-		$self->{find_next},
+		$find_next,
 		sub {
-			shift->find_next(@_);
+			shift->find_next_clicked(@_);
 		},
 	);
 
-	$self->{find_all} = Wx::Button->new(
+	my $find_all = Wx::Button->new(
 		$self,
 		Wx::wxID_OK,
-		Wx::gettext("Find All"),
+		Wx::gettext("Find &All"),
 	);
 
-	$self->{cancel} = Wx::Button->new(
+	my $cancel = Wx::Button->new(
 		$self,
 		Wx::wxID_CANCEL,
 		Wx::gettext("Cancel"),
@@ -123,24 +134,24 @@ sub new {
 	$fgSizer2->AddGrowableCol(1);
 	$fgSizer2->SetFlexibleDirection(Wx::wxBOTH);
 	$fgSizer2->SetNonFlexibleGrowMode(Wx::wxFLEX_GROWMODE_SPECIFIED);
-	$fgSizer2->Add( $self->{find_regex},   1, Wx::wxALL, 5 );
-	$fgSizer2->Add( $self->{find_reverse}, 1, Wx::wxALL, 5 );
-	$fgSizer2->Add( $self->{find_case},    1, Wx::wxALL, 5 );
-	$fgSizer2->Add( $self->{find_first},   1, Wx::wxALL, 5 );
+	$fgSizer2->Add( $find_regex, 1, Wx::wxALL, 5 );
+	$fgSizer2->Add( $find_reverse, 1, Wx::wxALL, 5 );
+	$fgSizer2->Add( $find_case, 1, Wx::wxALL, 5 );
+	$fgSizer2->Add( $find_first, 1, Wx::wxALL, 5 );
 
 	my $buttons = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$buttons->Add( $self->{find_next}, 0, Wx::wxALL, 5 );
-	$buttons->Add( $self->{find_all},  0, Wx::wxALL, 5 );
+	$buttons->Add( $find_next, 0, Wx::wxALL, 5 );
+	$buttons->Add( $find_all, 0, Wx::wxALL, 5 );
 	$buttons->Add( 20, 0, 1, Wx::wxEXPAND, 5 );
-	$buttons->Add( $self->{cancel}, 0, Wx::wxALL, 5 );
+	$buttons->Add( $cancel, 0, Wx::wxALL, 5 );
 
 	my $vsizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	$vsizer->Add( $m_staticText2,     0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxLEFT | Wx::wxRIGHT | Wx::wxTOP, 5 );
-	$vsizer->Add( $self->{find_term}, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL | Wx::wxEXPAND,             5 );
-	$vsizer->Add( $m_staticline2,     0, Wx::wxALL | Wx::wxEXPAND,                                           5 );
-	$vsizer->Add( $fgSizer2,          1, Wx::wxBOTTOM | Wx::wxEXPAND,                                        5 );
-	$vsizer->Add( $m_staticline1,     0, Wx::wxALL | Wx::wxEXPAND,                                           5 );
-	$vsizer->Add( $buttons,           0, Wx::wxEXPAND,                                                       5 );
+	$vsizer->Add( $m_staticText2, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxLEFT | Wx::wxRIGHT | Wx::wxTOP, 5 );
+	$vsizer->Add( $find_term, 0, Wx::wxALIGN_CENTER_VERTICAL | Wx::wxALL | Wx::wxEXPAND, 5 );
+	$vsizer->Add( $m_staticline2, 0, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$vsizer->Add( $fgSizer2, 1, Wx::wxBOTTOM | Wx::wxEXPAND, 5 );
+	$vsizer->Add( $m_staticline1, 0, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$vsizer->Add( $buttons, 0, Wx::wxEXPAND, 5 );
 
 	my $hsizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
 	$hsizer->Add( $vsizer, 1, Wx::wxALL | Wx::wxEXPAND, 5 );
@@ -149,14 +160,51 @@ sub new {
 	$self->Layout;
 	$hsizer->Fit($self);
 
+	$self->{find_term} = $find_term->GetId;
+	$self->{find_regex} = $find_regex->GetId;
+	$self->{find_reverse} = $find_reverse->GetId;
+	$self->{find_case} = $find_case->GetId;
+	$self->{find_first} = $find_first->GetId;
+	$self->{find_next} = $find_next->GetId;
+	$self->{find_all} = $find_all->GetId;
+
 	return $self;
 }
 
-sub find_next {
-	my $self  = shift;
-	my $event = shift;
+sub find_term {
+	Wx::Window::FindWindowById($_[0]->{find_term});
+}
 
-	die 'EVENT HANDLER NOT IMPLEMENTED';
+sub find_regex {
+	Wx::Window::FindWindowById($_[0]->{find_regex});
+}
+
+sub find_reverse {
+	Wx::Window::FindWindowById($_[0]->{find_reverse});
+}
+
+sub find_case {
+	Wx::Window::FindWindowById($_[0]->{find_case});
+}
+
+sub find_first {
+	Wx::Window::FindWindowById($_[0]->{find_first});
+}
+
+sub find_next {
+	Wx::Window::FindWindowById($_[0]->{find_next});
+}
+
+sub find_all {
+	Wx::Window::FindWindowById($_[0]->{find_all});
+}
+
+sub refresh {
+	$_[0]->main->error('Handler method refresh for event find_term.OnText not implemented');
+}
+
+sub find_next_clicked {
+	$_[0]->main->error('Handler method find_next_clicked for event find_next.OnButtonClick not implemented');
 }
 
 1;

@@ -1,0 +1,109 @@
+---
+abstract: 'Perl Application Development and Refactoring Environment'
+author:
+  - 'Gabor Szabo'
+build_requires:
+  Alien::wxWidgets: 0.46
+  Capture::Tiny: 0.06
+  ExtUtils::MakeMaker: 6.42
+  Locale::Msgfmt: 0.15
+  Test::Exception: 0.27
+  Test::MockObject: 1.09
+  Test::More: 0.88
+  Test::NoWarnings: 0.084
+  Test::Script: 1.07
+configure_requires:
+  ExtUtils::MakeMaker: 0
+distribution_type: module
+dynamic_config: 0
+generated_by: 'ExtUtils::MakeMaker version 6.57_05'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: Padre
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  App::cpanminus: 0.9923
+  Class::Adapter: 1.05
+  Class::Inspector: 1.22
+  Class::Unload: 0.03
+  Class::XSAccessor: 1.05
+  Cwd: 3.2701
+  DBD::SQLite: 1.27
+  DBI: 1.58
+  Data::Dumper: 2.101
+  Debug::Client: 0.11
+  Devel::Dumpvar: 0.04
+  Devel::Refactor: 0.05
+  Digest::MD5: 2.38
+  Encode: 2.26
+  ExtUtils::MakeMaker: 6.56
+  ExtUtils::Manifest: 1.56
+  File::Basename: 0
+  File::Copy::Recursive: 0.37
+  File::Find::Rule: 0.30
+  File::Glob: 0
+  File::HomeDir: 0.91
+  File::Path: 2.08
+  File::Remove: 1.40
+  File::ShareDir: 1.00
+  File::Spec: 3.2701
+  File::Spec::Functions: 3.2701
+  File::Temp: 0.20
+  File::Which: 1.08
+  File::pushd: 1.00
+  FindBin: 0
+  Format::Human::Bytes: 0.06
+  Getopt::Long: 0
+  HTML::Entities: 3.57
+  HTML::Parser: 3.58
+  IO::Scalar: 2.110
+  IO::Socket: 1.30
+  IO::String: 1.08
+  IPC::Open2: 0
+  IPC::Open3: 0
+  IPC::Run: 0.83
+  JSON::XS: 2.29
+  LWP: 5.815
+  List::MoreUtils: 0.22
+  List::Util: 1.18
+  Module::Build: 0.3603
+  Module::CoreList: 0
+  Module::Manifest: 0.07
+  Module::Refresh: 0.13
+  Module::Starter: 1.50
+  ORLite: 1.48
+  POD2::Base: 0.043
+  POSIX: 0
+  PPI: 1.213
+  PPIx::EditorTools: 0.13
+  PPIx::Regexp: 0.011
+  Params::Util: 0.33
+  Parse::ErrorString::Perl: 0.14
+  Parse::ExuberantCTags: 1.00
+  Pod::Abstract: 0.16
+  Pod::Functions: 0
+  Pod::POM: 0.17
+  Pod::Perldoc: 3.15
+  Pod::Simple: 3.07
+  Pod::Simple::XHTML: 3.04
+  Storable: 2.15
+  Template::Tiny: 0.11
+  Term::ReadLine: 0
+  Text::Balanced: 2.01
+  Text::Diff: 0.35
+  Text::FindIndent: 0.10
+  Time::HiRes: 1.9718
+  URI: 0
+  Wx: 0.91
+  Wx::Perl::ProcessStream: 0.29
+  YAML::Tiny: 1.32
+  perl: 5.008005
+  threads: 1.71
+  threads::shared: 1.33
+  version: 0.80
+version: 0.86

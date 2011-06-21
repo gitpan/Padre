@@ -11,7 +11,7 @@ use Padre::Constant ();
 use Padre::Current  ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -45,6 +45,10 @@ sub new {
 	);
 	$self->add_menu_action(
 		$file_new,
+		'file.new_copy',
+	);
+	$self->add_menu_action(
+		$file_new,
 		'file.new_p5_script',
 	);
 	$self->add_menu_action(
@@ -70,6 +74,11 @@ sub new {
 	$self->add_menu_action(
 		$file_new,
 		'file.new_p5_distro',
+	);
+
+	$self->add_menu_action(
+		$file_new,
+		'file.new_p5_modulestarter',
 	);
 
 	if ( $main->config->feature_wizard_selector ) {
@@ -170,6 +179,11 @@ sub new {
 	);
 
 	### End of close submenu
+
+	$self->{delete} = $self->add_menu_action(
+		$self,
+		'file.delete',
+	);
 
 	# Reload file(s)
 	my $file_reload = Wx::Menu->new;
@@ -311,6 +325,7 @@ sub refresh {
 		$self->{open_in_command_line}->Enable(0);
 	}
 	$self->{close}->Enable($document);
+	$self->{delete}->Enable($document);
 	$self->{close_all}->Enable($document);
 	$self->{close_all_but_current}->Enable($document);
 	$self->{reload_file}->Enable($document);

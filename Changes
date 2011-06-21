@@ -10,6 +10,90 @@ list API changes that may break compatibility for components of Padre, most
 notably for plugins. This allows plugins to update compatibility before the
 next production release, and synchronise their release to the Padre schedule.
 
+0.86 2011.06.18
+    - Fix #1124: 'Description' column not displayed when all descriptions empty
+      (ZENOG)
+    - Open Resources: do not match path for .t files (ZENOG, found by SZABGAB)
+    - Handle corrupt padre.db in SessionManager (SEWI)
+    - Migration of Style Settings from Menu to Preferences window (CLAUDIO)
+    - Add list of escape characters to the Regex Editor (SZABGAB)
+    - Add a test plugin and first tests using that plugin (SEWI)
+    - Add plugin hooks (SEWI)
+    - Regex Editor: Substitution can be toggled and it is off by default (SZABGAB)
+    - Extent Ctrl-left-mouse-click to modules and files with path (SEWI)
+    - Fix #1122: Save intuition recognizes more tests (SEWI)
+    - Fix #1138: Padre single instance server not working (MJ41)
+    - Fix #510, #704, #1178 Closing DocBrowser crashing Padre (SZABGAB)
+    - Add File->Delete menu option (#1179) (SEWI)
+    - Avoid running pointless syntax checks for unused documents (ADAMK)
+    - No longer need a different editor class for the Preferences dialog (ADAMK)
+    - Move Outline building to PPIx::EditorTools::Outline 0.12 (SZABGAB)
+    - Add menu options in View to Fold All and Unfold All (SZABGAB)
+    - Add menu option to Fold/Unfold where the cursor is now (SZABGAB)
+    - Move the standard PPILexer to PPIx::EditorTools::Lexer 0.13 (SZABGAB)
+    - Fix #1182: Crash when enabling a plugin (SEWI)
+    - Reverted commit 13860 which tried to fix ticker #1141 but broken the
+      directory list at startup at the same time (ADAMK)
+    - The Preferences dialog now translates options in drop-down boxes (ADAMK)
+    - Update German translation (ZENOG)
+    - Moved various Perl 5 related config options into a unified config
+      namespace lang_perl5_* (ADAMK)
+    - Moved various Perl 5 Preferences dialog elements into a single Perl 5
+      specific tab in preparation for additional future tabs (ADAMK)
+    - Fixed bug where the Function List scanner was incorrectly matching
+      __DATA__ or __END__ anywhere in any statement (ADAMK)
+    - Config file entries referring to values which are not in the valid option
+      list for a setting will use the default, but not overwrite (ADAMK)
+    - Upgraded Padre::Wx::Dialog::Text to wxFormBuilder (ADAMK)
+    - Find and Find in Files now save search options again (ADAMK)
+    - PluginManager now checks for a defined ->VERSION in plugins to help
+      make sure they are real modules and don't have mismatching package
+      statements or similar weird problems (ADAMK)
+    - Allow spaces in the path and filename of Perl script and still
+      be able to run them. #1219 (SZABGAB)
+    - Upgraded Padre::Wx::Dialog::Bookmarks to wxFormBuilder (ADAMK)
+    - Shrunk the code needed to support the "Convert Encoding" commands and
+      moved it to Padre::Wx::Main, removing the need for a dedicated
+      "Convert Encoding" dialog (ADAMK)
+    - Moved all Module::Starter options into module_starter_* (ADAMK)
+    - "toggle comments" button doesn't require text selection (GARU)
+    - A bug in the EOL Mode setup when opening Windows-mode text documents
+      while the default line endings are set to Unix was resulting in the
+      corruption of documents into mixed newline (ADAMK)
+    - Ctrl-F launches the quick search (bottom pane), 2nd time Ctrl-F
+      launches regular search and 3rd time Ctrl-F launches find in files
+      which will loose it's own shortcut Ctrl-Shift-F in the future #1223 (SEWI)
+    - Expanding the coverage of "apply" handlers in Padre::Config in
+      preparation for Padre Sync (ADAMK)
+    - Updated perlopquick.pod (Perl 5 operator quick reference) to latest
+      version (COWENS, AZAWAWI)
+    - Fixed wxWidgets 2.8.12 wxAuiNoteBook bug: the window will not carry
+      updates while it is frozen (MDOOTSON, AZAWAWI, ADAMK)
+    - Bumped Wx dependency to 0.9901 to fix the Wx::Button::GetDefaultSize
+      build bug (AZAWAWI)
+    - Padre can now use Wx::Scintilla if feature_wx_scintilla is enabled.
+      This fixes #257: Backport Scintilla Perl lexer for wxWidgets 2.8.10?
+      (AZAWAWI)
+    - About dialog displays now the Wx::Scintilla version if it is being used
+      by Padre (AZAWAWI)
+    - Unify terminology for the Firefox-like search box to "Find Fast" (ADAMK)
+    - Set focus to editor window if search bar is closed (SEWI)
+    - Set focus to editor after switching panes/tabs (SEWI)
+    - Add File -> New -> Copy of current document (SEWI)
+    - Fix "last update" timestamp for sessions (SEWI)
+    - Fast Find resets term correctly across multiple uses (ADAMK)
+    - Padre::Project::Perl detects project-wide version correctly (ADAMK)
+    - Padre can use Wx::Scintilla's built-in Perl 6 lexer if Wx::Scintilla
+      is being used by Padre (AZAWAWI)
+
+0.85 Development version, not released
+    - wxVSCROLL flag in FindInFiles tree control was causing the nodes to be 
+      editable if clicked after selection. Keyboard scrolling was broken as a
+      result (AZAWAWI)
+    - Padre::Wx::Main::find_editor_of_file renamed to editor_of_file and
+      Padre::Wx::Main::find_id_of_editor renamed to editor_id to clean out the
+      method namespace find* for use with search related functionality (ADAMK)
+
 0.84 2011.03.10
     - Function and TODO list: also handle Esc when focus is on the list (ZENOG)
     - Function and TODO list: remove unnecessary EVT_KILL_FOCUS handler (ZENOG)

@@ -39,7 +39,26 @@ use Padre::PluginHandle    ();
 use Padre::Wx              ();
 use Padre::Wx::Menu::Tools ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
+
+
+
+
+
+#####################################################################
+# Contants and definitions
+
+# Constants limited to this file
+use constant PADRE_HOOK_RETURN_IGNORE => 1;
+use constant PADRE_HOOK_RETURN_ERROR  => 2;
+
+#  List if valid Padre hooks:
+our %PADRE_HOOKS = (
+	before_delete => PADRE_HOOK_RETURN_ERROR,
+	after_delete  => PADRE_HOOK_RETURN_IGNORE,
+	before_save   => PADRE_HOOK_RETURN_ERROR,
+	after_save    => PADRE_HOOK_RETURN_IGNORE,
+);
 
 
 
@@ -251,7 +270,7 @@ sub shutdown {
 			Padre::DB::Plugin->update_enabled(
 				$module => 1,
 			);
-			$self->_plugin_disable($plugin);
+			$self->plugin_disable($plugin);
 
 		} elsif ( $plugin->disabled ) {
 			Padre::DB::Plugin->update_enabled(
@@ -549,6 +568,17 @@ sub _load_plugin {
 		return;
 	}
 
+	unless ( defined $module->VERSION ) {
+		$plugin->errstr(
+			sprintf(
+				Wx::gettext("%s - Plugin is empty or unversioned"),
+				$module,
+			)
+		);
+		$plugin->status('error');
+		return;
+	}
+
 	# Plug-in must be a Padre::Plugin subclass
 	unless ( $module->isa('Padre::Plugin') ) {
 		$plugin->errstr(
@@ -610,7 +640,10 @@ sub _load_plugin {
 		# Do not enable by default
 		$config->set( enabled => 0 );
 	}
-	unless ( $config->enabled ) {
+
+	# NOTE: This violates encapsulation. The plugin manager should be
+	# manipulated from the outside, it shouldn't introspect it's parent IDE
+	unless ( $config->enabled or $self->current->ide->{with_plugin}->{$module} ) {
 		$plugin->status('disabled');
 		return;
 	}
@@ -731,6 +764,18 @@ sub _unload_plugin {
 	return 1;
 }
 
+sub plugin_enable {
+	my $self = shift;
+	my $handle = $self->_plugin(shift) or return;
+	$handle->enable;
+}
+
+sub plugin_disable {
+	my $self = shift;
+	my $handle = $self->_plugin(shift) or return;
+	$handle->disable;
+}
+
 =pod
 
 =head2 C<reload_plugin>
@@ -748,23 +793,6 @@ sub reload_plugin {
 	$self->_load_plugin($module)   or return;
 	$self->enable_editors($module) or return;
 	return 1;
-}
-
-
-
-
-
-#####################################################################
-# Enabling and Disabling a Plugin
-
-# Assume the named plug-in exists, enable it
-sub _plugin_enable {
-	$_[0]->_plugin( $_[1] )->enable;
-}
-
-# Assume the named plug-in exists, disable it
-sub _plugin_disable {
-	$_[0]->_plugin( $_[1] )->disable;
 }
 
 =pod
@@ -849,6 +877,41 @@ sub plugin_event {
 	}
 	return 1;
 }
+
+# Run a plugin hook
+sub hook {
+	my $self     = shift;
+	my $hookname = shift;
+	my @args     = @_;
+
+	my $result = 1; # Default to success
+
+	if ( ref( $self->{hooks}->{$hookname} ) eq 'ARRAY' ) {
+		for my $hook ( @{ $self->{hooks}->{$hookname} } ) {
+
+			my @retval = eval { &{ $hook->[1] }( $hook->[0], @args ); };
+			if ($@) {
+				warn 'Plugin ' . $hook->[0] . ', hook ' . $hookname . ', code ' . $hook->[1] . ' crashed with ' . $@;
+				next;
+			}
+
+			# Return value handling depends on hook type
+			if ( $PADRE_HOOKS{$hookname} == PADRE_HOOK_RETURN_ERROR ) {
+				next unless defined( $retval[0] ); # Returned undef = no error
+				$self->main->error(
+					$retval[0] || sprintf(
+						Wx::gettext('Plugin %s, hook %s returned an emtpy error message'), $hook->[0], $hookname
+					)
+				);
+				$result = 0;
+			}
+
+		}
+	}
+
+	return $result;
+}
+
 
 # Show an error message
 sub _error {

@@ -13,7 +13,7 @@ use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -349,6 +349,21 @@ sub _content_info {
 	# How many threads are running
 	my $threads = $INC{'threads.pm'} ? scalar( threads->list ) : 'disabled';
 
+	my $alien = Wx::wxVERSION();
+
+	my $wx_scintilla_html = '';
+	if ( Padre::Wx::Editor->isa('Wx::ScintillaTextCtrl') ) {
+		eval "use Wx::Scintilla";
+		unless ($@) {
+			$wx_scintilla_html = <<"END_HTML";
+      <tr>
+        <td valign="top">Wx::Scintilla</td>
+        <td>$Wx::Scintilla::VERSION</td>
+      </tr>
+END_HTML
+		}
+	}
+
 	$self->{info}->SetPage( $self->_rtl(<<"END_HTML") );
 <html>
   <body bgcolor="#EEEEEE">
@@ -375,6 +390,10 @@ sub _content_info {
         <td>$wx_widgets</td>
       </tr>
       <tr>
+        <td valign="top">Alien::wxWidgets</td>
+        <td>$alien</td>
+      </tr>
+      <tr>
         <td valign="top">
         Wx::Perl::ProcessStream
         </td>
@@ -382,6 +401,7 @@ sub _content_info {
         $Wx::Perl::ProcessStream::VERSION
         </td>
       </tr>
+      $wx_scintilla_html
       <tr>
         <td valign="top">
         PPI

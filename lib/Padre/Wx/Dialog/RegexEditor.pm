@@ -12,7 +12,7 @@ use Padre::Wx::Role::Main ();
 # RichTextCtrl
 use Wx::RichText ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -131,7 +131,32 @@ sub _regex_groups {
 				'05(?<! )' => Wx::gettext('Negative lookbehind assertion'),
 				'06\n'     => Wx::gettext('Backreference to the nth group'),
 			}
-		}
+		},
+
+		# next list taken from perldoc perlre
+		# most of these are not interesting for beginners so I am not sure we need to show them
+		'05' => {
+			label => Wx::gettext('Escape characters'),
+			value => {
+				'00\t'       => Wx::gettext('Tab'),
+				'01\n'       => Wx::gettext('Newline'),
+				'02\r'       => Wx::gettext('Return'),
+				'03\f'       => Wx::gettext('Form feed'),
+				'04\a'       => Wx::gettext('Alarm'),
+				'05\e'       => Wx::gettext('Escape (Esc)'),
+				'06\033'     => Wx::gettext('Octal character'),
+				'07\x1B'     => Wx::gettext('Hex character'),
+				'08\x{263a}' => Wx::gettext('Long hex character'),
+				'09\cK'      => Wx::gettext('Control character'),
+				'10\N{name}' => Wx::gettext("Unicode character 'name'"),
+				'11\l'       => Wx::gettext('Lowercase next character'),
+				'12\u'       => Wx::gettext('Uppercase next character'),
+				'13\L'       => Wx::gettext('Lowercase till \E'),
+				'14\U'       => Wx::gettext('Uppercase till \E'),
+				'15\E'       => Wx::gettext('End case modification/metacharacter quoting'),
+				'16\Q'       => Wx::gettext('Quote (disable) pattern metacharacters till \E'),
+			}
+		},
 	);
 }
 
@@ -200,13 +225,6 @@ sub _create_controls {
 	# Description is hidden by default
 	$self->{description_text}->Hide;
 
-	# Replace regex text field
-	my $replace_label = Wx::StaticText->new( $self, -1, Wx::gettext('&Replace text with:') );
-	$self->{replace} = Wx::TextCtrl->new(
-		$self, -1, '', Wx::wxDefaultPosition, Wx::wxDefaultSize,
-		Wx::wxTE_MULTILINE | Wx::wxNO_FULL_REPAINT_ON_RESIZE
-	);
-
 	# Original input text field
 	my $original_label = Wx::StaticText->new( $self, -1, Wx::gettext('&Original text:') );
 	$self->{original_text} = Wx::TextCtrl->new(
@@ -221,12 +239,32 @@ sub _create_controls {
 		Wx::wxRE_MULTILINE | Wx::wxRE_READONLY | Wx::wxWANTS_CHARS # Otherwise arrows will not work on win32
 	);
 
+	# Toggle the visibility of the replace (substitution) fields
+	$self->{replace_checkbox} = Wx::CheckBox->new(
+		$self,
+		-1,
+		Wx::gettext('Show Subs&titution'),
+	);
+
+	# Replace regex text field
+	$self->{replace_label} = Wx::StaticText->new( $self, -1, Wx::gettext('&Replace text with:') );
+	$self->{replace_text} = Wx::TextCtrl->new(
+		$self, -1, '', Wx::wxDefaultPosition, Wx::wxDefaultSize,
+		Wx::wxTE_MULTILINE | Wx::wxNO_FULL_REPAINT_ON_RESIZE
+	);
+
+	$self->{replace_label}->Hide;
+	$self->{replace_text}->Hide;
+
 	# Result from replace text field
-	my $result_label = Wx::StaticText->new( $self, -1, Wx::gettext('&Result from replace:') );
+	$self->{result_label} = Wx::StaticText->new( $self, -1, Wx::gettext('&Result from replace:') );
 	$self->{result_text} = Wx::RichTextCtrl->new(
 		$self, -1, '', Wx::wxDefaultPosition, Wx::wxDefaultSize,
 		Wx::wxRE_MULTILINE | Wx::wxRE_READONLY | Wx::wxWANTS_CHARS # Otherwise arrows will not work on win32
 	);
+
+	$self->{result_label}->Hide;
+	$self->{result_text}->Hide;
 
 	# Insert regex into current document button_name
 	$self->{insert_button} = Wx::Button->new(
@@ -285,20 +323,23 @@ sub _create_controls {
 	my $left = Wx::BoxSizer->new(Wx::wxVERTICAL);
 	$left->Add( $modifiers, 0, Wx::wxALL | Wx::wxEXPAND, 2 );
 	$left->AddSpacer(5);
-	$left->Add( $regex_label,                  0, Wx::wxALL | Wx::wxEXPAND, 1 );
-	$left->Add( $combined,                     0, Wx::wxALL | Wx::wxEXPAND, 2 );
+	$left->Add( $regex_label, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
+	$left->Add( $combined,    0, Wx::wxALL | Wx::wxEXPAND, 2 );
+
 	$left->Add( $self->{description_checkbox}, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
 	$left->Add( $self->{description_text},     2, Wx::wxALL | Wx::wxEXPAND, 1 );
-
-	$left->Add( $replace_label,   0, Wx::wxALL | Wx::wxEXPAND, 1 );
-	$left->Add( $self->{replace}, 1, Wx::wxALL | Wx::wxEXPAND, 1 );
 
 	$left->Add( $original_label,        0, Wx::wxALL | Wx::wxEXPAND, 1 );
 	$left->Add( $self->{original_text}, 1, Wx::wxALL | Wx::wxEXPAND, 1 );
 	$left->Add( $matched_label,         0, Wx::wxALL | Wx::wxEXPAND, 1 );
 	$left->Add( $self->{matched_text},  1, Wx::wxALL | Wx::wxEXPAND, 1 );
-	$left->Add( $result_label,          0, Wx::wxALL | Wx::wxEXPAND, 1 );
-	$left->Add( $self->{result_text},   1, Wx::wxALL | Wx::wxEXPAND, 1 );
+
+	$left->Add( $self->{replace_checkbox}, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
+	$left->Add( $self->{replace_label},    0, Wx::wxALL | Wx::wxEXPAND, 1 );
+	$left->Add( $self->{replace_text},     1, Wx::wxALL | Wx::wxEXPAND, 1 );
+	$left->Add( $self->{result_label},     0, Wx::wxALL | Wx::wxEXPAND, 1 );
+	$left->Add( $self->{result_text},      1, Wx::wxALL | Wx::wxEXPAND, 1 );
+
 	$left->AddSpacer(5);
 	$left->Add( $buttons, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
 
@@ -324,7 +365,7 @@ sub _bind_events {
 	);
 	Wx::Event::EVT_TEXT(
 		$self,
-		$self->{replace},
+		$self->{replace_text},
 		sub { $_[0]->run; },
 	);
 	Wx::Event::EVT_TEXT(
@@ -351,7 +392,27 @@ sub _bind_events {
 		sub {
 
 			# toggles the visibility of the description field
+			if ( $self->{description_checkbox}->IsChecked ) {
+				my $regex = $self->{regex}->GetValue;
+				$self->{description_text}->SetValue( $self->_dump_regex($regex) );
+			}
 			$self->{description_text}->Show( $self->{description_checkbox}->IsChecked );
+			$self->{sizer}->Layout;
+		},
+	);
+
+	# Replace checkbox
+	Wx::Event::EVT_CHECKBOX(
+		$self,
+		$self->{replace_checkbox},
+		sub {
+
+			$self->replace;
+
+			# toggles the visibility of the replace fields
+			foreach my $field (qw(replace_label replace_text result_label result_text)) {
+				$self->{$field}->Show( $self->{replace_checkbox}->IsChecked );
+			}
 			$self->{sizer}->Layout;
 		},
 	);
@@ -388,7 +449,7 @@ sub _insert_regex {
 	my $self = shift;
 
 	my $match_part   = $self->{regex}->GetValue;
-	my $replace_part = $self->{replace}->GetValue;
+	my $replace_part = $self->{replace_text}->GetValue;
 
 	my ($modifiers) = $self->_get_modifier_settings;
 
@@ -457,7 +518,7 @@ sub show {
 			$self->{regex}->ChangeValue('\w+');
 		}
 
-		$self->{replace}->ChangeValue('Baz');
+		$self->{replace_text}->ChangeValue('Baz');
 		$self->{original_text}->SetValue('Foo Bar');
 
 		$self->Show;
@@ -526,7 +587,7 @@ sub get_data {
 	my %data = (
 		text => {
 			regex         => $self->{regex}->GetValue,
-			replace       => $self->{replace}->GetValue,
+			replace       => $self->{replace_text}->GetValue,
 			original_text => $self->{original_text}->GetValue,
 		},
 		modifiers => [ $self->_get_modifier_settings ],
@@ -581,42 +642,44 @@ sub run {
 
 	my $regex         = $self->{regex}->GetValue;
 	my $original_text = $self->{original_text}->GetValue;
-	my $replace       = $self->{replace}->GetValue;
-	my $result_text   = $original_text;
+
+	# TODO what about white space only regexes?
+	if ( $regex eq '' ) {
+		$self->{matched_text}->BeginTextColour(Wx::wxRED);
+		$self->{matched_text}->SetValue( Wx::gettext('Empty regex') );
+		$self->{matched_text}->EndTextColour;
+		return;
+	}
+
 
 	my ( $active, $inactive ) = $self->_get_modifier_settings;
-	my $xism = "$active-$inactive";
 
 	$self->{matched_text}->Clear;
-	$self->{result_text}->Clear;
 
 	$self->{matched_text}->BeginTextColour(Wx::wxBLACK);
 
 	my $match;
 	my $match_start;
 	my $match_end;
+	my $result;
 
 	my $warning;
 
 	# XXX Ignore Win32::API warnings. It's ugly but it works :)
 	local $SIG{__WARN__} = sub { $warning = $_[0] };
 
-	eval {
-
-		# /g modifier is useless in this case
-		# TODO loop on all matches
-		$xism =~ s/g//g;
-		if ( $original_text =~ /(?$xism:$regex)/ ) {
-			$match_start = $-[0];
-			$match_end   = $+[0];
-			$match       = substr( $original_text, $match_start, $match_end - $match_start );
-		}
-	};
+	# TODO loop on all matches in case of /g
+	my $code = "\$result = \$original_text =~ /\$regex/$active; (\$match_start, \$match_end) = (\$-[0], \$+[0])";
+	eval $code;
 	if ($@) {
 		$self->{matched_text}->BeginTextColour(Wx::wxRED);
 		$self->{matched_text}->SetValue( sprintf( Wx::gettext('Match failure in %s:  %s'), $regex, $@ ) );
 		$self->{matched_text}->EndTextColour;
 		return;
+	}
+
+	if ($result) {
+		$match = substr( $original_text, $match_start, $match_end - $match_start );
 	}
 
 	if ($warning) {
@@ -627,42 +690,35 @@ sub run {
 	}
 
 	if ( defined $match ) {
-		my @chars = split( //, $original_text );
-		my $pos = 0;
-		foreach my $char (@chars) {
-			if ( $pos == $match_start ) {
-				$self->{matched_text}->BeginTextColour(Wx::wxRED);
-				$self->{matched_text}->BeginUnderline;
-			} elsif ( $pos == $match_end ) {
-				$self->{matched_text}->EndTextColour;
-				$self->{matched_text}->EndUnderline;
+		if ( $match_start == $match_end ) {
+			$self->{matched_text}->BeginTextColour(Wx::wxRED);
+			$self->{matched_text}
+				->SetValue( sprintf( Wx::gettext('Match with 0 width at character %s'), $match_start ) );
+			$self->{matched_text}->EndTextColour;
+		} else {
+			my @chars = split( //, $original_text );
+			my $pos = 0;
+			foreach my $char (@chars) {
+				if ( $pos == $match_start ) {
+					$self->{matched_text}->BeginTextColour(Wx::wxRED);
+					$self->{matched_text}->BeginUnderline;
+				} elsif ( $pos == $match_end ) {
+					$self->{matched_text}->EndTextColour;
+					$self->{matched_text}->EndUnderline;
+				}
+				$self->{matched_text}->AppendText($char);
+				$pos++;
 			}
-			$self->{matched_text}->AppendText($char);
-			$pos++;
 		}
 	} else {
 		$self->{matched_text}->BeginTextColour(Wx::wxRED);
 		$self->{matched_text}->SetValue( Wx::gettext('No match') );
 		$self->{matched_text}->EndTextColour;
 	}
-
-	if ( $self->{global}->IsChecked ) {
-		eval "\$result_text =~ s{(?$xism:$regex)}{$replace}g";
-	} else {
-		eval "\$result_text =~ s{(?$xism:$regex)}{$replace}";
-	}
-	if ($@) {
-		$self->{result_text}->BeginTextColour(Wx::wxRED);
-		$self->{result_text}->AppendText( sprintf( Wx::gettext('Replace failure in %s:  %s'), $regex, $@ ) );
-		$self->{result_text}->EndTextColour;
-		return;
-	}
-
-	if ( defined $result_text ) {
-		$self->{result_text}->SetValue($result_text);
-	}
-
 	$self->{matched_text}->EndTextColour;
+
+
+	$self->replace;
 
 	$self->{description_text}->SetValue( $self->_dump_regex($regex) ) if $self->{description_text}->IsShown;
 
@@ -682,6 +738,34 @@ sub run {
 	#		$self->{regex}->AppendText($element->content);
 	#	$self->{regex}->EndTextColour;
 	#	}
+
+	return;
+}
+
+sub replace {
+	my $self = shift;
+	return if !$self->{replace_checkbox}->IsChecked;
+
+	my $regex       = $self->{regex}->GetValue;
+	my $result_text = $self->{original_text}->GetValue;
+	my $replace     = $self->{replace_text}->GetValue;
+
+	my ( $active, $inactive ) = $self->_get_modifier_settings;
+
+	$self->{result_text}->Clear;
+
+	my $code = "\$result_text =~ s{\$regex}{$replace}$active";
+	eval $code;
+	if ($@) {
+		$self->{result_text}->BeginTextColour(Wx::wxRED);
+		$self->{result_text}->AppendText( sprintf( Wx::gettext('Replace failure in %s:  %s'), $regex, $@ ) );
+		$self->{result_text}->EndTextColour;
+		return;
+	}
+
+	if ( defined $result_text ) {
+		$self->{result_text}->SetValue($result_text);
+	}
 
 	return;
 }

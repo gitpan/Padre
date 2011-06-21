@@ -19,7 +19,7 @@ use Padre::Wx::Menu      ();
 use Padre::Wx::Action    ();
 use Padre::Logger;
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 
 
 
@@ -137,6 +137,15 @@ sub init {
 	);
 
 	Padre::Wx::Action->new(
+		name       => 'file.new_copy',
+		label      => _T('Copy of current file'),
+		comment    => _T('Open a document and copy the content of the current tab'),
+		menu_event => sub {
+			$_[0]->on_new_from_current;
+		},
+	);
+
+	Padre::Wx::Action->new(
 		name       => 'file.new_p5_script',
 		label      => _T('Perl 5 Script'),
 		comment    => _T('Open a document with a skeleton Perl 5 script'),
@@ -183,6 +192,16 @@ sub init {
 		menu_event => sub {
 			require Padre::Wx::Dialog::ModuleStart;
 			Padre::Wx::Dialog::ModuleStart->start( $_[0] );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name       => 'file.new_p5_modulestarter',
+		label      => _T('Perl Distribution (New)...'),
+		comment    => _T('Setup a skeleton Perl distribution'),
+		menu_event => sub {
+			require Padre::Wx::Dialog::ModuleStarter;
+			Padre::Wx::Dialog::ModuleStarter->run( $_[0] );
 		},
 	);
 
@@ -350,6 +369,16 @@ sub init {
 		comment     => _T('Select some open files for closing'),
 		menu_event  => sub {
 			$_[0]->on_close_some;
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name        => 'file.delete',
+		need_editor => 1,
+		label       => _T('&Delete'),
+		comment     => _T('Close current document and remove the file from disk'),
+		menu_event  => sub {
+			$_[0]->on_delete;
 		},
 	);
 
@@ -889,7 +918,7 @@ sub init {
 		label       => _T('File...'),
 		comment     => _T('Select a file and insert its content at the current location'),
 		menu_event  => sub {
-			shift->on_insert_from_file(@_);
+			$_[0]->on_insert_from_file(@_);
 		},
 	);
 
@@ -898,13 +927,13 @@ sub init {
 	Padre::Wx::Action->new(
 		name           => 'edit.comment_toggle',
 		need_editor    => 1,
-		need_selection => 1,
+		need_selection => 0,
 		label          => _T('&Toggle Comment'),
 		comment        => _T('Comment out or remove comment out of selected lines in the document'),
 		shortcut       => 'Ctrl-Shift-C',
 		toolbar        => 'actions/toggle-comments',
 		menu_event     => sub {
-			shift->on_comment_block('TOGGLE');
+			$_[0]->on_comment_block('TOGGLE');
 		},
 	);
 
@@ -916,7 +945,7 @@ sub init {
 		comment        => _T('Comment out selected lines in the document'),
 		shortcut       => 'Ctrl-M',
 		menu_event     => sub {
-			shift->on_comment_block('COMMENT');
+			$_[0]->on_comment_block('COMMENT');
 		},
 	);
 
@@ -928,7 +957,7 @@ sub init {
 		comment        => _T('Remove comment out of selected lines in the document'),
 		shortcut       => 'Ctrl-Shift-M',
 		menu_event     => sub {
-			shift->on_comment_block('UNCOMMENT');
+			$_[0]->on_comment_block('UNCOMMENT');
 		},
 	);
 
@@ -940,8 +969,7 @@ sub init {
 		label       => _T('Encode Document to System Default'),
 		comment     => _T('Change the encoding of the current document to the default of the operating system'),
 		menu_event  => sub {
-			require Padre::Wx::Dialog::Encode;
-			Padre::Wx::Dialog::Encode::encode_document_to_system_default(@_);
+			$_[0]->encode_default;
 		},
 	);
 
@@ -951,8 +979,7 @@ sub init {
 		label       => _T('Encode Document to utf-8'),
 		comment     => _T('Change the encoding of the current document to utf-8'),
 		menu_event  => sub {
-			require Padre::Wx::Dialog::Encode;
-			Padre::Wx::Dialog::Encode::encode_document_to_utf8(@_);
+			$_[0]->encode_utf8;
 		},
 	);
 
@@ -962,8 +989,7 @@ sub init {
 		label       => _T('Encode Document to...'),
 		comment     => _T('Select an encoding and encode the document to that'),
 		menu_event  => sub {
-			require Padre::Wx::Dialog::Encode;
-			Padre::Wx::Dialog::Encode::encode_document_to(@_);
+			$_[0]->encode_dialog;
 		},
 	);
 
@@ -1145,10 +1171,29 @@ sub init {
 		shortcut    => 'Ctrl-F',
 		toolbar     => 'actions/edit-find',
 		menu_event  => sub {
-			require Padre::Wx::Dialog::Find;
-			my $dialog = Padre::Wx::Dialog::Find->new( $_[0] );
-			$dialog->run;
-			$dialog->Destroy;
+			my $main  = shift;
+			my $event = shift;
+
+			if ( $main->findfast->visible ) {
+				$main->findfast->_hide_panel;
+
+				require Padre::Wx::Dialog::Find;
+				my $dialog_find = Padre::Wx::Dialog::Find->new($main);
+				$dialog_find->{wait_ctrl_f} = 1; # (($event->GetModifiers == 2) and ($event->getKeyCode == 70)) ? 1 : 0;
+				$dialog_find->run;
+				$dialog_find->Destroy;
+				return unless $dialog_find->{cycle_ctrl_f};
+
+				# Ctrl-F in find dialog: Show find in files
+				require Padre::Wx::Dialog::FindInFiles;
+				my $dialog_fif = Padre::Wx::Dialog::FindInFiles->new($main);
+				$dialog_fif->run;
+				$dialog_fif->Destroy;
+				return unless $dialog_fif->{cycle_ctrl_f};
+			}
+
+			$main->findfast->search('next');
+
 			return;
 		},
 	);
@@ -1215,7 +1260,7 @@ sub init {
 		comment     => _T('Find next matching text using a toolbar-like dialog at the bottom of the editor'),
 		shortcut    => 'F4',
 		menu_event  => sub {
-			$_[0]->fast_find->search('next');
+			$_[0]->findfast->search('next');
 		},
 	);
 
@@ -1226,7 +1271,7 @@ sub init {
 		comment     => _T('Find previous matching text using a toolbar-like dialog at the bottom of the editor'),
 		shortcut    => 'Shift-F4',
 		menu_event  => sub {
-			$_[0]->fast_find->search('previous');
+			$_[0]->findfast->search('previous');
 		},
 	);
 
@@ -1360,12 +1405,12 @@ sub init {
 	);
 
 	Padre::Wx::Action->new(
-		name        => 'view.show_syntaxcheck',
+		name        => 'view.syntaxcheck',
 		label       => _T('Show Syntax Check'),
 		comment     => _T('Turn on syntax checking of the current document and show output in a window'),
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
-			$_[0]->show_syntax( $_[1]->IsChecked );
+			$_[0]->show_syntaxcheck( $_[1]->IsChecked );
 		},
 	);
 
@@ -1454,6 +1499,16 @@ sub init {
 		need_editor => 1,
 		menu_event  => sub {
 			$_[0]->current->editor->unfold_all;
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name        => 'view.fold_this',
+		label       => _T('Fold/Unfold this'),
+		comment     => _T('Unfold all the blocks that can be folded (need folding to be enabled)'),
+		need_editor => 1,
+		menu_event  => sub {
+			$_[0]->current->editor->fold_this;
 		},
 	);
 
@@ -1575,7 +1630,7 @@ sub init {
 		shortcut   => 'Ctrl-B',
 		menu_event => sub {
 			require Padre::Wx::Dialog::Bookmarks;
-			Padre::Wx::Dialog::Bookmarks->set_bookmark( $_[0] );
+			Padre::Wx::Dialog::Bookmarks->run_set( $_[0] );
 		},
 	);
 
@@ -1586,41 +1641,34 @@ sub init {
 		shortcut   => 'Ctrl-Shift-B',
 		menu_event => sub {
 			require Padre::Wx::Dialog::Bookmarks;
-			Padre::Wx::Dialog::Bookmarks->goto_bookmark( $_[0] );
+			Padre::Wx::Dialog::Bookmarks->run_goto( $_[0] );
 		},
 	);
 
 	# Style Actions
 
-	SCOPE: {
-		my %styles = Padre::Config::Style->core_styles;
-
-		foreach my $name ( sort keys %styles ) {
-			Padre::Wx::Action->new(
-				name        => "view.style.$name",
-				label       => $styles{$name},
-				comment     => _T('Switch highlighting colours'),
-				menu_method => 'AppendRadioItem',
-				menu_event  => sub {
-					$_[0]->change_style($name);
-				},
-			);
-		}
-	}
 
 	SCOPE: {
-		my @styles = Padre::Config::Style->user_styles;
+		my @styles = (
+			Padre::Config::Style->styles,
+			Padre::Config::Style->user_styles,
+		);
 
-		foreach my $name (@styles) {
-			Padre::Wx::Action->new(
-				name        => "view.style.$name",
-				label       => $name,
-				comment     => _T('Switch highlighting colours'),
-				menu_method => 'AppendRadioItem',
-				menu_event  => sub {
-					$_[0]->change_style( $name, 1 );
-				},
-			);
+		foreach my $private ( 0 .. 1 ) {
+			my $styles = $styles[$private];
+
+			foreach my $name ( sort keys %$styles ) {
+				Padre::Wx::Action->new(
+					name    => "view.style.$name",
+					label   => $styles->{$name},
+					comment => _T('Switch highlighting colours'),
+
+					#menu_method => 'AppendRadioItem',
+					menu_event => sub {
+						$_[0]->change_style( $name, $private );
+					},
+				);
+			}
 		}
 	}
 
@@ -2207,9 +2255,10 @@ sub init {
 	Padre::Wx::Action->new(
 		name       => 'tools.preferences',
 		label      => _T('Preferences'),
-		comment    => _T('Edit the user preferences'),
+		comment    => _T('Edit user and host preferences'),
 		menu_event => sub {
-			shift->on_preferences(@_);
+			require Padre::Wx::Dialog::Preferences;
+			Padre::Wx::Dialog::Preferences->run( $_[0] );
 		},
 	);
 
@@ -2543,7 +2592,7 @@ sub init {
 		comment    => _T('Set the focus to the "Syntax Check" window'),
 		shortcut   => 'Alt-C',
 		menu_event => sub {
-			$_[0]->show_syntax(1);
+			$_[0]->show_syntaxcheck(1);
 			$_[0]->syntax->SetFocus;
 		},
 	);

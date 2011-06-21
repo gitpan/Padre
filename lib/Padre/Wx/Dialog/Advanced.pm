@@ -8,7 +8,7 @@ use Padre::Config         ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.84';
+our $VERSION = '0.86';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -659,27 +659,30 @@ sub _on_reset_button {
 
 # Private method to handle the pressing of the save button
 sub _on_save_button {
-	my $self = shift;
+	my $self    = shift;
+	my $config  = $self->config;
+	my $current = $self->current;
+	my $prefs   = $self->{preferences};
 
-	#Save only changed stuff to config
-	my $config = $self->main->config;
-	my $prefs  = $self->{preferences};
+	# Lock most of Padre so any apply handlers run quickly
+	my $lock = $self->main->lock( 'UPDATE', 'REFRESH', 'DB' );
+
+	# Find the values that have changed
 	for my $name ( sort keys %$prefs ) {
 		my $pref     = $prefs->{$name};
 		my $type     = $pref->{type};
 		my $value    = $pref->{value};
 		my $original = $pref->{original};
-		my $changed =
-			( $type == Padre::Constant::ASCII or $type == Padre::Constant::PATH )
-			? $value ne $original
-			: $value != $original;
-
-		if ($changed) {
-			$config->set( $name, $value );
+		if ( $type == Padre::Constant::ASCII or $type == Padre::Constant::PATH ) {
+			next if $value eq $original;
+		} else {
+			next if $value == $original;
 		}
+
+		$config->apply( $name, $value, $current );
 	}
 
-	# And commit configuration...
+	# Save to disk/database
 	$config->write;
 
 	# Bye bye dialog
@@ -691,11 +694,19 @@ sub _on_save_button {
 # Private method to update the preferences list
 sub _update_list {
 	my $self   = shift;
-	my $config = $self->main->config;
+	my $config = $self->config;
 	my $filter = quotemeta $self->{filter}->GetValue;
 
 	my $list = $self->{list};
 	$list->DeleteAllItems;
+
+	# Hide value and info sizer when searching for other entry
+	$self->{vsizer}->Show( 2, 0 );
+	$self->{vsizer}->Show( 3, 0 );
+	$self->{vsizer}->Show( 4, 0 );
+
+	# Recalculate sizers
+	$self->Layout;
 
 	my $index          = -1;
 	my $preferences    = $self->{preferences};
@@ -768,7 +779,7 @@ sub _set_item_bold_font {
 # Private method to initialize a preferences hash from the local configuration
 sub _init_preferences {
 	my $self   = shift;
-	my $config = $self->main->config;
+	my $config = $self->config;
 
 	$self->{preferences} = ();
 	for my $name ( Padre::Config->settings ) {
