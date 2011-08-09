@@ -8,7 +8,7 @@ use Params::Util   ();
 use Padre::Current ();
 use Padre::Locale  ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 use overload
 	'bool' => sub () {1},
@@ -306,6 +306,7 @@ sub disable {
 		Carp::croak("Cannot disable plug-in '$self'");
 	}
 
+	# NOTE: Horribly violates encapsulation
 	my $manager = Padre->ide->plugin_manager;
 
 	# If the plugin defines document types, deregister them
@@ -313,7 +314,7 @@ sub disable {
 	while (@documents) {
 		my $type  = shift @documents;
 		my $class = shift @documents;
-		Padre::MimeTypes->remove_mime_class($type);
+		Padre::MimeTypes->reset_mime_class($type);
 	}
 
 	# Call the plugin's own disable method
@@ -351,6 +352,9 @@ sub disable {
 	# Update the status
 	$self->status('disabled');
 	$self->errstr('');
+
+	# Save the last version we successfully enabled to the database
+
 
 	return 0;
 }

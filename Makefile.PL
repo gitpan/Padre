@@ -8,8 +8,6 @@ use lib 'privinc';
 use inc::Module::Install 1.00;
 use POSIX qw(locale_h);
 
-
-
 # Workaround for the fact that Module::Install loads the modules
 # into memory and when Test::NoWarnings is loaded it will hide
 # the warnings generated from that point.
@@ -60,7 +58,7 @@ if ( '2.009000' eq Alien::wxWidgets->version ) {
 
 
 
-
+ 
 #####################################################################
 # Normal Boring Commands
 
@@ -74,6 +72,7 @@ requires 'perl' => '5.008005';
 
 # General dependencies
 requires 'App::cpanminus'           => '0.9923';
+requires 'B::Deparse'               => 0;
 requires 'Class::Adapter'           => '1.05';
 requires 'Class::Inspector'         => '1.22';
 requires 'Class::Unload'            => '0.03';
@@ -94,7 +93,7 @@ requires 'File::Glob'               => 0;
 requires 'File::Glob::Windows'      => '0.1.3' if win32;
 requires 'File::Copy::Recursive'    => '0.37';
 requires 'File::Find::Rule'         => '0.30';
-requires 'File::HomeDir'            => '0.91';
+requires 'File::HomeDir'            => (win32) ? '0.98' : '0.91';
 requires 'File::Path'               => '2.08';
 requires 'File::Remove'             => (win32) ? '1.49' : '1.40';
 requires 'File::ShareDir'           => '1.00';
@@ -120,8 +119,6 @@ requires 'LWP'                      => '5.815';
 requires 'Module::Build'            => '0.3603';
 requires 'Module::CoreList'         => 0;
 requires 'Module::Manifest'         => '0.07';
-requires 'Module::Refresh'          => '0.13';
-requires 'Module::Starter'          => '1.50';
 requires 'ORLite'                   => '1.48';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.14';
@@ -137,7 +134,8 @@ requires 'POSIX'                    => 0;
 requires 'PPI'                      => '1.213';
 requires 'PPIx::EditorTools'        => '0.13';
 requires 'PPIx::Regexp'             => '0.011';
-requires 'Storable'                 => '2.15';
+requires 'Probe::Perl'              => '0.01';
+requires 'Storable'                 => '2.16';
 requires 'Template::Tiny'           => '0.11';
 requires 'Term::ReadLine'           => 0;
 requires 'Text::Balanced'           => '2.01';
@@ -149,7 +147,6 @@ requires 'threads::shared'          => '1.33';
 requires 'URI'                      => '0';
 requires 'version'                  => '0.80';
 requires 'Win32'              => '0.31' if win32;
-requires 'Win32::API'         => '0.58' if win32;
 requires 'Win32::Shortcut'    => '0.07' if win32;
 requires 'Win32::TieRegistry' => '0.26' if win32;
 requires 'Wx' => ( win32 and $] >= 5.01 ) ? '0.9901' : '0.91';

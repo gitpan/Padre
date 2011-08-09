@@ -9,7 +9,7 @@ use File::Spec     ();
 use Padre::Util    ();
 use Padre::Project ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = 'Padre::Project';
 
 
@@ -78,10 +78,52 @@ sub _headline {
 sub version {
 	my $self = shift;
 
-	# The first approach is to look for a version declaration in the
-	# headline module for the project.
+	# Look for a version declaration in the headline module for the project.
 	my $file = $self->headline or return undef;
 	Padre::Util::parse_variable( $file, 'VERSION' );
+}
+
+sub module {
+	$_[0]->{module}
+		or $_[0]->{module} = $_[0]->_module;
+}
+
+# Attempts to determine a headline module name for the project
+sub _module {
+	my $self = shift;
+
+	# Look for a package declaration in the headline module for the project
+	my $file = $self->headline or return undef;
+	local $/ = "\n";
+	local $_;
+	open( my $fh, '<', $file ) #-# no critic (RequireBriefOpen)
+		or die "Could not open '$file': $!";
+
+	# Look for a package declaration somewhere in the first 10 lines.
+	# After that, it's probably more likely to be superfluous than real.
+	my $lines  = 0;
+	my $result = undef;
+	while (<$fh>) {
+		if (m{^ \s* package \s+ (\w[\w\:\']*) }x) {
+			$result = $1;
+			last;
+		}
+		last if ++$lines > 10;
+	}
+	close $fh;
+
+	return $result;
+}
+
+# Attempts to determine a distribution name (e.g. Foo-Bar) for the project
+sub distribution {
+	my $self = shift;
+	my $name = $self->module;
+	return undef unless defined $name;
+
+	# Transform using the most common pattern
+	$name =~ s/(?:::|')/-/g;
+	return $name;
 }
 
 
@@ -99,10 +141,10 @@ sub ignore_rule {
 		return 0 unless $super->();
 
 		# In a distribution, we can ignore more things
-		return 0 if $_->{name} =~ /^(?:blib|_build|inc|Makefile|pm_to_blib)\z/;
+		return 0 if $_->{name} =~ /^(?:blib|_build|inc|Makefile(?:\.old)?|pm_to_blib)\z/;
 
 		# It is fairly common to get bogged down in NYTProf output
-		return 0 if $_->{name} =~ /^nytprof(?:\.out)\z/;
+		return 0 if $_->{name} =~ /^nytprof(?:\.out)?\z/;
 
 		# Everything left, so we show it
 		return 1;
@@ -114,10 +156,10 @@ sub ignore_skip {
 	my $rule = $self->SUPER::ignore_skip();
 
 	# Ignore typical build files
-	push @$rule, '(?:^|\\/)(?:blib|_build|inc|Makefile|pm_to_blib)\z';
+	push @$rule, '(?:^|\\/)(?:blib|_build|inc|Makefile(?:\.old)?|pm_to_blib)\z';
 
 	# Ignore the enormous NYTProf output
-	push @$rule, '(?:^|\\/)nytprof(?:\.out)\z';
+	push @$rule, '(?:^|\\/)nytprof(?:\.out)?\z';
 
 	return $rule;
 }

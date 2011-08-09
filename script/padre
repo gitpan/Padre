@@ -37,22 +37,23 @@ if ( $^O eq 'darwin' and $^X !~ m{/wxPerl} ) {
 		warn "padre cannot find wxPerl executable (which it requires on OS X)\n";
 	}
 	exit 0;
-} elsif ( $^O eq 'linux' ) {
-	$ENV{LIBOVERLAY_SCROLLBAR} = 0;
 }
+
+# Disable overlay scrollbar on Linux.
+# Done ugly this way to satisfy Perl::Critic (grrr)
+local $ENV{LIBOVERLAY_SCROLLBAR} = ( $^O eq 'linux' ) ? 0 : $ENV{LIBOVERLAY_SCROLLBAR};
 
 # Handle special command line cases early, because options like --home
 # MUST be processed before the Padre.pm library is loaded.
-my $USAGE       = '';
-my $VERSION     = '';
-my $HOME        = undef;
-my $RESET       = undef;
-my $SESSION     = undef;
-my $PRELOAD     = undef;
-my $DESKTOP     = undef;
-my $ACTIONS     = undef;
-my $LOCALE      = undef;
-my $WITH_PLUGIN = undef;
+my $USAGE   = '';
+my $VERSION = '';
+my $HOME    = undef;
+my $RESET   = undef;
+my $SESSION = undef;
+my $PRELOAD = undef;
+my $DESKTOP = undef;
+my $ACTIONS = undef;
+my $LOCALE  = undef;
 if ( grep {/^-/} @ARGV ) {
 
 	# Avoid loading Getopt::Long entirely if we can,
@@ -67,8 +68,7 @@ if ( grep {/^-/} @ARGV ) {
 		'desktop'       => \$DESKTOP,
 		'actionqueue=s' => \$ACTIONS,
 		'locale=s'      => \$LOCALE,
-		'preload'       => \$PRELOAD,    # Keep this sekrit for now --ADAMK
-		'with-plugin=s' => \$WITH_PLUGIN,
+		'preload'       => \$PRELOAD, # Keep this sekrit for now --ADAMK
 	) or $USAGE = 1;
 }
 
@@ -173,9 +173,6 @@ my $ide = Padre->new(
 	actionqueue    => $ACTIONS,
 	startup_locale => $LOCALE,
 ) or die "Failed to create Padre instance";
-
-$ide->{with_plugin} = {};
-$ide->{with_plugin}->{$WITH_PLUGIN} = 1 if defined($WITH_PLUGIN);
 
 # Start the application
 $ide->run;

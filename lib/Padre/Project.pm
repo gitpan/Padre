@@ -8,7 +8,7 @@ use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION    = '0.86';
+our $VERSION    = '0.88';
 our $COMPATIBLE = '0.81';
 
 
@@ -49,7 +49,7 @@ sub new {
 ### DEPRECATED
 sub from_file {
 	if ( $VERSION > 0.84 ) {
-		warn "Deprecated Padre::Util::get_project_rcs called by " . scalar caller();
+		warn "Deprecated Padre::Project::from_file called by " . scalar caller();
 	}
 
 	require Padre::Current;
@@ -222,6 +222,7 @@ sub ignore_rule {
 		if ( $_->{name} =~ /^\./ ) {
 			return 0;
 		}
+
 		if (Padre::Constant::WIN32) {
 
 			# On Windows only ignore files or directories that
@@ -235,6 +236,13 @@ sub ignore_rule {
 				return 0;
 			}
 
+			# Windows thumbnailing, instead of having sensibly
+			# centralised storage of thumbnails, likes to put a
+			# file in every single directory.
+			if ( $_->{name} eq 'Thumbs.db' ) {
+				return 0;
+			}
+
 			# Likewise, desktop.ini files are stupid files used
 			# by windows to make a folder behave weirdly.
 			# Ignore them too.
@@ -242,6 +250,7 @@ sub ignore_rule {
 				return 0;
 			}
 		}
+
 		return 1;
 	};
 }
@@ -260,6 +269,10 @@ sub ignore_skip {
 		# versions of Windows.
 		push @$rule, "(?:^|\\/)\\\$";
 		push @$rule, "\\\$\$";
+
+		# Windows thumbnailing, instead of having sensibly centralised
+		# storage of thumbnails, likes to put a file in every single directory.
+		push @$rule, "(?:^|\\/)Thumbs.db\$";
 
 		# Likewise, desktop.ini files are stupid files used by windows
 		# to make a folder behave weirdly. Ignore them too.

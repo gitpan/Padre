@@ -30,18 +30,19 @@ use FindBin         ();
 use Cwd             ();
 use File::Spec      ();
 use List::Util      ();
-use Padre::Constant (); ### NO more Padre:: dependencies
+use Padre::Constant (); ### NO other Padre:: dependencies
 
 # If we make $VERSION an 'our' variable the parse_variable() function breaks
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.86';
+	$VERSION    = '0.88';
 	$COMPATIBLE = '0.81';
 }
 
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
+our $DISTRO    = undef;
 
 
 
@@ -71,6 +72,42 @@ our @EXPORT_OK = '_T';
 # The local newline type
 # NOTE: It's now in Padre::Constant, if you miss them, please use it from there
 #use constant NEWLINE => Padre::Constant::WIN32 ? 'WIN' : Padre::Constant::MAC ? 'MAC' : 'UNIX';
+
+# Pulled back from Padre::Constant as it wasn't a constant in the first place
+sub DISTRO {
+	return $DISTRO if defined $DISTRO;
+
+	if (Padre::Constant::WIN32) {
+
+		# Inherit from the main Windows classification
+		require Win32;
+		$DISTRO = uc Win32::GetOSName();
+
+	} elsif (Padre::Constant::MAC) {
+		$DISTRO = 'MAC';
+
+	} else {
+
+		# Try to identify a more specific linux distribution
+		local $@;
+		eval {
+			if ( open my $lsb_file, '<', '/etc/lsb-release' )
+			{
+				while (<$lsb_file>) {
+					next unless /^DISTRIB_ID\=(.+?)[\r\n]/;
+					if ( $1 eq 'Ubuntu' ) {
+						$DISTRO = 'UBUNTU';
+					}
+					last;
+				}
+			}
+		};
+	}
+
+	$DISTRO ||= 'UNKNOWN';
+
+	return $DISTRO;
+}
 
 
 
@@ -194,7 +231,7 @@ sub parse_variable {
 		} elsif (m{(?<!\\) ([\$*]) (([\w\:\']*) \b$variable)\b .* =}x) {
 			my $eval = qq{
 				package # Hide from PAUSE
-                                  ExtUtils::MakeMaker::_version;
+					ExtUtils::MakeMaker::_version;
 				no strict;
 				BEGIN { eval {
 					# Ensure any version() routine which might have leaked
@@ -258,7 +295,7 @@ sub get_matches {
 	die 'missing parameters' if @_ < 4;
 
 	require Encode;
-	$text  = Encode::encode( 'utf-8', $text );
+	$text  = Encode::encode( 'utf-8', $text  );
 	$regex = Encode::encode( 'utf-8', $regex );
 
 	my @matches = ();

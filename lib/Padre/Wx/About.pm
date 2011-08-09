@@ -9,11 +9,12 @@ use utf8;
 use Padre::Wx               ();
 use Padre::Wx::HtmlWindow   ();
 use Padre::Wx::Icon         ();
+use Padre::Config           ();
 use Padre::Util             ();
 use Wx::Perl::ProcessStream ();
 use PPI                     ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = 'Wx::Dialog';
 
 sub new {
@@ -44,7 +45,6 @@ sub new {
 
 	# Create the content for the Info page
 	$self->{info} = Padre::Wx::HtmlWindow->new($self);
-	$self->_content_info;
 
 	# Layout for the About dialog
 	$self->{notebook} = Wx::AuiNotebook->new(
@@ -162,6 +162,8 @@ sub _content_developers {
             Chris Dolan<br>
             <br>
             Claudio Ramirez<br>
+            <br>
+            Tom Eliaz<br>
           </p>
         </td>
         <td valign="top">
@@ -242,7 +244,7 @@ sub _content_translators {
             Chuanren Wu<br>
             <br>
             <b>$language{'zh-tw'}</b><br>
-            Matthew Lien - 練喆明<br>
+            BlueT - Matthew Lien - 練喆明<br>
             <br>
             <b>$language{'cz'}</b><br>
             Marcela Mašláňová<br>
@@ -352,16 +354,13 @@ sub _content_info {
 	my $alien = Wx::wxVERSION();
 
 	my $wx_scintilla_html = '';
-	if ( Padre::Wx::Editor->isa('Wx::ScintillaTextCtrl') ) {
-		eval "use Wx::Scintilla";
-		unless ($@) {
-			$wx_scintilla_html = <<"END_HTML";
+	if ( Padre::Config::wx_scintilla_ready() ) {
+		$wx_scintilla_html = <<"END_HTML";
       <tr>
         <td valign="top">Wx::Scintilla</td>
         <td>$Wx::Scintilla::VERSION</td>
       </tr>
 END_HTML
-		}
 	}
 
 	$self->{info}->SetPage( $self->_rtl(<<"END_HTML") );

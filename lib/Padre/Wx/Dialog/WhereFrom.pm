@@ -6,7 +6,7 @@ use warnings;
 use Padre::Role::Task         ();
 use Padre::Wx::FBP::WhereFrom ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::FBP::WhereFrom
@@ -57,7 +57,7 @@ sub run {
 	}
 
 	# Don't ask again
-	$config->set( feedback_done => 1 );
+	$config->set( nth_feedback => 1 );
 	$config->write;
 
 	return 1;

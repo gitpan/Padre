@@ -39,7 +39,7 @@ use Padre::PluginHandle    ();
 use Padre::Wx              ();
 use Padre::Wx::Menu::Tools ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 
 
@@ -531,7 +531,7 @@ sub load_plugin {
 # without regard to the context it is being called from.
 # So this method doesn't do stuff like refresh the plug-in menu.
 #
-# MAINTAINER NOTE: This method looks fairly long, but it's doing
+# NOTE: This method looks fairly long, but it's doing
 # a very specific and controlled series of steps. Splitting this up
 # would just make the process harder to understand, so please don't.
 sub _load_plugin {
@@ -643,7 +643,7 @@ sub _load_plugin {
 
 	# NOTE: This violates encapsulation. The plugin manager should be
 	# manipulated from the outside, it shouldn't introspect it's parent IDE
-	unless ( $config->enabled or $self->current->ide->{with_plugin}->{$module} ) {
+	unless ( $config->enabled ) {
 		$plugin->status('disabled');
 		return;
 	}
@@ -658,7 +658,7 @@ sub _load_plugin {
 	}
 
 	# FINALLY we can enable the plug-in
-	$plugin->enable;
+	$self->plugin_enable($plugin);
 
 	return 1;
 }
@@ -765,9 +765,17 @@ sub _unload_plugin {
 }
 
 sub plugin_enable {
-	my $self = shift;
-	my $handle = $self->_plugin(shift) or return;
-	$handle->enable;
+	my $self   = shift;
+	my $module = shift;
+	my $handle = $self->_plugin($module) or return;
+	my $result = $handle->enable;
+
+	# Update the last-enabled version each time it is enabled
+	Padre::DB::Plugin->update_version(
+		$module => $handle->version,
+	);
+
+	return $result;
 }
 
 sub plugin_disable {
@@ -825,18 +833,19 @@ sub plugin_db {
 
 	# Get the plug-in, and from there the config
 	my $plugin = $self->_plugin($module);
-	my $object = Padre::DB::Plugin->fetch_name($module);
-	unless ($object) {
-		$object = Padre::DB::Plugin->create(
-			name    => $plugin->class,
-			version => $plugin->version,
+	my @object = Padre::DB::Plugin->select( 'where name = ?', $module );
+	return $object[0] if @object;
+	return Padre::DB::Plugin->create(
+		name => $plugin->class,
 
-			# Having undef here means no preference yet
-			enabled => undef,
-			config  => undef,
-		);
-	}
-	return $object;
+		# Track the last version of the plugin that we were
+		# able to successfully enable (nothing to start with)
+		version => undef,
+
+		# Having undef here means no preference yet
+		enabled => undef,
+		config  => undef,
+	);
 }
 
 # Fire a event on all active plugins
@@ -1001,7 +1010,7 @@ sub get_menu {
 	return () unless $plugin and $plugin->{status} eq 'enabled';
 	return () unless $plugin->{object}->can('menu_plugins');
 
-	my ( $label, $menu ) = eval { $plugin->{object}->menu_plugins($main) };
+	my @menu = eval { $plugin->{object}->menu_plugins($main) };
 	if ($@) {
 		$plugin->errstr( Wx::gettext('Error when calling menu for plug-in ') . "'$module': $@" );
 		$plugin->{status} = 'error';
@@ -1010,8 +1019,24 @@ sub get_menu {
 		# crazy anyone trying to write a plug-in
 		return ();
 	}
-	return () unless defined $label and defined $menu;
-	return ( $label, $menu );
+
+	# Plugin provides a single menu item
+	if ( @menu == 1
+		and Params::Util::_INSTANCE( $menu[0], 'Wx::MenuItem' ) )
+	{
+		return @menu;
+	}
+
+	# Plugin provides a full submenu
+	if (    @menu == 2
+		and defined Params::Util::_STRING( $menu[0] )
+		and Params::Util::_INSTANCE( $menu[1], 'Wx::Menu' ) )
+	{
+		return ( -1, @menu );
+	}
+
+	# Unrecognised or unsupported menu type
+	return ();
 }
 
 =pod

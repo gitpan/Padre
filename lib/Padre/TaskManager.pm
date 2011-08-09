@@ -56,11 +56,14 @@ use 5.008005;
 use strict;
 use warnings;
 use Params::Util      ();
+use Padre::Config     ();
+use Padre::Current    ();
 use Padre::TaskHandle ();
+use Padre::TaskThread ();
 use Padre::TaskWorker ();
 use Padre::Logger;
 
-our $VERSION    = '0.86';
+our $VERSION    = '0.88';
 our $COMPATIBLE = '0.81';
 
 # Timeout values
@@ -68,13 +71,6 @@ use constant {
 	MAX_START_TIMEOUT => 10,
 	MAX_IDLE_TIMEOUT  => 30,
 };
-
-# HACK: Temporary flag to control whether or not we are spawning from
-#       the task master or whether we are spawning directly from the parent.
-#       Leave this turned off, Adam is using it to temporarily enable it
-#       while he is debugging it. Once fixed, it will stay on permanently
-#       and this flag will go away.
-use constant ENABLE_SLAVE_MASTER => 0;
 
 
 
@@ -117,7 +113,7 @@ sub new {
 	TRACE( $_[0] ) if DEBUG;
 	my $class   = shift;
 	my %param   = @_;
-	my $conduit = delete $param{conduit};
+	my $conduit = delete $param{conduit} or die "Failed to provide event conduit";
 	my $self    = bless {
 		active  => 0, # Are we running at the moment
 		threads => 1, # Are threads enabled
@@ -131,9 +127,6 @@ sub new {
 	}, $class;
 
 	# Do the initialisation needed for the event conduit
-	unless ( Params::Util::_INSTANCE( $conduit, 'Padre::Wx::Role::Conduit' ) ) {
-		die("Failed to provide an event conduit for the TaskManager");
-	}
 	$conduit->conduit_init($self);
 
 	return $self;
@@ -229,6 +222,12 @@ sub start {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	if ( $self->{threads} ) {
+		# Start the master if it wasn't pre-launched for some reason
+		unless ( Padre::TaskThread->master_running ) {
+			Padre::TaskThread->master;
+		}
+
+		# Start the workers
 		foreach ( 0 .. $self->{minimum} - 1 ) {
 			$self->start_worker;
 		}
@@ -261,18 +260,18 @@ sub stop {
 	# Clear out the pending queue
 	@{ $self->{queue} } = ();
 
-	# Stop all of our workers
-	foreach ( 0 .. $#{ $self->{workers} } ) {
-		$self->stop_worker($_);
-	}
-
 	# Shut down the master thread
-	# NOTE: Ignore the desires of ENABLE_SLAVE_MASTER here on really only
-	# on the reality of the actual running code.
-	if ($Padre::TaskThread::VERSION) {
+	# NOTE: We ignore the status of the thread master settings here and
+	# act only on the basis of whether or not a master thread is running.
+	if ( $Padre::TaskThread::VERSION ) {
 		if ( Padre::TaskThread->master_running ) {
 			Padre::TaskThread->master->stop;
 		}
+	}
+
+	# Stop all of our workers
+	foreach ( 0 .. $#{ $self->{workers} } ) {
+		$self->stop_worker($_);
 	}
 
 	# Empty task handles
@@ -345,7 +344,7 @@ sub cancel {
 			TRACE("Handle wid = $handle->{worker}") if DEBUG;
 			next unless defined $handle->{worker};
 			next unless $worker->{wid} == $handle->{worker};
-			TRACE("Sending 'cancel' message") if DEBUG;
+			TRACE("Sending 'cancel' message to worker $worker->{wid}") if DEBUG;
 			$worker->send('cancel');
 			return 1;
 		}
@@ -378,43 +377,17 @@ B<Padre::TaskManager>.
 sub start_worker {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-
-	if (ENABLE_SLAVE_MASTER) {
-
-		# Bootstrap the master thread if it isn't already running
-		require Padre::TaskThread;
-		my $master = Padre::TaskThread->master;
-
-		# Start the worker via the master.
-		my $worker = Padre::TaskWorker->new;
-		$master->send( start_child => $worker );
-		push @{ $self->{workers} }, $worker;
-		return $worker;
-
-	} else {
-
-		# Create the worker as normal
-		my $worker = Padre::TaskWorker->new;
-
-		# DBI goes nasty if you have a connection open at the moment
-		# the thread is spawned, which we can have if we are in the
-		# middle of a "DB" lock.
-		# To correct this, we need to anti-lock the database and
-		# get rid of the connection temporarily while the spawn is
-		# being done, then restore the database connection afterwards.
-		if ( $Padre::DB::VERSION and Padre::DB->connected ) {
-			Padre::DB->commit;
-			$worker->spawn;
-			Padre::DB->begin;
-			Padre::DB->pragma( 'synchronous' => 0 );
-		} else {
-			$worker->spawn;
-		}
-
-		# Continue as normal
-		push @{ $self->{workers} }, $worker;
-		return $worker;
+	unless ( Padre::TaskThread->master_running ) {
+		die "Master thread is unexpectedly not running";
 	}
+
+	# Start the worker via the master.
+	my $worker = Padre::TaskWorker->new;
+	Padre::TaskThread->master->send(
+		start_child => $worker,
+	);
+	push @{ $self->{workers} }, $worker;
+	return $worker;
 }
 
 =pod
@@ -480,7 +453,9 @@ way in which workers are used, such as maximising worker reuse for the same
 type of task, and "specialising" workers for particular types of tasks.
 
 If all existing workers are in use this method may also spawn new workers,
-up to the C<maximum> worker limit.
+up to the C<maximum> worker limit. Without the slave master logic enabled this
+will result in the editor blocking in the foreground briefly, this is something
+we can live with until the slave master feature is working again.
 
 Returns a L<Padre::TaskWorker> object, or C<undef> if there is no worker in
 which the task can be run.
@@ -571,18 +546,8 @@ sub run {
 		# Shortcut if there is nowhere to run the task
 		if ( $self->{threads} ) {
 			if ( scalar keys %$handles >= $self->{maximum} ) {
-				if ( Padre::Current->config->feature_restart_hung_task_manager ) {
-
-					# Restart hung task manager!
-					TRACE('PANIC: Restarting task manager') if DEBUG;
-					$self->stop;
-					$self->start;
-				} else {
-
-					# Ignore the problem and hope the user does not notice :)
-					TRACE('No more task handles available. Sorry') if DEBUG;
-					return;
-				}
+				TRACE('No more task handles available') if DEBUG;
+				return;
 			}
 		}
 
@@ -602,10 +567,17 @@ sub run {
 		}
 
 		# Register the handle for child messages
+		TRACE("Handle $hid registered for messages") if DEBUG;
 		$handles->{$hid} = $handle;
 
 		# Find the next/best worker for the task
-		my $worker = $self->best_worker($handle) or return;
+		my $worker = $self->best_worker($handle);
+		if ($worker) {
+			TRACE( "Handle $hid allocated worker " . $worker->wid ) if DEBUG;
+		} else {
+			TRACE("Handle $hid has no worker") if DEBUG;
+			return;
+		}
 
 		# Prepare handle timing
 		$handle->start_time(time);
@@ -644,14 +616,22 @@ sub on_signal {
 	TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
 	my $message = shift;
+	unless ( $self->{active} ) {
+		TRACE("Ignoring message while not active") if DEBUG;
+		return;
+	}
 	unless ( Params::Util::_ARRAY($message) ) {
-		TRACE("Unrecognised non-ARRAY or empty message");
+		TRACE("Unrecognised non-ARRAY or empty message") if DEBUG;
 		return;
 	}
 
-	# Fine the task handle for the task
-	my $hid = shift @$message;
-	my $handle = $self->{handles}->{$hid} or return;
+	# Find the task handle for the task
+	my $hid    = shift @$message;
+	my $handle = $self->{handles}->{$hid};
+	unless ($handle) {
+		TRACE("Handle $hid does not exist...") if DEBUG;
+		return;
+	}
 
 	# Update idle tracking so we don't force-kill this worker
 	$handle->idle_time(time);
@@ -661,14 +641,14 @@ sub on_signal {
 	if ( $method eq 'STARTED' ) {
 
 		# Register the task as running
+		TRACE("Handle $hid added to 'running'...") if DEBUG;
 		$self->{running}->{$hid} = $handle;
 		return;
 	}
 
 	# Any remaining task should be running
 	unless ( $self->{running}->{$hid} ) {
-
-		# warn("Received message for a task that is not running");
+		TRACE("Handle $hid is not running to receive '$method'") if DEBUG;
 		return;
 	}
 
@@ -677,6 +657,7 @@ sub on_signal {
 
 		# Remove from the running list to guarantee no more events
 		# will be sent to the handle (and thus to the task)
+		TRACE("Handle $hid removed from 'running'...") if DEBUG;
 		delete $self->{running}->{$hid};
 
 		# Free up the worker for other tasks
@@ -692,6 +673,7 @@ sub on_signal {
 		$handle->on_stopped(@$message);
 
 		# Remove from the task list to destroy the task
+		TRACE("Handle $hid completed on_stopped...") if DEBUG;
 		delete $self->{handles}->{$hid};
 
 		# This should have released a worker to process

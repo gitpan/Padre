@@ -16,7 +16,7 @@ use Padre::DB       ();
 use Padre::Constant ();
 use Padre::Logger;
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 sub new {
 	my $class = shift;
@@ -76,13 +76,12 @@ sub locked {
 sub shutdown {
 	my $self = shift;
 	my $lock = $self->lock( 'UPDATE', 'REFRESH', 'CONFIG' );
-	$self->{shutdown} = 1;
 
 	# If we have an update lock running, stop it manually now.
 	# If we don't do this, Win32 Padre will segfault on exit.
 	$self->{update_locker} = undef;
 
-	return 1;
+	$self->{shutdown} = 1;
 }
 
 
@@ -106,7 +105,7 @@ sub db_increment {
 		# database write operations faster, at the risk of config.db
 		# corruption if (and only if) there is a power outage,
 		# operating system crash, or catastrophic hardware failure.
-		Padre::DB->pragma( 'synchronous' => 0 );
+		Padre::DB->pragma( synchronous => 0 );
 	}
 	return;
 }
@@ -120,19 +119,19 @@ sub db_decrement {
 }
 
 sub config_increment {
-	my $self = shift;
-	unless ( $self->{config_depth}++ ) {
 
-		# TO DO: Initiate config locking here
-		# NOTE: Pretty sure we don't need to do anything specific
-		# here for the config file stuff.
-	}
+	# my $self = shift;
+	# unless ( $self->{config_depth}++ ) {
+	# TO DO: Initiate config locking here
+	# NOTE: Pretty sure we don't need to do anything specific
+	# here for the config file stuff.
+	# }
 	return;
 }
 
 sub config_decrement {
 	my $self = shift;
-	unless ( $self->{config_depth}-- ) {
+	unless ( --$self->{config_depth} ) {
 
 		# Write the config file here
 		$self->owner->config->write;
@@ -177,9 +176,11 @@ sub update_decrement {
 		$self->{update_locker} = undef;
 
 		# On Windows, we need to force layouts down to notebooks
-		if ( Wx::wxVERSION() >= 2.008012 and Padre::Constant::WXWIN32 ) {
-			my @notebook = grep { $_->isa('Wx::AuiNotebook') } $self->{owner}->GetChildren;
-			$_->Layout foreach @notebook;
+		if (Padre::Constant::WXWIN32) {
+			if ( Wx::wxVERSION() >= 2.008012 and $self->{owner} ) {
+				my @notebook = grep { $_->isa('Wx::AuiNotebook') } $self->{owner}->GetChildren;
+				$_->Layout foreach @notebook;
+			}
 		}
 	}
 	return;
@@ -212,16 +213,16 @@ sub busy_decrement {
 
 sub method_increment {
 	$_[0]->{method_depth}++;
-	$_[0]->{method_pending}->{ $_[1] }++;
+	$_[0]->{method_pending}->{ $_[1] }++ if $_[1];
 	return;
 }
 
 sub method_decrement {
 	my $self = shift;
-	$self->{method_pending}->{ $_[0] }--;
+
 	unless ( --$self->{method_depth} ) {
 
-		# Once we start the shutdown process, don't run anything
+		# Once we start the shutdown process, don't refresh anything
 		return if $self->{shutdown};
 
 		# Optimise the refresh methods
@@ -245,6 +246,7 @@ sub method_decrement {
 		}
 		$self->{method_pending} = {};
 	}
+
 	return;
 }
 

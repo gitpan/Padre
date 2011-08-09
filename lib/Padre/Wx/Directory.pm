@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use Params::Util                   ();
 use Padre::Current                 ();
+use Padre::Util                    ();
 use Padre::Role::Task              ();
 use Padre::Wx::Role::Dwell         ();
 use Padre::Wx::Role::View          ();
@@ -13,7 +14,7 @@ use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
 use Padre::Logger;
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Dwell
@@ -74,10 +75,11 @@ sub new {
 		Wx::wxTE_PROCESS_ENTER
 	);
 
+	# Set the descriptive text for the search button.
 	# This line is causing an error on Ubuntu due to some Wx problems.
 	# see https://bugs.launchpad.net/ubuntu/+source/padre/+bug/485012
 	# Supporting Ubuntu seems to be more important than having this text:
-	if ( Padre::Constant::DISTRO ne 'UBUNTU' ) {
+	if ( Padre::Util::DISTRO() ne 'UBUNTU' ) {
 		$search->SetDescriptiveText( Wx::gettext('Search') );
 	}
 
@@ -104,18 +106,7 @@ sub new {
 	);
 
 	# Create the search control menu
-	my $menu = Wx::Menu->new;
-	Wx::Event::EVT_MENU(
-		$self,
-		$menu->Append(
-			-1,
-			Wx::gettext('Move to other panel')
-		),
-		sub {
-			shift->move;
-		}
-	);
-	$search->SetMenu($menu);
+	$search->SetMenu( $self->new_menu );
 
 	# Create the tree control
 	$self->{tree} = Padre::Wx::Directory::TreeCtrl->new($self);
@@ -146,6 +137,38 @@ sub new {
 	return $self;
 }
 
+# We need to create the menu whenever our locale changes
+sub new_menu {
+	my $self = shift;
+	my $menu = Wx::Menu->new;
+
+	Wx::Event::EVT_MENU(
+		$self,
+		$menu->Append(
+			-1,
+			Wx::gettext('Refresh'),
+		),
+		sub {
+			$_[0]->rebrowse;
+		},
+	);
+
+	$menu->AppendSeparator;
+
+	Wx::Event::EVT_MENU(
+		$self,
+		$menu->Append(
+			-1,
+			Wx::gettext('Move to other panel'),
+		),
+		sub {
+			$_[0]->move;
+		},
+	);
+
+	return $menu;
+}
+
 
 
 
@@ -157,17 +180,13 @@ sub task_request {
 	my $self    = shift;
 	my $current = $self->current;
 	my $project = $current->project;
-	if ($project) {
-		return $self->SUPER::task_request(
-			@_,
-			project => $project,
-		);
-	} else {
-		return $self->SUPER::task_request(
-			@_,
-			root => $current->config->main_directory_root,
-		);
+	unless ( defined $project ) {
+		$project = $current->ide->project_manager->project( $current->config->main_directory_root );
 	}
+	return $self->SUPER::task_request(
+		@_,
+		project => $project,
+	);
 }
 
 
@@ -373,13 +392,21 @@ sub refresh {
 	TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
 	my $current = Padre::Current::_CURRENT(@_);
+	my $manager = $current->ide->project_manager;
 
 	# NOTE: Without a file open, Padre does not consider itself to
 	# have a "current project". We should probably try to find a way
 	# to correct this in future.
+	# NOTE: There's a semi-working hacky fix just for the directory
+	# browser here now, but really it needs to be integrated more deeply.
 	my $config  = $current->config;
 	my $project = $current->project;
 	my $root    = $project ? $project->root : $config->main_directory_root;
+	if ( $root and not $project ) {
+		if ( $manager->project_exists($root) ) {
+			$project = $manager->project($root);
+		}
+	}
 	my @options = (
 		order => $config->main_directory_order,
 	);
@@ -422,7 +449,7 @@ sub refresh {
 
 		# Do we have an (out of date) cached state we can use?
 		# If so, display it immediately and update it later on.
-		if ($project) {
+		if ( defined $project ) {
 			require Padre::Cache;
 			my $stash = Padre::Cache->stash(
 				__PACKAGE__ => $project,
@@ -444,6 +471,21 @@ sub refresh {
 			$self->browse;
 		}
 	}
+
+	return 1;
+}
+
+sub relocale {
+	my $self   = shift;
+	my $search = $self->{search};
+
+	# Reset the descriptive text
+	if ( Padre::Util::DISTRO() ne 'UBUNTU' ) {
+		$search->SetDescriptiveText( Wx::gettext('Search') );
+	}
+
+	# Rebuild the menu
+	$search->SetMenu( $self->new_menu );
 
 	return 1;
 }

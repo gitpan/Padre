@@ -5,12 +5,14 @@ use strict;
 use warnings;
 use File::Path                 ();
 use File::Spec                 ();
+use File::Basename             ();
+use Padre::Util                ('_T');
 use Padre::Constant            ();
 use Padre::Wx::TreeCtrl        ();
 use Padre::Wx::Role::Main      ();
 use Padre::Wx::Directory::Path ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Padre::Wx::TreeCtrl
@@ -89,6 +91,9 @@ sub new {
 }
 
 
+
+
+
 ######################################################################
 # Event Handlers
 
@@ -100,7 +105,7 @@ sub on_tree_item_activated {
 	my $data   = $self->GetPlData($item);
 	my $parent = $self->GetParent;
 
-	# If a folder, toggle the expand/collanse state
+	# If a folder, toggle the expand/collapse state
 	if ( $data->type == 1 ) {
 		$self->Toggle($item);
 		return;
@@ -118,9 +123,8 @@ sub on_tree_item_activated {
 sub key_up {
 	my $self  = shift;
 	my $event = shift;
-
-	my $mod = $event->GetModifiers || 0;
-	my $code = $event->GetKeyCode;
+	my $mod   = $event->GetModifiers || 0;
+	my $code  = $event->GetKeyCode;
 
 	# see Padre::Wx::Main::key_up
 	$mod = $mod & ( Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() );
@@ -128,58 +132,90 @@ sub key_up {
 	my $current = $self->current;
 	my $main    = $current->main;
 	my $project = $current->project;
-
 	my $item_id = $self->GetSelection;
-	my $data    = $self->GetPlData($item_id);
-
-	return if not $data;
-
-	my $file = File::Spec->catfile( $project->root, $data->path );
+	my $data    = $self->GetPlData($item_id) or return;
+	my $file    = File::Spec->catfile( $project->root, $data->path );
 
 	if ( $code == Wx::WXK_DELETE ) {
-		$self->_delete_file($file);
+		$self->delete_file($file);
 	}
 
 	$event->Skip;
 	return;
-
 }
 
-sub _create_directory {
+sub rename_file {
 	my $self = shift;
-	my $file = shift;
-
 	my $main = $self->main;
-	my $dir_name =
-		$main->prompt( 'Please type in the name of the new directory', 'Create Directory', 'CREATE_DIRECTORY' );
-	return if ( !defined($dir_name) || $dir_name =~ /^\s*$/ );
+	my $file = shift;
+	my $old  = File::Basename::basename($file);
+	my $new =
+		-d $file
+		? $main->simple_prompt(
+		Wx::gettext('Please type in the new name of the directory'),
+		Wx::gettext('Rename directory'), $old
+		)
+		: $main->simple_prompt(
+		Wx::gettext('Please type in the new name of the file'),
+		Wx::gettext('Rename file'), $old
+		);
+	return if ( !defined($new) || $new =~ /^\s*$/ );
 
-	require File::Spec;
-	require File::Basename;
 	my $path = File::Basename::dirname($file);
-	if ( mkdir File::Spec->catdir( $path, $dir_name ) ) {
-		$self->GetParent->browse;
+	if ( rename $file, File::Spec->catdir( $path, $new ) ) {
+		$self->GetParent->rebrowse;
 	} else {
-		$main->error( sprintf( Wx::gettext(q(Could not create: '%s': %s)), $path, $! ) );
+		$main->error( sprintf( Wx::gettext(q(Could not rename: '%s' to '%s': %s)), $file, $path, $! ) );
 	}
 	return;
 }
 
-sub _delete_file {
+sub create_directory {
+	my $self = shift;
+	my $path = shift;
+	my $main = $self->main;
+	my $name = $main->prompt(
+		'Please type in the name of the new directory',
+		'Create Directory',
+		'CREATE_DIRECTORY',
+	);
+	return if ( !defined($name) || $name =~ /^\s*$/ );
+
+	unless ( mkdir File::Spec->catdir( $path, $name ) ) {
+		$main->error(
+			sprintf(
+				Wx::gettext(q(Could not create: '%s': %s)),
+				$path,
+				$!,
+			)
+		);
+		return;
+	}
+
+	#
+	$self->GetParent->rebrowse;
+
+	return;
+}
+
+sub delete_file {
 	my $self = shift;
 	my $file = shift;
-
 	my $main = $self->main;
+	my $yes  = $main->yes_no( sprintf( Wx::gettext('Really delete the file "%s"?'), $file ) );
+	return unless $yes;
 
-	return if not $main->yes_no( sprintf( Wx::gettext('Really delete the file "%s"?'), $file ) );
+	# The background task Padre::Task::File already exists specifically
+	# for this kind of thing. Upgrade to use this in future.
+	my $error;
+	File::Path::remove_tree( $file, { error => \$error } );
 
-	my $error_ref;
-	File::Path::remove_tree( $file, { error => \$error_ref } );
+	if ( scalar @$error == 0 ) {
 
-	if ( scalar @$error_ref == 0 ) {
-		$self->GetParent->browse;
+		# This might be overkill a bit, but it works
+		$self->GetParent->rebrowse;
 	} else {
-		$main->error( sprintf Wx::gettext(q(Could not delete: '%s': %s)), $file, ( join ' ', @$error_ref ) );
+		$main->error( sprintf Wx::gettext(q(Could not delete: '%s': %s)), $file, ( join ' ', @$error ) );
 	}
 }
 
@@ -190,67 +226,124 @@ sub on_tree_item_menu {
 	my $self  = shift;
 	my $event = shift;
 	my $item  = $event->GetItem;
-	my $data  = $self->GetPlData($item);
+	my $data  = $self->GetPlData($item) or return;
 
-	# Only show the context menu for files (for now)
-	if ( $data->type == Padre::Wx::Directory::Path::DIRECTORY ) {
-		return;
-	}
-
-	# Generate the context menu for this file
+	# Generate the context menu for this file or directory
 	my $menu = Wx::Menu->new;
 	my $file = File::Spec->catfile(
 		$self->GetParent->root,
 		$data->path,
 	);
 
-	# The default action is the same as when it is double-clicked
-	Wx::Event::EVT_MENU(
-		$self,
-		$menu->Append( -1, Wx::gettext('Open File') ),
-		sub {
-			shift->on_tree_item_activated($event);
-		}
-	);
+	if ( $data->type == Padre::Wx::Directory::Path::DIRECTORY ) {
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Open in File Browser') ),
+			),
+			sub {
+				shift->main->on_open_in_file_browser($file);
+			}
+		);
 
-	Wx::Event::EVT_MENU(
-		$self,
-		$menu->Append( -1, Wx::gettext('Open in File Browser') ),
-		sub {
-			shift->main->on_open_in_file_browser($file);
-		}
-	);
+		$menu->AppendSeparator;
 
-	Wx::Event::EVT_MENU(
-		$self,
-		$menu->Append( -1, Wx::gettext('Delete File') ),
-		sub {
-			my $self = shift;
-			$self->_delete_file($file);
-		}
-	);
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Delete Directory') ),
+			),
+			sub {
+				shift->delete_file($file);
+			}
+		);
 
-	$menu->AppendSeparator;
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Rename Directory') ),
+			),
+			sub {
+				shift->rename_file($file);
+			}
+		);
 
-	Wx::Event::EVT_MENU(
-		$self,
-		$menu->Append( -1, Wx::gettext('Create Directory') ),
-		sub {
-			my $self = shift;
-			$self->_create_directory($file);
-		}
-	);
+		$menu->AppendSeparator;
 
-	$menu->AppendSeparator;
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Create Directory') ),
+			),
+			sub {
+				shift->create_directory($file);
+			}
+		);
 
-	# Updates the directory listing
-	Wx::Event::EVT_MENU(
-		$self,
-		$menu->Append( -1, Wx::gettext('Refresh') ),
-		sub {
-			shift->GetParent->rebrowse;
-		}
-	);
+	} else {
+
+		# The default action is the same as when it is double-clicked
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append( -1, Wx::gettext('Open File') ),
+			sub {
+				shift->on_tree_item_activated($event);
+			}
+		);
+
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Open in File Browser') ),
+			),
+			sub {
+				shift->main->on_open_in_file_browser($file);
+			}
+		);
+
+		$menu->AppendSeparator;
+
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Delete File') ),
+			),
+			sub {
+				shift->delete_file($file);
+			}
+		);
+
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Rename File') ),
+			),
+			sub {
+				shift->rename_file($file);
+			}
+		);
+
+		$menu->AppendSeparator;
+
+		Wx::Event::EVT_MENU(
+			$self,
+			$menu->Append(
+				-1,
+				$self->getlabel( _T('Create Directory') ),
+			),
+			sub {
+				my $dir = File::Basename::dirname($file);
+				shift->create_directory($dir);
+			}
+		);
+	}
 
 	# Pops up the context menu
 	$self->PopupMenu(
@@ -261,6 +354,36 @@ sub on_tree_item_menu {
 
 	return;
 }
+
+
+
+
+
+######################################################################
+# Localisation
+
+my %WIN32 = (
+	'Open in File Browser' => _T('Explore...'),
+	'Delete Directory'     => _T('Delete'),
+	'Rename Directory'     => _T('Rename'),
+	'Delete File'          => _T('Delete'),
+	'Rename File'          => _T('Rename'),
+	'Create Directory'     => _T('New Folder'),
+);
+
+# Improved gettext for the directory tree, which not only applies localisation
+# for languages, but also maps to operating system terms for the appropriate
+# actions.
+sub getlabel {
+	my $self  = shift;
+	my $label = shift;
+	if ( Padre::Constant::WIN32 and $WIN32{$label} ) {
+		$label = $WIN32{$label};
+	}
+	return Wx::gettext($label);
+}
+
+
 
 
 

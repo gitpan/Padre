@@ -8,8 +8,9 @@ use warnings;
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
+use Padre::Feature  ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -20,8 +21,9 @@ our @ISA     = 'Padre::Wx::Menu';
 # Padre::Wx::Menu Methods
 
 sub new {
-	my $class = shift;
-	my $main  = shift;
+	my $class  = shift;
+	my $main   = shift;
+	my $config = $main->config;
 
 	# Create the empty menu as normal
 	my $self = $class->SUPER::new(@_);
@@ -31,17 +33,14 @@ sub new {
 
 	# Search
 	$self->{find} = $self->add_menu_action(
-		$self,
 		'search.find',
 	);
 
 	$self->{find_next} = $self->add_menu_action(
-		$self,
 		'search.find_next',
 	);
 
 	$self->{find_previous} = $self->add_menu_action(
-		$self,
 		'search.find_previous',
 	);
 
@@ -49,7 +48,6 @@ sub new {
 
 	# Search and Replace
 	$self->{replace} = $self->add_menu_action(
-		$self,
 		'search.replace',
 	);
 
@@ -57,24 +55,44 @@ sub new {
 
 	# Recursive Search
 	$self->add_menu_action(
-		$self,
 		'search.find_in_files',
 	);
 
-	$self->add_menu_action(
-		$self,
-		'search.replace_in_files',
+	# Recursive Replace
+	if ( Padre::Feature::REPLACEINFILES ) {
+		$self->add_menu_action(
+			'search.replace_in_files',
+		);
+	}
+
+	# Special Search
+
+	$self->AppendSeparator;
+
+	$self->{goto} = $self->add_menu_action(
+		'search.goto',
 	);
+
+	# Bookmark Support
+	if ( Padre::Feature::BOOKMARK ) {
+		$self->AppendSeparator;
+
+		$self->{bookmark_set} = $self->add_menu_action(
+			'search.bookmark_set',
+		);
+
+		$self->{bookmark_goto} = $self->add_menu_action(
+			'search.bookmark_goto',
+		);
+	}
 
 	$self->AppendSeparator;
 
 	$self->add_menu_action(
-		$self,
 		'search.open_resource',
 	);
 
 	$self->add_menu_action(
-		$self,
 		'search.quick_menu_access',
 	);
 
@@ -86,13 +104,20 @@ sub title {
 }
 
 sub refresh {
-	my $self = shift;
-	my $doc = Padre::Current->editor ? 1 : 0;
+	my $self    = shift;
+	my $current = Padre::Current::_CURRENT(@_);
+	my $editor  = $current->editor ? 1 : 0;
 
-	$self->{find}->Enable($doc);
-	$self->{find_next}->Enable($doc);
-	$self->{find_previous}->Enable($doc);
-	$self->{replace}->Enable($doc);
+	$self->{find}->Enable($editor);
+	$self->{find_next}->Enable($editor);
+	$self->{find_previous}->Enable($editor);
+	$self->{replace}->Enable($editor);
+	$self->{goto}->Enable($editor);
+
+	# Bookmarks can only be placed on files on disk
+	if ( Padre::Feature::BOOKMARK ) {
+		$self->{bookmark_set}->Enable( ( $editor and defined $current->filename ) ? 1 : 0 );
+	}
 
 	return;
 }

@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -117,7 +117,7 @@ sub task_finish {
 		Wx::TreeItemData->new('')
 	);
 
-	# Add the packge trees
+	# Add the package trees
 	foreach my $pkg (@$data) {
 		my $branch = $self->AppendItem(
 			$root,

@@ -6,16 +6,9 @@ use warnings;
 use Padre::Search        ();
 use Padre::Wx::FBP::Find ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Wx::FBP::Find
-};
-
-use constant CONFIG => qw{
-	find_case
-	find_regex
-	find_first
-	find_reverse
 };
 
 
@@ -52,7 +45,6 @@ sub new {
 sub find_next_clicked {
 	my $self   = shift;
 	my $main   = $self->main;
-	my $config = $self->save;
 
 	# Generate the search object
 	my $search = $self->as_search;
@@ -93,9 +85,8 @@ sub find_next_clicked {
 sub key_up {
 	my $self  = shift;
 	my $event = shift;
-
-	my $mod = $event->GetModifiers || 0;
-	my $code = $event->GetKeyCode;
+	my $mod   = $event->GetModifiers || 0;
+	my $code  = $event->GetKeyCode;
 
 	# A fixed key binding isn't good at all.
 	# TODO: Change this to the action's keybinding
@@ -118,6 +109,10 @@ sub key_up {
 	return;
 }
 
+
+
+
+
 ######################################################################
 # Main Methods
 
@@ -134,23 +129,14 @@ sub run {
 	$text = '' if $text =~ /\n/;
 
 	# Clear out and reset the search term box
-	$self->find_term->refresh;
-	$self->find_term->SetValue($text) if length $text;
+	$self->find_term->refresh($text);
 	$self->find_term->SetFocus;
-
-	# Load search preferences
-	foreach my $name (CONFIG) {
-		$self->$name()->SetValue( $config->$name() );
-	}
 
 	# Refresh
 	$self->refresh;
 
 	# Show the dialog
 	my $result = $self->ShowModal;
-
-	# Save any changed preferences
-	$self->save;
 
 	if ( $result == Wx::wxID_CANCEL ) {
 
@@ -171,25 +157,6 @@ sub refresh {
 	my $enable = $self->find_term->GetValue ne '';
 	$self->find_next->Enable($enable);
 	$self->find_all->Enable($enable);
-}
-
-# Save the dialog settings to configuration.
-# Returns the config object as a convenience.
-sub save {
-	my $self    = shift;
-	my $config  = $self->current->config;
-	my $changed = 0;
-
-	foreach my $name (CONFIG) {
-		my $value = $self->$name()->GetValue;
-		next if $config->$name() == $value;
-		$config->set( $name => $value );
-		$changed = 1;
-	}
-
-	$config->write if $changed;
-
-	return $config;
 }
 
 # Generate a search object for the current dialog state

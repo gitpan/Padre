@@ -3,8 +3,9 @@ package Padre::Lock;
 use 5.008;
 use strict;
 use warnings;
+use Carp ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 sub new {
 	my $class  = shift;
@@ -13,37 +14,62 @@ sub new {
 
 	# Enable the locks
 	my $db     = 0;
+	my $config = 0;
 	my $busy   = 0;
 	my $update = 0;
 	foreach (@_) {
-		if ( $_ eq 'BUSY' ) {
-			$locker->busy_increment;
+		if ( $_ ne uc $_ ) {
+			$locker->method_increment($_);
+			push @$self, 'method_decrement';
+
+		} elsif ( $_ eq 'BUSY' ) {
+			$locker->busy_increment unless $busy;
 			$busy = 1;
 
+		} elsif ( $_ eq 'CONFIG' ) {
+
+			# Have CONFIG take an implicit DB lock as well so
+			# that any writes for DB locks opened while the CONFIG
+			# lock is open are aggregated into a single commit with
+			# DB writes from a config unlock.
+			$locker->config_increment unless $config;
+			$locker->db_increment     unless $db;
+			$config = 1;
+			$db     = 1;
+
 		} elsif ( $_ eq 'DB' ) {
-			$locker->db_increment;
+			$locker->db_increment unless $db;
 			$db = 1;
 
+		} elsif ( $_ eq 'REFRESH' ) {
+			$locker->method_increment;
+			push @$self, 'method_decrement';
+
 		} elsif ( $_ eq 'UPDATE' ) {
-			$locker->update_increment;
+			$locker->update_increment unless $update;
 			$update = 1;
 
 		} else {
-			$locker->method_increment($_);
-			push @$self, $_;
+			Carp::croak("Unknown or unsupported special lock '$_'");
 		}
 	}
 
-	# We always want to unlock commit/busy/update last.
-	# NOTE: Putting DB last means that actions involving a database commit
-	#       will APPEAR to happen faster. However, this could be somewhat
-	#       disconverting to long commits, because there will be user input
-	#       lag immediately after it appears to be "complete". If this
-	#       becomes a problem, move the DB to first so actions appear to be
-	#       slower, but the UI is immediately available once updated.
-	push @$self, 'BUSY'   if $busy;
-	push @$self, 'UPDATE' if $update;
-	push @$self, 'DB'     if $db;
+	# Regardless of which order we were given the locks, the unlocking
+	# definitely has to be done in a specific order.
+	#
+	# Putting DB last means that actions involving a database commit
+	# will APPEAR to happen faster. However, this could be somewhat
+	# disconcerting for long commits, because there will be user input
+	# lag immediately after it appears to be "complete". If this
+	# becomes a problem, move the DB to first so actions appear to be
+	# slower, but the UI is immediately available once updated.
+	#
+	# Because configuration involves a database write, we always do it
+	# before we release the database lock.
+	push @$self, 'busy_decrement'   if $busy;
+	push @$self, 'update_decrement' if $update;
+	push @$self, 'db_decrement'     if $db;
+	push @$self, 'config_decrement' if $config;
 
 	return $self;
 }
@@ -52,15 +78,11 @@ sub new {
 sub DESTROY {
 	my $locker = shift @{ $_[0] } or return;
 	foreach ( @{ $_[0] } ) {
-		if ( $_ eq 'UPDATE' ) {
-			$locker->update_decrement if $locker->can('update_decrement');
-		} elsif ( $_ eq 'DB' ) {
-			$locker->db_decrement if $locker->can('db_decrement');
-		} elsif ( $_ eq 'BUSY' ) {
-			$locker->busy_decrement if $locker->can('busy_decrement');
-		} else {
-			$locker->method_decrement($_) if $locker->can('method_decrement');
-		}
+
+		# NOTE: DO NOT CONVERT TO A GREP.
+		#       Depending on what happens in the method call, this
+		#       destroy handler may need to behave reentrantly.
+		$locker->$_() if $locker->can($_);
 	}
 }
 

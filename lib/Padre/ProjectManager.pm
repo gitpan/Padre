@@ -10,7 +10,7 @@ use File::Spec     ();
 use Scalar::Util   ();
 use Padre::Project ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 
 
@@ -33,7 +33,7 @@ sub project {
 	my $root = shift;
 
 	# Is this root an existing project?
-	if ( $self->{$root} ) {
+	if ( defined $self->{$root} ) {
 		return $self->{$root};
 	}
 

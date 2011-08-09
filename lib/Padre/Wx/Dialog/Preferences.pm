@@ -10,7 +10,7 @@ use Padre::Wx::Role::Config     ();
 use Padre::Wx::FBP::Preferences ();
 use Padre::Logger;
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Wx::Role::Config
 	Padre::Wx::FBP::Preferences
@@ -30,13 +30,19 @@ sub run {
 	my $main  = shift;
 	my $self  = $class->new($main);
 
+	# Always show the first tab regardless of which one
+	# was selected in wxFormBuilder.
+	$self->treebook->ChangeSelection(0);
+
 	# Load preferences from configuration
 	my $config = $main->config;
 	$self->config_load($config);
 
-	# Show the dialog
-	$self->Fit;
+	# Refresh the sizing, layout and position after the config load
+	$self->GetSizer->SetSizeHints($self);
 	$self->CentreOnParent;
+
+	# Show the dialog
 	if ( $self->ShowModal == Wx::wxID_CANCEL ) {
 		return;
 	}
@@ -61,13 +67,11 @@ sub new {
 	my $self = shift->SUPER::new(@_);
 
 	# Set the content of the editor preview
-	$self->preview->{Document} = Padre::Document->new(
-		mimetype => 'application/x-perl',
-	);
+	$self->preview->{Document} = Padre::Document->new( mimetype => 'application/x-perl', );
 	$self->preview->{Document}->set_editor( $self->preview );
 	$self->preview->SetText(
-		join '', map {"$_\n"}
-			"#!/usr/bin/perl",
+		join '',
+		map {"$_\n"} "#!/usr/bin/perl",
 		"",
 		"use strict;",
 		"",
@@ -218,6 +222,8 @@ sub advanced {
 	my $self = shift;
 
 	# Cancel the preferences dialog since it is not needed
+	# but save it first
+	$self->config_save( $self->main->config );
 	$self->cancel;
 
 	# Show the advanced settings dialog instead
@@ -303,4 +309,3 @@ sub choice {
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
-

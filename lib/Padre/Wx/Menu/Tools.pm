@@ -8,11 +8,12 @@ use warnings;
 use Params::Util    ();
 use Padre::Constant ();
 use Padre::Config   ();
+use Padre::Feature  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -34,29 +35,27 @@ sub new {
 
 	# User Preferences
 	$self->add_menu_action(
-		$self,
 		'tools.preferences',
 	);
 
-	# TODO Remove comments after 0.69 release
-	#	$self->add_menu_action(
-	#		$self,
-	#		'tools.sync',
-	#	);
+	# Config Sync
+	if ( Padre::Feature::SYNC ) {
+		$self->add_menu_action(
+			'tools.sync',
+		);
+	}
 
 	# Key bindings
 	$self->add_menu_action(
-		$self,
 		'tools.keys',
 	);
 
+	$self->AppendSeparator;
+
 	# Regex Editor
 	$self->add_menu_action(
-		$self,
 		'tools.regex',
 	);
-
-	$self->AppendSeparator;
 
 	# Create the module tools submenu
 	my $modules = Wx::Menu->new;
@@ -92,7 +91,6 @@ sub new {
 
 	# Link to the Plugin Manager
 	$self->add_menu_action(
-		$self,
 		'plugins.plugin_manager',
 	);
 
@@ -170,7 +168,7 @@ sub add {
 			$need = 0;
 		}
 
-		push @$entries, $self->Append( -1, @menu );
+		push @$entries, $self->Append(@menu);
 		if ( $module eq 'Padre::Plugin::My' ) {
 			$need = 1;
 		}

@@ -3,26 +3,19 @@ package Padre::TaskThread;
 # Cleanly encapsulated object for a thread that does work based
 # on packaged method calls passed via a shared queue.
 
-# NOTE: The TRACE() calls in this class should be commented out unless
-# actively debugging, so that the Padre::Logger class will only be
-# loaded AFTER the threads spawn.
-
 use 5.008005;
 use strict;
 use warnings;
 use Scalar::Util     ();
 use Padre::TaskQueue ();
 
-# use Padre::Logger;
-use constant DEBUG => 0;
+# NOTE: The TRACE() calls in this class should be commented out unless
+# actively debugging, so that the Padre::Logger class will only be
+# loaded AFTER the threads spawn.
+use Padre::Logger;
+# use constant DEBUG => 0;
 
-# NOTE: Don't use Padre::Wx here, by only loading the Wx core
-# we can have less of Wx loaded when we spawn the master thread.
-# Given that background threads shouldn't be using Wx anyway,
-# loaded less code now cuts the per-thread cost of several meg.
-use Wx ();
-
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 # Worker id sequence, so identifiers will be available in objects
 # across all instances and threads before the thread has been spawned.
@@ -165,7 +158,9 @@ sub send {
 	}
 
 	# Add the message to the queue
+	TRACE("Calling enqueue '$method'") if DEBUG;
 	$self->{queue}->enqueue( [ $method, @_ ] );
+	TRACE("Completed enqueue '$method'") if DEBUG;
 
 	return 1;
 }
@@ -199,12 +194,8 @@ sub run {
 	# Loop over inbound requests
 	TRACE("Entering worker run-time loop") if DEBUG;
 	while (1) {
-		TRACE("Attempting to dequeue1") if DEBUG;
 		my $message = $queue->dequeue1;
-		TRACE("Completed the dequeue1") if DEBUG;
-
 		unless ( ref $message eq 'ARRAY' and @$message ) {
-
 			# warn("Message is not an ARRAY reference");
 			next;
 		}

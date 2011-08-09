@@ -8,7 +8,7 @@ use File::Spec       ();
 use File::Spec::Unix ();
 use File::Temp       ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 sub new {
 	my $class = shift;
@@ -45,7 +45,7 @@ sub run {
 
 		# Write the file content
 		open( my $fh, '>', $file ) or die "open($file): $!";
-		binmode( $fh, ':utf8' );
+		binmode( $fh, ':encoding(UTF-8)' );
 		$fh->print( $files->{$unix} );
 		close($fh) or die "close($file): $!";
 	}

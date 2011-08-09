@@ -25,7 +25,7 @@ use Padre::Util    ('_T');
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 # Binary file extensions, which we don't support loading at all
 my %EXT_BINARY = ();
@@ -44,9 +44,8 @@ my %HIGHLIGHTER_CONFIG = ();
 #       of objects now.
 my %MIME = ();
 
-
-
-
+# Default document classes
+my %DEFAULT_DOC_CLASS = ();
 
 #####################################################################
 # Document Registration
@@ -72,6 +71,7 @@ sub _initialize {
 		bib   => 'application/x-bibtex',
 		bml   => 'application/x-bml',     # dreamwidth file format
 		c     => 'text/x-c',
+		h     => 'text/x-c',
 		cc    => 'text/x-c++src',
 		cpp   => 'text/x-c++src',
 		cxx   => 'text/x-c++src',
@@ -109,7 +109,7 @@ sub _initialize {
 		plx   => \&perl_mime_type,
 		pm    => \&perl_mime_type,
 		pmc   => \&perl_mime_type,        # Compiled Perl Module or gimme5's output
-		pod   => \&perl_mime_type,
+		pod   => \&pod_mime_type,
 		psgi  => 'application/x-psgi',
 		sty   => 'application/x-latex',
 		t     => \&perl_mime_type,
@@ -139,28 +139,74 @@ sub _initialize {
 		pm6 => 'application/x-perl6',
 	);
 
+	%DEFAULT_DOC_CLASS = (
+
+		#	'text/x-abc'                => ## \
+		'text/x-adasrc' => 'DoubleDashComment',
+		'text/x-asm'    => 'HashComment',
+
+		#	'text/x-bat'                => ## REM
+		'application/x-bibtex' => 'PercentComment',
+		'text/x-c'             => 'DoubleSlashComment',
+		'text/x-c++src'        => 'DoubleSlashComment',
+
+		#	'text/css'                  => ## /* ... */
+		'text/x-eiffel' => 'DoubleDashComment',
+
+		#	'text/x-forth'              => ## \
+		#	'text/x-fortran'            => ## !
+		#	'text/html'                 => ## <!-- ... -->
+		'application/javascript' => 'DoubleSlashComment',
+		'application/x-latex'    => 'PercentComment',
+
+		#	'application/x-lisp'        => ## ;
+		'application/x-shellscript' => 'HashComment',
+		'text/x-java-source'        => 'DoubleSlashComment',
+		'text/x-lua'                => 'DoubleDashComment',
+		'text/x-makefile'           => 'HashComment',
+		'text/x-matlab'             => 'PercentComment',
+
+		#	'text/x-pascal'             => ## { ... }
+		'application/x-perl' => 'Perl',
+
+		#	'application/x-psgi'        => ## Perl or HashComment or something else?
+		'text/x-python' => 'HashComment',
+
+		'application/x-php'  => 'HashComment',
+		'application/x-ruby' => 'HashComment',
+
+		'text/x-sql' => 'DoubleDashComment',
+
+		#	'text/vbscript'             => ## '
+		'text/x-config' => 'HashComment',
+
+		#	'text/xml'                  => ## <!-- ... -->
+		'text/x-yaml'         => 'HashComment',
+		'application/x-perl6' => 'HashComment',
+
+		#       'text/x-perlxs'             => ## ' #'
+		#	'text/x-perltt'             => ## <!-- ... -->
+		'text/x-csharp' => 'DoubleSlashComment',
+
+		'text/x-pod' => 'POD',
+	);
+
 	%HIGHLIGHTER_CONFIG = (
 		'application/x-perl' => 'lang_perl5_lexer',
 	);
 
 	# This is the mime-type to Scintilla lexer mapping.
-	# Lines marked with CONFIRMED indicate that the mime-typehas been checked
-	# to confirm that the MIME type is either the official type, or the primary
+	# Lines marked with CONFIRMED indicate that the mime-type has been checked
+	# that the MIME type is either the official type, or the primary
 	# one in use by the relevant language community.
 
 	# name  => Human readable name
 	# lexer => The Scintilla lexer to be used
-	# class => document class
 
 	# Padre can use Wx::Scintilla's built-in Perl 6 lexer
-	my $perl6_scintilla_lexer = Wx::wxSTC_LEX_NULL;
-	if ( Padre::Wx::Editor->isa('Wx::ScintillaTextCtrl') ) {
-		eval "use Wx::Scintilla";
-		unless ($@) {
-			no warnings;
-			$perl6_scintilla_lexer = $Wx::Scintilla::wxSCINTILLA_LEX_PERL6;
-		}
-	}
+	my $perl6_scintilla_lexer =
+		Padre::Config::wx_scintilla_ready() ? Wx::Scintilla::wxSCINTILLA_LEX_PERL6() : Wx::wxSTC_LEX_NULL;
+
 	%MIME = (
 		'text/x-abc' => {
 			name  => 'ABC',
@@ -262,7 +308,7 @@ sub _initialize {
 
 		'text/x-java-source' => {
 			name  => 'Java',
-			lexer => Wx::wxSTC_LEX_NULL,
+			lexer => Wx::wxSTC_LEX_CPP,
 		},
 
 		'text/x-lua' => {
@@ -288,7 +334,6 @@ sub _initialize {
 		'application/x-perl' => {
 			name  => 'Perl 5',
 			lexer => Wx::wxSTC_LEX_PERL,     # CONFIRMED
-			class => 'Padre::Document::Perl',
 		},
 
 		'application/x-psgi' => {
@@ -298,77 +343,78 @@ sub _initialize {
 
 		'text/x-python' => {
 			name  => 'Python',
-			lexer => Wx::wxSTC_LEX_PYTHON,   # CONFIRMED
+			lexer => Wx::wxSTC_LEX_PYTHON,          # CONFIRMED
+			class => 'Padre::Document::HashComment',
 		},
 
 		'application/x-php' => {
 			name  => 'PHP',
-			lexer => Wx::wxSTC_LEX_PHPSCRIPT, # CONFIRMED
+			lexer => Wx::wxSTC_LEX_PHPSCRIPT,       # CONFIRMED
 		},
 
 		'application/x-ruby' => {
 			name  => 'Ruby',
-			lexer => Wx::wxSTC_LEX_RUBY,      # CONFIRMED
+			lexer => Wx::wxSTC_LEX_RUBY,            # CONFIRMED
+			class => 'Padre::Document::HashComment',
 		},
 
 		'text/x-sql' => {
 			name  => 'SQL',
-			lexer => Wx::wxSTC_LEX_SQL,       # CONFIRMED
+			lexer => Wx::wxSTC_LEX_SQL,             # CONFIRMED
 		},
 
 		'application/x-tcl' => {
 			name  => 'Tcl',
-			lexer => Wx::wxSTC_LEX_TCL,       # CONFIRMED
+			lexer => Wx::wxSTC_LEX_TCL,             # CONFIRMED
 		},
 
 		'text/vbscript' => {
 			name  => 'VBScript',
-			lexer => Wx::wxSTC_LEX_VBSCRIPT,  # CONFIRMED
+			lexer => Wx::wxSTC_LEX_VBSCRIPT,        # CONFIRMED
 		},
 
 		'text/x-config' => {
 			name  => 'Config',
 			lexer => Wx::wxSTC_LEX_CONF,
-			class => 'Padre::Document::Config',
 		},
 
 		# text/xml specifically means "human-readable XML".
 		# This is prefered to the more generic application/xml
 		'text/xml' => {
 			name  => 'XML',
-			lexer => Wx::wxSTC_LEX_XML, # CONFIRMED
+			lexer => Wx::wxSTC_LEX_XML,             # CONFIRMED
 		},
 
 		'text/x-yaml' => {
 			name  => 'YAML',
-			lexer => Wx::wxSTC_LEX_YAML, # CONFIRMED
+			lexer => Wx::wxSTC_LEX_YAML,            # CONFIRMED
 		},
 
 		'application/x-pir' => {
 			name  => 'PIR',
-			lexer => Wx::wxSTC_LEX_NULL, # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL,            # CONFIRMED
 		},
 
 		'application/x-pasm' => {
 			name  => 'PASM',
-			lexer => Wx::wxSTC_LEX_NULL, # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL,            # CONFIRMED
 		},
 
 		'application/x-perl6' => {
 			name  => 'Perl 6',
-			lexer => $perl6_scintilla_lexer, # CONFIRMED
+			lexer => $perl6_scintilla_lexer,        # CONFIRMED
 		},
 
 		'text/plain' => {
 			name  => _T('Text'),
-			lexer => Wx::wxSTC_LEX_NULL,     # CONFIRMED
+			lexer => Wx::wxSTC_LEX_NULL,            # CONFIRMED
 		},
 
 		# Completely custom mime types
-		'text/x-perlxs' => {                 # totally not confirmed
+		'text/x-perlxs' => {                        # totally not confirmed
 			name => 'XS',
 			lexer =>
-				Wx::wxSTC_LEX_CPP,           # for the lack of a better XS lexer (vim?)
+				Wx::wxSTC_LEX_CPP,                  # for the lack of a better XS lexer (vim?)
 		},
 		'text/x-perltt' => {
 			name  => 'Template Toolkit',
@@ -377,15 +423,22 @@ sub _initialize {
 
 		'text/x-csharp' => {
 			name  => 'C#',
-			lexer => Wx::wxSTC_LEX_CPP,      # better than nothing
+			lexer => Wx::wxSTC_LEX_CPP,
 		},
-
+		'text/x-pod' => {
+			name  => 'POD',
+			lexer => Wx::wxSTC_LEX_PERL,
+		},
 	);
 
-	# TO DO:
-	# add some mime-type for pod files
-	# or remove the whole Padre::Document::POD class as it is not in use
-	#'text/x-pod'         => 'Padre::Document::POD',
+
+	foreach my $type ( keys %DEFAULT_DOC_CLASS ) {
+		if ( exists $MIME{$type} ) {
+			$MIME{$type}->{class} = 'Padre::Document::' . $DEFAULT_DOC_CLASS{$type};
+		} else {
+			warn "Unknown MIME type: $type\n";
+		}
+	}
 
 	# Array ref of objects with value and mime_type fields that have the raw values
 	__PACKAGE__->load_highlighter_config;
@@ -430,20 +483,15 @@ sub get_lexer {
 	$MIME{ $_[1] }->{lexer};
 }
 
-# TO DO: Set some reasonable default highlighers for each mime-type for when there
-# are no plugins. e.g. For Perl 6 style files that should be plain text.
-# Either allow the plugins to set the defaults (maybe allow the plugin that implements
-# the special features of this mime-type to pick the default or shall we have a list of
-# prefered default values ?
-
 sub add_mime_class {
 	my $class      = shift;
 	my $type       = shift;
 	my $mime_class = shift;
+
 	if ( not $MIME{$type} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type was not supported when %s(%s) was called"),
+				Wx::gettext('MIME type was not supported when %s(%s) was called'),
 				'add_mime_class',
 				$type
 			)
@@ -451,28 +499,17 @@ sub add_mime_class {
 		return;
 	}
 
-	if ( $MIME{$type}->{class} ) {
-		Padre::Current->main->error(
-			sprintf(
-				Wx::gettext("Mime type already had a class '%s' when %s(%s) was called"),
-				$MIME{$type}->{class},
-				'add_mime_class',
-				$type
-			)
-		);
-		return;
-	}
 	$MIME{$type}->{class} = $mime_class;
 }
 
-sub remove_mime_class {
+sub reset_mime_class {
 	my $class = shift;
 	my $type  = shift;
 
 	if ( not $MIME{$type} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type is not supported when %s(%s) was called"),
+				Wx::gettext('MIME type is not supported when %s(%s) was called'),
 				'remove_mime_class',
 				$type
 			)
@@ -483,14 +520,19 @@ sub remove_mime_class {
 	if ( not $MIME{$type}->{class} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type did not have a class entry when %s(%s) was called"),
+				Wx::gettext('MIME type did not have a class entry when %s(%s) was called'),
 				'remove_mime_class',
 				$type
 			)
 		);
 		return;
 	}
-	delete $MIME{$type}->{class};
+
+	if ( exists $DEFAULT_DOC_CLASS{$type} ) {
+		$MIME{$type}->{class} = 'Padre::Document::' . $DEFAULT_DOC_CLASS{$type};
+	} else {
+		delete $MIME{$type}->{class};
+	}
 }
 
 sub get_mime_class {
@@ -500,7 +542,7 @@ sub get_mime_class {
 	if ( not $MIME{$type} ) {
 		Padre::Current->main->error(
 			sprintf(
-				Wx::gettext("Mime type is not supported when %s(%s) was called"),
+				Wx::gettext('MIME type is not supported when %s(%s) was called'),
 				'get_mime_class',
 				$type
 			)
@@ -545,7 +587,7 @@ sub get_highlighter_name {
 	my $class       = shift;
 	my $highlighter = shift;
 
-	# TO DO this can happen if the user configureda highlighter but on the next start
+	# TO DO this can happen if the user configured highlighter but on the next start
 	# the highlighter is not available any more
 	# we need to handle this situation
 	return '' if !defined($highlighter);
@@ -757,8 +799,12 @@ sub guess_mimetype {
 			# of bits and Padre/Perl simply has the wrong point of view (UTF-8),
 			# so we drop these warnings:
 			local $SIG{__WARN__} = sub {
-				print STDERR $_[0] . ' while looking for mime type of $filename'
-					unless $_[0] =~ /Malformed UTF\-8 char/;
+				# Die if we throw a bad codepoint - this is a binary file.
+				if ( $_[0] =~ /Code point .* is not Unicode/ ) {
+					die $_[0];
+				} elsif ( $_[0] !~ /Malformed UTF\-8 char/ ) {
+					print STDERR "$_[0] while looking for mime type of $filename";
+				}
 			};
 
 			# Is this a script of some kind?
@@ -883,6 +929,12 @@ sub guess_mimetype {
 
 	# Fall back to plain text file
 	return 'text/plain';
+}
+
+# currently we only have one pod mime-type but probably we should have
+# two separate ones. One for Perl 5 and one for Perl 6
+sub pod_mime_type {
+	return 'text/x-pod';
 }
 
 sub perl_mime_type {

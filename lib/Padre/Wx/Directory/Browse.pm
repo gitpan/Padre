@@ -8,10 +8,11 @@ use strict;
 use warnings;
 use Scalar::Util               ();
 use Padre::Task                ();
+use Padre::Constant            ();
 use Padre::Wx::Directory::Path ();
 use Padre::Logger;
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = 'Padre::Task';
 
 use constant NO_WARN => 1;
@@ -55,23 +56,32 @@ sub new {
 ######################################################################
 # Padre::Task Methods
 
-# If somehow we tried to run with a non-existint root, skip
 sub prepare {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	return 0 unless defined $self->{root};
 	return 0 unless length $self->{root};
+
+	# You can't opendir a UNC path on Windows,
+	# so any attempt to run this task is pointless.
+	if (Padre::Constant::WIN32) {
+		return 0 if $self->{root} =~ /\\\\/;
+	}
+
+	# Don't run if our root path does not exist any more
 	return 0 unless -d $self->{root};
+
 	return 1;
 }
 
 sub run {
 	TRACE( $_[0] ) if DEBUG;
 	require Module::Manifest;
-	my $self  = shift;
-	my $root  = $self->{root};
-	my $list  = $self->{list};
-	my @queue = @$list;
+	my $self   = shift;
+	my $handle = $self->handle;
+	my $root   = $self->{root};
+	my $list   = $self->{list};
+	my @queue  = @$list;
 
 	# Prepare the skip rules
 	my $rule = Module::Manifest->new;
@@ -108,7 +118,6 @@ sub run {
 			next if $file =~ /^\.+\z/;
 
 			# Traverse symlinks
-			my $skip = 0;
 			my $fullname = File::Spec->catdir( $dir, $file );
 			while (1) {
 				my $target;
@@ -125,7 +134,6 @@ sub run {
 					? $target
 					: File::Spec->canonpath( File::Spec->catdir( $dir, $target ) );
 			}
-			next if $skip;
 
 			# File doesn't exist, either a directory error, symlink to nowhere or something unexpected.
 			# Don't worry, just skip, because we can't show it in the dir browser anyway
@@ -180,8 +188,9 @@ sub run {
 
 		# Step 3 - Send the completed directory back to the parent process
 		#          Don't send a response if the directory is empty.
-		if (@objects) {
-			$self->handle->message( OWNER => $request, map { $_->[0] } @objects );
+		#          Also skip if we are running in the parent and have no handle.
+		if ( $handle and @objects ) {
+			$handle->message( OWNER => $request, map { $_->[0] } @objects );
 		}
 	}
 

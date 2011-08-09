@@ -18,7 +18,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 use Padre::Constant ();
 
@@ -55,7 +55,7 @@ sub open_in_file_browser {
 		$filename =~ s/\//\\/g;
 		$error = $self->_execute( 'explorer.exe', "/select,\"$filename\"" );
 	} elsif (Padre::Constant::UNIX) {
-		my $parent_folder = File::Basename::dirname($filename);
+		my $parent_folder = -d $filename ? $filename : File::Basename::dirname($filename);
 		$error = $self->_execute_unix($parent_folder);
 	} else {
 

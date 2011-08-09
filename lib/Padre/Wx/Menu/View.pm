@@ -5,29 +5,18 @@ package Padre::Wx::Menu::View;
 use 5.008;
 use strict;
 use warnings;
-use File::Glob               ();
 use Padre::Constant          ();
 use Padre::Current           ();
+use Padre::Feature           ();
 use Padre::Config::Style     ();
 use Padre::Wx                ();
 use Padre::Wx::ActionLibrary ();
 use Padre::Wx::Menu          ();
 use Padre::Locale            ();
 
-our $VERSION = '0.86';
-our @ISA     = 'Padre::Wx::Menu';
-
-my @GUI_ELEMENTS = qw{
-	functions
-	todo
-	outline
-	directory
-	output
-	syntaxcheck
-	command_line
-	statusbar
-	toolbar
-};
+our $VERSION    = '0.88';
+our $COMPATIBLE = '0.87';
+our @ISA        = 'Padre::Wx::Menu';
 
 
 
@@ -49,33 +38,52 @@ sub new {
 
 	# Can the user move stuff around
 	$self->{lockinterface} = $self->add_menu_action(
-		$self,
 		'view.lockinterface',
 	);
 
 	$self->AppendSeparator;
 
 	# Show or hide GUI elements
-	foreach my $element (@GUI_ELEMENTS) {
-		next unless defined $element;
+	$self->{functions} = $self->add_menu_action(
+		'view.functions',
+	);
 
-		my $action = 'view.' . $element;
+	$self->{todo} = $self->add_menu_action(
+		'view.todo',
+	);
 
-		if ( ref($element) eq 'ARRAY' ) {
-			( $element, $action ) = @{$element};
-		}
+	$self->{outline} = $self->add_menu_action(
+		'view.outline',
+	);
 
-		$self->{$element} = $self->add_menu_action(
-			$self,
-			$action,
-		);
-	}
+	$self->{directory} = $self->add_menu_action(
+		'view.directory',
+	);
+
+	$self->{output} = $self->add_menu_action(
+		'view.output',
+	);
+
+	$self->{syntaxcheck} = $self->add_menu_action(
+		'view.syntaxcheck',
+	);
+
+	$self->{command_line} = $self->add_menu_action(
+		'view.command_line',
+	);
+
+	$self->{toolbar} = $self->add_menu_action(
+		'view.toolbar',
+	);
+
+	$self->{statusbar} = $self->add_menu_action(
+		'view.statusbar',
+	);
 
 	$self->AppendSeparator;
 
+	# View as (Highlighting File Type)
 	SCOPE: {
-
-		# View as (Highlighting File Type)
 		$self->{view_as_highlighting} = Wx::Menu->new;
 		$self->Append(
 			-1,
@@ -84,10 +92,7 @@ sub new {
 		);
 
 		my %mimes = Padre::MimeTypes::menu_view_mimes();
-		my @names = sort {
-			( $b eq 'text/plain' ) <=> ( $a eq 'text/plain' )
-				or Wx::gettext( $mimes{$a} ) cmp Wx::gettext( $mimes{$b} )
-		} keys %mimes;
+		my @names = $self->sort_mimes( \%mimes );
 		foreach my $name (@names) {
 			my $radio = $self->add_menu_action(
 				$self->{view_as_highlighting},
@@ -98,109 +103,85 @@ sub new {
 
 	$self->AppendSeparator;
 
-	# Editor Functionality
-	$self->{lines} = $self->add_menu_action(
-		$self,
-		'view.lines',
-	);
-
-	$self->{folding} = $self->add_menu_action(
-		$self,
-		'view.folding',
-	);
-
-	$self->{fold_all} = $self->add_menu_action(
-		$self,
-		'view.fold_all',
-	);
-
-	$self->{unfold_all} = $self->add_menu_action(
-		$self,
-		'view.unfold_all',
-	);
-
-	$self->{fold_this} = $self->add_menu_action(
-		$self,
-		'view.fold_this',
-	);
-
-	$self->{show_calltips} = $self->add_menu_action(
-		$self,
-		'view.show_calltips',
-	);
-
+	# Show or hide editor elements
 	$self->{currentline} = $self->add_menu_action(
-		$self,
 		'view.currentline',
 	);
 
+	$self->{lines} = $self->add_menu_action(
+		'view.lines',
+	);
+
+	$self->{indentation_guide} = $self->add_menu_action(
+		'view.indentation_guide',
+	);
+
+	$self->{whitespaces} = $self->add_menu_action(
+		'view.whitespaces',
+	);
+
+	$self->{calltips} = $self->add_menu_action(
+		'view.calltips',
+	);
+
+	$self->{eol} = $self->add_menu_action(
+		'view.eol',
+	);
+
 	$self->{rightmargin} = $self->add_menu_action(
-		$self,
 		'view.rightmargin',
+	);
+
+	# Code folding menu entries
+	if ( Padre::Feature::FOLDING ) {
+		$self->AppendSeparator;
+
+		$self->{folding} = $self->add_menu_action(
+			'view.folding',
+		);
+
+		$self->{fold_all} = $self->add_menu_action(
+			'view.fold_all',
+		);
+
+		$self->{unfold_all} = $self->add_menu_action(
+			'view.unfold_all',
+		);
+
+		$self->{fold_this} = $self->add_menu_action(
+			'view.fold_this',
+		);
+	}
+
+	$self->AppendSeparator;
+
+	$self->{word_wrap} = $self->add_menu_action(
+		'view.word_wrap',
 	);
 
 	$self->AppendSeparator;
 
-	# Editor Whitespace Layout
-	$self->{eol} = $self->add_menu_action(
-		$self,
-		'view.eol',
-	);
-
-	$self->{whitespaces} = $self->add_menu_action(
-		$self,
-		'view.whitespaces',
-	);
-
-	$self->{indentation_guide} = $self->add_menu_action(
-		$self,
-		'view.indentation_guide',
-	);
-
-	$self->{word_wrap} = $self->add_menu_action(
-		$self,
-		'view.word_wrap',
-	);
-
-	if ( $config->feature_bookmark ) {
-
-		$self->AppendSeparator;
-
-		# Bookmark Support
-		$self->{bookmark_set} = $self->add_menu_action(
-			$self,
-			'view.bookmark_set',
-		);
-
-		$self->{bookmark_goto} = $self->add_menu_action(
-			$self,
-			'view.bookmark_goto',
-		);
-
-		$self->AppendSeparator;
-
-	}
-
 	# Font Size
-	if ( $config->feature_fontsize ) {
-		$self->{font_size} = Wx::Menu->new;
+	if ( Padre::Feature::FONTSIZE ) {
+		$self->{fontsize} = Wx::Menu->new;
 		$self->Append(
 			-1,
-			Wx::gettext("Font Size"),
-			$self->{font_size}
+			Wx::gettext('Font Size'),
+			$self->{fontsize}
 		);
+
 		$self->{font_increase} = $self->add_menu_action(
-			$self->{font_size},
+			$self->{fontsize},
 			'view.font_increase',
 		);
 
 		$self->{font_decrease} = $self->add_menu_action(
-			$self->{font_size},
+			$self->{fontsize},
 			'view.font_decrease',
 		);
 
 		$self->{font_reset} = $self->add_menu_action(
-			$self->{font_size},
+			$self->{fontsize},
 			'view.font_reset',
 		);
 	}
@@ -247,7 +228,6 @@ sub new {
 
 	# Window Effects
 	$self->add_menu_action(
-		$self,
 		'view.full_screen',
 	);
 
@@ -268,7 +248,6 @@ sub refresh {
 	# Simple check state cases from configuration
 	$self->{statusbar}->Check( $config->main_statusbar );
 	$self->{lines}->Check( $config->editor_linenumbers );
-	$self->{folding}->Check( $config->editor_folding );
 	$self->{currentline}->Check( $config->editor_currentline );
 	$self->{rightmargin}->Check( $config->editor_right_margin_enable );
 	$self->{eol}->Check( $config->editor_eol );
@@ -280,14 +259,18 @@ sub refresh {
 	$self->{todo}->Check( $config->main_todo );
 	$self->{lockinterface}->Check( $config->main_lockinterface );
 	$self->{indentation_guide}->Check( $config->editor_indentationguides );
-	$self->{show_calltips}->Check( $config->editor_calltips );
+	$self->{calltips}->Check( $config->editor_calltips );
 	$self->{command_line}->Check( $config->main_command_line );
 	$self->{syntaxcheck}->Check( $config->main_syntaxcheck );
 	$self->{toolbar}->Check( $config->main_toolbar );
 
-	$self->{fold_all}->Enable( $self->{folding}->IsChecked );
-	$self->{unfold_all}->Enable( $self->{folding}->IsChecked );
-	$self->{fold_this}->Enable( $self->{folding}->IsChecked );
+	if ( Padre::Feature::FOLDING ) {
+		my $folding = $config->editor_folding;
+		$self->{folding}->Check($folding);
+		$self->{fold_all}->Enable($folding);
+		$self->{unfold_all}->Enable($folding);
+		$self->{fold_this}->Enable($folding);
+	}
 
 	# Check state for word wrap is document-specific
 	if ($document) {
@@ -304,10 +287,10 @@ sub refresh {
 		my $has_checked = 0;
 		if ( $document->mimetype ) {
 			my %mimes = Padre::MimeTypes::menu_view_mimes();
-			my @mimes = sort { lc($a) cmp lc($b) } keys %mimes;
+			my @mimes = $self->sort_mimes( \%mimes );
 			foreach my $pos ( 0 .. scalar @mimes - 1 ) {
 				my $radio = $self->{view_as_highlighting}->FindItemByPosition($pos);
-				if ( $document->mimetype eq $mimes{ $mimes[$pos] } ) {
+				if ( $document->mimetype eq $mimes[$pos] ) {
 					$radio->Check(1);
 					$has_checked = 1;
 				}
@@ -320,47 +303,27 @@ sub refresh {
 		}
 	}
 
-	# Disable zooming and bookmarks if there's no current document
-	$self->{font_increase}->Enable($doc) if defined $self->{font_increase};
-	$self->{font_decrease}->Enable($doc) if defined $self->{font_decrease};
-	$self->{font_reset}->Enable($doc)    if defined $self->{font_reset};
-
-	# You cannot set a bookmark unless the current document is on disk.
-	if ( defined $self->{bookmark_set} ) {
-		my $set = ( $doc and defined $document->filename ) ? 1 : 0;
-		$self->{bookmark_set}->Enable($set);
+	# Disable zooming if there's no current document
+	if ( Padre::Feature::FONTSIZE ) {
+		$self->{font_increase}->Enable($doc);
+		$self->{font_decrease}->Enable($doc);
+		$self->{font_reset}->Enable($doc);
 	}
 
 	return;
 }
 
-sub gui_element_add {
-	my $self = shift;
-	my $id   = $_[2];
+sub sort_mimes {
+	my $self  = shift;
+	my $mimes = shift;
 
-	# Don't add duplicates
-	foreach (@GUI_ELEMENTS) {
-		next unless ref $_ eq 'ARRAY';
-		return 1 if $_->[2] =~ /^\Q$id\E$/;
-	}
+	# Can't do "return sort", must sort to a list first
+	my @sorted = sort {
+		( $b eq 'text/plain' ) <=> ( $a eq 'text/plain' )
+			or Wx::gettext( $mimes->{$a} ) cmp Wx::gettext( $mimes->{$b} )
+	} keys %$mimes;
 
-	push @GUI_ELEMENTS, [@_];
-
-	return 1;
-}
-
-sub gui_element_remove {
-	my $self = shift;
-	my $id   = shift;
-
-	my @new_gui_elements;
-
-	for (@GUI_ELEMENTS) {
-		next if ( ref($_) eq 'ARRAY' ) and ( $_->[2] eq $id );
-		push @new_gui_elements, $_;
-	}
-
-	return 1;
+	return @sorted;
 }
 
 1;

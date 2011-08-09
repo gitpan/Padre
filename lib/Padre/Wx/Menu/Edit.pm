@@ -6,10 +6,11 @@ use 5.008;
 use strict;
 use warnings;
 use Padre::Current  ();
+use Padre::Feature  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -31,12 +32,10 @@ sub new {
 
 	# Undo/Redo
 	$self->{undo} = $self->add_menu_action(
-		$self,
 		'edit.undo',
 	);
 
 	$self->{redo} = $self->add_menu_action(
-		$self,
 		'edit.redo',
 	);
 
@@ -74,12 +73,10 @@ sub new {
 
 	# Cut and Paste
 	$self->{cut} = $self->add_menu_action(
-		$self,
 		'edit.cut',
 	);
 
 	$self->{copy} = $self->add_menu_action(
-		$self,
 		'edit.copy',
 	);
 
@@ -113,21 +110,13 @@ sub new {
 
 	# Paste
 	$self->{paste} = $self->add_menu_action(
-		$self,
 		'edit.paste',
 	);
 
 	my $submenu = Wx::Menu->new;
-	$self->{insert_submenu} = $self->AppendSubMenu( $submenu, Wx::gettext('Insert') );
-
-	$self->{insert_special} = $self->add_menu_action(
+	$self->{insert_submenu} = $self->AppendSubMenu(
 		$submenu,
-		'edit.insert.insert_special',
-	);
-
-	$self->{snippets} = $self->add_menu_action(
-		$submenu,
-		'edit.insert.snippets',
+		Wx::gettext('Insert'),
 	);
 
 	$self->{insert_from_file} = $self->add_menu_action(
@@ -135,41 +124,41 @@ sub new {
 		'edit.insert.from_file',
 	);
 
-	$self->AppendSeparator;
-
-	# Miscellaneous Actions
-	$self->{goto} = $self->add_menu_action(
-		$self,
-		'edit.goto',
+	$self->{snippets} = $self->add_menu_action(
+		$submenu,
+		'edit.insert.snippets',
 	);
 
+	$self->{insert_special} = $self->add_menu_action(
+		$submenu,
+		'edit.insert.insert_special',
+	);
+
+	$self->AppendSeparator;
+
 	$self->{next_problem} = $self->add_menu_action(
-		$self,
 		'edit.next_problem',
 	);
 
-	$self->{quick_fix} = $self->add_menu_action(
-		$self,
-		'edit.quick_fix',
-	);
+	if ( Padre::Feature::QUICK_FIX ) {
+		$self->{quick_fix} = $self->add_menu_action(
+			'edit.quick_fix',
+		);
+	}
 
 	$self->{autocomp} = $self->add_menu_action(
-		$self,
 		'edit.autocomp',
 	);
 
 	$self->{brace_match} = $self->add_menu_action(
-		$self,
 		'edit.brace_match',
 	);
 
 	$self->{brace_match_select} = $self->add_menu_action(
-		$self,
 		'edit.brace_match_select',
 	);
 
 	$self->{join_lines} = $self->add_menu_action(
-		$self,
 		'edit.join_lines',
 	);
 
@@ -177,17 +166,14 @@ sub new {
 
 	# Commenting
 	$self->{comment_toggle} = $self->add_menu_action(
-		$self,
 		'edit.comment_toggle',
 	);
 
 	$self->{comment} = $self->add_menu_action(
-		$self,
 		'edit.comment',
 	);
 
 	$self->{uncomment} = $self->add_menu_action(
-		$self,
 		'edit.uncomment',
 	);
 
@@ -310,16 +296,11 @@ sub new {
 		'edit.applydiff2project',
 	);
 
-	# End diff tools
-
-
 	$self->{filter_tool} = $self->add_menu_action(
-		$self,
 		'edit.filter_tool',
 	);
 
-	$self->{filter_tool} = $self->add_menu_action(
-		$self,
+	$self->{perl_filter} = $self->add_menu_action(
 		'edit.perl_filter',
 	);
 
@@ -350,25 +331,24 @@ sub title {
 }
 
 sub refresh {
-	my $self          = shift;
-	my $current       = Padre::Current::_CURRENT(@_);
-	my $editor        = $current->editor || 0;
-	my $text          = $current->text;
-	my $document      = $current->document;
-	my $hasdoc        = $document ? 1 : 0;
-	my $comment       = $hasdoc ? ( $document->comment_lines_str ? 1 : 0 ) : 0;
-	my $newline       = $hasdoc ? $document->newline_type : '';
-	my $has_quick_fix = $hasdoc && $document->can('get_quick_fix_provider');
+	my $self     = shift;
+	my $current  = Padre::Current::_CURRENT(@_);
+	my $editor   = $current->editor || 0;
+	my $document = $current->document;
+	my $hasdoc   = $document ? 1 : 0;
+	my $comment  = $hasdoc ? ( $document->comment_lines_str ? 1 : 0 ) : 0;
+	my $newline  = $hasdoc ? $document->newline_type : '';
+	my $quickfix = $hasdoc && $document->can('get_quick_fix_provider');
 
 	# Handle the simple cases
-	$self->{goto}->Enable($hasdoc);
 	$self->{next_problem}->Enable($hasdoc);
-	$self->{quick_fix}->Enable($has_quick_fix) if $self->{main}->config->feature_quick_fix;
+	if ( Padre::Feature::QUICK_FIX ) {
+		$self->{quick_fix}->Enable($quickfix);
+	}
 	$self->{autocomp}->Enable($hasdoc);
 	$self->{brace_match}->Enable($hasdoc);
 	$self->{brace_match_select}->Enable($hasdoc);
 	$self->{join_lines}->Enable($hasdoc);
-
 	$self->{insert_special}->Enable($hasdoc);
 	$self->{snippets}->Enable($hasdoc);
 	$self->{comment_toggle}->Enable($comment);
@@ -393,6 +373,7 @@ sub refresh {
 	unless ( $newline eq 'MAC' ) {
 		$self->{convert_nl_mac}->Enable($hasdoc);
 	}
+
 	$self->{tabs_to_spaces}->Enable($hasdoc);
 	$self->{spaces_to_tabs}->Enable($hasdoc);
 	$self->{delete_leading}->Enable($hasdoc);
@@ -401,7 +382,6 @@ sub refresh {
 	$self->{show_as_decimal}->Enable($hasdoc);
 
 	# Handle the complex cases
-	my $selection = !!( defined $text and $text ne '' );
 	$self->{undo}->Enable($editor);
 	$self->{redo}->Enable($editor);
 	$self->{paste}->Enable($editor);

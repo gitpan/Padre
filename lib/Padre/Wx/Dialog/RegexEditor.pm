@@ -12,7 +12,7 @@ use Padre::Wx::Role::Main ();
 # RichTextCtrl
 use Wx::RichText ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -651,7 +651,6 @@ sub run {
 		return;
 	}
 
-
 	my ( $active, $inactive ) = $self->_get_modifier_settings;
 
 	$self->{matched_text}->Clear;
@@ -665,7 +664,7 @@ sub run {
 
 	my $warning;
 
-	# XXX Ignore Win32::API warnings. It's ugly but it works :)
+	# Ignore warnings on win32. It's ugly but it works :)
 	local $SIG{__WARN__} = sub { $warning = $_[0] };
 
 	# TODO loop on all matches in case of /g

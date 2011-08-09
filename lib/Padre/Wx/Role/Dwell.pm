@@ -27,7 +27,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 # Track timer Wx id values for each dwell event
 my %ID = ();

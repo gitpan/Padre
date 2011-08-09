@@ -26,12 +26,12 @@ use Params::Util   ();
 use JSON::XS       ();
 use LWP::UserAgent ();
 use HTTP::Cookies  ();
-use HTTP::Request::Common qw/GET POST DELETE/;
+use HTTP::Request::Common qw/GET POST DELETE PUT/;
 use Padre::Util     ();
 use Padre::Current  ();
 use Padre::Constant ();
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 
 
@@ -65,8 +65,9 @@ sub new {
 	# Save cookies for state management from Padre session to session
 	# is this even wanted? remove at padre close?
 	my $ua = LWP::UserAgent->new;
-	push @{ $ua->requests_redirectable }, 'POST';
-	$ua->timeout(2);
+
+	#push @{ $ua->requests_redirectable }, 'POST';
+	$ua->timeout(5);
 	$ua->cookie_jar(
 		HTTP::Cookies->new(
 			file => File::Spec->catfile(
@@ -148,19 +149,21 @@ sub register {
 	}
 
 	# this crashes if server is unavailable. FIXME
-	my $resp = $self->ua->request(
+	my $response = $self->ua->request(
 		POST "$server/register",
 		'Content-Type' => 'application/json',
 		'Content'      => $self->{json}->encode($params),
 	);
-	if ( $resp->code == 200 ) {
+	if ( $response->code == 201 ) {
 		return 'Account registered successfully. Please log in.';
 	}
 
-	my $h = $self->{json}->decode( $resp->content );
+	local $@;
+	my $h = eval { $self->{json}->decode( $response->content ) };
 
-	return "Registration Failure: $h->{error}" if $h->{error};
-	return "Registration failure.";
+	return "Registration failure(Server): $h->{error}" if $h->{error};
+	return "Registration failure(Padre): $@" if $@;
+        return "Registration failure(unknown)";
 }
 
 =pod
@@ -183,9 +186,11 @@ sub login {
 		return 'Failure: cannot log in, user already logged in.';
 	}
 
-	my $resp = $self->ua->request( POST "$server/login", $params );
+	my $response = $self->ua->request( POST "$server/login", $params );
 
-	if ( $resp->content !~ /Wrong username or password/i and $resp->code == 200 ) {
+	if ( $response->content !~ /Wrong username or password/i
+		and ( $response->code == 200 or $response->code == 302 ) )
+	{
 		$self->{state} = 'logged_in';
 		return 'Logged in successfully.';
 	}
@@ -212,9 +217,9 @@ sub logout {
 		return 'Failure: cannot logout, user not logged in.';
 	}
 
-	my $resp = $self->ua->request( GET "$server/logout" );
+	my $response = $self->ua->request( GET "$server/logout" );
 
-	if ( $resp->code == 200 ) {
+	if ( $response->code == 200 ) {
 		$self->{state} = 'not_logged_in';
 		return 'Logged out successfully.';
 	}
@@ -242,9 +247,9 @@ sub server_delete {
 		return 'Failure: user not logged in.';
 	}
 
-	my $resp = $self->ua->request( DELETE "$server/user/config" );
+	my $response = $self->ua->request( DELETE "$server/config" );
 
-	if ( $resp->code == 200 ) {
+	if ( $response->code == 200 ) {
 		return 'Configuration deleted successfully.';
 	}
 
@@ -279,12 +284,12 @@ sub local_to_server {
 		$h{$k} = $conf->{$k};
 	}
 
-	my $resp = $self->ua->request(
-		POST "$server/user/config",
+	my $response = $self->ua->request(
+		PUT "$server/config",
 		'Content-Type' => 'application/json',
 		'Content'      => $self->{json}->encode( \%h ),
 	);
-	if ( $resp->code == 200 ) {
+	if ( $response->code == 204 ) {
 		return 'Configuration uploaded successfully.';
 	}
 
@@ -306,31 +311,43 @@ sub server_to_local {
 	my $config = $self->config;
 	my $server = $config->config_sync_server;
 
-	return 'Failure: no server found.' if not $server;
+	return 'Failure: no server found.' unless $server;
 
 	if ( $self->{state} ne 'logged_in' ) {
 		return 'Failure: user not logged in.';
 	}
 
-	my $resp = $self->ua->request( GET "$server/user/config", 'Accept' => 'application/json' );
+	my $response = $self->ua->request(
+		GET "$server/config",
+		'Accept' => 'application/json',
+	);
 
-	my $c;
-	eval { $c = $self->{json}->decode( $resp->content ); };
-	if ($@) {
-		return 'Failed to deserialize serverside configuration.';
-	}
+	local $@;
+	my $json;
+	eval { $json = $self->{json}->decode( $response->content ); };
+	return 'Failed to deserialize serverside configuration.' if $@;
 
-	# apply each setting to the global config. should only be HUMAN settings
-	delete $c->{Version};
-	delete $c->{version};
-	for my $key ( keys %$c ) {
-		$config->apply( $key, $c->{$key} );
+	# Apply each setting to the global config. should only be HUMAN settings
+	delete $json->{Version};
+	delete $json->{version};
+	my @errors;
+	for my $key ( keys %$json ) {
+		my $meta = eval { $config->meta($key); };
+		unless ( $meta and $meta->store == Padre::Constant::HUMAN ) {
+
+			# Skip unknown or non-HUMAN settings
+			next;
+		}
+		eval { $config->apply( $key, $json->{$key} ); };
+		push @errors, $@ if $@;
 	}
-	$config->apply( main_singleinstance => 1 );
 	$config->write;
 
-	if ( $resp->code == 200 ) {
+	if ( $response->code == 200 && @errors == 0 ) {
 		return 'Configuration downloaded and applied successfully.';
+	} elsif ( $response->code == 200 && @errors ) {
+		warn @errors;
+		return 'Configuration downloaded successfully, some errors encountered applying to your current configuration.';
 	}
 
 	return 'Failed to download serverside configuration file to local Padre instance.';

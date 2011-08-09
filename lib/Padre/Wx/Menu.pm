@@ -5,6 +5,7 @@ package Padre::Wx::Menu;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Current    ();
 use Padre::Wx::Action ();
 use Padre::Wx         ();
 
@@ -13,7 +14,7 @@ use Class::Adapter::Builder
 	NEW      => 'Wx::Menu',
 	AUTOLOAD => 'PUBLIC';
 
-our $VERSION = '0.86';
+our $VERSION = '0.88';
 
 use Class::XSAccessor {
 	getters => {
@@ -27,11 +28,11 @@ sub refresh {1}
 # Overrides and then calls XS wx Menu::Append.
 # Adds any hotkeys to global registry of bound keys
 sub Append {
-	my $self   = shift;
-	my $string = $_[1];
-	my $item   = $self->wx->Append(@_);
-	my ($underlined) = ( $string =~ m/(\&\w)/ );
-	my ($accel)      = ( $string =~ m/(Ctrl-.+|Alt-.+)/ );
+	my $self  = shift;
+	my $item  = $self->wx->Append(@_);
+	my $label = $item->GetLabel;
+	my ($underlined) = ( $label =~ m/(\&\w)/ );
+	my ($accel)      = ( $label =~ m/(Ctrl-.+|Alt-.+)/ );
 	if ( $underlined or $accel ) {
 		$self->{main}->{accel_keys} ||= {};
 		if ($underlined) {
@@ -50,9 +51,9 @@ sub Append {
 # Add a normal menu item to menu from a existing Padre action
 sub add_menu_action {
 	my $self    = shift;
-	my $menu    = shift;
+	my $menu    = (@_ > 1) ? shift : $self;
 	my $name    = shift;
-	my $actions = Padre->ide->actions;
+	my $actions = Padre::Current->ide->actions;
 	my $action  = $actions->{$name} or return 0;
 	my $method  = $action->menu_method || 'Append';
 
@@ -62,9 +63,7 @@ sub add_menu_action {
 	);
 
 	my $comment = $action->comment;
-	if ($comment) {
-		$item->SetHelp($comment);
-	}
+	$item->SetHelp($comment) if $comment;
 
 	Wx::Event::EVT_MENU(
 		$self->{main},

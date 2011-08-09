@@ -60,6 +60,7 @@ no_index:
     - xt
 requires:
   App::cpanminus: 0.9923
+  B::Deparse: 0
   Class::Adapter: 1.05
   Class::Inspector: 1.22
   Class::Unload: 0.03
@@ -106,8 +107,6 @@ requires:
   Module::Build: 0.3603
   Module::CoreList: 0
   Module::Manifest: 0.07
-  Module::Refresh: 0.13
-  Module::Starter: 1.50
   ORLite: 1.48
   POD2::Base: 0.043
   POSIX: 0
@@ -123,7 +122,8 @@ requires:
   Pod::Perldoc: 3.15
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
-  Storable: 2.15
+  Probe::Perl: 0.01
+  Storable: 2.16
   Template::Tiny: 0.11
   Term::ReadLine: 0
   Text::Balanced: 2.01
@@ -143,4 +143,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.86
+version: 0.88
