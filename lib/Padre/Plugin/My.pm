@@ -8,7 +8,7 @@ use Padre::Constant ();
 use Padre::Plugin   ();
 use Padre::Wx       ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -93,7 +93,7 @@ sub other_method {
 	# $main->message( "Filename: $filename\nCount: $count", 'Current file' );
 
 	# my $doc   = Padre::Current->document;
-	# my $text  = $doc->text_get();
+	# my $text  = $doc->text_get;
 	# $text     =~ s/[ \t]+$//m;
 	# $doc->text_set( $text );
 

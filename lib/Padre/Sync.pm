@@ -31,7 +31,7 @@ use Padre::Util     ();
 use Padre::Current  ();
 use Padre::Constant ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 
 
@@ -163,7 +163,7 @@ sub register {
 
 	return "Registration failure(Server): $h->{error}" if $h->{error};
 	return "Registration failure(Padre): $@" if $@;
-        return "Registration failure(unknown)";
+	return "Registration failure(unknown)";
 }
 
 =pod
@@ -249,7 +249,7 @@ sub server_delete {
 
 	my $response = $self->ua->request( DELETE "$server/config" );
 
-	if ( $response->code == 200 ) {
+	if ( $response->code == 204 ) {
 		return 'Configuration deleted successfully.';
 	}
 

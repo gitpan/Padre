@@ -3,14 +3,16 @@ package Padre::Wx::FunctionList;
 use 5.008005;
 use strict;
 use warnings;
+use Carp                  ();
 use Scalar::Util          ();
 use Params::Util          ();
+use Padre::Feature        ();
 use Padre::Role::Task     ();
 use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -158,6 +160,10 @@ sub new {
 		}
 	);
 
+	if (Padre::Feature::STYLE_GUI) {
+		$self->recolour;
+	}
+
 	return $self;
 }
 
@@ -177,8 +183,11 @@ sub view_label {
 }
 
 sub view_close {
-	$_[0]->task_reset;
 	$_[0]->main->show_functions(0);
+}
+
+sub view_stop {
+	$_[0]->task_reset;
 }
 
 
@@ -189,31 +198,15 @@ sub view_close {
 # Event Handlers
 
 sub on_list_item_activated {
-	my $self  = shift;
-	my $event = shift;
+	my $self   = shift;
+	my $event  = shift;
+	my $editor = $self->current->editor or return;
 
 	# Which sub did they click
-	my $subname = $self->{list}->GetStringSelection;
-	unless ( defined Params::Util::_STRING($subname) ) {
-		return;
+	my $name = $self->{list}->GetStringSelection;
+	if ( defined Params::Util::_STRING($name) ) {
+		$editor->goto_function($name);
 	}
-
-	# Locate the function
-	my $document = $self->current->document or return;
-	my $editor = $document->editor;
-	my ( $start, $end ) = Padre::Util::get_matches(
-		$editor->GetText,
-		$document->get_function_regex($subname),
-		$editor->GetSelection, # Provides two params
-	);
-	unless ( defined $start ) {
-
-		# Couldn't find it
-		return;
-	}
-
-	# Move the selection to the sub location
-	$editor->goto_pos_centerize($start);
 
 	return;
 }
@@ -232,6 +225,34 @@ sub focus_on_search {
 
 sub gettext_label {
 	Wx::gettext('Functions');
+}
+
+# Pick up colouring from the current editor style
+sub recolour {
+	my $self   = shift;
+	my $config = $self->config;
+
+	# Load the editor style
+	require Padre::Wx::Editor;
+	my $data = Padre::Wx::Editor::data( $config->editor_style ) or return;
+
+	# Find the colours we need
+	my $foreground = $data->{padre}->{colors}->{PADRE_BLACK}->{foreground};
+	my $background = $data->{padre}->{background};
+
+	# Apply them to the widgets
+	if ( defined $foreground and defined $background ) {
+		$foreground = Padre::Wx::color($foreground);
+		$background = Padre::Wx::color($background);
+
+		$self->{list}->SetForegroundColour($foreground);
+		$self->{list}->SetBackgroundColour($background);
+
+		# $self->{search}->SetForegroundColour($foreground);
+		# $self->{search}->SetBackgroundColour($background);
+	}
+
+	return 1;
 }
 
 sub refresh {
@@ -264,20 +285,18 @@ sub refresh {
 	}
 
 	# Nothing to do if there is no content
-	if ( $document->is_unused ) {
+	my $task = $document->task_functions;
+	if ( $document->is_unused or not $task ) {
 		$list->Clear;
-		return 1;
+		return;
 	}
 
 	# Launch the background task
-	my $task = $document->task_functions or return;
 	$self->task_request(
 		task  => $task,
 		text  => $document->text_get,
 		order => $current->config->main_functions_order,
 	);
-
-	return 1;
 }
 
 # Set an updated method list from the task

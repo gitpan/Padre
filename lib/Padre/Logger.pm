@@ -8,10 +8,10 @@ Padre::Logger - Compile-time logging library for Padre
 
 =head1 SYNOPSIS
 
-  # In the launch/dev.pl script
-  BEGIN {
-      $Padre::Logger::DEBUG = 1;
-  }
+  # In the launcher script
+  $ENV{PADRE_DEBUG} = 1;
+
+
 
   use Padre;
 
@@ -38,9 +38,10 @@ use warnings;
 use threads;
 use threads::shared;
 use Carp            ();
+use Time::HiRes     ();
 use Padre::Constant ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 # Handle the PADRE_DEBUG environment variable
 BEGIN {
@@ -82,7 +83,7 @@ END_PERL
 
 # Global trace function
 sub TRACE {
-	my $time    = scalar localtime time;
+	my $time    = Time::HiRes::time;
 	my $caller  = ( caller(1) )[3] || 'main';
 	my $logfile = Padre::Constant::LOG_FILE;
 	my $thread =
@@ -95,7 +96,7 @@ sub TRACE {
 
 		# print $fh sprintf(
 		print sprintf(
-			"# %s %s%s %s\n",
+			"# %.5f %s%s %s\n",
 			$time,
 			$thread,
 			$caller,

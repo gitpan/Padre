@@ -18,7 +18,7 @@ use strict;
 use warnings;
 
 # package exports and version
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 use Padre::Constant ();
 
@@ -175,8 +175,13 @@ sub _execute {
 		# because it crashes when launching a non-console app
 		if (Padre::Constant::WIN32) {
 
-			# Spawn process without waiting (only on win32, see perlport)
-			system( 1, $cmd, @cmd_args );
+			# There is no actual waiting since cmd.exe starts explorer.exe and quits
+			require Padre::Util::Win32;
+			Padre::Util::Win32::ExecuteProcessAndWait(
+				directory  => $self->{project},
+				file       => 'cmd.exe',
+				parameters => "/C $cmd @cmd_args",
+			);
 		} else {
 			require IPC::Open2;
 			my $ok = eval {

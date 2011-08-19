@@ -11,6 +11,7 @@ use 5.008;
 use strict;
 use warnings;
 use Carp                   ();
+use Scalar::Util           ();
 use Params::Util           ();
 use Padre::Constant        ();
 use Padre::Util            ('_T');
@@ -22,7 +23,7 @@ use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -191,6 +192,19 @@ sub write {
 	close $FILE or return 1;
 
 	return 1;
+}
+
+sub clone {
+	my $self  = shift;
+	my $class = Scalar::Util::blessed($self);
+	my $host  = $self->host->clone;
+	my $human = $self->human->clone;
+	if ( $self->project ) {
+		my $project = $self->project->clone;
+		return $class->new( $host, $human, $project );
+	} else {
+		return $class->new( $host, $human );
+	}
 }
 
 
@@ -540,7 +554,7 @@ setting(
 
 		# (Ticket #668)
 		no warnings;
-		if ( $Padre::Wx::ToolBar::DOCKABLE ) {
+		if ($Padre::Wx::ToolBar::DOCKABLE) {
 			$main->rebuild_toolbar;
 		}
 
@@ -773,9 +787,9 @@ setting(
 
 # Directory Tree Settings
 setting(
-	name    => 'default_projects_directory',
-	type    => Padre::Constant::PATH,
-	store   => Padre::Constant::HOST,
+	name  => 'default_projects_directory',
+	type  => Padre::Constant::PATH,
+	store => Padre::Constant::HOST,
 	default => File::HomeDir->my_documents || '',
 );
 
@@ -783,9 +797,9 @@ setting(
 
 # The default editor font should be Consolas 10pt on Vista and Windows 7
 setting(
-	name    => 'editor_font',
-	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
+	name  => 'editor_font',
+	type  => Padre::Constant::ASCII,
+	store => Padre::Constant::HUMAN,
 	default => Padre::Util::DISTRO =~ /^WIN(?:VISTA|7)$/ ? 'consolas 10' : '',
 );
 setting(
@@ -847,7 +861,7 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 	apply   => sub {
-		if ( $Padre::Feature::VERSION ) {
+		if ($Padre::Feature::VERSION) {
 			Padre::Feature::FOLDING() or return;
 		} else {
 			$_[0]->feature_folding or return;
@@ -929,7 +943,13 @@ setting(
 	name    => 'editor_cursor_blink',
 	type    => Padre::Constant::INTEGER,
 	store   => Padre::Constant::HUMAN,
-	default => 500, # milliseconds
+	default => 500,                     # milliseconds
+);
+setting(
+	name    => 'editor_dwell',
+	type    => Padre::Constant::INTEGER,
+	store   => Padre::Constant::HUMAN,
+	default => 500,
 );
 setting(
 	name    => 'find_case',
@@ -1216,11 +1236,21 @@ setting(
 	store   => Padre::Constant::HOST,
 	default => 1,
 );
+
+# External tool integration
+
 setting(
-	name    => 'external_diff_tool',
-	type    => Padre::Constant::ASCII,
+	name    => 'bin_diff',
+	type    => Padre::Constant::PATH,
 	store   => Padre::Constant::HOST,
 	default => '',
+);
+
+setting(
+	name  => 'bin_shell',
+	type  => Padre::Constant::PATH,
+	store => Padre::Constant::HOST,
+	default => Padre::Constant::WIN32 ? 'cmd.exe' : '',
 );
 
 # Enable/Disable entire functions that some people dislike.
@@ -1323,6 +1353,52 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+);
+
+# Enable experimental expanded style support
+setting(
+	name    => 'feature_style_gui',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+# Enable experimental Run with Devel::EndStats support.
+setting(
+	name    => 'feature_devel_endstats',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	help    => _T('Enable or disable the Run with Devel::EndStats if it is installed. ')
+		. _T('This requires an installed Devel::EndStats and a Padre restart'),
+);
+
+# Specify Devel::EndStats options for experimental Run with Devel::EndStats support
+setting(
+	name    => 'feature_devel_endstats_options',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'verbose,1',
+	help    => _T(q{Specify Devel::EndStats options. 'feature_devel_endstats' must be enabled.}),
+);
+
+# Enable experimental Run with Devel::TraceUse support.
+setting(
+	name    => 'feature_devel_traceuse',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	help    => _T('Enable or disable the Run with Devel::TraceUse if it is installed. ')
+		. _T('This requires an installed Devel::TraceUse and a Padre restart'),
+);
+
+# Specify Devel::TraceUse options for experimental Run with Devel::TraceUse support
+setting(
+	name    => 'feature_devel_traceuse_options',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => '',
+	help    => _T(q{Specify Devel::TraceUse options. 'feature_devel_traceuse' must be enabled.}),
 );
 
 # Window menu list shorten common path

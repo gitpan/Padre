@@ -5,7 +5,8 @@ package Padre::Wx;
 use 5.008;
 use strict;
 use warnings;
-use constant ();
+use constant     ();
+use Params::Util ();
 
 # Threading must be loaded before Wx loads
 use threads;
@@ -21,14 +22,21 @@ use Wx::DND    ();
 use Wx::AUI    ();
 use Wx::Locale ();
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.43';
 
-# Hard version lock on a new-enough Wx.pm
 BEGIN {
+
+	# Hard version lock on a new-enough Wx.pm
 	unless ( $Wx::VERSION and $Wx::VERSION >= 0.91 ) {
 		die("Your Wx.pm is not new enough (need 0.91, found $Wx::VERSION)");
 	}
+
+	# Load all the image handlers that we support by default in Padre.
+	# Don't load all of them with Wx::InitAllImageHandlers, it wastes memory.
+	Wx::Image::AddHandler( Wx::PNGHandler->new );
+	Wx::Image::AddHandler( Wx::ICOHandler->new );
+	Wx::InitAllImageHandlers();
 }
 
 sub import {
@@ -58,9 +66,13 @@ sub import {
 	}
 
 	# Convert to proper constants
+	# NOTE: This completes the conversion of Wx::wxFoo constants to Wx::Foo.
+	# NOTE: On separate lines to prevent the PAUSE indexer thingkng that we
+	#       are trying to claim ownership of Wx.pm
 	SCOPE: {
-		package Wx; ## no critic
-		constant::->import(\%constants);
+		package ## no critic
+			Wx;
+		constant::->import( \%constants );
 	}
 
 	return 1;
@@ -132,6 +144,24 @@ sub aui_pane_info {
 		$info->$method(shift);
 	}
 	return $info;
+}
+
+# Allow objects to capture the mouse when over them, so you can scroll
+# lists and such without focusing on them.
+sub capture_mouse {
+	my $window = Params::Util::_INSTANCE( shift, 'Wx::Window' ) or return;
+	Wx::Event::EVT_ENTER_WINDOW(
+		$window,
+		sub {
+			$window->CaptureMouse;
+		}
+	);
+	Wx::Event::EVT_LEAVE_WINDOW(
+		$window,
+		sub {
+			$window->ReleaseMouse;
+		}
+	);
 }
 
 

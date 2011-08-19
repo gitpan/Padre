@@ -7,7 +7,7 @@ use Padre::Wx                     ();
 use Padre::Wx::TreeCtrl           ();
 use Padre::Wx::Dialog::WizardPage ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw(Padre::Wx::Dialog::WizardPage);
 
 # Initialize the page
@@ -132,7 +132,7 @@ sub _on_tree_selection_changed {
 		$self->next_wizard(undef);
 		$self->status('');
 	}
-	$self->refresh();
+	$self->refresh;
 }
 
 # Private method to update the tree by using the filter

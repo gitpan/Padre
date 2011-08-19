@@ -7,7 +7,7 @@ use Padre::Wx     ();
 use Padre::Util   ();
 use Padre::Plugin ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -58,48 +58,55 @@ sub plugin_disable {
 		$self->config_write( { foo => 1 } );
 	}
 
+	# Close the introspection tool
+	if ( $self->{expression} ) {
+		delete( $self->{expression} )->Destroy;
+	}
+
+	# Unload our dialog classes
+	$self->unload(
+		qw{
+			Padre::Wx::Dialog::Expression
+			Padre::Wx::FBP::Expression
+			}
+	);
+
 	return 1;
 }
 
 sub menu_plugins_simple {
 	my $self = shift;
 	return $self->plugin_name => [
+		Wx::gettext('Evaluate &Expression') . '...' => 'expression',
+
+		'---' => undef,
+
 		Wx::gettext('Run Document inside Padre')  => 'eval_document',
 		Wx::gettext('Run Selection inside Padre') => 'eval_selection',
 
-		'---'               => undef,
-		Wx::gettext('Dump') => [
-			Wx::gettext('Dump Expression...')    => 'dump_expression',
-			Wx::gettext('Dump Current Document') => 'dump_document',
-			Wx::gettext('Dump Task Manager')     => 'dump_taskmanager',
-			Wx::gettext('Dump Top IDE Object')   => 'dump_padre',
-			Wx::gettext('Dump Current PPI Tree') => 'dump_ppi',
-			Wx::gettext('Dump %INC and @INC')    => 'dump_inc',
-			Wx::gettext('Dump Display Geometry') => 'dump_display',
-			Wx::gettext('Start/Stop sub trace')  => 'trace_sub_startstop',
-		],
 		'---' => undef,
 
-		Wx::gettext('Load All Padre Modules')        => 'load_everything',
-		Wx::gettext('Simulate Crash')                => 'simulate_crash',
-		Wx::gettext('Simulate Background Exception') => 'simulate_task_exception',
-		Wx::gettext('Simulate Background Crash')     => 'simulate_task_crash',
+		Wx::gettext('&Load All Padre Modules')        => 'load_everything',
+		Wx::gettext('Simulate &Crash')                => 'simulate_crash',
+		Wx::gettext('Simulate Background &Exception') => 'simulate_task_exception',
+		Wx::gettext('Simulate &Background Crash')     => 'simulate_task_crash',
+		Wx::gettext('&Start/Stop sub trace')          => 'trace_sub_startstop',
 
 		'---' => undef,
 
-		sprintf( Wx::gettext('wxWidgets %s Reference'), '2.8.12' ) => sub {
+		sprintf( Wx::gettext('&wxWidgets %s Reference'), '2.8.12' ) => sub {
 			Padre::Wx::launch_browser('http://docs.wxwidgets.org/2.8.12/');
 		},
-		Wx::gettext('STC Reference') => sub {
+		Wx::gettext('&STC Reference') => sub {
 			Padre::Wx::launch_browser('http://www.yellowbrain.com/stc/index.html');
 		},
-		Wx::gettext('wxPerl Live Support') => sub {
+		Wx::gettext('wxPerl &Live Support') => sub {
 			Padre::Wx::launch_irc('wxperl');
 		},
 
 		'---' => undef,
 
-		Wx::gettext('About') => 'show_about',
+		Wx::gettext('&About') => 'show_about',
 	];
 }
 
@@ -110,23 +117,20 @@ sub menu_plugins_simple {
 #####################################################################
 # Plugin Methods
 
-sub dump_expression {
+sub expression {
 	my $self = shift;
+	my $main = $self->main;
 
-	# Get the expression
-	require Padre::Wx::History::TextEntryDialog;
-	my $dialog = Padre::Wx::History::TextEntryDialog->new(
-		$self->main,
-		Wx::gettext("Expression"),
-		Wx::gettext("Expression"),
-		'Padre::Plugin::Devel.expression',
-	);
-	return if $dialog->ShowModal == Wx::wxID_CANCEL;
-	my $perl = $dialog->GetValue;
-	$dialog->Destroy;
+	unless ( $self->{expression} ) {
 
-	# Evaluate it
-	return $self->_dump_eval($perl);
+		# Load and show the expression dialog
+		require Padre::Wx::Dialog::Expression;
+		$self->{expression} = Padre::Wx::Dialog::Expression->new($main);
+	}
+	$self->{expression}->Show;
+	$self->{expression}->SetFocus;
+
+	return;
 }
 
 sub eval_document {
@@ -139,97 +143,6 @@ sub eval_selection {
 	my $self = shift;
 	my $document = $self->current->document or return;
 	return $self->_dump_eval( $self->current->text );
-}
-
-sub dump_document {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $document = $current->document;
-	unless ($document) {
-		$current->main->error( Wx::gettext('No file is open') );
-		return;
-	}
-	return $self->_dump($document);
-}
-
-sub dump_taskmanager {
-	my $self = shift;
-	return $self->_dump( $self->current->ide->task_manager );
-}
-
-# Dumps the current Perl 5 PPI document to the current output window
-sub dump_ppi {
-	my $self     = shift;
-	my $current  = $self->current;
-	my $document = $current->document;
-	my $main     = $self->current->main;
-
-	# Make sure that there is a Perl 5 document
-	require Params::Util;
-	unless ( Params::Util::_INSTANCE( $current->document, 'Padre::Document::Perl' ) ) {
-		$main->error( Wx::gettext('No Perl 5 file is open') );
-		return;
-	}
-
-	# Generate the PPI dump string and set into the output window
-	require PPI::Dumper;
-	require PPI::Document;
-	my $source = $document->text_get;
-	my $doc    = PPI::Document->new( \$source );
-	my $dumper = PPI::Dumper->new( $doc, locations => 1, indent => 4 );
-
-	$main->output->SetValue( $dumper->string );
-	$main->output->SetSelection( 0, 0 );
-	$main->show_output(1);
-}
-
-sub dump_padre {
-	$_[0]->_dump( $_[0]->current->ide );
-}
-
-# Copy %INC and @INC before passing them to _dump,
-# so changes during the _dump process aren't in the output.
-sub dump_inc {
-	$_[0]->_dump( {%INC}, [@INC] );
-}
-
-sub dump_display {
-	my $self     = shift;
-	my @displays = ();
-
-	# Due to the way it is mapped into Wx.pm
-	# this must NOT be called as a method.
-	my $count = Wx::Display::GetCount();
-
-	foreach ( 0 .. $count - 1 ) {
-		my $display = Wx::Display->new($_);
-		push @displays,
-			{
-			IsPrimary     => $display->IsPrimary,
-			GetGeometry   => $self->_rect( $display->GetGeometry ),
-			GetClientArea => $self->_rect( $display->GetClientArea ),
-			};
-	}
-	$self->_dump(
-		{   GetCount    => $count,
-			DisplayList => \@displays,
-		}
-	);
-}
-
-sub _rect {
-	my $self = shift;
-	my $rect = shift;
-	my %hash = map { $_ => $rect->$_() } qw{
-		GetTop
-		GetBottom
-		GetLeft
-		GetRight
-		GetHeight
-		GetWidth
-	};
-	$hash{wx} = $rect;
-	return \%hash;
 }
 
 sub trace_sub_startstop {

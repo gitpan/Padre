@@ -13,9 +13,10 @@ use Padre::TaskQueue ();
 # actively debugging, so that the Padre::Logger class will only be
 # loaded AFTER the threads spawn.
 use Padre::Logger;
+
 # use constant DEBUG => 0;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 # Worker id sequence, so identifiers will be available in objects
 # across all instances and threads before the thread has been spawned.
@@ -196,6 +197,7 @@ sub run {
 	while (1) {
 		my $message = $queue->dequeue1;
 		unless ( ref $message eq 'ARRAY' and @$message ) {
+
 			# warn("Message is not an ARRAY reference");
 			next;
 		}

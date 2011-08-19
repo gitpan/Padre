@@ -9,7 +9,7 @@ use Padre::Constant       ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -96,6 +96,10 @@ sub show {
 		}
 	);
 
+	if ( $page->can('view_start') ) {
+		$page->view_start;
+	}
+
 	return;
 }
 
@@ -107,6 +111,11 @@ sub hide {
 
 		# Not showing this
 		return 1;
+	}
+
+	# Shut down the page if it is running something
+	if ( $page->can('view_stop') ) {
+		$page->view_stop;
 	}
 
 	# Remove the page

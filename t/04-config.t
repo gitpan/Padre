@@ -2,10 +2,10 @@
 
 use strict;
 use warnings;
-use constant NUMBER_OF_CONFIG_OPTIONS => 128;
+use constant NUMBER_OF_CONFIG_OPTIONS => 135;
 
 # Move of Debug to Run Menu
-use Test::More tests => NUMBER_OF_CONFIG_OPTIONS * 2 + 27;
+use Test::More tests => NUMBER_OF_CONFIG_OPTIONS * 2 + 28;
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
 use File::Temp ();
@@ -93,6 +93,9 @@ is_deeply( $config2, $config, 'Config round-trips ok' );
 # No configuration operations require loading Wx
 is( $Wx::VERSION, undef, 'Wx is never loaded during config operations' );
 
+# Check clone support
+my $copy = $config->clone;
+is_deeply( $copy, $config, '->clone ok' );
 
 
 

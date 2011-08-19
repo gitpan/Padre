@@ -8,7 +8,7 @@ use Padre::Wx       ();
 use Padre::Wx::Icon ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -82,7 +82,7 @@ sub on_list_item_activated {
 		return;
 	}
 
-	$self->select_problem( $line - 1 );
+	# $self->select_problem( $line - 1 );
 
 	return;
 }

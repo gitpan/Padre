@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -710,6 +710,12 @@ sub _menu_plugins_submenu {
 	}
 
 	return $menu;
+}
+
+# Experimental and unsupported, as it means we would have TWO entirely different
+# "simple" menu configuration methods.
+sub menu_actions {
+	return ();
 }
 
 # Very Experimental !!!

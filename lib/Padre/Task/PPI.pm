@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Task';
 
 =pod
@@ -18,6 +18,7 @@ Padre::Task::PPI - Generic L<PPI> background processing task
 
   package Padre::Task::MyFancyTest;
   
+  use strict;
   use base 'Padre::Task::PPI';
   
   # Will be called after ppi-parsing:
@@ -74,6 +75,11 @@ sub run {
 	require PPI::Document;
 	$self->process( PPI::Document->new( \$text ) );
 
+	return 1;
+}
+
+# Default null processing
+sub process {
 	return 1;
 }
 

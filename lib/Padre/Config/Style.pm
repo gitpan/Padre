@@ -16,7 +16,7 @@ use Padre::Constant ();
 use Padre::Util     ('_T');
 use Padre::Logger;
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.79';
 
 
@@ -43,11 +43,12 @@ BEGIN {
 
 	# Define the core style library
 	%CORE_STYLES = (
-		default   => _T('Padre'),
-		evening   => _T('Evening'),
-		night     => _T('Night'),
-		ultraedit => _T('Ultraedit'),
-		notepad   => _T('Notepad++'),
+		default       => _T('Padre'),
+		evening       => _T('Evening'),
+		night         => _T('Night'),
+		ultraedit     => _T('Ultraedit'),
+		notepad       => _T('Notepad++'),
+		solarize_dark => _T('Solarize') . ' ' . _T('Dark'),
 	);
 
 	# Locate any custom user styles

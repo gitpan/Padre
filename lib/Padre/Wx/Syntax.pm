@@ -4,6 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 use Params::Util          ();
+use Padre::Feature        ();
 use Padre::Role::Task     ();
 use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
@@ -13,15 +14,13 @@ use Padre::Wx::TreeCtrl   ();
 use Padre::Wx::HtmlWindow ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
 	Wx::Panel
 };
-
-use constant TIMER => Wx::NewId();
 
 # perldiag error message classification
 my %MESSAGE = (
@@ -69,14 +68,11 @@ my %MESSAGE = (
 	},
 );
 
-
 sub new {
 	my $class = shift;
 	my $main  = shift;
 	my $panel = shift || $main->bottom;
-
-	# Create the parent panel which will contain the search and tree
-	my $self = $class->SUPER::new($panel);
+	my $self  = $class->SUPER::new($panel);
 
 	# Create the underlying object
 	$self->{tree} = Padre::Wx::TreeCtrl->new(
@@ -102,9 +98,8 @@ sub new {
 	$self->SetSizer($sizer);
 
 	# Additional properties
-	$self->{model}    = [];
-	$self->{document} = '';
-	$self->{length}   = -1;
+	$self->{model}  = [];
+	$self->{length} = -1;
 
 	# Prepare the available images
 	my $images = Wx::ImageList->new( 16, 16 );
@@ -147,6 +142,10 @@ sub new {
 
 	$self->Hide;
 
+	if (Padre::Feature::STYLE_GUI) {
+		$self->recolour;
+	}
+
 	return $self;
 }
 
@@ -166,21 +165,11 @@ sub view_label {
 }
 
 sub view_close {
-	$_[0]->task_reset;
 	$_[0]->main->show_syntaxcheck(0);
 }
 
-
-
-
-
-#####################################################################
-# Timer Control
-
-sub start {
+sub view_start {
 	my $self = shift;
-	$self->running and return;
-	TRACE('Starting the syntax checker') if DEBUG;
 
 	# Add the margins for the syntax markers
 	foreach my $editor ( $self->main->editors ) {
@@ -191,47 +180,23 @@ sub start {
 		# Set margin 1 16 px wide
 		$editor->SetMarginWidth( 1, 16 );
 	}
-
-	if ( Params::Util::_INSTANCE( $self->{timer}, 'Wx::Timer' ) ) {
-		$self->on_timer( undef, 1 );
-	} else {
-		TRACE('Creating new timer') if DEBUG;
-		$self->{timer} = Wx::Timer->new( $self, TIMER );
-		Wx::Event::EVT_TIMER(
-			$self, TIMER,
-			sub {
-				$self->on_timer( $_[1], $_[2] );
-			},
-		);
-	}
-	$self->{timer}->Start( 1000, 0 );
-
-	return;
 }
 
-sub stop {
+sub view_stop {
 	my $self = shift;
-	$self->running or return;
-	TRACE('Stopping the syntax checker') if DEBUG;
+	my $main = $self->main;
+	my $lock = $main->lock('UPDATE');
 
-	# Stop the timer
-	if ( Params::Util::_INSTANCE( $self->{timer}, 'Wx::Timer' ) ) {
-		$self->{timer}->Stop;
-	}
+	# Clear out any state and tasks
+	$self->task_reset;
+	$self->clear;
 
-	# Remove the editor margin
-	foreach my $editor ( $self->main->editors ) {
+	# Remove the editor margins
+	foreach my $editor ( $main->editors ) {
 		$editor->SetMarginWidth( 1, 0 );
 	}
 
-	# Clear out the existing data
-	$self->clear;
-
 	return;
-}
-
-sub running {
-	!!( $_[0]->{timer} and $_[0]->{timer}->IsRunning );
 }
 
 
@@ -242,12 +207,12 @@ sub running {
 # Event Handlers
 
 sub on_tree_item_selection_changed {
-	my ( $self, $event ) = @_;
-
-	my $item = $event->GetItem or return;
+	my $self  = shift;
+	my $event = shift;
+	my $item  = $event->GetItem or return;
 	my $issue = $self->{tree}->GetPlData($item);
 
-	if ( $issue && $issue->{diagnostics} ) {
+	if ( $issue and $issue->{diagnostics} ) {
 		my $diag = $issue->{diagnostics};
 		$self->_update_help_page($diag);
 	} else {
@@ -256,17 +221,17 @@ sub on_tree_item_selection_changed {
 }
 
 sub on_tree_item_activated {
-	my ( $self, $event ) = @_;
-
-	my $item   = $event->GetItem                 or return;
+	my $self   = shift;
+	my $event  = shift;
+	my $item   = $event->GetItem or return;
 	my $issue  = $self->{tree}->GetPlData($item) or return;
-	my $editor = $self->current->editor          or return;
+	my $editor = $self->current->editor or return;
 	my $line   = $issue->{line};
 
-	return
-		if not defined($line)
-			or $line !~ /^\d+$/o
-			or $editor->GetLineCount < $line;
+	# Does it point to somewhere valid?
+	return unless defined $line;
+	return if $line !~ /^\d+$/o;
+	return if $editor->GetLineCount < $line;
 
 	# Select the problem after the event has finished
 	Wx::Event::EVT_IDLE(
@@ -276,13 +241,6 @@ sub on_tree_item_activated {
 			Wx::Event::EVT_IDLE( $self, undef );
 		},
 	);
-}
-
-sub on_timer {
-	my $self  = shift;
-	my $event = shift;
-	$event->Skip(0) if defined $event;
-	$self->refresh;
 }
 
 
@@ -321,45 +279,70 @@ sub clear {
 	return;
 }
 
-sub relocale {
+# Pick up colouring from the current editor style
+sub recolour {
+	my $self   = shift;
+	my $config = $self->config;
 
-	# Nothing to implement here
+	# Load the editor style
+	require Padre::Wx::Editor;
+	my $data = Padre::Wx::Editor::data( $config->editor_style ) or return;
+
+	# Find the colours we need
+	my $foreground = $data->{padre}->{colors}->{PADRE_BLACK}->{foreground};
+	my $background = $data->{padre}->{background};
+
+	# Apply them to the widgets
+	if ( defined $foreground and defined $background ) {
+		$foreground = Padre::Wx::color($foreground);
+		$background = Padre::Wx::color($background);
+
+		$self->{tree}->SetForegroundColour($foreground);
+		$self->{tree}->SetBackgroundColour($background);
+
+		# $self->{search}->SetForegroundColour($foreground);
+		# $self->{search}->SetBackgroundColour($background);
+	}
+
+	return 1;
+}
+
+# Nothing to implement here
+sub relocale {
 	return;
 }
 
 sub refresh {
 	my $self = shift;
-	my $document = $self->current->document or return;
 
-	# If the document is unused, shortcut to avoid pointless tasks
-	if ( $document->is_unused ) {
-		my $lock = $self->main->lock('UPDATE');
+	# Abort any in-flight checks
+	$self->task_reset;
+
+	# Do we have a document with something in it?
+	my $document = $self->current->document;
+	unless ( $document and not $document->is_unused ) {
 		$self->clear;
 		return;
 	}
 
-	# Allows us to check when an empty or unsaved document is open
-	my $filename = defined( $document->filename ) ? $document->filename : '';
-
-	my $length = $document->text_length;
-
-	if ( $filename eq $self->{document} ) {
-
-		# Shortcut if nothing has changed.
-		# NOTE: Given the speed at which the timer fires a cheap
-		# length check is better than an expensive MD5 check.
-		return if ( $length eq $self->{length} );
+	# Is there a syntax check task for this document type
+	my $task = $document->task_syntax;
+	unless ($task) {
+		$self->clear;
+		return;
 	}
 
-	$self->{document} = $filename;
-	$self->{length}   = $length;
-
 	# Fire the background task discarding old results
-	$self->task_reset;
 	$self->task_request(
-		task     => $document->task_syntax,
+		task     => $task,
 		document => $document,
 	);
+
+	# Clear out the syntax check window, leaving the margin as is
+	$self->{tree}->DeleteAllItems;
+	$self->_update_help_page;
+
+	return 1;
 }
 
 sub task_finish {
@@ -377,6 +360,14 @@ sub render {
 	my $document = $current->document;
 	my $filename = $current->filename;
 	my $lock     = $self->main->lock('UPDATE');
+
+	# Clear all indicators
+	$editor->StartStyling( 0, Wx::wxSTC_INDICS_MASK );
+	$editor->SetStyling( $editor->GetTextLength - 1, 0 );
+
+	# NOTE: Recolor the document to make sure we do not accidentally
+	# remove syntax highlighting while syntax checking
+	$document->colourize;
 
 	# Flush old results
 	$self->clear;
@@ -417,15 +408,20 @@ sub render {
 	ISSUE:
 	foreach my $issue ( sort { $a->{line} <=> $b->{line} } @$model ) {
 
-		if ( not exists $issue->{type} ) {
-			require Data::Dumper;
-			TRACE( "Cannot handle issue:\n" . Data::Dumper::Dumper($issue) ) if DEBUG;
-			next ISSUE;
-		}
+		my $line       = $issue->{line} - 1;
+		my $type       = exists $issue->{type} ? $issue->{type} : 'F';
+		my $marker     = $MESSAGE{$type}{marker};
+		my $is_warning = $marker == Padre::Wx::MarkWarn();
+		$editor->MarkerAdd( $line, $marker );
 
-		my $line = $issue->{line} - 1;
-		my $type = $issue->{type};
-		$editor->MarkerAdd( $line, $MESSAGE{$type}{marker} );
+		# Underline the syntax warning/error line with an orange or red squiggle indicator
+		my $start  = $editor->PositionFromLine($line);
+		my $indent = $editor->GetLineIndentPosition($line);
+		my $end    = $editor->GetLineEndPosition($line);
+
+		# Change only the indicators
+		$editor->StartStyling( $indent, Wx::wxSTC_INDICS_MASK );
+		$editor->SetStyling( $end - $indent, $is_warning ? Wx::wxSTC_INDIC1_MASK : Wx::wxSTC_INDIC2_MASK );
 
 		my $item = $self->{tree}->AppendItem(
 			$root,
@@ -435,7 +431,7 @@ sub render {
 				$MESSAGE{$type}{label},
 				$issue->{message}
 			),
-			$MESSAGE{$type}{marker} == Padre::Wx::MarkWarn() ? $self->{images}{warning} : $self->{images}{error}
+			$is_warning ? $self->{images}{warning} : $self->{images}{error}
 		);
 		$self->{tree}->SetPlData( $item, $issue );
 	}
@@ -476,7 +472,7 @@ sub _update_help_page {
 		$help->Hide;
 	}
 
-	#Sticky note light-yellow background
+	# Sticky note light-yellow background
 	$self->{help}->SetBackgroundColour( Wx::Colour->new( 0xFD, 0xFC, 0xBB ) );
 
 	# Relayout to actually hide/show the help page

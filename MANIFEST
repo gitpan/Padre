@@ -2,7 +2,6 @@
 Artistic
 Changes
 COPYING
-dev
 eg/hello.pasm
 eg/perl5/cmd.pl
 eg/perl5/cyrillic_test.pl
@@ -188,6 +187,7 @@ lib/Padre/Wx/Debugger.pm
 lib/Padre/Wx/Dialog/Advanced.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
 lib/Padre/Wx/Dialog/DocStats.pm
+lib/Padre/Wx/Dialog/Expression.pm
 lib/Padre/Wx/Dialog/FilterTool.pm
 lib/Padre/Wx/Dialog/Find.pm
 lib/Padre/Wx/Dialog/FindFast.pm
@@ -231,6 +231,7 @@ lib/Padre/Wx/Directory/TreeCtrl.pm
 lib/Padre/Wx/Display.pm
 lib/Padre/Wx/Editor.pm
 lib/Padre/Wx/FBP/Bookmarks.pm
+lib/Padre/Wx/FBP/Expression.pm
 lib/Padre/Wx/FBP/Find.pm
 lib/Padre/Wx/FBP/FindFast.pm
 lib/Padre/Wx/FBP/FindInFiles.pm
@@ -298,7 +299,6 @@ LICENSE
 Makefile.PL
 MANIFEST			This list of files
 META.yml
-MYMETA.yml
 Padre.fbp
 padre.yml
 privinc/Module/Install/PRIVATE/Padre.pm
@@ -414,6 +414,7 @@ share/styles/evening.yml
 share/styles/mc.yml
 share/styles/night.yml
 share/styles/notepad.yml
+share/styles/solarize_dark.yml
 share/styles/ultraedit.yml
 share/templates/template.p6
 share/templates/template.pl
@@ -443,7 +444,6 @@ t/28_task_manager.t
 t/40-perl.t
 t/41-perl-project.t
 t/42-perl-project-temp.t
-t/43-perl-utils.t
 t/44-perl-syntax.t
 t/45-perl-functionlist.t
 t/50-browser.t
@@ -529,7 +529,9 @@ win32/README
 winxs/Makefile.PL
 winxs/Win32.xs
 xt/actions.t
+xt/actiontest.t
 xt/badcode.t
+xt/blockers.t
 xt/compile.t
 xt/copyright.t
 xt/crashtest.t
@@ -548,3 +550,4 @@ xt/pmv.t
 xt/pod.t
 xt/pragmas.t
 xt/test-plugin.t
+xt/threads.t

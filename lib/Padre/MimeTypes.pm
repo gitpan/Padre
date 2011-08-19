@@ -25,7 +25,7 @@ use Padre::Util    ('_T');
 use Padre::Wx      ();
 use Padre::DB      ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 # Binary file extensions, which we don't support loading at all
 my %EXT_BINARY = ();
@@ -779,6 +779,8 @@ sub guess_mimetype {
 	}
 
 	# Try derive the mime type from the basename
+	# Makefile is now highlighted as a Makefile
+	# Changelog files are now displayed as text files
 	if ($filename) {
 		my $basename = File::Basename::basename($filename);
 		if ($basename) {
@@ -799,6 +801,7 @@ sub guess_mimetype {
 			# of bits and Padre/Perl simply has the wrong point of view (UTF-8),
 			# so we drop these warnings:
 			local $SIG{__WARN__} = sub {
+
 				# Die if we throw a bad codepoint - this is a binary file.
 				if ( $_[0] =~ /Code point .* is not Unicode/ ) {
 					die $_[0];

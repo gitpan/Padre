@@ -17,7 +17,7 @@ use Padre::Wx             ();
 use Padre::Logger;
 use Wx::RichText; # Is this necesary?
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -200,7 +200,7 @@ sub gettext_label {
 # Tweaked to avoid strings copying as much as possible.
 sub AppendText {
 	my $self     = shift;
-	my $use_ansi = $self->main->ide->config->main_output_ansi;
+	my $use_ansi = $self->main->config->main_output_ansi;
 	if ( utf8::is_utf8( $_[0] ) ) {
 		if ($use_ansi) {
 			$self->_handle_ansi_escapes( $_[0] );
@@ -219,7 +219,7 @@ sub AppendText {
 	# Scroll down to the latest position
 	# Maybe we should check for a setting
 	# so user can set if they want scroll
-	$self->ShowPosition( $self->GetLastPosition() );
+	$self->ShowPosition( $self->GetLastPosition );
 	return ();
 }
 

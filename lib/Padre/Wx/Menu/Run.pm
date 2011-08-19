@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -42,7 +42,7 @@ sub new {
 		'run.run_command',
 	);
 
-	$self->AppendSeparator; 
+	$self->AppendSeparator;
 
 	$self->{run_tests} = $self->add_menu_action(
 		'run.run_tests',

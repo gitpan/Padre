@@ -8,7 +8,7 @@ use PPI::Dumper    ();
 use Text::Balanced ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 sub class_to_color {
 	my $class  = shift;
@@ -93,7 +93,7 @@ sub colorize {
 	$end_line          = $editor->LineFromPosition($end_pos);
 	$styling_start_pos = $editor->PositionFromLine($start_line);
 	$styling_end_pos   = $editor->GetLineEndPosition($end_line);
-	$line_count        = $editor->GetLineCount();
+	$line_count        = $editor->GetLineCount;
 	$last_char         = $editor->GetLineEndPosition( $line_count - 1 );
 	my $inital_text = $editor->GetTextRange( $start_pos, $end_pos );
 

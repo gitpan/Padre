@@ -36,7 +36,7 @@ use Padre::Constant (); ### NO other Padre:: dependencies
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.88';
+	$VERSION    = '0.90';
 	$COMPATIBLE = '0.81';
 }
 
@@ -236,7 +236,7 @@ sub parse_variable {
 				BEGIN { eval {
 					# Ensure any version() routine which might have leaked
 					# into this package has been deleted.  Interferes with
-					# version->import()
+					# version->import
 					undef *version;
 					require version;
 					"version"->import;
@@ -295,7 +295,7 @@ sub get_matches {
 	die 'missing parameters' if @_ < 4;
 
 	require Encode;
-	$text  = Encode::encode( 'utf-8', $text  );
+	$text  = Encode::encode( 'utf-8', $text );
 	$regex = Encode::encode( 'utf-8', $regex );
 
 	my @matches = ();

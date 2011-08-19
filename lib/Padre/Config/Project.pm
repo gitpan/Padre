@@ -5,11 +5,12 @@ package Padre::Config::Project;
 use 5.008;
 use strict;
 use warnings;
+use Scalar::Util   ();
 use File::Basename ();
 use YAML::Tiny     ();
 use Params::Util   ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 
 
@@ -48,6 +49,15 @@ sub read {
 		dirname  => $dirname,
 		fullname => $fullname,
 	);
+}
+
+#
+# my $new = $config->clone;
+#
+sub clone {
+	my $self  = shift;
+	my $class = Scalar::Util::blessed($self);
+	return $class->new(%$self);
 }
 
 # NOTE: Once we add the ability to edit the project settings, make sure

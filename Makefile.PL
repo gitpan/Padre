@@ -58,7 +58,7 @@ if ( '2.009000' eq Alien::wxWidgets->version ) {
 
 
 
- 
+
 #####################################################################
 # Normal Boring Commands
 
@@ -73,6 +73,8 @@ requires 'perl' => '5.008005';
 # General dependencies
 requires 'App::cpanminus'           => '0.9923';
 requires 'B::Deparse'               => 0;
+requires 'Capture::Tiny'            => '0.06';
+requires 'CGI'                      => '3.47';
 requires 'Class::Adapter'           => '1.05';
 requires 'Class::Inspector'         => '1.22';
 requires 'Class::Unload'            => '0.03';
@@ -84,7 +86,6 @@ requires 'DBI'                      => '1.58';
 requires 'Debug::Client'            => '0.11';
 requires 'Devel::Dumpvar'           => '0.04';
 requires 'Devel::Refactor'          => '0.05';
-requires 'Digest::MD5'              => '2.38';
 requires 'Encode'                   => '2.26';
 requires 'ExtUtils::MakeMaker'      => '6.56';
 requires 'ExtUtils::Manifest'       => '1.56';
@@ -116,8 +117,9 @@ requires 'JSON::XS'                 => '2.29';
 requires 'List::Util'               => '1.18';
 requires 'List::MoreUtils'          => '0.22';
 requires 'LWP'                      => '5.815';
+requires 'LWP::UserAgent'           => '5.815';
 requires 'Module::Build'            => '0.3603';
-requires 'Module::CoreList'         => 0;
+requires 'Module::CoreList'         => '2.22';
 requires 'Module::Manifest'         => '0.07';
 requires 'ORLite'                   => '1.48';
 requires 'Params::Util'             => '0.33';
@@ -152,7 +154,6 @@ requires 'Win32::TieRegistry' => '0.26' if win32;
 requires 'Wx' => ( win32 and $] >= 5.01 ) ? '0.9901' : '0.91';
 requires 'Wx::Perl::ProcessStream' => '0.29';
 requires 'YAML::Tiny'              => '1.32';
-test_requires 'Capture::Tiny'      => '0.06';
 test_requires 'Test::More'         => '0.88';
 test_requires 'Test::MockObject'   => '1.09';
 test_requires 'Test::Script'       => '1.07';

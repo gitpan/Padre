@@ -9,7 +9,7 @@ use Padre::Current  ();
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 
 
@@ -20,11 +20,18 @@ our $VERSION = '0.88';
 
 sub new {
 	my $class = shift;
-	my $self  = bless {
+
+	my $default_bg = Wx::SystemSettings::GetColour(Wx::wxSYS_COLOUR_WINDOW);
+	my $error_bg   = Wx::Colour->new(
+		$default_bg->Red,
+		int( $default_bg->Green * 0.5 ),
+		int( $default_bg->Blue * 0.5 )
+	);
+	my $self = bless {
 		restart          => 1,
 		backward         => 0,
-		default_bgcolour => Wx::Colour->new('#ffffff'),
-		error_bgcolour   => Wx::Colour->new('#ffaaaa'),
+		default_bgcolour => $default_bg,
+		error_bgcolour   => $error_bg,
 	}, $class;
 	return $self;
 }
@@ -64,7 +71,7 @@ sub search {
 # -- Private methods
 
 sub _find {
-	my $self = shift;
+	my $self    = shift;
 	my $current = Padre::Current->new;
 	my $editor  = $current->editor or return;
 	my $main    = $current->main;

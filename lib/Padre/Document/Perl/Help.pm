@@ -9,7 +9,7 @@ use Padre::Util ();
 use Padre::Help ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Help';
 
 # for caching help list (for faster access)
@@ -27,7 +27,7 @@ sub help_init {
 		return;
 	}
 
-	my @index = $self->_collect_perldoc();
+	my @index = $self->_collect_perldoc;
 
 	# Add Installed modules
 	push @index, $self->_find_installed_modules;

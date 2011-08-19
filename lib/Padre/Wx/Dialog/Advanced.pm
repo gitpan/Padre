@@ -8,7 +8,7 @@ use Padre::Config         ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -415,9 +415,9 @@ sub _on_copy_to_clipboard {
 	} elsif ( $action == COPY_VALUE ) {
 		$text = $pref->{value};
 	}
-	if ( $text and Wx::wxTheClipboard->Open() ) {
+	if ( $text and Wx::wxTheClipboard->Open ) {
 		Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($text) );
-		Wx::wxTheClipboard->Close();
+		Wx::wxTheClipboard->Close;
 	}
 
 	return;
@@ -708,9 +708,18 @@ sub _update_list {
 	# Recalculate sizers
 	$self->Layout;
 
-	my $index          = -1;
-	my $preferences    = $self->{preferences};
-	my $alternateColor = Wx::Colour->new( 0xED, 0xF5, 0xFF );
+	my $index       = -1;
+	my $preferences = $self->{preferences};
+
+	# Try to derive an alternate row colour based on the current system colour
+	my $realColor = Wx::SystemSettings::GetColour(Wx::wxSYS_COLOUR_WINDOW);
+
+	# Alternate candystripe is slightly darker and blueish
+	my $alternateColor = Wx::Colour->new(
+		int( $realColor->Red * 0.9 ),
+		int( $realColor->Green * 0.9 ),
+		$realColor->Blue,
+	);
 
 	my @preference_names = sort { $a cmp $b } keys %$preferences;
 	if ( $self->{sortcolumn} == 1 ) {

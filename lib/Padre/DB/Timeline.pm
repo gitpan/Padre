@@ -9,7 +9,7 @@ use DBI          ();
 use DBD::SQLite  ();
 use Params::Util ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 
 
@@ -20,7 +20,7 @@ our $VERSION = '0.88';
 
 sub new {
 	my $class = shift;
-	my $self  = bless { @_ }, $class;
+	my $self = bless {@_}, $class;
 
 	# Check the database handle
 	unless ( Params::Util::_INSTANCE( $self->dbh, 'DBI::db' ) ) {
@@ -51,6 +51,7 @@ sub upgrade {
 
 	# Roll the schema forwards
 	while ( $want and $want > $have ) {
+
 		# Find the migration step
 		my $method = "upgrade" . ++$have;
 		unless ( $self->can($method) ) {

@@ -6,7 +6,7 @@ use warnings;
 use Pod::Perldoc        ();
 use Pod::Perldoc::ToPod ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Pod::Perldoc';
 
 sub new {
@@ -56,10 +56,10 @@ sub process {
 
 	return $self->usage_brief unless @pages;
 
-	$self->find_good_formatter_class();
-	$self->formatter_sanity_check();
+	$self->find_good_formatter_class;
+	$self->formatter_sanity_check;
 
-	$self->maybe_diddle_INC();
+	$self->maybe_diddle_INC;
 
 	# for when we're apparently in a module or extension directory
 

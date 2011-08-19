@@ -88,13 +88,9 @@ use Carp         ();
 use Exporter     ();
 use Params::Util ();
 
-our $VERSION   = '0.88';
+our $VERSION   = '0.90';
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_CURRENT';
-
-use Class::XSAccessor {
-	constructor => 'new',
-};
 
 
 
@@ -119,6 +115,18 @@ sub _CURRENT {
 	}
 
 	return Padre::Current->new;
+}
+
+
+
+
+
+#####################################################################
+# Constructor
+
+sub new {
+	my $class = shift;
+	bless {@_}, $class;
 }
 
 

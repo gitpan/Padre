@@ -10,7 +10,7 @@ use Padre::Feature  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -140,7 +140,7 @@ sub new {
 		'edit.next_problem',
 	);
 
-	if ( Padre::Feature::QUICK_FIX ) {
+	if (Padre::Feature::QUICK_FIX) {
 		$self->{quick_fix} = $self->add_menu_action(
 			'edit.quick_fix',
 		);
@@ -342,7 +342,7 @@ sub refresh {
 
 	# Handle the simple cases
 	$self->{next_problem}->Enable($hasdoc);
-	if ( Padre::Feature::QUICK_FIX ) {
+	if (Padre::Feature::QUICK_FIX) {
 		$self->{quick_fix}->Enable($quickfix);
 	}
 	$self->{autocomp}->Enable($hasdoc);

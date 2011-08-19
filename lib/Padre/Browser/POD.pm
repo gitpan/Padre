@@ -12,7 +12,7 @@ use Pod::Abstract                 ();
 use Padre::Browser::Document      ();
 use Padre::Browser::PseudoPerldoc ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 use Class::XSAccessor {
 	constructor => 'new',
@@ -65,7 +65,7 @@ sub resolve {
 	SCOPE: {
 		local *STDERR = IO::Scalar->new;
 		local *STDOUT = IO::Scalar->new;
-		eval { $pd->process() };
+		eval { $pd->process };
 	}
 
 	return unless -s $tempfile;

@@ -36,29 +36,35 @@ for modules that use this system.
 use 5.008;
 use strict;
 use warnings;
-use constant       ();
-use Padre::Config  ();
+use constant      ();
+use Padre::Config ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 my $config = Padre::Config->read;
 
-constant->import( {
-	# Bloaty features users can disable
-	BOOKMARK        => $config->feature_bookmark,
-	CURSORMEMORY    => $config->feature_cursormemory,
-	DEBUGGER        => $config->feature_debugger,
-	FOLDING         => $config->feature_folding,
-	FONTSIZE        => $config->feature_fontsize,
-	SESSION         => $config->feature_session,
+constant->import(
+	{
 
-	# Experimental features users can enable
-	QUICK_FIX       => $config->feature_quick_fix,
-	REPLACEINFILES  => $config->feature_replaceinfiles,
-	SYNC            => $config->feature_sync,
-	WIZARD_SELECTOR => $config->feature_wizard_selector,
-	WX_SCINTILLA    => $config->feature_wx_scintilla,
-} );
+		# Bloaty features users can disable
+		BOOKMARK     => $config->feature_bookmark,
+		CURSORMEMORY => $config->feature_cursormemory,
+		DEBUGGER     => $config->feature_debugger,
+		FOLDING      => $config->feature_folding,
+		FONTSIZE     => $config->feature_fontsize,
+		SESSION      => $config->feature_session,
+
+		# Experimental features users can enable
+		QUICK_FIX       => $config->feature_quick_fix,
+		REPLACEINFILES  => $config->feature_replaceinfiles,
+		SYNC            => $config->feature_sync,
+		STYLE_GUI       => $config->feature_style_gui,
+		WIZARD_SELECTOR => $config->feature_wizard_selector,
+		WX_SCINTILLA    => $config->feature_wx_scintilla,
+		DEVEL_ENDSTATS  => $config->feature_devel_endstats,
+		DEVEL_TRACEUSE  => $config->feature_devel_traceuse,
+	}
+);
 
 1;
 

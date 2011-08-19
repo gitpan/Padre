@@ -24,7 +24,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.81';
 
 # Since everything is used OO-style, we will be require'ing
@@ -78,6 +78,9 @@ sub import {
 		Padre/CPAN.pm
 		Padre/Test.pm
 	};
+	if (Padre::Constant::WIN32) {
+		$skip{'Padre/Util/Win32.pm'} = 1;
+	}
 	foreach my $child (@children) {
 
 		# Evil modules we should avoid
@@ -175,9 +178,9 @@ sub run {
 
 	# If we are on Windows, disable Win32::SetChildShowWindow so that
 	# calls to system() or qx() won't spawn visible command line windows.
-	if ( Padre::Constant::WIN32 ) {
+	if (Padre::Constant::WIN32) {
 		require Win32;
-		Win32::SetChildShowWindow( Win32::SW_HIDE );
+		Win32::SetChildShowWindow( Win32::SW_HIDE() );
 	}
 
 	# Allow scripts to detect that they are being executed within Padre
@@ -186,7 +189,8 @@ sub run {
 	TRACE("Padre->run was called version $VERSION") if DEBUG;
 
 	# Make WxWidgets translate the default buttons
-	local $ENV{LANGUAGE} = Padre::Constant::UNIX
+	local $ENV{LANGUAGE} =
+		Padre::Constant::UNIX
 		? $self->config->locale
 		: $ENV{LANGUAGE};
 

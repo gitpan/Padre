@@ -7,7 +7,7 @@ use Params::Util          ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -135,13 +135,9 @@ sub on_auinotebook_page_changed {
 		my $current      = Scalar::Util::refaddr($editor);
 		@$page_history = grep { $_ != $current } @$page_history;
 		push @$page_history, $current;
-
-		# Update indentation in case auto-update is on
-		# TO DO: Violates encapsulation
-		$editor->{Document}->set_indentation_style;
 	}
 
-	$main->{ide}->plugin_manager->plugin_event('editor_changed');
+	$main->ide->plugin_manager->plugin_event('editor_changed');
 }
 
 

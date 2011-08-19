@@ -37,7 +37,7 @@ use Padre::Wx::Frame::Null ();
 
 # use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Wx::App';
 
 
@@ -50,7 +50,7 @@ our @ISA     = 'Wx::App';
 my $SINGLETON = undef;
 
 sub new {
-	unless ( $SINGLETON ) {
+	unless ($SINGLETON) {
 		$SINGLETON = shift->SUPER::new;
 		$SINGLETON->{conduit} = Padre::Wx::Frame::Null->new;
 		$SINGLETON->{conduit}->conduit_init;

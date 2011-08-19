@@ -13,7 +13,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -39,7 +39,7 @@ sub new {
 	);
 
 	# Config Sync
-	if ( Padre::Feature::SYNC ) {
+	if (Padre::Feature::SYNC) {
 		$self->add_menu_action(
 			'tools.sync',
 		);
@@ -61,7 +61,7 @@ sub new {
 	my $modules = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Module Tools'),
+		Wx::gettext('&Module Tools'),
 		$modules,
 	);
 
@@ -98,7 +98,7 @@ sub new {
 	my $tools = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Plug-in Tools'),
+		Wx::gettext('P&lug-in Tools'),
 		$tools,
 	);
 

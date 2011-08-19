@@ -8,7 +8,7 @@ use Padre::Config   ();
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 # Generate faster accessors
 use Class::XSAccessor {
@@ -139,9 +139,10 @@ sub label_menu {
 
 	my $shortcut = $self->shortcut;
 
-	if ( $shortcut
-		and ( ( $shortcut eq 'F12' ) 
-			or ( $self->id == -1 or Padre::Constant::WIN32() or Padre::Constant::MAC()) ) )
+	if ($shortcut
+		and (  ( $shortcut eq 'F12' )
+			or ( $self->id == -1 or Padre::Constant::WIN32() or Padre::Constant::MAC() ) )
+		)
 	{
 		$label .= "\t" . $shortcut;
 	}

@@ -6,6 +6,7 @@ use warnings;
 use Params::Util                   ();
 use Padre::Current                 ();
 use Padre::Util                    ();
+use Padre::Feature                 ();
 use Padre::Role::Task              ();
 use Padre::Wx::Role::Dwell         ();
 use Padre::Wx::Role::View          ();
@@ -14,7 +15,7 @@ use Padre::Wx::Directory::TreeCtrl ();
 use Padre::Wx                      ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Dwell
@@ -133,6 +134,10 @@ sub new {
 	# Fits panel layout
 	$self->SetSizerAndFit($sizerh);
 	$sizerh->SetSizeHints($self);
+
+	if (Padre::Feature::STYLE_GUI) {
+		$self->recolour;
+	}
 
 	return $self;
 }
@@ -311,6 +316,34 @@ sub clear {
 	$self->{search}->ShowCancelButton(0);
 	$self->{tree}->DeleteChildren( $self->{tree}->GetRootItem );
 	return;
+}
+
+# Pick up colouring from the current editor style
+sub recolour {
+	my $self   = shift;
+	my $config = $self->config;
+
+	# Load the editor style
+	require Padre::Wx::Editor;
+	my $data = Padre::Wx::Editor::data( $config->editor_style ) or return;
+
+	# Find the colours we need
+	my $foreground = $data->{padre}->{colors}->{PADRE_BLACK}->{foreground};
+	my $background = $data->{padre}->{background};
+
+	# Apply them to the widgets
+	if ( defined $foreground and defined $background ) {
+		$foreground = Padre::Wx::color($foreground);
+		$background = Padre::Wx::color($background);
+
+		$self->{tree}->SetForegroundColour($foreground);
+		$self->{tree}->SetBackgroundColour($background);
+
+		# $self->{search}->SetForegroundColour($foreground);
+		# $self->{search}->SetBackgroundColour($background);
+	}
+
+	return 1;
 }
 
 # Refill the tree from storage

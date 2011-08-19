@@ -7,8 +7,9 @@ use strict;
 use warnings;
 use File::Spec      ();
 use Padre::Constant ();
+use Padre::Current  ();
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.81';
 
 
@@ -91,10 +92,16 @@ sub documents {
 
 sub config {
 	my $self = shift;
+
+	# We only need our own config file if we have a padre.yml file
+	unless ( defined $self->{padre_yml} ) {
+		require Padre::Current;
+		return Padre::Current->config;
+	}
+
 	unless ( $self->{config} ) {
 
 		# Get the default config object
-		require Padre::Current;
 		my $config = Padre::Current->config;
 
 		# If we have a padre.yml file create a custom config object
@@ -116,6 +123,7 @@ sub config {
 			);
 		}
 	}
+
 	return $self->{config};
 }
 
@@ -168,7 +176,7 @@ sub _vcs {
 
 
 ######################################################################
-# Process Execution Resources
+# Process Execution
 
 sub temp {
 	$_[0]->{temp} or $_[0]->{temp} = $_[0]->_temp;
@@ -202,6 +210,53 @@ sub temp_sync {
 	}
 
 	return $files;
+}
+
+sub launch_shell {
+	my $self   = shift;
+	my $config = $self->config;
+	my $shell  = $config->bin_shell or return;
+
+	if (Padre::Constant::WIN32) {
+		require Win32;
+		require Padre::Util::Win32;
+		Win32::SetChildShowWindow( Win32::SW_SHOWNORMAL() );
+		Padre::Util::Win32::ExecuteProcessAndWait(
+			directory  => $self->{project},
+			file       => 'cmd.exe',
+			parameters => "/C $shell",
+		);
+		Win32::SetChildShowWindow( Win32::SW_HIDE() );
+
+	} else {
+		require File::pushd;
+		my $pushd = File::pushd::pushd( $self->root );
+		system $shell;
+	}
+
+	return 1;
+}
+
+# Run a command and wait
+sub launch_system {
+	my $self = shift;
+	my $cmd  = shift;
+
+	# Make sure we execute from the correct directory
+	if (Padre::Constant::WIN32) {
+		require Padre::Util::Win32;
+		Padre::Util::Win32::ExecuteProcessAndWait(
+			directory  => $self->{project},
+			file       => 'cmd.exe',
+			parameters => "/C $cmd",
+		);
+	} else {
+		require File::pushd;
+		my $pushd = File::pushd::pushd( $self->root );
+		system $cmd;
+	}
+
+	return 1;
 }
 
 

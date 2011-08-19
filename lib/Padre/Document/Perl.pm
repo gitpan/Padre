@@ -14,9 +14,10 @@ use Padre::Perl       ();
 use Padre::Document   ();
 use Padre::File       ();
 use Padre::Role::Task ();
+use Padre::Feature    ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -53,10 +54,17 @@ sub task_syntax {
 # (Ballpark: Around 1 Gigahertz-second of *BLOCKING* CPU per 1000 lines)
 # Check out Padre::Task::PPI and children instead!
 sub ppi_get {
+	require PPI::Document;
 	my $self = shift;
 	my $text = $self->text_get;
-	require PPI::Document;
 	PPI::Document->new( \$text );
+}
+
+sub ppi_dump {
+	require PPI::Dumper;
+	my $self = shift;
+	my $ppi  = $self->ppi_get;
+	PPI::Dumper->new( $ppi, locations => 1, indent => 4 )->string;
 }
 
 sub ppi_set {
@@ -284,13 +292,11 @@ sub guess_subpath {
 my $keywords;
 
 sub keywords {
-	$keywords or
-	$keywords = YAML::Tiny::LoadFile(
-		Padre::Util::sharefile( 'languages', 'perl5', 'perl5.yml' )
-	);
+	$keywords
+		or $keywords = YAML::Tiny::LoadFile( Padre::Util::sharefile( 'languages', 'perl5', 'perl5.yml' ) );
 }
 
-my $wordchars =  join '', '$@%&_:[]{}', 0 .. 9, 'A' .. 'Z', 'a' .. 'z';
+my $wordchars = join '', '$@%&_:[]{}', 0 .. 9, 'A' .. 'Z', 'a' .. 'z';
 
 sub stc_word_chars {
 	return $wordchars;
@@ -301,28 +307,6 @@ sub stc_word_chars {
 # return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
 sub get_function_regex {
 	return qr/(?:^|[^# \t-])[ \t]*((?:sub|func|method)\s+$_[1]\b|\*$_[1]\s*=\s*(?:sub\b|\\\&))/;
-}
-
-sub get_functions {
-	$_[0]->find_functions( $_[0]->text_get );
-}
-
-sub find_functions {
-	my $n = "\\cM?\\cJ";
-	return grep { defined $_ } $_[1] =~ m/
-		(?:
-			${n}__(?:DATA|END)__\b.*
-			|
-			$n$n=\w+.*?$n\s*?$n=cut\b(?=.*?(?:$n){1,2})
-			|
-			(?:^|$n)\s*
-			(?:
-				(?:sub|func|method)\s+(\w+(?:::\w+)*)
-				|
-				\* (\w+(?:::\w+)*) \s* = \s* (?: sub \b | \\\& )
-			)
-		)
-	/sgx;
 }
 
 =pod
@@ -377,8 +361,16 @@ sub get_command {
 	my $shortname = File::Basename::basename($filename);
 
 	my @commands = (qq{"$perl"});
-	push @commands, '-d'                        if $debug;
+	push @commands, '-d' if $debug;
 	push @commands, '-Mdiagnostics(-traceonly)' if $trace;
+	if (Padre::Feature::DEVEL_ENDSTATS) {
+		my $devel_endstats_options = $config->feature_devel_endstats_options;
+		push @commands, '-MDevel::EndStats' . ( $devel_endstats_options ne '' ? "=$devel_endstats_options" : '' );
+	}
+	if (Padre::Feature::DEVEL_TRACEUSE) {
+		my $devel_traceuse_options = $config->feature_devel_traceuse_options;
+		push @commands, '-d:TraceUse' . ( $devel_traceuse_options ne '' ? "=$devel_traceuse_options" : '' );
+	}
 	push @commands, "$run_args{interpreter}";
 	if (Padre::Constant::WIN32) {
 		push @commands, qq{"$shortname"$script_args};
@@ -490,15 +482,14 @@ sub beginner_check {
 		document => $self,
 		editor   => $self->editor
 	);
-
 	$beginner->check( $self->text_get );
 
+	# Report any errors
 	my $error = $beginner->error;
-
 	if ($error) {
-		Padre->ide->wx->main->error( Wx::gettext('Error: ') . $error );
+		$self->current->main->error( Wx::gettext('Error: ') . $error );
 	} else {
-		Padre->ide->wx->main->message( Wx::gettext('No errors found.') );
+		$self->current->main->message( Wx::gettext('No errors found.') );
 	}
 
 	return 1;
@@ -549,9 +540,8 @@ sub find_unmatched_brace_response {
 # to what PPI considers a PPI::Token::Symbol, but since we're doing
 # it the manual, stupid way, this may also work within quotelikes and regexes.
 sub get_current_symbol {
-	my $self = shift;
-	my $pos  = shift;
-
+	my $self   = shift;
+	my $pos    = shift;
 	my $editor = $self->editor;
 	$pos = $editor->GetCurrentPos if not defined $pos;
 
@@ -656,7 +646,9 @@ sub find_variable_declaration_response {
 }
 
 sub find_method_declaration {
-	my ($self) = @_;
+	my $self   = shift;
+	my $main   = $self->current->main;
+	my $editor = $self->editor;
 
 	my ( $location, $token ) = $self->get_current_symbol;
 	unless ( defined $location ) {
@@ -664,28 +656,12 @@ sub find_method_declaration {
 			Wx::gettext("Current cursor does not seem to point at a method"),
 			Wx::gettext("Check cancelled"),
 			Wx::wxOK,
-			Padre->ide->wx->main
+			$main
 		);
 		return ();
 	}
-	if ( $token =~ /^\w+$/ ) {
-
-		# check if there is -> before or (  after or shall we look it up in the list of existing methods?
-		# search for sub someting in
-		#    current file
-		#    all the files in the project directory (if in project)
-		# cache the list of methods found
-	}
-
-	#	Wx::MessageBox(
-	#		Wx::gettext("Current '$token' $location"),
-	#		Wx::gettext("Check cancelled"),
-	#		Wx::wxOK,
-	#		Padre->ide->wx->main
-	#	);
 
 	# Try to extract class methods' class name
-	my $editor       = $self->editor;
 	my $line         = $location->[0] - 1;
 	my $col          = $location->[1] - 1;
 	my $line_start   = $editor->PositionFromLine($line);
@@ -694,43 +670,36 @@ sub find_method_declaration {
 	my ($class) = $line_content =~ /(?:^|[^\w:\$])(\w+(?:::\w+)*)\s*->\s*\Q$token\E$/;
 
 	my ( $found, $filename ) = $self->_find_method( $token, $class );
-	if ( not $found ) {
+	unless ($found) {
 		Wx::MessageBox(
 			sprintf( Wx::gettext("Current '%s' not found"), $token ),
 			Wx::gettext("Check cancelled"),
 			Wx::wxOK,
-			Padre->ide->wx->main
+			$main
 		);
 		return;
 	}
 
 	require Padre::Wx::Dialog::Positions;
-	Padre::Wx::Dialog::Positions->set_position();
+	Padre::Wx::Dialog::Positions->set_position;
 
-	if ( not $filename ) {
-
-		#print "No filename\n";
-		# goto $line in current file
-
-		$self->goto_sub($token);
-	} else {
-		my $main = Padre->ide->wx->main;
-
-		# open or switch to file
-		my $id = $main->editor_of_file($filename);
-		if ( not defined $id ) {
-			$id = $main->setup_editor($filename);
-		}
-
-		#print "Filename '$filename' id '$id'\n";
-		# goto $line in that file
-		return if not defined $id;
-
-		#print "ID $id\n";
-		my $editor = $main->notebook->GetPage($id);
-		$editor->{Document}->goto_sub($token);
+	# Go to function in current file
+	unless ($filename) {
+		$editor->goto_function($token);
+		return ();
 	}
 
+	# Open or switch to file
+	my $id = $main->editor_of_file($filename);
+	unless ( defined $id ) {
+		$id = $main->setup_editor($filename);
+	}
+	return unless defined $id;
+
+	SCOPE: {
+		my $editor = $main->notebook->GetPage($id) or return;
+		$editor->goto_function($token);
+	}
 
 	return ();
 }
@@ -756,7 +725,7 @@ sub _find_method {
 						or not $tag->{extension}{class} eq $class;
 				last;
 			} continue {
-				$tag = $parser->findNextTag();
+				$tag = $parser->findNextTag;
 			}
 
 			# fall back to the first method name match (bad idea?)
@@ -774,7 +743,7 @@ sub _find_method {
 
 		# Consume the basic function list
 		my $filename = $self->filename;
-		$self->{_methods_}->{$_} = $filename for $self->get_functions;
+		$self->{_methods_}->{$_} = $filename foreach $self->functions;
 
 		# Scan for declarations in all module files.
 		# TODO: This is horrendously slow to be running in the foreground.
@@ -810,70 +779,9 @@ sub _find_method {
 	return;
 }
 
-#scan text for sub declaration
-sub _find_sub_decl_line_number {
-	my $name  = shift;
-	my $text  = shift;
-	my @lines = split /\n/, $text;
 
-	foreach my $i ( 0 .. $#lines ) {
-		if ($lines[$i] =~ /sub \s+ $name\b
-		 (?!;)
-		 (?! \([\$;\@\%\\]+ \);)
-		 /x
-			)
-		{
-			return $i;
-		}
-	}
 
-	return -1;
-}
 
-# Go to the named subroutine
-# Uses the outline if there is one (if the user has opened the outline tree)
-# If not, falls back to a regex, which is pretty basic at the moment
-# Perhaps we could always run the outline task, even if the tree is not open?
-sub goto_sub {
-	my ( $self, $name ) = @_;
-
-	if ( my $line = $self->get_sub_line_number($name) ) {
-		$self->editor->goto_line_centerize($line);
-		return;
-	}
-
-	# Fall back to regexs if there's no outline
-	my $line = _find_sub_decl_line_number( $name, $self->text_get );
-	if ( $line > -1 ) {
-		$self->editor->goto_line_centerize($line);
-		return 1;
-	}
-
-	return;
-}
-
-# Check the outline data to see if we have a particular sub
-sub has_sub {
-	my $self = shift;
-	my $sub  = shift;
-
-	return $self->get_sub_line_number($sub) ? 1 : 0;
-}
-
-# Returns the line number of a sub (or undef if it doesn't exist) based on the outline data
-sub get_sub_line_number {
-	my $self = shift;
-	my $sub  = shift or return;
-	my $data = $self->outline_data or return;
-
-	foreach my $package (@$data) {
-		foreach my $method ( @{ $package->{methods} } ) {
-			return $method->{line} if $method->{name} eq $sub;
-		}
-	}
-
-	return;
-}
 
 #####################################################################
 # Padre::Document Document Manipulation
@@ -954,7 +862,6 @@ sub change_variable_style {
 
 	return;
 }
-
 
 sub rename_variable_response {
 	my $self = shift;
@@ -1048,7 +955,7 @@ sub extract_subroutine {
 	my $editor = $self->editor;
 
 	# get the selected code
-	my $code = $editor->GetSelectedText();
+	my $code = $editor->GetSelectedText;
 
 	#print "startlocation: " . join(", ", @$start_position) . "\n";
 	# this could be configurable
@@ -1068,7 +975,7 @@ EOC
 
 	# we want to get a list of the subroutines to pick where to place
 	# the new sub
-	my @functions = $self->get_functions;
+	my @functions = $self->functions;
 
 	# need to check there are functions already defined
 	if ( scalar(@functions) == 0 ) {
@@ -1091,10 +998,10 @@ EOC
 		require PPIx::EditorTools;
 		my $token = PPIx::EditorTools::find_token_at_location( $ppi_doc, $start_position );
 		return unless $token;
-		my $statement = $token->statement();
+		my $statement = $token->statement;
 		my $parent    = $statement;
 
-		#print "The statement is: " . $statement->statement() . "\n";
+		#print "The statement is: " . $statement->statement . "\n";
 		my $last_location; # use this to get the last point before the PPI::Document
 		while ( !$parent->isa('PPI::Document') ) {
 
@@ -1113,10 +1020,10 @@ EOC
 		#print "Document start location is: $doc_start_location\n";
 
 		# make the change to the selected text
-		$editor->BeginUndoAction(); # do the edit atomically
+		$editor->BeginUndoAction; # do the edit atomically
 		$editor->ReplaceSelection($new_sub_call);
 		$editor->InsertText( $insert_start_location, $data->GetText );
-		$editor->EndUndoAction();
+		$editor->EndUndoAction;
 
 		return;
 	}
@@ -1124,19 +1031,19 @@ EOC
 	# Show a list of functions
 	require Padre::Wx::Dialog::RefactorSelectFunction;
 	my $dialog = Padre::Wx::Dialog::RefactorSelectFunction->new( $editor->main, \@functions );
-	$dialog->show();
+	$dialog->show;
 	if ( $dialog->{cancelled} ) {
 
-		#$dialog->Destroy();
+		#$dialog->Destroy;
 		return ();
 	}
 
 	my $subname = $dialog->get_function_name;
 
-	#$dialog->Destroy();
+	#$dialog->Destroy;
 
 	# make the change to the selected text
-	$editor->BeginUndoAction(); # do the edit atomically
+	$editor->BeginUndoAction; # do the edit atomically
 	$editor->ReplaceSelection($new_sub_call);
 
 	# with the change made
@@ -1144,14 +1051,14 @@ EOC
 	my ( $start, $end ) = Padre::Util::get_matches(
 		$editor->GetText,
 		$self->get_function_regex($subname),
-		$editor->GetSelection,  # Provides two params
+		$editor->GetSelection, # Provides two params
 	);
 	unless ( defined $start ) {
 
 		# This needs to now rollback the
 		# the changes made with the editor
-		$editor->Undo();
-		$editor->EndUndoAction();
+		$editor->Undo;
+		$editor->EndUndoAction;
 
 		# Couldn't find it
 		# should be dialog
@@ -1161,7 +1068,7 @@ EOC
 
 	# now insert the text into the right location
 	$editor->InsertText( $start, $data->GetText );
-	$editor->EndUndoAction();
+	$editor->EndUndoAction;
 
 	return ();
 
@@ -1347,7 +1254,7 @@ sub autocomplete {
 	# check for variables
 	my $parser = $self->perltags_parser;
 
-	my $last = $editor->GetLength();
+	my $last = $editor->GetLength;
 
 	my $pre_text  = $editor->GetTextRange( 0,    $first );
 	my $post_text = $editor->GetTextRange( $pos, $last );
@@ -1367,7 +1274,7 @@ sub autocomplete {
 	my @ret = $ac->run($parser);
 	return @ret if @ret;
 
-	return $ac->auto();
+	return $ac->auto;
 }
 
 sub newline_keep_column {
@@ -1657,17 +1564,17 @@ sub event_on_left_up {
 
 		# Does it look like a variable?
 		if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
-			$self->find_variable_declaration();
+			$self->find_variable_declaration;
 		}
 
 		# Does it look like a function?
-		elsif ( defined $location && $self->has_sub($token) ) {
-			$self->goto_sub($token);
+		elsif ( defined $location and $editor->has_function($token) ) {
+			$editor->goto_function($token);
 		}
 
 		# Does it look like a path or module?
-		elsif ( defined($token) and ( $token =~ /(?:\/|\:\:)/ ) ) {
-			Padre->ide->wx->main->on_open_selection($token);
+		elsif ( defined $token and $token =~ /(?:\/|\:\:)/ ) {
+			$self->current->main->on_open_selection($token);
 		}
 	}
 }
@@ -1677,24 +1584,27 @@ sub event_mouse_moving {
 	my $editor = shift;
 	my $event  = shift;
 
-	if ( $event->Moving && $event->ControlDown ) {
+	if ( $event->Moving and $event->ControlDown ) {
 
-		# Mouse is moving with ctrl pressed. If anything under the cursor looks like it can be
-		#  clicked on to take us somewhere, highlight it.
-		# TODO: currently only supports subs/methods in the same file
-		my $point = $event->GetPosition();
+		# Mouse is moving with ctrl pressed. If anything under the
+		# cursor looks like it can be clicked on to take us somewhere,
+		# highlight it.
+		# TODO: Currently only supports subs/methods in the same file
+		my $point = $event->GetPosition;
 		my $pos   = $editor->PositionFromPoint($point);
 		my ( $location, $token ) = $self->get_current_symbol($pos);
 
 		$token ||= '';
 
-		if ( $self->{last_highlight} && $token ne $self->{last_highlight}{token} ) {
+		if ( $self->{last_highlight} and $token ne $self->{last_highlight}->{token} ) {
 
-			# No longer mousing over the same token, so un-highlight it
+			# No longer mousing over the same token so un-highlight it
 			$self->_clear_highlight($editor);
+			$self->{last_highlight} = undef;
 		}
 
-		return unless $self->has_sub($token);
+		return unless length $token;
+		return unless $editor->has_function($token);
 
 		$editor->StartStyling( $location->[2], Wx::wxSTC_INDICS_MASK );
 		$editor->SetStyling( length($token), Wx::wxSTC_INDIC2_MASK );
@@ -1882,34 +1792,36 @@ sub guess_filename_to_open {
 
 sub lexer_keywords {
 	return [
+
 		# Perl Keywords
-		[ qw(NULL __FILE__ __LINE__ __PACKAGE__ __DATA__ __END__ AUTOLOAD
-		BEGIN CORE DESTROY END EQ GE GT INIT LE LT NE CHECK abs accept
-		alarm and atan2 bind binmode bless caller chdir chmod chomp chop
-		chown chr chroot close closedir cmp connect continue cos crypt
-		dbmclose dbmopen defined delete die do dump each else elsif endgrent
-		endhostent endnetent endprotoent endpwent endservent eof eq eval
-		exec exists exit exp fcntl fileno flock for foreach fork format
-		formline ge getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname
-		gethostent getlogin getnetbyaddr getnetbyname getnetent getpeername
-		getpgrp getppid getpriority getprotobyname getprotobynumber getprotoent
-		getpwent getpwnam getpwuid getservbyname getservbyport getservent
-		getsockname getsockopt glob gmtime goto grep gt hex if index
-		int ioctl join keys kill last lc lcfirst le length link listen
-		local localtime lock log lstat lt map mkdir msgctl msgget msgrcv
-		msgsnd my ne next no not oct open opendir or ord our pack package
-		pipe pop pos print printf prototype push quotemeta qu
-		rand read readdir readline readlink readpipe recv redo
-		ref rename require reset return reverse rewinddir rindex rmdir
-		scalar seek seekdir select semctl semget semop send setgrent
-		sethostent setnetent setpgrp setpriority setprotoent setpwent
-		setservent setsockopt shift shmctl shmget shmread shmwrite shutdown
-		sin sleep socket socketpair sort splice split sprintf sqrt srand
-		stat study sub substr symlink syscall sysopen sysread sysseek
-		system syswrite tell telldir tie tied time times truncate
-		uc ucfirst umask undef unless unlink unpack unshift untie until
-		use utime values vec wait waitpid wantarray warn while write
-		xor given when default say state UNITCHECK) ],
+		[   qw(NULL __FILE__ __LINE__ __PACKAGE__ __DATA__ __END__ AUTOLOAD
+				BEGIN CORE DESTROY END EQ GE GT INIT LE LT NE CHECK abs accept
+				alarm and atan2 bind binmode bless caller chdir chmod chomp chop
+				chown chr chroot close closedir cmp connect continue cos crypt
+				dbmclose dbmopen defined delete die do dump each else elsif endgrent
+				endhostent endnetent endprotoent endpwent endservent eof eq eval
+				exec exists exit exp fcntl fileno flock for foreach fork format
+				formline ge getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname
+				gethostent getlogin getnetbyaddr getnetbyname getnetent getpeername
+				getpgrp getppid getpriority getprotobyname getprotobynumber getprotoent
+				getpwent getpwnam getpwuid getservbyname getservbyport getservent
+				getsockname getsockopt glob gmtime goto grep gt hex if index
+				int ioctl join keys kill last lc lcfirst le length link listen
+				local localtime lock log lstat lt map mkdir msgctl msgget msgrcv
+				msgsnd my ne next no not oct open opendir or ord our pack package
+				pipe pop pos print printf prototype push quotemeta qu
+				rand read readdir readline readlink readpipe recv redo
+				ref rename require reset return reverse rewinddir rindex rmdir
+				scalar seek seekdir select semctl semget semop send setgrent
+				sethostent setnetent setpgrp setpriority setprotoent setpwent
+				setservent setsockopt shift shmctl shmget shmread shmwrite shutdown
+				sin sleep socket socketpair sort splice split sprintf sqrt srand
+				stat study sub substr symlink syscall sysopen sysread sysseek
+				system syswrite tell telldir tie tied time times truncate
+				uc ucfirst umask undef unless unlink unpack unshift untie until
+				use utime values vec wait waitpid wantarray warn while write
+				xor given when default say state UNITCHECK)
+		],
 	];
 }
 

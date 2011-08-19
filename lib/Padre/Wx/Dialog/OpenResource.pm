@@ -11,7 +11,7 @@ use Padre::Wx::Role::Main ();
 use Padre::MimeTypes      ();
 use Padre::Role::Task     ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Main
@@ -389,7 +389,7 @@ sub _setup_events {
 		$self,
 		$self->{copy_button},
 		sub {
-			my @matches      = $self->{matches_list}->GetSelections();
+			my @matches      = $self->{matches_list}->GetSelections;
 			my $num_selected = scalar @matches;
 			if ( $num_selected == 1 ) {
 				if ( Wx::wxTheClipboard->Open ) {

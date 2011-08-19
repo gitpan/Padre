@@ -127,6 +127,7 @@ use warnings;
 use Carp ();
 use File::Spec 3.21 (); # 3.21 needed for volume-safe abs2rel
 use File::Temp       ();
+use Params::Util     ();
 use Padre::Constant  ();
 use Padre::Current   ();
 use Padre::Util      ();
@@ -135,8 +136,8 @@ use Padre::MimeTypes ();
 use Padre::File      ();
 use Padre::Logger;
 
-our $VERSION    = '0.88';
-our $COMPATIBLE = '0.81';
+our $VERSION    = '0.90';
+our $COMPATIBLE = '0.89';
 
 
 
@@ -176,7 +177,7 @@ my $UNSAVED = 0;
 
 use Class::XSAccessor {
 	getters => {
-		unsaved     => 'unsaved',
+		unsaved      => 'unsaved',
 		filename     => 'filename',    # setter is defined as normal function
 		file         => 'file',        # Padre::File - object
 		editor       => 'editor',
@@ -214,7 +215,7 @@ MIME type is defined by the C<guess_mimetype> function.
 
 sub new {
 	my $class = shift;
-	my $self  = bless { @_ }, $class;
+	my $self = bless {@_}, $class;
 
 	# This sub creates the document object and is allowed to use self->filename,
 	# once noone else uses it, it shout be deleted from the $self - hash before
@@ -298,7 +299,7 @@ sub new {
 }
 
 sub rebless {
-	my ($self) = @_;
+	my $self = shift;
 
 	# Rebless as either to a subclass if there is a mime-type or
 	# to the the base class,
@@ -367,7 +368,7 @@ sub colourize {
 	my $lexer  = $self->lexer;
 	my $editor = $self->editor;
 	$editor->SetLexer($lexer);
-	TRACE("coloUrize called") if DEBUG;
+	TRACE("colourize called") if DEBUG;
 
 	$editor->remove_color;
 	if ( $lexer == Wx::wxSTC_LEX_CONTAINER ) {
@@ -483,7 +484,7 @@ sub is_saved {
 }
 
 sub is_unsaved {
-	return !!( $_[0]->editor->GetModify and not defined $_[0]->file );
+	return !!( $_[0]->editor->GetModify and defined $_[0]->file );
 }
 
 # Returns true if this is a new document that is too insignificant to
@@ -504,7 +505,7 @@ sub is_unused {
 # 2) when we try to save the file (gvim)
 # 3) every time we type something ????
 sub has_changed_on_disk {
-	my ($self) = @_;
+	my $self = shift;
 	return 0 unless defined $self->file;
 	return 0 unless defined $self->timestamp;
 
@@ -528,25 +529,6 @@ sub timestamp_now {
 	return undef unless $file->can('mtime');
 	return $file->mtime;
 }
-
-# Generate MD5-checksum for current file stored on disk
-sub checksum_on_file {
-	warn join( ',', caller ) . ' called Document::checksum_on_file which is out-of-service.';
-	return 1;
-}
-
-# Part of the above checksum_on_file sub
-# Commented out to keep Perl::Critic happy
-#my $self = shift;
-#
-#my $filename = $self->{file}->filename;
-#return unless defined $filename;
-#
-#require Digest::MD5;
-#
-#open my $FH, '<', $filename or return;
-#binmode($FH);
-#return Digest::MD5->new->addfile(*$FH)->hexdigest;
 
 =pod
 
@@ -743,10 +725,12 @@ sub autoclean {
 }
 
 sub save_file {
-	my $self = shift;
-
-	my $manager = $self->current->ide->plugin_manager;
-	return unless $manager->hook( 'before_save', $self );
+	my $self    = shift;
+	my $current = $self->current;
+	my $manager = $current->ide->plugin_manager;
+	unless ( $manager->hook( 'before_save', $self ) ) {
+		return;
+	}
 
 	# Show the file-changed-dialog again after the file was saved:
 	delete $self->{_already_popup_file_changed};
@@ -758,7 +742,9 @@ sub save_file {
 	$config = $self->project->config if $self->project;
 	$self->set_errstr('');
 
-	$self->autoclean if $config && $config->save_autoclean;
+	if ( $config and $config->save_autoclean ) {
+		$self->autoclean;
+	}
 
 	my $content = $self->text_get;
 	my $file    = $self->file;
@@ -779,7 +765,7 @@ sub save_file {
 			),
 			Wx::gettext("Save Warning"),
 			Wx::wxYES_NO | Wx::wxCENTRE,
-			$self->main,
+			$current->main,
 		);
 
 		return 0 if $ret == Wx::wxYES;
@@ -864,8 +850,7 @@ TO DO: In the future it should backup the changes in case the user regrets the a
 =cut
 
 sub reload {
-	my ($self) = @_;
-
+	my $self = shift;
 	my $file = $self->file or return;
 	return $self->load_file;
 }
@@ -1307,15 +1292,17 @@ sub guess_subpath {
 	return ();
 }
 
+sub functions {
+	my $self = shift;
+	my $task = Params::Util::_DRIVER( $self->task_functions, 'Padre::Task' ) or return;
+	$task->find( $self->text_get );
+}
+
 # Abstract methods, each subclass should implement it
 # TO DO: Clearly this isn't ACTUALLY abstract (since they exist)
 
 sub keywords {
 	return {};
-}
-
-sub get_functions {
-	return ();
 }
 
 sub get_function_regex {
@@ -1343,10 +1330,8 @@ sub is_readonly {
 }
 
 sub selection_stats {
-	my ($self) = @_;
-
-	my $text = $self->editor->GetSelectedText;
-
+	my $self    = shift;
+	my $text    = $self->editor->GetSelectedText;
 	my $words   = 0;
 	my $newline = $self->newline;
 	my $lines   = 1;
@@ -1361,15 +1346,13 @@ sub selection_stats {
 }
 
 sub stats {
-	my ($self) = @_;
-
-	my ( $chars_without_space, $words ) = (0) x 2;
-
-	my $editor = $self->editor;
-	my $text   = $self->text_get;
-
-	my $lines            = $editor->GetLineCount();
-	my $chars_with_space = $editor->GetTextLength();
+	my $self                = shift;
+	my $chars_without_space = 0;
+	my $words               = 0;
+	my $editor              = $self->editor;
+	my $text                = $self->text_get;
+	my $lines               = $editor->GetLineCount;
+	my $chars_with_space    = $editor->GetTextLength;
 
 	# TODO: Remove this limit? Right now, it is greater than the default file size limit.
 	if ( length $text < 2_500_000 ) {
@@ -1438,7 +1421,7 @@ sub autocomplete {
 	# line from beginning to current position
 	my $prefix = $editor->GetTextRange( $first, $pos );
 	$prefix =~ s{^.*?(\w+)$}{$1};
-	my $last = $editor->GetLength();
+	my $last = $editor->GetLength;
 	my $text = $editor->GetTextRange( 0, $last );
 	my $pre  = $editor->GetTextRange( 0, $first + length($prefix) );
 	my $post = $editor->GetTextRange( $first, $last );

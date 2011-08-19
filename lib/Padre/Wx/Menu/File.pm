@@ -12,7 +12,7 @@ use Padre::Current  ();
 use Padre::Feature  ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -64,7 +64,7 @@ sub new {
 		'file.new_p6_script',
 	);
 
-	if ( Padre::Feature::WIZARD_SELECTOR ) {
+	if (Padre::Feature::WIZARD_SELECTOR) {
 		$file_new->AppendSeparator;
 
 		$self->add_menu_action(
@@ -84,7 +84,7 @@ sub new {
 	my $file_open = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Open...'),
+		Wx::gettext('O&pen'),
 		$file_open,
 	);
 
@@ -171,7 +171,7 @@ sub new {
 	my $file_reload = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Reload'),
+		Wx::gettext('Re&load'),
 		$file_reload,
 	);
 
@@ -185,7 +185,7 @@ sub new {
 		'file.reload_all',
 	);
 
-	$self->{reload_all} = $self->add_menu_action(
+	$self->{reload_some} = $self->add_menu_action(
 		$file_reload,
 		'file.reload_some',
 	);
@@ -219,7 +219,7 @@ sub new {
 		'file.save_all',
 	);
 
-	if ( Padre::Feature::SESSION ) {
+	if (Padre::Feature::SESSION) {
 
 		$self->AppendSeparator;
 
@@ -289,7 +289,7 @@ sub title {
 }
 
 sub refresh {
-	my $self     = shift;
+	my $self = shift;
 	my $document = Padre::Current->document ? 1 : 0;
 
 	$self->{open_in_file_browser}->Enable($document);
@@ -312,6 +312,7 @@ sub refresh {
 	$self->{close_all_but_current}->Enable($document);
 	$self->{reload_file}->Enable($document);
 	$self->{reload_all}->Enable($document);
+	$self->{reload_some}->Enable($document);
 	$self->{save}->Enable($document);
 	$self->{save_as}->Enable($document);
 	$self->{save_intuition}->Enable($document);
@@ -371,7 +372,7 @@ sub refill_recent {
 	}
 
 	# Enable/disable 'Open Last Closed File' menu item
-	$self->{open_last_closed_file}->Enable($last_closed_file_found ? 1 : 0);
+	$self->{open_last_closed_file}->Enable( $last_closed_file_found ? 1 : 0 );
 
 	return;
 }

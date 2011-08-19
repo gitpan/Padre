@@ -8,7 +8,7 @@ use Padre::Task     ();
 use Padre::Constant ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Task';
 
 
@@ -25,13 +25,8 @@ sub prepare {
 
 	# Save the list of open files
 	require Padre::Current;
-	$self->{changes} = {
-		map {
-			$_->filename => $_->text_get,
-		} grep {
-			$_->is_unsaved
-		} Padre::Current->main->documents
-	};
+	$self->{changes} =
+		{ map { $_->filename => $_->text_get, } grep { $_->is_unsaved } Padre::Current->main->documents };
 
 	return 1;
 }
@@ -46,16 +41,18 @@ sub run {
 
 	# Remove the (bulky) changes from the task object so it
 	# won't need to be sent back up to the main thread.
-	my $changes  = delete $self->{changes};
+	my $changes = delete $self->{changes};
 
-	if ( %$changes ) {
+	if (%$changes) {
+
 		# Save the content (quickly)
 		require Storable;
 		Storable::lock_nstore( $changes, $filename );
 	} else {
+
 		# No changed files, remove backup file
 		require File::Remove;
-		File::Remove($filename) if -e $filename;
+		File::Remove::remove($filename) if -e $filename;
 	}
 
 	return 1;

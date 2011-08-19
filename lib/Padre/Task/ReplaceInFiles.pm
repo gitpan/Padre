@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Task';
 
 
@@ -164,7 +164,7 @@ sub run {
 			next unless @lines;
 
 			# Found results, inform our owner
-			$self->handle->message( OWNER => $object, @lines );
+			$self->message( OWNER => $object, @lines );
 		}
 		unshift @queue, @children;
 	}

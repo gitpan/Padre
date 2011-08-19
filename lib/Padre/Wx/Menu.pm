@@ -14,7 +14,7 @@ use Class::Adapter::Builder
 	NEW      => 'Wx::Menu',
 	AUTOLOAD => 'PUBLIC';
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 use Class::XSAccessor {
 	getters => {
@@ -51,7 +51,7 @@ sub Append {
 # Add a normal menu item to menu from a existing Padre action
 sub add_menu_action {
 	my $self    = shift;
-	my $menu    = (@_ > 1) ? shift : $self;
+	my $menu    = ( @_ > 1 ) ? shift : $self;
 	my $name    = shift;
 	my $actions = Padre::Current->ide->actions;
 	my $action  = $actions->{$name} or return 0;

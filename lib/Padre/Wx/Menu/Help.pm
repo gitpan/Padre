@@ -12,7 +12,7 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -31,9 +31,7 @@ sub new {
 	$self->{main} = $main;
 
 	# Add the POD-based help launchers
-	$self->add_menu_action(
-		'help.help'
-	);
+	$self->add_menu_action('help.help');
 
 	$self->add_menu_action(
 		'help.context_help',

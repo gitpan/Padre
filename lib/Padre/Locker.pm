@@ -16,7 +16,7 @@ use Padre::DB       ();
 use Padre::Constant ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 sub new {
 	my $class = shift;
@@ -134,7 +134,7 @@ sub config_decrement {
 	unless ( --$self->{config_depth} ) {
 
 		# Write the config file here
-		$self->owner->config->write;
+		$self->{owner}->config->write;
 	}
 	return;
 }

@@ -35,7 +35,7 @@ use Padre::Wx::AuiManager ();
 use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Role::Task
 	Wx::Dialog
@@ -379,7 +379,7 @@ sub show_page {
 
 	# not sure if I can do this:
 	# yep seems I can!
-	$self->{search}->SetFocus();
+	$self->{search}->SetFocus;
 
 }
 

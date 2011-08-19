@@ -22,7 +22,7 @@ use Params::Util ();
 use Padre::Util  ();
 use Padre::Wx    ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -50,7 +50,7 @@ our $DEFAULT_ICON;
 
 # Convenience access to the official Padre icon
 sub PADRE {
-	return icon('logo');
+	return icon( 'logo', { size => '64x64' } );
 }
 
 # On windows, you actually need to provide it with a native icon file that

@@ -6,7 +6,7 @@ use warnings;
 use Padre::Sync          ();
 use Padre::Wx::FBP::Sync ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Wx::FBP::Sync';
 
 sub new {
@@ -105,7 +105,7 @@ sub btn_login {
 
 	# Attempt login
 	my $rc = $sync->login(
-		{       username => $username,
+		{   username => $username,
 			password => $password,
 		}
 	);
@@ -169,11 +169,11 @@ sub btn_register {
 
 	# Attempt registration
 	my $rc = $self->{sync}->register(
-		{   username => $username,
-			password => $pw,
+		{   username         => $username,
+			password         => $pw,
 			password_confirm => $pw_confirm,
-			email    => $email,
-			email_confirm => $email_confirm,
+			email            => $email,
+			email_confirm    => $email_confirm,
 		}
 	);
 

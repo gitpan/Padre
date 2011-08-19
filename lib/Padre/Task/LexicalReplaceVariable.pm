@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task::PPI ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Task::PPI';
 
 =pod
@@ -21,7 +21,7 @@ Padre::Task::LexicalReplaceVariable - Lexically variable replace using L<PPI>
           location    => [ $line, $column ], # the position of *any* occurrence of the variable
           replacement => '$foo',
   );
-  $replacer->schedule();
+  $replacer->schedule;
 
 =head1 DESCRIPTION
 

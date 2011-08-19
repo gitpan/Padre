@@ -11,7 +11,7 @@ use Storable                 ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION  = '0.88';
+our $VERSION  = '0.90';
 our $SEQUENCE = 0;
 
 
@@ -270,10 +270,11 @@ sub run {
 	$self->{inbox} = [];
 
 	# Create a circular reference back from the task
+	# HACK: This is pretty damned evil, find a better way
 	$task->{handle} = $self;
 
 	# Call the task's run method
-	eval { $task->run(); };
+	eval { $task->run; };
 
 	# Clean up the temps
 	delete $task->{handle};
@@ -336,16 +337,15 @@ sub cancel {
 sub dequeue {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-	my $handle = $self->handle or return 0;
 
 	# Pull from the inbox first
-	my $inbox = $handle->inbox or return 0;
+	my $inbox = $self->inbox or return 0;
 	if (@$inbox) {
 		return shift @$inbox;
 	}
 
 	# Pull off the queue
-	my $queue = $handle->queue or return 0;
+	my $queue = $self->queue or return 0;
 	foreach my $message ( $queue->dequeue ) {
 		if ( $message->[0] eq 'cancel' ) {
 			$self->{cancel} = 1;
@@ -371,17 +371,16 @@ sub dequeue {
 sub dequeue_nb {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-	my $handle = $self->handle or return 0;
 
 	# Pull from the inbox first
-	my $inbox = $handle->inbox or return 0;
+	my $inbox = $self->inbox or return 0;
 	if (@$inbox) {
 		return shift @$inbox;
 	}
 
 	# Pull off the queue, non-blocking
-	my $queue = $handle->queue or return 0;
-	foreach my $message ( $queue->dequeue ) {
+	my $queue = $self->queue or return 0;
+	foreach my $message ( $queue->dequeue_nb ) {
 		if ( $message->[0] eq 'cancel' ) {
 			$self->{cancel} = 1;
 			next;

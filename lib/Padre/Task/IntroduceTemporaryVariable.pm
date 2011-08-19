@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task::PPI ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Task::PPI';
 
 =pod
@@ -31,8 +31,8 @@ Given a region of code within a statement, replaces that code with a temporary v
 Declares and initializes the temporary variable right above the statement that included the selected
 expression.
 
-Usually, you simply set C<start_position> to what C<< $editor->GetSelectionStart() >> returns
-and C<end_position> to C<< $editor->GetSelectionEnd() - 1 >>.
+Usually, you simply set C<start_position> to what C<< $editor->GetSelectionStart >> returns
+and C<end_position> to C<< $editor->GetSelectionEnd - 1 >>.
 
 =cut
 

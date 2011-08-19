@@ -61,7 +61,7 @@ use Padre::Wx::Role::Conduit  ();
 use Padre::Wx::Role::Dialog   ();
 use Padre::Logger;
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.85';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
@@ -79,7 +79,7 @@ use constant {
 };
 
 # Convenience until we get a config param or something
-use constant BACKUP_INTERVAL => 10;
+use constant BACKUP_INTERVAL => 30;
 
 =pod
 
@@ -113,7 +113,6 @@ sub new {
 
 	# Bootstrap some Wx internals
 	Wx::Log::SetActiveTarget( Wx::LogStderr->new );
-	Wx::InitAllImageHandlers();
 
 	# Initialise the style and position
 	my $config   = $ide->config;
@@ -200,7 +199,7 @@ sub new {
 	Padre::Wx::ActionLibrary->init($self);
 
 	# Bootstrap the wizard system
-	if ( Padre::Feature::WIZARD_SELECTOR ) {
+	if (Padre::Feature::WIZARD_SELECTOR) {
 		require Padre::Wx::WizardLibrary;
 		Padre::Wx::WizardLibrary->init($self);
 	}
@@ -291,21 +290,25 @@ sub new {
 	);
 
 	# Scintilla Event Hooks
-        # We delay per-stc-update processing until idle.
-        # This is primarily due to a defect http://trac.wxwidgets.org/ticket/4272:
-        # No status bar updates during STC_PAINTED, which we appear to hit on UPDATEUI.
-	Wx::Event::EVT_STC_UPDATEUI( 
-                $self, -1, sub { 
-                  shift->{_do_update_ui} = 1;
-                } );
-        Wx::Event::EVT_IDLE(
-                $self, sub { 
-                  my $self = shift;
-                  if($self->{_do_update_ui}) {
-                    $self->{_do_update_ui} = undef;
-                    $self->on_stc_update_ui();
-                  }
-                });
+	# We delay per-stc-update processing until idle.
+	# This is primarily due to a defect http://trac.wxwidgets.org/ticket/4272:
+	# No status bar updates during STC_PAINTED, which we appear to hit on UPDATEUI.
+	Wx::Event::EVT_STC_UPDATEUI(
+		$self, -1,
+		sub {
+			shift->{_do_update_ui} = 1;
+		}
+	);
+	Wx::Event::EVT_IDLE(
+		$self,
+		sub {
+			my $self = shift;
+			if ( $self->{_do_update_ui} ) {
+				$self->{_do_update_ui} = undef;
+				$self->on_stc_update_ui;
+			}
+		}
+	);
 
 	Wx::Event::EVT_STC_CHANGE( $self, -1, \&on_stc_change );
 	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
@@ -328,7 +331,7 @@ sub new {
 
 	# This require is only here so it can follow this constructor
 	# when it moves to being created on demand.
-	if ( Padre::Feature::DEBUGGER ) {
+	if (Padre::Feature::DEBUGGER) {
 		require Padre::Wx::Debugger;
 		$self->{debugger} = Padre::Wx::Debugger->new;
 	}
@@ -698,6 +701,7 @@ sub syntax {
 }
 
 BEGIN {
+	no warnings 'once';
 	*debugger = sub {
 		my $self = shift;
 		unless ( defined $self->{debug} ) {
@@ -705,7 +709,8 @@ BEGIN {
 			$self->{debug} = Padre::Wx::Debug->new($self);
 		}
 		return $self->{debug};
-	} if Padre::Feature::DEBUGGER;
+		}
+		if Padre::Feature::DEBUGGER;
 }
 
 sub outline {
@@ -1452,12 +1457,12 @@ sub refresh {
 
 =head3 C<add_refresh_listener>
 
-Adds an object which will have its C<< ->refresh() >> method
+Adds an object which will have its C<< ->refresh >> method
 called whenever the main refresh event is triggered. The
 refresh listener is stored as a weak reference so make sure
 that you keep the listener alive elsewhere.
 
-If your object does not have a C<< ->refresh() >> method, pass in
+If your object does not have a C<< ->refresh >> method, pass in
 a code reference - it will be called instead.
 
 Note that this method must return really quick. If you plan to
@@ -1651,7 +1656,7 @@ sub refresh_syntaxcheck {
 	return unless $self->has_syntax;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{syntaxcheck}->IsChecked;
-	$self->syntax->on_timer( undef, 1 );
+	$self->syntax->refresh;
 	return;
 }
 
@@ -1746,10 +1751,8 @@ Force a refresh of Padre's toolbar.
 sub refresh_toolbar {
 	my $self = shift;
 	return if $self->locked('REFRESH');
-	my $toolbar = $self->GetToolBar;
-	if ($toolbar) {
-		$toolbar->refresh( $_[0] or $self->current );
-	}
+	my $toolbar = $self->GetToolBar or return;
+	$toolbar->refresh( $_[0] or $self->current );
 }
 
 =pod
@@ -1805,6 +1808,7 @@ sub refresh_rdstatus {
 	my $self = shift;
 	return if $self->locked('REFRESH');
 	$self->GetStatusBar->is_read_only( $_[0] or $self->current );
+	return;
 }
 
 =pod
@@ -1819,15 +1823,10 @@ Force a refresh of the function list on the right.
 
 sub refresh_functions {
 	my $self = shift;
-
 	return unless $self->has_functions;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{functions}->IsChecked;
-
-	my @windows = @_;
-	push @windows, $self->current unless @windows;
-	$self->functions->refresh(@windows);
-
+	$self->functions->refresh( $_[0] or $self->current );
 	return;
 }
 
@@ -1843,13 +1842,10 @@ Force a refresh of the TODO list on the right.
 
 sub refresh_todo {
 	my $self = shift;
-
 	return unless $self->has_todo;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{todo}->IsChecked;
-
 	$self->todo->refresh(@_);
-
 	return;
 }
 
@@ -1863,12 +1859,9 @@ Force a refresh of the directory tree
 
 sub refresh_directory {
 	my $self = shift;
-
 	return unless $self->has_directory;
 	return if $self->locked('REFRESH');
-
 	$self->directory->refresh( $_[0] or $self->current );
-
 	return;
 }
 
@@ -1916,6 +1909,7 @@ sub change_style {
 	# Save editor style configuration
 	$self->config->set( editor_style => $name );
 	$self->config->write;
+
 	return;
 }
 
@@ -1946,7 +1940,8 @@ sub change_locale {
 	delete $self->{locale};
 	$self->{locale} = Padre::Locale::object();
 
-	if (Padre::Constant::UNIX) { # make WxWidgets translate the default buttons etc.
+	# Make WxWidgets translate the default buttons etc.
+	if (Padre::Constant::UNIX) {
 		## no critic (RequireLocalizedPunctuationVars)
 		$ENV{LANGUAGE} = $name;
 		## use critic
@@ -2053,6 +2048,7 @@ recreate it from scratch.
 
 sub rebuild_toolbar {
 	my $self    = shift;
+	my $lock    = $self->lock('UPDATE');
 	my $toolbar = $self->GetToolBar;
 	$toolbar->Destroy if $toolbar;
 
@@ -2089,16 +2085,15 @@ the panel.
 
 sub show_functions {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock( 'UPDATE', 'refresh_functions' );
-	unless ( $on == $self->menu->view->{functions}->IsChecked ) {
-		$self->menu->view->{functions}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG', 'refresh_functions' );
+	unless ( $show == $self->menu->view->{functions}->IsChecked ) {
+		$self->menu->view->{functions}->Check($show);
 	}
 
-	$self->config->set( main_functions => $on );
-	$self->_show_functions($on);
+	$self->config->set( main_functions => $show );
+	$self->_show_functions($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2126,16 +2121,15 @@ the panel.
 
 sub show_todo {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock( 'UPDATE', 'refresh_todo' );
-	unless ( $on == $self->menu->view->{todo}->IsChecked ) {
-		$self->menu->view->{todo}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG', 'refresh_todo' );
+	unless ( $show == $self->menu->view->{todo}->IsChecked ) {
+		$self->menu->view->{todo}->Check($show);
 	}
 
-	$self->config->set( main_todo => $on );
-	$self->_show_todo($on);
+	$self->config->set( main_todo => $show );
+	$self->_show_todo($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2166,16 +2160,15 @@ the panel.
 
 sub show_outline {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock( 'UPDATE', 'refresh_outline' );
-	unless ( $on == $self->menu->view->{outline}->IsChecked ) {
-		$self->menu->view->{outline}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG', 'refresh_outline' );
+	unless ( $show == $self->menu->view->{outline}->IsChecked ) {
+		$self->menu->view->{outline}->Check($show);
 	}
 
-	$self->config->set( main_outline => $on );
-	$self->_show_outline($on);
+	$self->config->set( main_outline => $show );
+	$self->_show_outline($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2184,13 +2177,9 @@ sub _show_outline {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
-		my $outline = $self->outline;
-		$self->right->show($outline);
-		$outline->start;
+		$self->right->show( $self->outline );
 	} elsif ( $self->has_outline ) {
-		my $outline = $self->outline;
-		$self->right->hide($outline);
-		$outline->stop;
+		$self->right->hide( $self->outline );
 		delete $self->{outline};
 	}
 }
@@ -2204,14 +2193,16 @@ sub _show_outline {
 =cut
 
 BEGIN {
+	no warnings 'once';
 	*show_debug = sub {
 		my $self = shift;
-		my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+		my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
 		my $lock = $self->lock('UPDATE');
-		$self->_show_debug($on);
+		$self->_show_debug($show);
 		$self->aui->Update;
 		return;
-	} if Padre::Feature::DEBUGGER;
+		}
+		if Padre::Feature::DEBUGGER;
 
 	*_show_debug = sub {
 		my $self = shift;
@@ -2224,7 +2215,8 @@ BEGIN {
 			$self->right->hide($debugger);
 		}
 		return 1;
-	} if Padre::Feature::DEBUGGER;
+		}
+		if Padre::Feature::DEBUGGER;
 }
 
 =pod
@@ -2241,16 +2233,15 @@ the panel.
 
 sub show_directory {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock( 'UPDATE', 'refresh_directory' );
-	unless ( $on == $self->menu->view->{directory}->IsChecked ) {
-		$self->menu->view->{directory}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG', 'refresh_directory' );
+	unless ( $show == $self->menu->view->{directory}->IsChecked ) {
+		$self->menu->view->{directory}->Check($show);
 	}
 
-	$self->config->set( main_directory => $on );
-	$self->_show_directory($on);
+	$self->config->set( main_directory => $show );
+	$self->_show_directory($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2280,16 +2271,15 @@ the panel.
 
 sub show_output {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock('UPDATE');
-	unless ( $on == $self->menu->view->{output}->IsChecked ) {
-		$self->menu->view->{output}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG' );
+	unless ( $show == $self->menu->view->{output}->IsChecked ) {
+		$self->menu->view->{output}->Check($show);
 	}
 
-	$self->config->set( main_output => $on );
-	$self->_show_output($on);
+	$self->config->set( main_output => $show );
+	$self->_show_output($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2319,8 +2309,7 @@ to show the panel.
 
 sub show_findfast {
 	my $self = shift;
-	my $on = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
 	return;
 }
 
@@ -2338,11 +2327,10 @@ to show the panel.
 
 sub show_findinfiles {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
 	my $lock = $self->lock('UPDATE');
-	$self->_show_findinfiles($on);
+	$self->_show_findinfiles($show);
 	$self->aui->Update;
-
 	return;
 }
 
@@ -2371,11 +2359,10 @@ to show the panel.
 
 sub show_replaceinfiles {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
 	my $lock = $self->lock('UPDATE');
-	$self->_show_replaceinfiles($on);
+	$self->_show_replaceinfiles($show);
 	$self->aui->Update;
-
 	return;
 }
 
@@ -2404,16 +2391,15 @@ the panel.
 
 sub show_command_line {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock('UPDATE');
-	unless ( $on == $self->menu->view->{command_line}->IsChecked ) {
-		$self->menu->view->{command_line}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG' );
+	unless ( $show == $self->menu->view->{command_line}->IsChecked ) {
+		$self->menu->view->{command_line}->Check($show);
 	}
 
-	$self->config->set( main_command_line => $on );
-	$self->_show_command_line($on);
+	$self->config->set( main_command_line => $show );
+	$self->_show_command_line($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2444,16 +2430,15 @@ the panel.
 
 sub show_syntaxcheck {
 	my $self = shift;
-	my $on   = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $lock = $self->lock( 'UPDATE', 'refresh_syntaxcheck' );
-	unless ( $on == $self->menu->view->{syntaxcheck}->IsChecked ) {
-		$self->menu->view->{syntaxcheck}->Check($on);
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG', 'refresh_syntaxcheck' );
+	unless ( $show == $self->menu->view->{syntaxcheck}->IsChecked ) {
+		$self->menu->view->{syntaxcheck}->Check($show);
 	}
 
-	$self->config->set( main_syntaxcheck => $on );
-	$self->_show_syntaxcheck($on);
+	$self->config->set( main_syntaxcheck => $show );
+	$self->_show_syntaxcheck($show);
 	$self->aui->Update;
-	$self->ide->save_config;
 
 	return;
 }
@@ -2462,18 +2447,9 @@ sub _show_syntaxcheck {
 	my $self = shift;
 	my $lock = $self->lock('UPDATE');
 	if ( $_[0] ) {
-		my $syntax = $self->syntax;
-		$self->bottom->show(
-			$syntax,
-			sub {
-				$self->show_syntaxcheck(0);
-			},
-		);
-		$syntax->start unless $syntax->running;
+		$self->bottom->show( $self->syntax );
 	} elsif ( $self->has_syntax ) {
-		my $syntax = $self->syntax;
-		$self->bottom->hide($syntax);
-		$syntax->stop if $syntax->running;
+		$self->bottom->hide( $self->syntax );
 		delete $self->{syntax};
 	}
 }
@@ -2785,7 +2761,7 @@ sub on_run_this_test {
 		my $things_to_test = $tempfile->filename;
 		$self->run_command(qq{"$prove" - -lv < "$things_to_test"});
 	} else {
-		$self->run_command("$prove -bv $filename");
+		$self->run_command("$prove -lv $filename");
 	}
 	chdir $dir;
 }
@@ -2932,7 +2908,7 @@ sub run_command {
 		$self->error( sprintf( Wx::gettext("Failed to start '%s' command"), $cmd ) );
 		$self->menu->run->enable;
 	}
-	$self->current->editor->SetFocus();
+	$self->current->editor->SetFocus;
 	return;
 }
 
@@ -3311,8 +3287,8 @@ sub search_next {
 	# shortcut special logic and run that search immediately.
 	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
 		$search = $self->{search} = shift;
-		return !! $search->search_next($editor);
-	} elsif ( @_ ) {
+		return !!$search->search_next($editor);
+	} elsif (@_) {
 		die 'Invalid argument to search_next';
 	}
 
@@ -3320,7 +3296,7 @@ sub search_next {
 	my ( $position1, $position2 ) = $editor->GetSelection;
 	if ( $position1 == $position2 ) {
 		return unless $search;
-		return !! $search->search_next($editor);
+		return !!$search->search_next($editor);
 	}
 
 	# Multiple lines are also done the obvious way
@@ -3328,7 +3304,7 @@ sub search_next {
 	my $line2 = $editor->LineFromPosition($position2);
 	unless ( $line1 == $line2 ) {
 		return unless $search;
-		return !! $self->search_next($editor);
+		return !!$self->search_next($editor);
 	}
 
 	# Case-specific search for the current selection
@@ -3341,7 +3317,7 @@ sub search_next {
 			$position1, $position2,
 		),
 	);
-	return !! $search->search_next($editor);
+	return !!$search->search_next($editor);
 }
 
 =pod
@@ -3369,8 +3345,8 @@ sub search_previous {
 	# shortcut special logic and run that search immediately.
 	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
 		$search = $self->{search} = shift;
-		return !! $search->search_previous($editor);
-	} elsif ( @_ ) {
+		return !!$search->search_previous($editor);
+	} elsif (@_) {
 		die 'Invalid argument to search_previous';
 	}
 
@@ -3378,7 +3354,7 @@ sub search_previous {
 	my ( $position1, $position2 ) = $editor->GetSelection;
 	if ( $position1 == $position2 ) {
 		return unless $search;
-		return !! $search->search_previous($editor);
+		return !!$search->search_previous($editor);
 	}
 
 	# Multiple lines are also done the obvious way
@@ -3386,7 +3362,7 @@ sub search_previous {
 	my $line2 = $editor->LineFromPosition($position2);
 	unless ( $line1 == $line2 ) {
 		return unless $search;
-		return !! $self->search_previous($editor);
+		return !!$self->search_previous($editor);
 	}
 
 	# Case-specific search for the current selection
@@ -3399,7 +3375,7 @@ sub search_previous {
 			$position1, $position2,
 		),
 	);
-	return !! $search->search_previous($editor);
+	return !!$search->search_previous($editor);
 }
 
 =pod
@@ -3643,7 +3619,7 @@ sub on_close_window {
 
 	# Terminate any currently running debugger session before we start
 	# to do anything significant.
-	if ( Padre::Feature::DEBUGGER ) {
+	if (Padre::Feature::DEBUGGER) {
 		if ( $self->{debugger} ) {
 			$self->{debugger}->quit;
 		}
@@ -3654,7 +3630,7 @@ sub on_close_window {
 	# just save some basic parts like the last session and so on.
 	# Some of the steps in the shutdown have transactions anyway, but
 	# this will expand them to cover everything.
-	my $transaction = $self->lock('DB', 'refresh_recent');
+	my $transaction = $self->lock( 'DB', 'refresh_recent' );
 
 	# Capture the current session, before we start the interactive
 	# part of the shutdown which will mess it up.
@@ -3891,17 +3867,6 @@ sub setup_editor {
 			}
 		}
 
-		# Scheduled for removal: This is done by document->new later and should be
-		# in only one place, please re-enable it and remove this comment if you think
-		# it should stay:
-		# if file does not exist, create it so that future access
-		# (such as size checking) won't warn / blow up padre
-		#		if ( not -f $file ) {
-		#			open my $fh, '>', $file;
-		#			close $fh;
-		#		}
-
-
 		#not sure where the best place for this checking is..
 		#I'd actually like to make it recursivly open files
 		#(but that will require a dialog listing them to avoid opening an infinite number of files)
@@ -3917,15 +3882,8 @@ sub setup_editor {
 		}
 	}
 
-	my $lock = $self->lock('REFRESH');
-	my $document = Padre::Document->new( filename => $file, );
-
-	# Catch critical errors:
-	unless ( defined $document ) {
-		return;
-	}
-
-	$file ||= ''; #to avoid warnings
+	my $document = Padre::Document->new( filename => $file ) or return;
+	$file ||= ''; # to avoid warnings
 	if ( $document->errstr ) {
 		warn $document->errstr . " when trying to open '$file'";
 		return;
@@ -3933,14 +3891,13 @@ sub setup_editor {
 
 	TRACE("Document created for '$file'") if DEBUG;
 
+	my $lock = $self->lock( 'REFRESH', 'update_last_session', 'refresh_menu' );
 	my $editor = Padre::Wx::Editor->new( $self->notebook );
 	$editor->{Document} = $document;
 	$document->set_editor($editor);
 	$editor->configure_editor($document);
 
 	$plugins->editor_enable($editor);
-
-	my $title = $editor->{Document}->get_title;
 
 	$editor->set_preferences;
 
@@ -3960,24 +3917,21 @@ sub setup_editor {
 			: $config->default_projects_directory;
 	} else {
 		TRACE( "Adding new file to history: " . $document->filename ) if DEBUG;
+
+		my $history = $self->lock( 'DB', 'refresh_recent' );
 		Padre::DB::History->create(
 			type => 'files',
 			name => $document->filename,
 		);
-
-		# Call the method immediately if not locked
-		$self->lock('refresh_recent');
 	}
 
+	my $title = $editor->{Document}->get_title;
 	my $id = $self->create_tab( $editor, $title );
 	$self->notebook->GetPage($id)->SetFocus;
 
-	if ( Padre::Feature::CURSORMEMORY ) {
+	if (Padre::Feature::CURSORMEMORY) {
 		$editor->restore_cursor_position;
 	}
-
-	# Update and refresh immediately if not locked
-	$self->lock( 'update_last_session', 'refresh_menu' );
 
 	# Notify plugins
 	$plugins->plugin_event('editor_changed');
@@ -4527,13 +4481,13 @@ sub reload_file {
 		$editor = $document->editor;
 	}
 
-	if ( Padre::Feature::CURSORMEMORY ) {
+	if (Padre::Feature::CURSORMEMORY) {
 		$editor->store_cursor_position;
 	}
 	if ( $document->reload ) {
 		$editor = $document->editor;
 		$editor->configure_editor($document);
-		if ( Padre::Feature::CURSORMEMORY ) {
+		if (Padre::Feature::CURSORMEMORY) {
 			$editor->restore_cursor_position;
 		}
 	} else {
@@ -5068,7 +5022,7 @@ sub close {
 		} @{ $self->{on_close_watchers}->{$fn} };
 	}
 
-	if ( Padre::Feature::CURSORMEMORY ) {
+	if (Padre::Feature::CURSORMEMORY) {
 		$editor->store_cursor_position;
 	}
 	if ( $document->tempfile ) {
@@ -5290,8 +5244,8 @@ sub delete {
 	my $document = $editor->{Document}     or return;
 
 	# We need those even when the document is already closed:
-	my $file     = $document->file;
-	my $filename = $document->filename;
+	my $file = $document->file;
+	my $filename = $document->filename or return;
 
 	if ( !$file->can_delete ) {
 		$self->error( Wx::gettext('This type of file (URL) is missing delete support.') );
@@ -5345,23 +5299,17 @@ sub on_nth_pane {
 	my $self = shift;
 	my $id   = shift;
 	my $page = $self->notebook->GetPage($id);
-	if ($page) {
-
-		my $manager = $self->{ide}->plugin_manager;
-
-		$self->notebook->SetSelection($id);
-		$self->refresh_status( $self->current );
-		$page->{Document}->set_indentation_style(); # TO DO: encapsulation?
-		$page->SetFocus;
-
-		$manager->plugin_event('editor_changed');
-
-		return 1;
+	unless ($page) {
+		$self->current->editor->SetFocus;
+		return;
 	}
 
-	$self->current->editor->SetFocus();
+	$self->notebook->SetSelection($id);
+	$self->refresh_status;
+	$page->SetFocus;
+	$self->ide->plugin_manager->plugin_event('editor_changed');
 
-	return;
+	return 1;
 }
 
 =pod
@@ -5388,7 +5336,7 @@ sub on_next_pane {
 		$self->on_nth_pane(0);
 	}
 
-	$self->current->editor->SetFocus();
+	$self->current->editor->SetFocus;
 
 	return;
 }
@@ -5417,7 +5365,7 @@ sub on_prev_pane {
 		$self->on_nth_pane( $count - 1 );
 	}
 
-	$self->current->editor->SetFocus();
+	$self->current->editor->SetFocus;
 
 	return;
 }
@@ -5531,13 +5479,15 @@ positive or negative.
 =cut
 
 sub zoom {
-	my ( $self, $factor ) = @_;
+	my $self = shift;
 	my $page = $self->current->editor or return;
+	my $zoom = $page->GetZoom + shift;
 
-	my $zoom = $page->GetZoom + $factor;
 	foreach my $page ( $self->editors ) {
 		$page->SetZoom($zoom);
 	}
+
+	return 1;
 }
 
 
@@ -5659,6 +5609,7 @@ No return value.
 =cut
 
 BEGIN {
+	no warnings 'once';
 	*editor_folding = sub {
 		my $self = shift;
 		my $show = $_[0] ? 1 : 0;
@@ -5676,7 +5627,8 @@ BEGIN {
 		$self->menu->view->refresh;
 
 		return;
-	};
+		}
+		if Padre::Feature::FOLDING;
 }
 
 =pod
@@ -5827,13 +5779,13 @@ Toggle word wrapping for current document. No return value.
 
 sub on_word_wrap {
 	my $self = shift;
-	my $on = @_ ? $_[0] ? 1 : 0 : 1;
-	unless ( $on == $self->menu->view->{word_wrap}->IsChecked ) {
-		$self->menu->view->{word_wrap}->Check($on);
+	my $show = @_ ? $_[0] ? 1 : 0 : 1;
+	unless ( $show == $self->menu->view->{word_wrap}->IsChecked ) {
+		$self->menu->view->{word_wrap}->Check($show);
 	}
 
 	my $doc = $self->current->document or return;
-	my $mode = $on ? Wx::wxSTC_WRAP_WORD : Wx::wxSTC_WRAP_NONE;
+	my $mode = $show ? Wx::wxSTC_WRAP_WORD : Wx::wxSTC_WRAP_NONE;
 	$doc->editor->SetWrapMode($mode);
 }
 
@@ -6504,7 +6456,7 @@ sub on_last_visited_pane {
 		$self->refresh_toolbar( $self->current );
 	}
 
-	$self->current->editor->SetFocus();
+	$self->current->editor->SetFocus;
 
 }
 
@@ -6560,7 +6512,7 @@ No return value.
 =cut
 
 sub on_duplicate {
-	my $self     = shift;
+	my $self = shift;
 	my $document = $self->current->document or return;
 	return $self->new_document_from_string(
 		$document->text_get,
@@ -6710,7 +6662,7 @@ sub change_highlighter {
 		TRACE("Editor $editor focused $focused lexer: $lexer") if DEBUG;
 		if ( $editor eq $focused ) {
 			$editor->needs_manual_colorize(0);
-			$document->colourize();
+			$document->colourize;
 		} else {
 			$editor->needs_manual_colorize(1);
 		}
@@ -6781,11 +6733,7 @@ sub key_up {
 		#			#$self->bottom->GetSelection;
 		#		}
 	} elsif ( !$mod and $code == 27 ) { # ESC
-		if ( $self->findfast->visible ) {
-			$self->findfast->_hide_panel;
-		} elsif ( $self->has_output ) {
-			$self->show_output(0);
-		}
+		&{ $self->ide->actions->{'view.close_panel'}->menu_event }( $self, $event );
 	}
 
 	if ( $config->autocomplete_always and ( !$mod ) and ( $code == 8 ) ) {

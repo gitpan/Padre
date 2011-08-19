@@ -6,7 +6,7 @@ use warnings;
 use Padre::Search        ();
 use Padre::Wx::FBP::Find ();
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::FBP::Find
 };
@@ -43,8 +43,8 @@ sub new {
 # Event Handlers
 
 sub find_next_clicked {
-	my $self   = shift;
-	my $main   = $self->main;
+	my $self = shift;
+	my $main = $self->main;
 
 	# Generate the search object
 	my $search = $self->as_search;

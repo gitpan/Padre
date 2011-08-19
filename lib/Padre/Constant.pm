@@ -10,7 +10,7 @@ use File::Path ();
 use File::Spec ();
 use File::HomeDir 0.91 ();
 
-our $VERSION    = '0.88';
+our $VERSION    = '0.90';
 our $COMPATIBLE = '0.57';
 
 # Convenience constants for the operating system
@@ -146,7 +146,7 @@ use constant DEFAULT_SINGLEINSTANCE => ( WIN32 and not( $ENV{HARNESS_ACTIVE} or 
 
 # It would be better if we had fully dynamic collision awareness support,
 # so that Padre could automatically port hop.
-# In the mean time, just make sure that dev.pl, test, and production versions
+# In the mean time, just make sure that dev, test, and production versions
 # of Padre use different ports, so they don't collide with each other.
 use constant DEFAULT_SINGLEINSTANCE_PORT => (
 	  $ENV{PADRE_DEV}      ? 4446

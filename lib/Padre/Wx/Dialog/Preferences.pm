@@ -10,7 +10,7 @@ use Padre::Wx::Role::Config     ();
 use Padre::Wx::FBP::Preferences ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = qw{
 	Padre::Wx::Role::Config
 	Padre::Wx::FBP::Preferences
@@ -246,40 +246,38 @@ sub guess {
 	return;
 }
 
+# Generate a config object that we won't ultimately save, but can be used
+# when tailoring the editor preview to new settings.
+sub preview_config {
+	TRACE( $_[0] ) if DEBUG;
+	my $self   = shift;
+	my $config = $self->config;
+	my $diff   = $self->config_diff($config);
+	my $custom = $config->clone;
+	foreach my $key ( sort keys %$diff ) {
+		$custom->set( $key => $diff->{$key} );
+	}
+	return $custom;
+}
+
 # We do this the long-hand way for now, as we don't have a suitable
 # method for generating proper logical style objects.
 sub preview_refresh {
 	TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
-	my $config  = $self->config;
+	my $main    = $self->main;
+	my $lock    = $main->lock('UPDATE');
 	my $preview = $self->preview;
-
-	# Set the colour of the current line (if visible)
-	if ( $config->editor_currentline ) {
-		$preview->SetCaretLineBackground( $self->editor_currentline_color->GetColour );
-	}
-
-	# Set the font for the editor
-	my $font = $self->editor_font->GetSelectedFont;
-	$preview->SetFont($font);
-	$preview->StyleSetFont( Wx::wxSTC_STYLE_DEFAULT, $font );
-
-	# Set the right margin if applicable
-	if ( $self->editor_right_margin_enable->GetValue ) {
-		$preview->SetEdgeColumn( $self->editor_right_margin_column );
-		$preview->SetEdgeMode(Wx::wxSTC_EDGE_LINE);
-	} else {
-		$preview->SetEdgeMode(Wx::wxSTC_EDGE_NONE);
-	}
 
 	# Apply the style (but only if we can do so safely)
 	if ( $self->{original_style} ) {
-		my $style = $self->choice('editor_style');
+		my $config = $self->preview_config;
+		my $style  = $self->choice('editor_style');
 
 		# Removed for RELEAES_TESTING=1 pass
 		#Padre::Current->main->action("view.style.$style");
 		$self->current->main->action("view.style.$style");
-		$preview->set_preferences;
+		$preview->set_preferences($config);
 	}
 
 	return;

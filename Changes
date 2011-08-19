@@ -10,6 +10,70 @@ list API changes that may break compatibility for components of Padre, most
 notably for plugins. This allows plugins to update compatibility before the
 next production release, and synchronise their release to the Padre schedule.
 
+Changes which do not break API compatibility for plugins should be listed in
+the even version for the release, even during development.
+
+0.90 Tue 16 Aug 2011
+    - Return task instance from Padre::Role::Task::tast_request (BRAMBLE)
+    - Add solarize theme contributed by Anton Ukolov ('sugar' on irc) (BRAMBLE)
+    - Improved fast find text entry colours #1290 (BRAMBLE)
+    - Improved preferences colours for 'dark' themed desktops #1290 (BRAMBLE)
+    - Added feature_devel_endstats (disabled by default) which makes Padre
+      run scripts with -MDevel::EndStats=<feature_devel_endstats_options>
+      to show various statistics when your program terminates (AZAWAWI)
+    - Fixed "Open in File Browser" under Windows 7 (AZAWAWI)
+    - The functions and syntax check windows needs to be cleared when the
+      document does not provide any functions or syntax checker tasks (AZAWAWI)
+    - The syntax checker is now more accurate when typing faster (AZAWAWI)
+    - Added a change dwell mechanism to the editor panels, which gives any tools
+      based on editor content an opportunity to auto-refresh (ADAMK)
+    - Added dwell-refresh to the function list, so new functions are added as
+      they are being typed or pasted (ADAMK)
+    - Converted syntax checker from timer polling with hash shortcutting to the
+      new dwell-refresh mechanism (ADAMK)
+    - Converted outline from timer polling with length shortcutting to the new
+      dwell-refresh mechanism (ADAMK)
+    - Fixed #1287: Find in files crashing (SEWI)
+    - Auto-backup is working again #105 (SEWI)
+    - Fixed #1286: Too many newlines being inserted (SEWI)
+    - Only allow PNG and ICO images by default, saving 4meg of RAM (ADAMK)
+    - Handle crash when File/Delete is called on an Unsaved document (AZAWAWI)
+    - File Reload All/Some was not working as expected (AZAWAWI)
+    - Add a xt test for open blocker tickets (SEWI)
+    - Underline the syntax warning/error line with an orange or red squiggle
+      indicator (AZAWAWI)
+    - TRACE() calls now use epoch microsecond timestamps instead of localtime
+      to make subsecond temporal relationships more obvious (ADAMK)
+    - When the syntax checker is rescanning after a document change, clear the
+      window but do not change the margin (ADAMK)
+    - Add _ shortcuts in menus. Still to do. Sorry to translators (DOLMEN)
+    - Add ... to menus leading to dialogs. Sorry to translators (DOLMEN)
+    - Fix blurry app icon on Ubuntu with Unity desktop (DOLMEN)
+    - Fixed failing thread test (SEWI)
+    - Added feature_devel_traceuse (disabled by default) which makes Padre
+      run scripts with -d:TraceUse=<feature_devel_traceuse_options>
+      to show the modules that your program loads recursively (AZAWAWI)
+    - Checked menu actions may be called form other events but the menu
+      event (SEWI)
+    - Stop ignoring syntax checking errors without an actual type (AZAWAWI)
+    - The editor change dwell time (the time between when you stop typing and
+      when tools like function list and syntax update) is now configurable as
+      editor_dwell in Advanced Preferences (ADAMK)
+    - Replaced Dump... menu in the Developer Plugin with a more general Dump
+      Expression tool so you can explore the internals of Padre incrementally
+      instead of selecting a menu every time (ADAMK)
+    - Added experimental config setting feature_style_gui to allow major GUI
+      tools such as the function list and directory tree to inherit their
+      foreground and background colouring from the active editor style (ADAMK)
+    - Update German translation (ZENOG)
+
+0.89 Development version, not released
+    - Heavily refactored function search in Padre::Document, breaking compat.
+      Moved function locating code to Padre::Editor as find_function,
+      has_function and goto_function. Padre::Document now just has a single 
+      "functions" method which does the work via the task class (ADAMK)
+    - In Padre::Editor the smart highlight methods are how smart_highlight_show
+      and smart_highlight_hide (ADAMK)
 
 0.88 2011.08.09
     - Thread Slave Mastering now works for Task 2.0. This removes thread spawn

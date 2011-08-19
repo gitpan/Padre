@@ -11,7 +11,7 @@ use Padre::Task                ();
 use Padre::Wx::Directory::Path ();
 use Padre::Logger;
 
-our $VERSION = '0.88';
+our $VERSION = '0.90';
 our @ISA     = 'Padre::Task';
 
 use constant NO_WARN => 1;
@@ -114,7 +114,7 @@ sub run {
 			if ( $object->name =~ $filter ) {
 
 				# Send the matching file to the parent thread
-				$self->handle->message( OWNER => $object );
+				$self->message( OWNER => $object );
 			}
 			next;
 		}
