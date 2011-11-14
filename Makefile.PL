@@ -71,13 +71,13 @@ all_from 'lib/Padre.pm';
 requires 'perl' => '5.008005';
 
 # General dependencies
+requires 'Algorithm::Diff'          => '1.19';
 requires 'App::cpanminus'           => '0.9923';
 requires 'B::Deparse'               => 0;
 requires 'Capture::Tiny'            => '0.06';
 requires 'CGI'                      => '3.47';
 requires 'Class::Adapter'           => '1.05';
 requires 'Class::Inspector'         => '1.22';
-requires 'Class::Unload'            => '0.03';
 requires 'Class::XSAccessor'        => '1.05';
 requires 'Cwd'                      => '3.2701';
 requires 'Data::Dumper'             => '2.101';
@@ -122,6 +122,7 @@ requires 'Module::Build'            => '0.3603';
 requires 'Module::CoreList'         => '2.22';
 requires 'Module::Manifest'         => '0.07';
 requires 'ORLite'                   => '1.48';
+requires 'ORLite::Migrate'          => '1.08';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.14';
 requires 'Parse::ExuberantCTags'    => '1.00';
@@ -138,27 +139,30 @@ requires 'PPIx::EditorTools'        => '0.13';
 requires 'PPIx::Regexp'             => '0.011';
 requires 'Probe::Perl'              => '0.01';
 requires 'Storable'                 => '2.16';
+requires 'Sort::Versions'           => '1.5';
 requires 'Template::Tiny'           => '0.11';
 requires 'Term::ReadLine'           => 0;
 requires 'Text::Balanced'           => '2.01';
-requires 'Text::Diff'               => '0.35';
+requires 'Text::Diff'               => '1.41';
 requires 'Text::FindIndent'         => '0.10';
 requires 'Time::HiRes'              => '1.9718';
+requires 'Text::Patch'              => '1.8';
 requires 'threads'                  => '1.71';
 requires 'threads::shared'          => '1.33';
 requires 'URI'                      => '0';
 requires 'version'                  => '0.80';
-requires 'Win32'              => '0.31' if win32;
-requires 'Win32::Shortcut'    => '0.07' if win32;
-requires 'Win32::TieRegistry' => '0.26' if win32;
-requires 'Wx' => ( win32 and $] >= 5.01 ) ? '0.9901' : '0.91';
-requires 'Wx::Perl::ProcessStream' => '0.29';
-requires 'YAML::Tiny'              => '1.32';
-test_requires 'Test::More'         => '0.88';
-test_requires 'Test::MockObject'   => '1.09';
-test_requires 'Test::Script'       => '1.07';
-test_requires 'Test::Exception'    => '0.27';
-test_requires 'Test::NoWarnings'   => '0.084';
+requires 'Win32'                    => '0.31' if win32;
+requires 'Win32::Shortcut'          => '0.07' if win32;
+requires 'Win32::TieRegistry'       => '0.26' if win32;
+requires 'Wx'                       => '0.9901';
+requires 'Wx::Perl::ProcessStream'  => '0.29';
+requires 'Wx::Scintilla'            => '0.34';
+requires 'YAML::Tiny'               => '1.32';
+test_requires 'Test::More'          => '0.88';
+test_requires 'Test::MockObject'    => '1.09';
+test_requires 'Test::Script'        => '1.07';
+test_requires 'Test::Exception'     => '0.27';
+test_requires 'Test::NoWarnings'    => '0.084';
 
 # Special dependencies
 
@@ -222,6 +226,9 @@ keywords(
 	"replace",
 	"syntax",
 	"windows",
+	"version control",
+	"patch",
+	"diff",
 	"wx",
 	"wxwidgets",
 );

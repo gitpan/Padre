@@ -13,7 +13,7 @@ use Padre::Wx::Menu ();
 use Padre::Locale   ();
 use Padre::Current  ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -46,7 +46,7 @@ sub new {
 	my $style = Wx::Menu->new;
 	$self->{variable_style_menu} = $self->Append(
 		-1,
-		Wx::gettext('Change variable style'),
+		Wx::gettext('&Change variable style'),
 		$style,
 	);
 

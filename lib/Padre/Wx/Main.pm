@@ -37,8 +37,7 @@ use List::Util                ();
 use Scalar::Util              ();
 use Params::Util              ();
 use Time::HiRes               ();
-use Padre::Wx::Action         ();
-use Padre::Wx::ActionLibrary  ();
+use Wx::Scintilla::Constant   ();
 use Padre::Constant           ();
 use Padre::Util               ('_T');
 use Padre::Perl               ();
@@ -49,9 +48,11 @@ use Padre::DB                 ();
 use Padre::Feature            ();
 use Padre::Locker             ();
 use Padre::Wx                 ();
+use Padre::Wx::Action         ();
+use Padre::Wx::ActionLibrary  ();
 use Padre::Wx::Icon           ();
+use Padre::Wx::Theme          ();
 use Padre::Wx::Display        ();
-use Padre::Wx::Editor         ();
 use Padre::Wx::Menubar        ();
 use Padre::Wx::Notebook       ();
 use Padre::Wx::StatusBar      ();
@@ -61,8 +62,8 @@ use Padre::Wx::Role::Conduit  ();
 use Padre::Wx::Role::Dialog   ();
 use Padre::Logger;
 
-our $VERSION    = '0.90';
-our $COMPATIBLE = '0.85';
+our $VERSION    = '0.92';
+our $COMPATIBLE = '0.91';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
 	Padre::Wx::Role::Dialog
@@ -111,21 +112,18 @@ sub new {
 		Carp::croak("Did not provide an ide object to Padre::Wx::Main->new");
 	}
 
-	# Bootstrap some Wx internals
-	Wx::Log::SetActiveTarget( Wx::LogStderr->new );
-
 	# Initialise the style and position
 	my $config   = $ide->config;
 	my $size     = [ $config->main_width, $config->main_height ];
 	my $position = [ $config->main_left, $config->main_top ];
-	my $style    = Wx::wxDEFAULT_FRAME_STYLE;
+	my $style    = Wx::DEFAULT_FRAME_STYLE | Wx::CLIP_CHILDREN;
 
 	# If we closed while maximized on the previous run,
 	# the previous size is completely suspect.
 	# This doesn't work on Windows,
 	# so we use a different mechanism for it.
-	if ( not Padre::Constant::WXWIN32 and $config->main_maximized ) {
-		$style |= Wx::wxMAXIMIZE;
+	if ( not Padre::Constant::WIN32 and $config->main_maximized ) {
+		$style |= Wx::MAXIMIZE;
 	}
 
 	# Generate a smarter default size than Wx does
@@ -150,7 +148,7 @@ sub new {
 	# wrong, but at least it has the correct proportions. To fix the
 	# buggy layout we will unmaximize and remaximize it again later
 	# just before we ->Show the window.
-	if ( Padre::Constant::WXWIN32 and $config->main_maximized ) {
+	if ( Padre::Constant::WIN32 and $config->main_maximized ) {
 		$self->Maximize(1);
 	}
 
@@ -188,6 +186,9 @@ sub new {
 	my $startup_locale = $ide->opts->{startup_locale};
 	$self->{locale} = ( $startup_locale ? Padre::Locale::object($startup_locale) : Padre::Locale::object() );
 
+	# Bootstrap style information in case the GUI will need it
+	$self->{theme} = Padre::Wx::Theme->find( $config->editor_style );
+
 	# A large complex application looks, frankly, utterly stupid
 	# if it gets very small, or even mildly small.
 	$self->SetMinSize( Wx::Size->new( 500, 400 ) );
@@ -197,12 +198,6 @@ sub new {
 
 	# Bootstrap the action system
 	Padre::Wx::ActionLibrary->init($self);
-
-	# Bootstrap the wizard system
-	if (Padre::Feature::WIZARD_SELECTOR) {
-		require Padre::Wx::WizardLibrary;
-		Padre::Wx::WizardLibrary->init($self);
-	}
 
 	# Temporary store for the notebook tab history
 	# TO DO: Storing this here (might) violate encapsulation.
@@ -299,6 +294,7 @@ sub new {
 			shift->{_do_update_ui} = 1;
 		}
 	);
+
 	Wx::Event::EVT_IDLE(
 		$self,
 		sub {
@@ -313,7 +309,6 @@ sub new {
 	Wx::Event::EVT_STC_CHANGE( $self, -1, \&on_stc_change );
 	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
 	Wx::Event::EVT_STC_CHARADDED( $self, -1, \&on_stc_char_added );
-	Wx::Event::EVT_STC_DWELLSTART( $self, -1, \&on_stc_dwell_start );
 
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
@@ -325,6 +320,9 @@ sub new {
 	$self->_show_output( $config->main_output );
 	$self->_show_command_line( $config->main_command_line );
 	$self->_show_syntaxcheck( $config->main_syntaxcheck );
+	$self->_show_vcs( $config->main_vcs ) if $config->feature_vcs_support;
+	$self->_show_cpan_explorer( $config->main_cpan_explorer )
+		if $config->feature_cpan_explorer;
 
 	# Lock the panels if needed
 	$self->aui->lock_panels( $config->main_lockinterface );
@@ -378,7 +376,7 @@ sub timer_start {
 	# render pass.
 	# This gives us an optimum compromise between being PERCEIVED
 	# to start-up quickly, and ACTUALLY starting up quickly.
-	if ( Padre::Constant::WXWIN32 and $config->main_maximized ) {
+	if ( Padre::Constant::WIN32 and $config->main_maximized ) {
 
 		# This is a hacky workaround for buggy maximise-at-startup
 		# layout generation on windows.
@@ -524,6 +522,8 @@ Accessors to GUI elements:
 
 =item * C<syntax>
 
+=item * C<vcs>
+
 =back
 
 Accessors to operating data:
@@ -549,6 +549,8 @@ use Class::XSAccessor {
 		has_output         => 'output',
 		has_command_line   => 'command_line',
 		has_syntax         => 'syntax',
+		has_vcs		   => 'vcs',
+		has_cpan_explorer  => 'cpan_explorer',
 		has_functions      => 'functions',
 		has_todo           => 'todo',
 		has_debugger       => 'debugger',
@@ -566,6 +568,7 @@ use Class::XSAccessor {
 		ide                 => 'ide',
 		config              => 'config',
 		title               => 'title',
+		theme               => 'theme',
 		aui                 => 'aui',
 		menu                => 'menu',
 		notebook            => 'notebook',
@@ -578,25 +581,6 @@ use Class::XSAccessor {
 		search => 'search',
 	},
 };
-
-=pod
-
-=head3 C<about>
-
-    my $dialog = $main->about;
-
-Returns the About Padre dialog, creating it if needed.
-
-=cut
-
-sub about {
-	my $self = shift;
-	unless ( defined $self->{about} ) {
-		require Padre::Wx::About;
-		$self->{about} = Padre::Wx::About->new($self);
-	}
-	return $self->{about};
-}
 
 =pod
 
@@ -700,6 +684,33 @@ sub syntax {
 	return $self->{syntax};
 }
 
+sub vcs {
+	my $self = shift;
+	unless ( defined $self->{vcs} ) {
+		require Padre::Wx::VCS;
+		$self->{vcs} = Padre::Wx::VCS->new($self);
+	}
+	return $self->{vcs};
+}
+
+sub cpan_explorer {
+	my $self = shift;
+	unless ( defined $self->{cpan_explorer} ) {
+		require Padre::Wx::CPAN2;
+		$self->{cpan_explorer} = Padre::Wx::CPAN2->new($self);
+	}
+	return $self->{cpan_explorer};
+}
+
+sub diff {
+	my $self = shift;
+	unless ( defined $self->{diff} ) {
+		require Padre::Wx::Diff;
+		$self->{diff} = Padre::Wx::Diff->new($self);
+	}
+	return $self->{diff};
+}
+
 BEGIN {
 	no warnings 'once';
 	*debugger = sub {
@@ -764,11 +775,6 @@ sub open_resource {
 	return $self->{open_resource};
 }
 
-sub wizard_selector {
-	require Padre::Wx::Dialog::WizardSelector;
-	return Padre::Wx::Dialog::WizardSelector->new( $_[0] );
-}
-
 sub help_search {
 	my $self  = shift;
 	my $topic = shift;
@@ -811,8 +817,8 @@ Return current quick find dialog. Create a new one if needed.
 sub findfast {
 	my $self = shift;
 	unless ( defined $self->{findfast} ) {
-		require Padre::Wx::Dialog::FindFast;
-		$self->{findfast} = Padre::Wx::Dialog::FindFast->new;
+		require Padre::Wx::FindFast;
+		$self->{findfast} = Padre::Wx::FindFast->new;
 	}
 	return $self->{findfast};
 }
@@ -830,8 +836,8 @@ Return current replace dialog. Create a new one if needed.
 sub replace {
 	my $self = shift;
 	unless ( defined $self->{replace} ) {
-		require Padre::Wx::Dialog::Replace;
-		$self->{replace} = Padre::Wx::Dialog::Replace->new($self);
+		require Padre::Wx::Replace;
+		$self->{replace} = Padre::Wx::Replace->new($self);
 	}
 	return $self->{replace};
 }
@@ -924,7 +930,7 @@ sub load_files {
 
 =pod
 
-=head2 C<lock>
+=head3 C<lock>
 
   my $lock = $main->lock('UPDATE', 'BUSY', 'refresh_toolbar');
 
@@ -984,7 +990,7 @@ sub lock {
 
 =pod
 
-=head2 locked
+=head3 C<locked>
 
 This method provides the ability to check if a resource is currently locked.
 
@@ -1015,7 +1021,7 @@ sub single_instance_address {
 	my $config = $self->config;
 
 	require Wx::Socket;
-	if (Padre::Constant::WXWIN32) {
+	if (Padre::Constant::WIN32) {
 
 		# Since using a Wx::IPv4address doesn't seem to work,
 		# for now just return the two-value host/port list.
@@ -1072,7 +1078,7 @@ sub single_instance_start {
 	require Wx::Socket;
 	$self->{single_instance} = Wx::SocketServer->new(
 		$self->single_instance_address,
-		Wx::wxSOCKET_NOWAIT | Wx::wxSOCKET_REUSEADDR,
+		Wx::SOCKET_NOWAIT | Wx::SOCKET_REUSEADDR,
 	);
 	unless ( $self->{single_instance}->Ok ) {
 		delete $self->{single_instance_server};
@@ -1332,7 +1338,7 @@ sub window_top {
 
 =pod
 
-=head2 C<window_save>
+=head3 C<window_save>
 
     $main->window_save;
 
@@ -1421,6 +1427,8 @@ sub refresh {
 	$self->refresh_syntaxcheck($current);
 	$self->refresh_functions($current);
 	$self->refresh_outline($current);
+	$self->refresh_diff($current);
+	$self->refresh_vcs($current) if $self->config->feature_vcs_support;
 
 	# Refresh the remaining elements while the background tasks
 	# are running for the other elements.
@@ -1445,9 +1453,10 @@ sub refresh {
 		if ( defined $id and $id >= 0 ) {
 			$notebook->GetPage($id)->SetFocus;
 		}
-		$self->aui->GetPane('notebook')->PaneBorder(0);
-	} else {
-		$self->aui->GetPane('notebook')->PaneBorder(1);
+
+		# $self->aui->GetPane('notebook')->PaneBorder(0);
+		# } else {
+		# $self->aui->GetPane('notebook')->PaneBorder(1);
 	}
 
 	return;
@@ -1656,13 +1665,34 @@ sub refresh_syntaxcheck {
 	return unless $self->has_syntax;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{syntaxcheck}->IsChecked;
-	$self->syntax->refresh;
+	$self->syntax->refresh( $_[0] or $self->current );
 	return;
 }
 
 =pod
 
-=head2 C<refresh_outline>
+=head3 C<refresh_vcs>
+
+    $main->refresh_vcs;
+
+Do a refresh of version control checking. This is a "rapid" change,
+since actual version control check is happening in the background.
+
+=cut
+
+sub refresh_vcs {
+	my $self = shift;
+	return unless $self->has_vcs;
+	return if $self->locked('REFRESH');
+	return unless $self->menu->view->{vcs}->IsChecked;
+	$self->vcs->refresh( $_[0] or $self->current );
+	return;
+}
+
+
+=pod
+
+=head3 C<refresh_outline>
 
     $main->refresh_outline;
 
@@ -1675,7 +1705,7 @@ sub refresh_outline {
 	return unless $self->has_outline;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{outline}->IsChecked;
-	$self->outline->refresh;
+	$self->outline->refresh( $_[0] or $self->current );
 	return;
 }
 
@@ -1845,7 +1875,7 @@ sub refresh_todo {
 	return unless $self->has_todo;
 	return if $self->locked('REFRESH');
 	return unless $self->menu->view->{todo}->IsChecked;
-	$self->todo->refresh(@_);
+	$self->todo->refresh( @_ or $self->current );
 	return;
 }
 
@@ -1867,7 +1897,7 @@ sub refresh_directory {
 
 =pod
 
-=head2 C<refresh_aui>
+=head3 C<refresh_aui>
 
 This is a refresh method wrapper around the C<AUI> C<Update> method so
 that it can be lock-managed by the existing locking system.
@@ -1883,37 +1913,29 @@ sub refresh_aui {
 
 =pod
 
-=head2 Interface Rebuilding Methods
+=head3 C<refresh_diff>
 
-Those methods reconfigure Padre's main window in case of drastic changes
-(locale, etc.)
+    $main->refresh_diff;
 
-=head3 C<change_style>
-
-    $main->change_style( $style, $private );
-
-Apply C<$style> to Padre main window. C<$private> is a Boolean true if
-the style is located in user's private Padre directory.
+Do a refresh of saved and current document differences. This is a "rapid" change,
+since actual calculating differences is happening in the background.
 
 =cut
 
-sub change_style {
-	my $self    = shift;
-	my $name    = shift;
-	my $private = shift;
-	Padre::Wx::Editor::data( $name, $private );
-	foreach my $editor ( $self->editors ) {
-		$editor->padre_setup;
-	}
-
-	# Save editor style configuration
-	$self->config->set( editor_style => $name );
-	$self->config->write;
-
+sub refresh_diff {
+	my $self = shift;
+	return unless $self->config->feature_document_diffs;
+	return if $self->locked('REFRESH');
+	$self->diff->refresh( $_[0] or $self->current );
 	return;
 }
 
 =pod
+
+=head2 Interface Rebuilding Methods
+
+Those methods reconfigure Padre's main window in case of drastic changes
+(locale, etc.)
 
 =head3 C<change_locale>
 
@@ -1927,6 +1949,7 @@ the new locale.
 sub change_locale {
 	my $self = shift;
 	my $name = shift;
+	my $lock = $self->lock('CONFIG');
 	unless ( defined $name ) {
 		$name = Padre::Locale::system_rfc4646 || Padre::Locale::last_resort_rfc4646;
 	}
@@ -1934,7 +1957,6 @@ sub change_locale {
 
 	# Save the locale to the config
 	$self->config->set( locale => $name );
-	$self->config->write;
 
 	# Reset the locale
 	delete $self->{locale};
@@ -2026,9 +2048,34 @@ sub relocale {
 		$self->{regex_editor}->set_data($data_ref);
 	}
 
-	# Replace the about box if it exists
-	if ( exists $self->{about} ) {
-		$self->{about} = Padre::Wx::About->new($self);
+	return;
+}
+
+=pod
+
+=head3 C<restyle>
+
+    $main->restyle;
+
+The term and method C<restyle> is reserved for code that needs to be run when
+the L<Padre::Wx::Theme|theme> of the editor has changed and the colouring of
+the application needs to be changed without restarting.
+
+Note that the new style must be applied to configuration before this method is
+called, and this method is usually called by the C<apply> handler for the
+C<editor_style> configuration setting.
+
+=cut
+
+sub restyle {
+	my $self  = shift;
+	my $name  = $self->config->editor_style;
+	my $style = $self->{theme} = Padre::Wx::Theme->find($name);
+	my $lock  = $self->lock('UPDATE');
+
+	# Apply the new style to all current editors
+	foreach my $editor ( $self->editors ) {
+		$style->apply($editor);
 	}
 
 	return;
@@ -2297,7 +2344,7 @@ sub _show_output {
 
 =pod
 
-=head2 C<show_findfast>
+=head3 C<show_findfast>
 
     $main->show_findfast( $visible );
 
@@ -2308,8 +2355,16 @@ to show the panel.
 =cut
 
 sub show_findfast {
-	my $self = shift;
-	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $self    = shift;
+	my $show    = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $visible = $self->has_findfast && $self->findfast->visible;
+	if ( $show and not $visible ) {
+		$self->findfast->_show_panel;
+		$self->aui->Update;
+	} elsif ( $visible and not $show ) {
+		$self->findfast->_hide_panel;
+		$self->aui->Update;
+	}
 	return;
 }
 
@@ -2456,29 +2511,77 @@ sub _show_syntaxcheck {
 
 =pod
 
-=head2 Search and Replace
+=head3 C<show_vcs>
 
-=head2 find_dialog
+    $main->show_vcs( $visible );
 
-    $main->find_dialog;
-
-Show the find dialog, escalating from the fast find if needed
+Show the version control panel at the bottom if C<$visible> is true. Hide it
+otherwise. If C<$visible> is not provided, the method defaults to show
+the panel.
 
 =cut
 
-sub find_dialog {
+sub show_vcs {
 	my $self = shift;
-	my $term = '';
-
-	# Close the fast find panel if it was open
-	if ( $self->has_findfast ) {
-
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	my $lock = $self->lock( 'UPDATE', 'CONFIG', 'refresh_vcs' );
+	unless ( $show == $self->menu->view->{vcs}->IsChecked ) {
+		$self->menu->view->{vcs}->Check($show);
 	}
 
-	# Create the find dialog.
-	my $find = $self->find;
+	$self->config->set( main_vcs => $show );
+	$self->_show_vcs($show);
+	$self->aui->Update;
 
+	return;
+}
 
+sub _show_vcs {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+	if ( $_[0] ) {
+		$self->right->show( $self->vcs );
+	} elsif ( $self->has_vcs ) {
+		$self->right->hide( $self->vcs );
+		delete $self->{vcs};
+	}
+}
+
+=pod
+
+=head3 C<show_cpan_explorer>
+
+    $main->show_cpan_explorer( $visible );
+
+Show the CPAN explorer panel at the bottom if C<$visible> is true. Hide it
+otherwise. If C<$visible> is not provided, the method defaults to show
+the panel.
+
+=cut
+
+sub show_cpan_explorer {
+	my $self = shift;
+	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
+	unless ( $show == $self->menu->view->{cpan_explorer}->IsChecked ) {
+		$self->menu->view->{cpan_explorer}->Check($show);
+	}
+
+	$self->config->set( main_cpan_explorer => $show );
+	$self->_show_cpan_explorer($show);
+	$self->aui->Update;
+
+	return;
+}
+
+sub _show_cpan_explorer {
+	my $self = shift;
+	my $lock = $self->lock('UPDATE');
+	if ( $_[0] ) {
+		$self->right->show( $self->cpan_explorer );
+	} elsif ( $self->has_cpan_explorer ) {
+		$self->right->hide( $self->cpan_explorer );
+		delete $self->{cpan_explorer};
+	}
 }
 
 =pod
@@ -2594,7 +2697,7 @@ sub on_run_command {
 		Wx::gettext("Run setup"),
 		"run_command",
 	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $command = $dialog->GetValue;
@@ -2708,7 +2811,7 @@ sub on_run_tests {
 		my $things_to_test = $tempfile->filename;
 		$self->run_command(qq{"$prove" - -b < "$things_to_test"});
 	} else {
-		$self->run_command("$prove -b $project_dir/t");
+		$self->run_command("$prove -l $project_dir/t");
 	}
 	chdir $dir;
 }
@@ -2806,6 +2909,20 @@ sub run_command {
 			my $title = $cmd;
 			$title =~ s/"//g;
 			system qq(start "$title" cmd /C "$cmd & pause");
+		} elsif (Padre::Constant::UNIX) {
+
+			if ( defined $ENV{COLORTERM} ) {
+				if ( $ENV{COLORTERM} eq 'gnome-terminal' ) {
+
+					#Gnome-Terminal line format:
+					#gnome-terminal -e "bash -c \"prove -lv t/96_edit_patch.t; exec bash\""
+					system qq($ENV{COLORTERM} -e "bash -c \\\"$cmd; exec bash\\\"" & );
+				} else {
+					system qq(xterm -sb -e "$cmd; sleep 1000" &);
+				}
+			}
+		} elsif (Padre::Constant::UNIX) {
+			# tome
 		} else {
 			system qq(xterm -sb -e "$cmd; sleep 1000" &);
 		}
@@ -2971,14 +3088,14 @@ sub run_document {
 				$self->run_command($cmd);
 			}
 		} else {
-			my $styles = Wx::wxCENTRE | Wx::wxICON_HAND | Wx::wxYES_NO;
+			my $styles = Wx::CENTRE | Wx::ICON_HAND | Wx::YES_NO;
 			my $ret    = Wx::MessageBox(
 				$document->errstr . "\n" . Wx::gettext('Do you want to continue?'),
 				Wx::gettext("Warning"),
 				$styles,
 				$self,
 			);
-			if ( $ret == Wx::wxYES ) {
+			if ( $ret == Wx::YES ) {
 				SCOPE: {
 					require File::pushd;
 					File::pushd::pushd( $document->project_dir ) if -e $document->project_dir;
@@ -3161,7 +3278,7 @@ Various methods to help send information to user.
 
 Some methods are inherited from L<Padre::Wx::Role::Dialog>.
 
-=head2 C<status>
+=head3 C<status>
 
     $main->status( $msg );
 
@@ -3223,7 +3340,7 @@ sub prompt {
 	my $dialog = Padre::Wx::History::TextEntryDialog->new(
 		$self, $title, $subtitle, $key,
 	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $value = $dialog->GetValue;
@@ -3247,7 +3364,7 @@ sub simple_prompt {
 	my $value    = shift || '';
 
 	my $dialog = Wx::TextEntryDialog->new( $self, $title, $subtitle, $value );
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $new_value = $dialog->GetValue;
@@ -3264,7 +3381,32 @@ search and replace functions and dialogs.
 However, they still represent abstract logic and should NOT be tied directly to
 keystroke or menu events.
 
-=head2 C<search_next>
+=head3 C<find_dialog>
+
+    $main->find_dialog;
+
+Show the find dialog, escalating from the fast find if needed
+
+=cut
+
+sub find_dialog {
+	my $self = shift;
+	my $term = '';
+
+	# Close the fast find panel if it was open
+	if ( $self->has_findfast ) {
+
+	}
+
+	# Create the find dialog.
+	my $find = $self->find;
+
+
+}
+
+=pod
+
+=head3 C<search_next>
 
   # Next match for a new explicit search
   $main->search_next( $search );
@@ -3322,7 +3464,7 @@ sub search_next {
 
 =pod
 
-=head2 C<search_previous>
+=head3 C<search_previous>
 
   # Previous match for a new search
   $main->search_previous( $search );
@@ -3380,7 +3522,7 @@ sub search_previous {
 
 =pod
 
-=head2 C<replace_next>
+=head3 C<replace_next>
 
   # Next replace for a new search
   $main->replace_next( $search );
@@ -3411,7 +3553,7 @@ sub replace_next {
 
 =pod
 
-=head2 C<replace_all>
+=head3 C<replace_all>
 
   # Replace all for a new search
   $main->replace_all( $search );
@@ -3490,7 +3632,7 @@ sub on_comment_block {
 	my $begin_line      = $editor->LineFromPosition($selection_start);
 	my $end_line =
 		$editor->LineFromPosition( $selection_start == $selection_end ? $selection_end : $selection_end - 1 );
-	my $comment = $document->comment_lines_str;
+	my $comment = $document->get_comment_line_string;
 
 	if ( not defined $comment ) {
 		$self->error(
@@ -3665,11 +3807,11 @@ sub on_close_window {
 			my $ret = Wx::MessageBox(
 				Wx::gettext("You still have a running process. Do you want to kill it and exit?"),
 				Wx::gettext("Warning"),
-				Wx::wxYES_NO | Wx::wxCENTRE,
+				Wx::YES_NO | Wx::CENTRE,
 				$self,
 			);
 
-			if ( $ret == Wx::wxYES ) {
+			if ( $ret == Wx::YES ) {
 				if ( $self->{command} ) {
 					if (Padre::Constant::WIN32) {
 						$self->{command}->KillProcess;
@@ -3706,10 +3848,26 @@ sub on_close_window {
 	# It probably also makes it shut actually faster as well, as Wx won't
 	# try to do any updates or painting as we shut things down.
 	$self->Show(0);
+	TRACE("MAIN WINDOW HIDDEN. PADRE APPEARS TO BE CLOSED TO USER") if DEBUG;
 
 	# Clean up our secondary windows
-	if ( $self->has_about ) {
-		$self->about->Destroy;
+	if ( $self->has_directory ) {
+		$self->directory->view_stop;
+	}
+	if ( $self->has_functions ) {
+		$self->functions->view_stop;
+	}
+	if ( $self->has_outline ) {
+		$self->outline->view_stop;
+	}
+	if ( $self->has_syntax ) {
+		$self->syntax->view_stop;
+	}
+	if ( $self->has_cpan_explorer ) {
+		$self->cpan_explorer->view_stop;
+	}
+	if ( $self->has_vcs ) {
+		$self->vcs->view_stop;
 	}
 	if ( $self->{help} ) {
 		$self->{help}->Destroy;
@@ -3730,7 +3888,7 @@ sub on_close_window {
 
 	# Stop the task manager.
 	TRACE("Shutting down Task Manager") if DEBUG;
-	$self->ide->task_manager->stop;
+	$ide->task_manager->stop;
 
 	# The AUI manager requires a manual UnInit. The documentation for it
 	# says that if we don't do this it may segfault the process on exit.
@@ -3738,11 +3896,20 @@ sub on_close_window {
 
 	# Vacuum database on exit so that it does not grow.
 	# Since you can't VACUUM inside a transaction, end it first.
+	# Doing the vacuum here, which can take several 10ths of a second,
+	# gives the child threads a chance to clean up and exit.
 	undef $transaction;
 	Padre::DB->vacuum;
 
-	TRACE("Closing Padre") if DEBUG;
+	# Yield to allow any final task manager messages to flush out
+	TRACE("Yielding to allow final plthreadevent handling") if DEBUG;
+	$ide->wx->Yield;
 
+	# Clean up the shut down (unjoined) threads
+	TRACE("Waiting to join final threads") if DEBUG;
+	$ide->task_manager->waitjoin;
+
+	TRACE("Closing Padre") if DEBUG;
 	return;
 }
 
@@ -3891,22 +4058,14 @@ sub setup_editor {
 
 	TRACE("Document created for '$file'") if DEBUG;
 
-	my $lock = $self->lock( 'REFRESH', 'update_last_session', 'refresh_menu' );
+	require Padre::Wx::Editor;
+	my $lock   = $self->lock( 'REFRESH', 'update_last_session', 'refresh_menu' );
 	my $editor = Padre::Wx::Editor->new( $self->notebook );
 	$editor->{Document} = $document;
 	$document->set_editor($editor);
-	$editor->configure_editor($document);
-
+	$editor->set_document($document);
 	$plugins->editor_enable($editor);
-
-	$editor->set_preferences;
-
-	if ( $config->main_syntaxcheck ) {
-		if ( $editor->GetMarginWidth(1) == 0 ) {
-			$editor->SetMarginType( 1, Wx::wxSTC_MARGIN_SYMBOL ); # margin number 1 for symbols
-			$editor->SetMarginWidth( 1, 16 );                     # set margin 1 16 px wide
-		}
-	}
+	$editor->setup_document;
 
 	if ( $document->is_new ) {
 
@@ -3927,6 +4086,7 @@ sub setup_editor {
 
 	my $title = $editor->{Document}->get_title;
 	my $id = $self->create_tab( $editor, $title );
+	$editor->Show;
 	$self->notebook->GetPage($id)->SetFocus;
 
 	if (Padre::Feature::CURSORMEMORY) {
@@ -4040,7 +4200,7 @@ sub on_open_selection {
 			Wx::gettext("Nothing selected. Enter what should be opened:"),
 			Wx::gettext("Open selection"), ''
 		);
-		return if $dialog->ShowModal == Wx::wxID_CANCEL;
+		return if $dialog->ShowModal == Wx::ID_CANCEL;
 
 		$text = $dialog->GetValue;
 		$dialog->Destroy;
@@ -4223,9 +4383,9 @@ sub open_file_dialog {
 		: Wx::gettext('All Files') . '|*|' . $wildcards;
 	my $dialog = Wx::FileDialog->new(
 		$self, Wx::gettext('Open File'),
-		$self->cwd, '', $wildcards, Wx::wxFD_MULTIPLE,
+		$self->cwd, '', $wildcards, Wx::FD_MULTIPLE,
 	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my @filenames = $dialog->GetFilenames;
@@ -4259,11 +4419,11 @@ sub open_file_dialog {
 					$filename
 				),
 				Wx::gettext("Open Warning"),
-				Wx::wxYES_NO | Wx::wxCENTRE,
+				Wx::YES_NO | Wx::CENTRE,
 				$self,
 			);
 
-			next if $ret == Wx::wxYES;
+			next if $ret == Wx::YES;
 		}
 
 		my $FN = File::Spec->catfile( $self->cwd, $filename );
@@ -4279,11 +4439,11 @@ sub open_file_dialog {
 					$FN
 				),
 				Wx::gettext("Open Warning"),
-				Wx::wxYES_NO | Wx::wxCENTRE,
+				Wx::YES_NO | Wx::CENTRE,
 				$self,
 			);
 
-			next if $ret == Wx::wxYES;
+			next if $ret == Wx::YES;
 		}
 
 		push @files, $FN;
@@ -4486,7 +4646,7 @@ sub reload_file {
 	}
 	if ( $document->reload ) {
 		$editor = $document->editor;
-		$editor->configure_editor($document);
+		$editor->set_document($document);
 		if (Padre::Feature::CURSORMEMORY) {
 			$editor->restore_cursor_position;
 		}
@@ -4549,8 +4709,6 @@ sub on_save {
 	my $document = shift || $self->current->document;
 	return unless $document;
 
-	#print $document->filename, "\n";
-
 	my $pageid = $self->editor_id( $document->editor );
 	if ( $document->is_new ) {
 
@@ -4610,9 +4768,9 @@ sub on_save_as {
 			$self->{cwd},
 			$filename,
 			Wx::gettext('All Files') . ( Padre::Constant::WIN32 ? '|*.*' : '|*' ),
-			Wx::wxFD_SAVE,
+			Wx::FD_SAVE,
 		);
-		if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+		if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 			return;
 		}
 
@@ -4628,7 +4786,6 @@ sub on_save_as {
 		#print "Path: " . $dialog->GetPath  . "\n";
 		$self->{cwd} = $dialog->GetDirectory;
 		my $saveto = $dialog->GetPath;
-
 
 		# PJL - waxhead 10/02/2011
 		# commenting out the file extension check
@@ -4666,26 +4823,25 @@ sub on_save_as {
 		#					$ext_string
 		#				),
 		#				Wx::gettext("File extension missing warning..."),
-		#				Wx::wxYES_NO | Wx::wxCENTRE,
+		#				Wx::YES_NO | Wx::CENTRE,
 		#				$self,
 		#			);
 		#
 		#
 		#			# return back to the save as dialog when we click No.
-		#			if( $ret == Wx::wxNO ) {
+		#			if( $ret == Wx::NO ) {
 		#				next; # because we are in a while(1) loop
 		#			}
 		#		}
-
 
 		#my $path = File::Spec->catfile( $self->cwd, $filename );
 		my $path = File::Spec->catfile($saveto);
 		if ( -e $path ) {
 			my $response = Wx::MessageBox(
 				Wx::gettext("File already exists. Overwrite it?"),
-				Wx::gettext("Exist"), Wx::wxYES_NO, $self,
+				Wx::gettext("Exist"), Wx::YES_NO, $self,
 			);
-			if ( $response == Wx::wxYES ) {
+			if ( $response == Wx::YES ) {
 				$document->set_filename($path);
 				$document->save_file;
 				$document->set_newline_type(Padre::Constant::NEWLINE);
@@ -4703,7 +4859,7 @@ sub on_save_as {
 	$self->_save_buffer($pageid);
 
 	$document->set_mimetype( $document->guess_mimetype );
-	$document->editor->padre_setup;
+	$document->editor->setup_document;
 	$document->rebless;
 	$document->colourize;
 
@@ -4816,7 +4972,7 @@ sub on_save_intuition {
 	$self->_save_buffer($pageid);
 
 	$document->set_mimetype( $document->guess_mimetype );
-	$document->editor->padre_setup;
+	$document->editor->setup_document;
 	$document->rebless;
 	$document->colourize;
 
@@ -4897,10 +5053,10 @@ sub _save_buffer {
 		my $ret = Wx::MessageBox(
 			Wx::gettext("File changed on disk since last saved. Do you want to overwrite it?"),
 			$doc->filename || Wx::gettext("File not in sync"),
-			Wx::wxYES_NO | Wx::wxCENTRE,
+			Wx::YES_NO | Wx::CENTRE,
 			$self,
 		);
-		return if $ret != Wx::wxYES;
+		return if $ret != Wx::YES;
 	}
 
 	unless ( $doc->save_file ) {
@@ -4992,17 +5148,17 @@ sub close {
 		my $ret = Wx::MessageBox(
 			Wx::gettext("File changed. Do you want to save it?"),
 			$document->filename || Wx::gettext("Unsaved File"),
-			Wx::wxYES_NO | Wx::wxCANCEL | Wx::wxCENTRE,
+			Wx::YES_NO | Wx::CANCEL | Wx::CENTRE,
 			$self,
 		);
-		if ( $ret == Wx::wxYES ) {
+		if ( $ret == Wx::YES ) {
 			$self->on_save($document);
-		} elsif ( $ret == Wx::wxNO ) {
+		} elsif ( $ret == Wx::NO ) {
 
 			# just close it
 		} else {
 
-			# Wx::wxCANCEL, or when clicking on [x]
+			# Wx::CANCEL, or when clicking on [x]
 			return 0;
 		}
 	}
@@ -5262,10 +5418,10 @@ sub delete {
 			Wx::gettext("Do you really want to close and delete %s from disk?"),
 			$filename
 		),
-		Wx::wxYES_NO | Wx::wxCANCEL | Wx::wxCENTRE,
+		Wx::YES_NO | Wx::CANCEL | Wx::CENTRE,
 		$self,
 	);
-	return 1 unless $ret == Wx::wxYES;
+	return 1 unless $ret == Wx::YES;
 
 	TRACE( join ' ', "Deleting ", ref $document, $filename || 'Unknown' ) if DEBUG;
 
@@ -5372,64 +5528,11 @@ sub on_prev_pane {
 
 =pod
 
-=head3 C<on_diff>
-
-    $main->on_diff;
-
-Run C<Text::Diff> between current document and its last saved content on
-disk. This allow to see what has changed before saving. Display the
-differences in the output pane.
-
-=cut
-
-sub on_diff {
-	my $self     = shift;
-	my $document = $self->current->document or return;
-	my $text     = $document->text_get;
-	my $file     = defined( $document->{file} ) ? $document->{file}->filename : undef;
-	unless ($file) {
-		return $self->error( Wx::gettext("Cannot diff if file was never saved") );
-	}
-
-	my $external_diff = $self->config->external_diff_tool;
-	if ($external_diff) {
-		my $dir = File::Temp::tempdir( CLEANUP => 1 );
-		my $filename = File::Spec->catdir(
-			$dir,
-			'IN_EDITOR' . File::Basename::basename($file)
-		);
-		if ( CORE::open( my $fh, '>', $filename ) ) {
-			print $fh $text;
-			CORE::close($fh);
-			system( $external_diff, $file, $filename );
-		} else {
-			$self->error($!);
-		}
-
-		# save current version in a temp directory
-		# run the external diff on the original and the launch the
-	} else {
-		require Text::Diff;
-		my $diff = Text::Diff::diff( $file, \$text );
-		unless ($diff) {
-			$diff = Wx::gettext("There are no differences\n");
-		}
-
-		$self->show_output(1);
-		$self->output->clear;
-		$self->output->AppendText($diff);
-	}
-
-	return;
-}
-
-=pod
-
 =head3 C<on_join_lines>
 
     $main->on_join_lines;
 
-Join current line with next one (Ã  la B<vi> with C<Ctrl+J>). No return value.
+Join current line with next one (à la B<vi> with C<Ctrl+J>). No return value.
 
 =cut
 
@@ -5493,15 +5596,15 @@ sub zoom {
 
 =pod
 
-=head3 C<open_regex_editor>
+=head3 C<show_regex_editor>
 
-    $main->open_regex_editor;
+    $main->show_regex_editor;
 
 Open Padre's regular expression editor. No return value.
 
 =cut
 
-sub open_regex_editor {
+sub show_regex_editor {
 	my $self = shift;
 
 	unless ( defined $self->{regex_editor} ) {
@@ -5522,15 +5625,15 @@ sub open_regex_editor {
 
 =pod
 
-=head3 C<open_perl_filter>
+=head3 C<show_perl_filter>
 
-    $main->open_perl_filter;
+    $main->show_perl_filter;
 
 Open Padre's filter-through-perl. No return value.
 
 =cut
 
-sub open_perl_filter {
+sub show_perl_filter {
 	my $self = shift;
 
 	unless ( defined $self->{perl_filter} ) {
@@ -5544,27 +5647,6 @@ sub open_perl_filter {
 	}
 
 	$self->{perl_filter}->show;
-
-	return;
-}
-
-=pod
-
-=head3 C<on_key_bindings>
-
-    $main->on_key_bindings;
-
-Opens the key bindings dialog
-
-=cut
-
-sub on_key_bindings {
-	my $self = shift;
-
-	# Show the key bindings dialog
-	require Padre::Wx::Dialog::KeyBindings;
-	my $key_bindings = Padre::Wx::Dialog::KeyBindings->new($self);
-	$key_bindings->show;
 
 	return;
 }
@@ -5674,8 +5756,11 @@ sub editor_rightmargin {
 	my $lock = $self->lock('CONFIG');
 	$self->config->set( editor_right_margin_enable => $show );
 
-	my $mode = $show ? Wx::wxSTC_EDGE_LINE : Wx::wxSTC_EDGE_NONE;
 	my $column = $self->config->editor_right_margin_column;
+	my $mode   = $show
+		? Wx::Scintilla::Constant::EDGE_LINE
+		: Wx::Scintilla::Constant::EDGE_NONE;
+
 	foreach my $editor ( $self->editors ) {
 		$editor->SetEdgeColumn($column);
 		$editor->SetEdgeMode($mode);
@@ -5757,7 +5842,10 @@ sub editor_whitespace {
 	my $lock = $self->lock('CONFIG');
 	$self->config->set( editor_whitespace => $show );
 
-	my $mode = $show ? Wx::wxSTC_WS_VISIBLEALWAYS : Wx::wxSTC_WS_INVISIBLE;
+	my $mode = $show
+		? Wx::Scintilla::Constant::SCWS_VISIBLEALWAYS
+		: Wx::Scintilla::Constant::SCWS_INVISIBLE;
+
 	foreach my $editor ( $self->editors ) {
 		$editor->SetViewWhiteSpace($show);
 	}
@@ -5784,8 +5872,11 @@ sub on_word_wrap {
 		$self->menu->view->{word_wrap}->Check($show);
 	}
 
-	my $doc = $self->current->document or return;
-	my $mode = $show ? Wx::wxSTC_WRAP_WORD : Wx::wxSTC_WRAP_NONE;
+	my $doc  = $self->current->document or return;
+	my $mode = $show
+		? Wx::Scintilla::Constant::SC_WRAP_WORD
+		: Wx::Scintilla::Constant::SC_WRAP_NONE;
+
 	$doc->editor->SetWrapMode($mode);
 }
 
@@ -5870,15 +5961,14 @@ return value.
 =cut
 
 sub on_toggle_lockinterface {
-	my $self   = shift;
-	my $config = $self->config;
+	my $self = shift;
+	my $lock = $self->lock('CONFIG');
 
-	# Update and save configuration
-	$config->apply(
+	# Update setting
+	$self->config->apply(
 		'main_lockinterface',
 		$self->menu->view->{lockinterface}->IsChecked ? 1 : 0,
 	);
-	$config->write;
 
 	return;
 }
@@ -5907,9 +5997,9 @@ sub on_insert_from_file {
 		$self,      Wx::gettext('Open file'),
 		$self->cwd, '',
 		Wx::gettext('All Files') . ( Padre::Constant::WIN32 ? '|*.*' : '|*' ),
-		Wx::wxFD_OPEN,
+		Wx::FD_OPEN,
 	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $filename = $dialog->GetFilename;
@@ -6132,7 +6222,7 @@ sub on_stc_change {
     $main->on_stc_char_added;
 
 This handler is called when a character is added. No return value. See
-L<http://www.yellowbrain.com/stc/events.html#EVT_STC_CHARADDED>
+L<http://www.scintilla.org/ScintillaDoc.html#SCN_CHARADDED>
 
 TO DO: maybe we need to check this more carefully.
 
@@ -6147,31 +6237,6 @@ sub on_stc_char_added {
 	} elsif ( $key == 125 ) { # Closing brace
 		$self->current->editor->autoindent('deindent');
 	}
-	return;
-}
-
-=pod
-
-=head3 C<on_stc_dwell_start>
-
-    $main->on_stc_dwell_start( $event );
-
-Handler of the C<DWELLSTART> C<$event>. This event is sent when the mouse
-has not moved in a given amount of time. Doesn't do anything by now. No
-return value.
-
-=cut
-
-sub on_stc_dwell_start {
-	my ( $self, $event ) = @_;
-
-	my $editor = $self->current->editor;
-
-	# print "dwell: ", $event->GetPosition, "\n";
-	# $editor->show_tooltip;
-	# print Wx::GetMousePosition, "\n";
-	# print Wx::GetMousePositionXY, "\n";
-
 	return;
 }
 
@@ -6242,7 +6307,7 @@ sub on_tab_and_space {
 		Wx::gettext('How many spaces for each tab:'),
 		$title, $type,
 	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $space_num = $dialog->GetValue;
@@ -6273,83 +6338,63 @@ sub on_tab_and_space {
 
 =pod
 
-=head3 C<on_delete_ending_space>
+=head3 C<on_delete_trailing_spaces>
 
-    $main->on_delete_ending_space;
+    $main->on_delete_trailing_spaces;
 
 Trim all ending spaces in current selection, or document if no text is
 selected. No return value.
 
 =cut
 
-sub on_delete_ending_space {
+sub on_delete_trailing_spaces {
 	my $self     = shift;
 	my $current  = $self->current;
 	my $document = $current->document or return;
-	my $src      = $current->text;
-	my $code     = ( defined($src) && length($src) > 0 ) ? $src : $document->text_get;
-
-	# Remove ending space
-	$code =~ s/([^\n\S]+)$//mg;
-
-	if ($src) {
-		my $editor = $current->editor;
-		$editor->ReplaceSelection($code);
-	} else {
-		my $editor      = $current->editor;
-		my $line_number = $editor->GetCurrentLine;
-
-		$document->text_set($code);
-
-		$editor->GotoLine($line_number);
+	my $selected = $current->text;
+	unless ( length $selected ) {
+		return $document->delete_trailing_spaces;
 	}
+
+	# Remove trailing space from selected text
+	$selected =~ s/([^\n\S]+)$//mg;
+
+	# Replace only if the selection is changed
+	unless ( $selected eq $current->text ) {
+		$current->editor->ReplaceSelection($selected);
+	}
+
+	return;
 }
 
 =pod
 
-=head3 C<on_delete_leading_space>
+=head3 C<on_delete_leading_spaces>
 
-    $main->on_delete_leading_space;
+    $main->on_delete_leading_spaces;
 
 Trim all leading spaces in current selection. No return value.
 
 =cut
 
-sub on_delete_leading_space {
-	my $self    = shift;
-	my $current = $self->current;
-	my $src     = $current->text;
-	unless ($src) {
-		$self->message('No selection');
-		return;
+sub on_delete_leading_spaces {
+	my $self     = shift;
+	my $current  = $self->current;
+	my $document = $current->document or return;
+	my $selected = $current->text;
+	unless ( length $selected ) {
+		return $document->delete_leading_spaces;
 	}
 
-	require Padre::Wx::History::TextEntryDialog;
-	my $dialog = Padre::Wx::History::TextEntryDialog->new(
-		$self,
-		'How many leading spaces to delete(1 tab == 4 spaces):',
-		'Delete Leading Space',
-		'fay_delete_leading_space',
-	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
-		return;
-	}
-	my $space_num = $dialog->GetValue;
-	$dialog->Destroy;
-	unless ( defined $space_num and $space_num =~ /^\d+$/ ) {
-		return;
+	# Remove trailing space from selected text
+	$selected =~ s/^[ \t]+//mg;
+
+	# Replace only if the selection is changed
+	unless ( $selected eq $current->text ) {
+		$current->editor->ReplaceSelection($selected);
 	}
 
-	my $code           = $src;
-	my $spaces         = ' ' x $space_num;
-	my $tab_num        = int( $space_num / 4 );
-	my $space_num_left = $space_num - 4 * $tab_num;
-	my $tabs           = "\t" x $tab_num;
-	$tabs .= '' x $space_num_left if ($space_num_left);
-	$code =~ s/^($spaces|$tabs)//mg;
-
-	my $editor = $current->editor;
-	$editor->ReplaceSelection($code);
+	return;
 }
 
 =pod
@@ -6384,10 +6429,10 @@ sub timer_check_overwrite {
 	#	my $ret = Wx::MessageBox(
 	#		$Text,
 	#		$doc->filename || Wx::gettext("File not in sync"),
-	#		Wx::wxYES_NO | Wx::wxCENTRE, $self,
+	#		Wx::YES_NO | Wx::CENTRE, $self,
 	#	);
 	#
-	#	if ( $ret == Wx::wxYES ) {
+	#	if ( $ret == Wx::YES ) {
 	#		unless ( $doc->reload ) {
 	#			$self->error(
 	#				sprintf(
@@ -6396,7 +6441,7 @@ sub timer_check_overwrite {
 	#				)
 	#			);
 	#		} else {
-	#			$doc->editor->configure_editor($doc);
+	#			$doc->editor->set_document($doc);
 	#		}
 	#	} else {
 	#		$doc->{timestamp} = $doc->timestamp_now;
@@ -6414,90 +6459,6 @@ sub timer_check_overwrite {
 	$winlist->show;
 
 	return;
-}
-
-=pod
-
-=head3 C<on_last_visited_pane>
-
-    $main->on_last_visited_pane;
-
-Put focus on tab visited before the current one. No return value.
-
-=cut
-
-sub on_last_visited_pane {
-	my ( $self, $event ) = @_;
-
-	my $history = $self->{page_history};
-
-	if ( @$history >= 2 ) {
-
-		# This works, but isn't perfect, improve if you want!
-		$self->{last_visited_pane_depth} = -1
-			if ( !defined( $self->{last_visited_pane_time} ) )
-			or $self->{last_visited_pane_time} < ( Time::HiRes::time() - 1 );
-
-		@$history[ -1, -2 ] = @$history[ -2, -1 ];
-		foreach my $i ( $self->pageids ) {
-			my $editor   = $_[0]->notebook->GetPage($i);
-			my $histaddr = $history->[ $self->{last_visited_pane_depth} ];
-			if ( $histaddr and $histaddr eq Scalar::Util::refaddr($editor) ) {
-				$self->notebook->SetSelection($i);
-
-				--$self->{last_visited_pane_depth};
-				$self->{last_visited_pane_time} = Time::HiRes::time();
-				last;
-			}
-		}
-
-		# Partial refresh
-		$self->refresh_status( $self->current );
-		$self->refresh_toolbar( $self->current );
-	}
-
-	$self->current->editor->SetFocus;
-
-}
-
-=pod
-
-=head3 C<on_oldest_visited_pane>
-
-    $main->on_oldest_visited_pane;
-
-Put focus on tab visited the longest time ago. No return value.
-
-=cut
-
-sub on_oldest_visited_pane {
-	my ( $self, $event ) = @_;
-
-	my $page_history = $self->{page_history};
-
-	if ( @$page_history >= 2 ) {
-
-		# This works, but isn't perfect, improve if you want!
-		$self->{oldest_visited_pane_depth} = 0
-			if ( !defined( $self->{oldest_visited_pane_time} ) )
-			or $self->{oldest_visited_pane_time} < ( Time::HiRes::time() - 1 );
-
-		@$page_history[ -1, -2 ] = @$page_history[ -2, -1 ];
-		foreach my $i ( $self->pageids ) {
-			my $editor = $_[0]->notebook->GetPage($i);
-			if ( Scalar::Util::refaddr($editor) eq $page_history->[ $self->{oldest_visited_pane_depth} ] ) {
-				$self->notebook->SetSelection($i);
-
-				++$self->{last_visited_pane_depth};
-				$self->{oldest_visited_pane_time} = Time::HiRes::time();
-				last;
-			}
-		}
-
-		# Partial refresh
-		$self->refresh_status( $self->current );
-		$self->refresh_toolbar( $self->current );
-	}
 }
 
 =pod
@@ -6522,45 +6483,111 @@ sub on_duplicate {
 
 =pod
 
-=head3 C<on_new_from_template>
+=head2 Code Starter Methods
 
-    $main->on_new_from_template( $extension );
+These methods provide skeleton generators for a variety of file types, with
+the preferences of the user applied already.
 
-Create a new document according to template for C<$extension> type of
-file. No return value.
+=head3 C<start_perl5_script>
+
+    $main->start_perl5_script;
+
+Create a new blank Perl 5 script, applying the user's style preferences if
+possible.
 
 =cut
 
-sub on_new_from_template {
-	my $self      = shift;
-	my $extension = shift;
+# For now, we don't actually apply their style preferences
+sub start_perl5_script {
+	my $self = shift;
 
-	# Load the template
-	my $file = File::Spec->catfile(
-		Padre::Util::sharedir('templates'),
-		"template.$extension"
-	);
-	my $template = Padre::Util::slurp($file);
-	unless ($template) {
-		$self->error( sprintf( Wx::gettext("Failed to find template file '%s'"), $file ) );
+	# Generate the code from the script template
+	require Padre::Template;
+	my $code = Padre::Template->render('perl5/script.pl');
+
+	# Show the new file in a new editor window
+	$self->new_document_from_string( $code, 'application/x-perl' );
+}
+
+=pod
+
+=head3 C<start_perl5_module>
+
+    $main->start_perl5_module($package);
+
+Create a new empty Perl 5 module, applying the user's style preferences if
+possible. If passed a package name, that module will be created.
+
+If no package name is provided, the user will be asked for the name to use.
+
+=cut
+
+# For now, we don't actually apply their style preferences
+sub start_perl5_module {
+	my $self   = shift;
+	my $module = shift;
+	unless ($module) {
+		$module = $self->prompt(
+			Wx::gettext('Module name:'),
+			Wx::gettext('New Module'),
+		);
 	}
 
-	# Generate the full file content
-	require Template::Tiny;
-	require Padre::Util::Template;
-	my $output = '';
-	Template::Tiny->new->process(
-		$template,
-		{   config => $self->{config},
-			util   => Padre::Util::Template->new,
-		},
-		\$output,
+	# Generate the code from the module template
+	require Padre::Template;
+	my $code = Padre::Template->render(
+		'perl5/module.pm',
+		module => $module,
 	);
 
-	# Create the file from the content
-	require Padre::MimeTypes;
-	my $mime_type = Padre::MimeTypes->guess_mimetype( $output, $file );
-	return $self->new_document_from_string( $output, $mime_type );
+	# Show the new file in a new editor window
+	$self->new_document_from_string( $code, 'application/x-perl' );
+}
+
+=pod
+
+=head3 C<start_perl5_test>
+
+    $main->start_perl5_test;
+
+Create a new empty Perl 5 test, applying the user's style preferences if
+possible.
+
+=cut
+
+# For now, we don't actually apply their style preferences
+sub start_perl5_test {
+	my $self = shift;
+
+	# Generate the code from the script template
+	require Padre::Template;
+	my $code = Padre::Template->render('perl5/test.t');
+
+	# Show the new file in a new editor window
+	$self->new_document_from_string( $code, 'application/x-perl' );
+}
+
+=pod
+
+=head3 C<start_perl6_script>
+
+    $main->start_perl6_script;
+
+Create a new blank Perl 6 script, applying the user's style preferences if
+possible.
+
+=cut
+
+# For now, we don't actually apply their style preferences
+sub start_perl6_script {
+	my $self = shift;
+
+	# Generate the code from the script template
+	require Padre::Template;
+	my $code = Padre::Template->render('perl6/script.p6');
+
+	# Show the new file in a new editor window
+	$self->new_document_from_string( $code, 'application/x-perl6' );
 }
 
 =pod
@@ -6569,7 +6596,7 @@ sub on_new_from_template {
 
 Various methods that did not fit exactly in above categories...
 
-=head2 C<action>
+=head3 C<action>
 
   Padre::Current->main->action('help.about');
 
@@ -6689,37 +6716,28 @@ sub key_up {
 	my $code   = $event->GetKeyCode;
 	my $config = $self->config;
 
-	# Remove the bit ( Wx::wxMOD_META) set by Num Lock being pressed on Linux
+	# Remove the bit ( Wx::MOD_META) set by Num Lock being pressed on Linux
 	# () needed after the constants as they are functions in Perl and
 	# without constants perl will call only the first one.
-	$mod = $mod & ( Wx::wxMOD_ALT() + Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() );
-	if ( $mod == Wx::wxMOD_CMD ) { # Ctrl
-		                           # Ctrl-TAB  #TO DO it is already in the menu
-		if ( $code == Wx::WXK_TAB ) {
-
-			if ( $config->swap_ctrl_tab_alt_right ) {
-				&{ $self->ide->actions->{'window.next_file'}->menu_event }( $self, $event );
-			} else {
-				&{ $self->ide->actions->{'window.last_visited_file'}->menu_event }( $self, $event );
-			}
+	$mod = $mod & ( Wx::MOD_ALT + Wx::MOD_CMD + Wx::MOD_SHIFT );
+	if ( $mod == Wx::MOD_CMD ) { # Ctrl
+		# Ctrl-TAB TO DO it is already in the menu
+		if ( $code == Wx::K_TAB ) {
+			&{ $self->ide->actions->{'window.next_file'}->menu_event }( $self, $event );
 		}
-	} elsif ( $mod == Wx::wxMOD_CMD() + Wx::wxMOD_SHIFT() ) { # Ctrl-Shift
-		                                                      # Ctrl-Shift-TAB
-		                                                      # TODO it is already in the menu
-		if ( $code == Wx::WXK_TAB ) {
+	} elsif ( $mod == Wx::MOD_CMD + Wx::MOD_SHIFT ) { # Ctrl-Shift
+		                                              # Ctrl-Shift-TAB
+		                                              # TODO it is already in the menu
+		if ( $code == Wx::K_TAB ) {
 
-			if ( $config->swap_ctrl_tab_alt_right ) {
-				&{ $self->ide->actions->{'window.previous_file'}->menu_event }( $self, $event );
-			} else {
-				&{ $self->ide->actions->{'window.oldest_visited_file'}->menu_event }( $self, $event );
-			}
+			&{ $self->ide->actions->{'window.previous_file'}->menu_event }( $self, $event );
 		}
-	} elsif ( $mod == Wx::wxMOD_ALT() ) {
+	} elsif ( $mod == Wx::MOD_ALT ) {
 
 		#		my $current_focus = Wx::Window::FindFocus();
 		#		TRACE("Current focus: $current_focus") if DEBUG;
 		#		# TO DO this should be fine tuned later
-		#		if ($code == Wx::WXK_UP) {
+		#		if ($code == Wx::K_UP) {
 		#			# TO DO get the list of panels at the bottom from some other place
 		#			if (my $editor = $self->current->editor) {
 		#				if ($current_focus->isa('Padre::Wx::Output') or
@@ -6728,7 +6746,7 @@ sub key_up {
 		#					$editor->SetFocus;
 		#				}
 		#			}
-		#		} elsif ($code == Wx::WXK_DOWN) {
+		#		} elsif ($code == Wx::K_DOWN) {
 		#			#TRACE("Selection: " . $self->bottom->GetSelection) if DEBUG;
 		#			#$self->bottom->GetSelection;
 		#		}
@@ -6822,7 +6840,7 @@ sub set_mimetype {
 	my $doc = $self->current->document;
 	if ($doc) {
 		$doc->set_mimetype($mime_type);
-		$doc->editor->padre_setup;
+		$doc->editor->setup_document;
 		$doc->rebless;
 		$doc->colourize;
 	}
@@ -6833,11 +6851,13 @@ sub set_mimetype {
 
 =head3 C<new_document_from_string>
 
-    $main->new_document_from_string( $string, $mimetype );
+    $main->new_document_from_string( $string, $mimetype, $encoding );
 
 Create a new document in Padre with the string value.
 
 Pass in an optional mime type to have Padre colorize the text correctly.
+
+Pass in an optional encoding name that will be used when saving the file.
 
 Note: this method may not belong here...
 
@@ -6847,6 +6867,7 @@ sub new_document_from_string {
 	my $self     = shift;
 	my $string   = shift;
 	my $mimetype = shift;
+	my $encoding = shift;
 
 	# If we are currently focused on an unused document,
 	# reuse that instead of making a new one.
@@ -6861,13 +6882,16 @@ sub new_document_from_string {
 	if ($mimetype) {
 		$document->set_mimetype($mimetype);
 	}
+	if ($encoding) {
+		$document->set_encoding($encoding);
+	}
 
 	$document->{original_content} = $document->text_get;
-	$document->editor->padre_setup;
+	$document->editor->setup_document;
 	$document->rebless;
 	$document->colourize;
 
-	return 1;
+	return $document;
 }
 
 sub filter_tool {

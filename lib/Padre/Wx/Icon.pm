@@ -22,7 +22,7 @@ use Params::Util ();
 use Padre::Util  ();
 use Padre::Wx    ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 # For now apply a single common configuration
 use constant SIZE   => '16x16';
@@ -102,7 +102,7 @@ sub find {
 			( split /\//, $hinted )
 		) . $pref{ext};
 		next unless -f $file;
-		return Wx::Bitmap->new( $file, Wx::wxBITMAP_TYPE_PNG );
+		return Wx::Bitmap->new( $file, Wx::BITMAP_TYPE_PNG );
 	}
 
 	if ( defined $DEFAULT_ICON ) {

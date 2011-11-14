@@ -13,7 +13,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -33,6 +33,14 @@ sub new {
 	# Add additional properties
 	$self->{main} = $main;
 
+	if($main->config->feature_diff_window) {
+		# Differences window
+		$self->add_menu_action(
+			'tools.diff_window',
+		);
+		$self->AppendSeparator;
+	}
+
 	# User Preferences
 	$self->add_menu_action(
 		'tools.preferences',
@@ -44,11 +52,6 @@ sub new {
 			'tools.sync',
 		);
 	}
-
-	# Key bindings
-	$self->add_menu_action(
-		'tools.keys',
-	);
 
 	$self->AppendSeparator;
 

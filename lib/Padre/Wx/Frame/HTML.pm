@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx             ();
 use Padre::Wx::HtmlWindow ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Wx::Frame';
 
 sub new {
@@ -18,7 +18,7 @@ sub new {
 	my %param = (
 		parent => undef,
 		id     => -1,
-		style  => Wx::wxDEFAULT_FRAME_STYLE,
+		style  => Wx::DEFAULT_FRAME_STYLE,
 		title  => '',
 		pos    => [ -1, -1 ],
 		size   => [ -1, -1 ],
@@ -46,14 +46,14 @@ sub new {
 		-1,
 		[ -1, -1 ],
 		[ -1, -1 ],
-		Wx::wxHW_NO_SELECTION,
+		Wx::HW_NO_SELECTION,
 	);
 	$self->{renderer}->SetBorders(0);
 
 	$self->{sizer}->Add(
 		$self->{renderer},
 		1, # Growth proportion
-		Wx::wxEXPAND,
+		Wx::EXPAND,
 		5, # Border size
 	);
 

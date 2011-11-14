@@ -6,7 +6,7 @@ use warnings;
 use Padre::Role::Task         ();
 use Padre::Wx::FBP::WhereFrom ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::FBP::WhereFrom
@@ -44,7 +44,7 @@ sub run {
 	my $config = $self->config;
 
 	# Show the dialog
-	if ( $self->ShowModal == Wx::wxID_OK ) {
+	if ( $self->ShowModal == Wx::ID_OK ) {
 
 		# Fire and forget the HTTP request to the server
 		$self->task_request(

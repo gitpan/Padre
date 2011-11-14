@@ -6,7 +6,7 @@ use warnings;
 use Padre::Search        ();
 use Padre::Wx::FBP::Find ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::FBP::Find
 };
@@ -135,18 +135,16 @@ sub run {
 	# Refresh
 	$self->refresh;
 
+	# Hide the Fast Find if visible
+	$self->main->show_findfast(0);
+
 	# Show the dialog
 	my $result = $self->ShowModal;
 
-	if ( $result == Wx::wxID_CANCEL ) {
-
-		# As we leave the Find dialog, return the user to the current editor
-		# window so they don't need to click it.
-		my $editor = $self->current->editor;
-		$editor->SetFocus if $editor;
-
-		return;
-	}
+	# As we leave the Find dialog, return the user to the current editor
+	# window so they don't need to click it.
+	my $editor = $self->current->editor;
+	$editor->SetFocus if $editor;
 
 	return;
 }

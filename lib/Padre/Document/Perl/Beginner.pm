@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 =head1 NAME
 
@@ -81,7 +81,7 @@ sub _report {
 	#++$line; # Editor starts counting at 0
 
 	# These are two lines to enable the translators to use argument numbers:
-	$self->{error} = Wx::gettext( sprintf( 'Line %d: ', $line ) ) . Wx::gettext( sprintf( $text, @_ ) );
+	$self->{error} = sprintf( Wx::gettext('Line %d: %s'), $line, sprintf( Wx::gettext($text), @_ ) );
 
 	return;
 }

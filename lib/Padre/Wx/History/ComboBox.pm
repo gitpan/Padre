@@ -12,8 +12,8 @@ Padre::Wx::History::ComboBox - A history-enabled Wx combobox
       $self,
       -1,
       '', # Use the last history value
-      Wx::wxDefaultPosition,
-      Wx::wxDefaultSize,
+      Wx::DefaultPosition,
+      Wx::DefaultSize,
       [ 'search' ], # The history queue to read from
   );
 
@@ -43,7 +43,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::DB ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Wx::ComboBox';
 
 sub new {
@@ -96,7 +96,7 @@ sub SaveValue {
 
 	# If this is a value is not in our existing recent list, save it
 	if ( defined $value and length $value ) {
-		if ( $self->FindString($value) == Wx::wxNOT_FOUND ) {
+		if ( $self->FindString($value) == Wx::NOT_FOUND ) {
 			Padre::DB::History->create(
 				type => $self->{type},
 				name => $value,

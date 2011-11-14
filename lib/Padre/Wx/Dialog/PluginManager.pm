@@ -8,9 +8,10 @@ use warnings;
 use Carp                  ();
 use Padre::Wx             ();
 use Padre::Wx::Icon       ();
+use Padre::Wx::HtmlWindow ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -33,9 +34,9 @@ sub new {
 		$main,
 		-1,
 		Wx::gettext('Plug-in Manager'),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxDEFAULT_FRAME_STYLE,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::DEFAULT_FRAME_STYLE,
 	);
 
 	# Set some internal parameters
@@ -58,10 +59,10 @@ sub new {
 	$self->{list} = Wx::ListView->new(
 		$self,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxLC_REPORT
-			| Wx::wxLC_SINGLE_SEL,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::LC_REPORT
+			| Wx::LC_SINGLE_SEL,
 	);
 	$self->{list}->InsertColumn( 0, Wx::gettext('Name') );
 	$self->{list}->InsertColumn( 1, Wx::gettext('Version') );
@@ -92,7 +93,7 @@ sub new {
 	$self->{imagelist} = Wx::ImageList->new( 16, 16 );
 	$self->{list}->AssignImageList(
 		$self->{imagelist},
-		Wx::wxIMAGE_LIST_SMALL,
+		Wx::IMAGE_LIST_SMALL,
 	);
 
 	# Plug-in Name Header
@@ -102,18 +103,17 @@ sub new {
 		Wx::gettext('Plug-in Name'),
 	);
 	my $font = $self->{label}->GetFont;
-	$font->SetWeight(Wx::wxFONTWEIGHT_BOLD);
+	$font->SetWeight(Wx::FONTWEIGHT_BOLD);
 	$font->SetPointSize( $font->GetPointSize + 4 );
 	$self->{label}->SetFont($font);
 
 	# Plug-in Documentation HTML Window
-	require Padre::Wx::HtmlWindow;
 	$self->{whtml} = Wx::HtmlWindow->new($self);
 
 	# Enable/Disable Button
 	$self->{button_main} = Wx::Button->new(
 		$self,
-		Wx::wxID_OK,
+		Wx::ID_OK,
 		Wx::gettext('&Enable'),
 	);
 	Wx::Event::EVT_BUTTON(
@@ -141,7 +141,7 @@ sub new {
 	# Close Button
 	$self->{button_close} = Wx::Button->new(
 		$self,
-		Wx::wxID_CANCEL,
+		Wx::ID_CANCEL,
 		Wx::gettext('&Close'),
 	);
 	Wx::Event::EVT_BUTTON(
@@ -155,35 +155,35 @@ sub new {
 	# Dialog Layout
 
 	# Horizontal button sizer
-	my $buttons = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
+	my $buttons = Wx::BoxSizer->new(Wx::HORIZONTAL);
 	$buttons->AddStretchSpacer;
-	$buttons->Add( $self->{button_main},        0, Wx::wxALL, 1 );
-	$buttons->Add( $self->{button_preferences}, 0, Wx::wxALL, 1 );
+	$buttons->Add( $self->{button_main},        0, Wx::ALL, 1 );
+	$buttons->Add( $self->{button_preferences}, 0, Wx::ALL, 1 );
 	$buttons->AddStretchSpacer;
-	$buttons->Add( $self->{button_close}, 0, Wx::wxALL, 1 );
+	$buttons->Add( $self->{button_close}, 0, Wx::ALL, 1 );
 	$buttons->AddStretchSpacer;
 
 	# Horizontal plug-in name positioning
-	my $header = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
+	my $header = Wx::BoxSizer->new(Wx::HORIZONTAL);
 	$header->AddStretchSpacer;
-	$header->Add( $self->{label}, 0, Wx::wxEXPAND | Wx::wxALIGN_CENTER, 1 );
+	$header->Add( $self->{label}, 0, Wx::EXPAND | Wx::ALIGN_CENTER, 1 );
 	$header->AddStretchSpacer;
 
 	# Vertical layout of the right hand side
-	my $right = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	$right->Add( $header, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
+	my $right = Wx::BoxSizer->new(Wx::VERTICAL);
+	$right->Add( $header, 0, Wx::ALL | Wx::EXPAND, 1 );
 	$right->Add(
 		$self->{whtml},
 		1,
-		Wx::wxALL | Wx::wxALIGN_TOP | Wx::wxALIGN_CENTER_HORIZONTAL | Wx::wxEXPAND,
+		Wx::ALL | Wx::ALIGN_TOP | Wx::ALIGN_CENTER_HORIZONTAL | Wx::EXPAND,
 		1
 	);
-	$right->Add( $buttons, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
+	$right->Add( $buttons, 0, Wx::ALL | Wx::EXPAND, 1 );
 
 	# Main sizer
-	my $sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$sizer->Add( $self->{list}, 0, Wx::wxALL | Wx::wxEXPAND, 1 );
-	$sizer->Add( $right,        1, Wx::wxALL | Wx::wxEXPAND, 1 );
+	my $sizer = Wx::BoxSizer->new(Wx::HORIZONTAL);
+	$sizer->Add( $self->{list}, 0, Wx::ALL | Wx::EXPAND, 1 );
+	$sizer->Add( $right,        1, Wx::ALL | Wx::EXPAND, 1 );
 
 	# Tune the size and position it appears
 	$self->SetSizer($sizer);
@@ -206,10 +206,10 @@ sub show {
 	# there's at least a plug-in, since there will always be
 	# 'my plug-in'
 	my $item = $self->{list}->GetItem(0);
-	$item->SetState(Wx::wxLIST_STATE_SELECTED);
+	$item->SetState(Wx::LIST_STATE_SELECTED);
 	$self->{list}->SetItem($item);
 
-	$self->Show;
+	$self->ShowModal;
 }
 
 # GUI Handlers
@@ -358,7 +358,7 @@ sub show_error_message {
 	# @INC gets printed out between () remove that for now
 	$message =~ s/\(\@INC.*\)//;
 
-	Wx::MessageBox( $message, $title, Wx::wxOK | Wx::wxCENTER, $self );
+	Wx::MessageBox( $message, $title, Wx::OK | Wx::CENTRE, $self );
 }
 
 #
@@ -452,7 +452,7 @@ sub _update_list {
 
 	# Auto-resize columns
 	foreach ( 0 .. 2 ) {
-		$self->{list}->SetColumnWidth( $_, Wx::wxLIST_AUTOSIZE );
+		$self->{list}->SetColumnWidth( $_, Wx::LIST_AUTOSIZE );
 	}
 
 	# Making sure the list can show all columns

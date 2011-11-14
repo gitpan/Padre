@@ -38,17 +38,6 @@ for ( '.', '..', '../..', 'blib/lib', 'lib' ) {
 	last;
 }
 
-use_ok('Padre::Perl');
-
-my $cmd;
-if ( $^O eq 'MSWin32' ) {
-
-	# Look for Perl on Windows
-	$cmd = Padre::Perl::cperl();
-	plan skip_all => 'Need some Perl for this test' unless defined($cmd);
-	$cmd .= ' ';
-}
-
 my @actions = (
 	'file.new',
 	'file.open_last_closed_file',
@@ -60,8 +49,6 @@ my @actions = (
 	'file.new,search.find',
 	'file.new,search.find_next',
 	'file.new,search.find_previous',
-	'file.new,search.quick_find_next',
-	'file.new,search.quick_find_previous',
 
 	# Twice to reset them to previous state
 	'view.lockinterface,view.lockinterface',
@@ -86,14 +73,22 @@ my @actions = (
 	'view.font_increase,view.font_decrease,view.font_reset',
 	'view.full_screen,view.full_screen,',
 	'search.find,view.close_panel',
-	'file.new,file.new,window.last_visited_file',
-	'file.new,file.new,window.oldest_visited_file',
 	'file.new,file.new,window.next_file',
 	'file.new,file.new,window.previous_file',
-	'file.new,file.new,window.last_visited_file_old',
 );
 
 plan( tests => scalar(@actions) * 3 + 1 );
+
+use_ok('Padre::Perl');
+
+my $cmd;
+if ( $^O eq 'MSWin32' ) {
+
+	# Look for Perl on Windows
+	$cmd = Padre::Perl::cperl();
+	plan skip_all => 'Need some Perl for this test' unless defined($cmd);
+	$cmd .= ' ';
+}
 
 # Create temp dir
 my $dir = File::Temp->newdir;

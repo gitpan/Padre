@@ -31,30 +31,30 @@ my %modules = map {
 my @t_files = glob "t/*.t";
 
 #map {"t/$_"} File::Find::Rule->relative->name('*.t')->file->in('t');
-plan( tests => scalar( keys %modules ) * 10 + scalar(@t_files) );
+plan( tests => scalar( keys %modules ) * 11 + scalar(@t_files) );
 
 my %SKIP = map { ( "t/$_" => 1 ) } qw(
-	01-load.t
-	06-utils.t
-	07-version.t
-	08-style.t
-	14-warnings.t
+	01_compile.t
+	06_utils.t
+	07_version.t
+	08_style.t
+	14_warnings.t
 	21_task_thread.t
 	22_task_worker.t
 	23_task_chain.t
 	24_task_master.t
 	25_task_handle.t
 	26_task_eval.t
-	41-perl-project.t
-	42-perl-project-temp.t
-	61-directory-path.t
-	62-directory-task.t
-	63-directory-project.t
-	83-autosave.t
-	85-commandline.t
-	92-padre-file.t
-	93-padre-filename-win.t
-	94-padre-file-remote.t
+	41_perl_project.t
+	42_perl_project_temp.t
+	61_directory_path.t
+	62_directory_task.t
+	63_directory_project.t
+	83_autosave.t
+	85_commandline.t
+	92_padre_file.t
+	93_padre_filename_win.t
+	94_padre_file_remote.t
 );
 
 # A pathetic way to try to avoid tests that would use the real ~/.padre of the user
@@ -75,11 +75,6 @@ use POSIX qw(locale_h);
 $ENV{PADRE_HOME} = File::Temp::tempdir( CLEANUP => 1 );
 foreach my $module ( sort keys %modules ) {
 	require_ok($module);
-
-	# Padre::DB::Migrate is fatal if called without import params
-	unless ( $module eq 'Padre::DB::Migrate' ) {
-		$module->import;
-	}
 
 	ok( $module->VERSION, "$module: Found \$VERSION" );
 }
@@ -233,11 +228,12 @@ foreach my $module ( sort keys %modules ) {
 	# Check for method calls that don't exist
 	SKIP: {
 		if ( $module =~ /\bRole\b/ ) {
-			skip( 'Ignoring role $module', 1 );
+			skip( "Ignoring module $module", 1 );
 		}
 		if ( $module eq 'Padre::Autosave' ) {
 			skip( 'Ignoring flaky ORLite usage in Padre::Autosave', 1 );
 		}
+
 		my $tokens = $document->find(
 			sub {
 				$_[1]->isa('PPI::Token::Word') or return '';
@@ -252,6 +248,8 @@ foreach my $module ( sort keys %modules ) {
 				my $object = $operator->sprevious_sibling or return '';
 				$object->isa('PPI::Token::Symbol') or return '';
 				$object->content eq '$self' or return '';
+
+				return 1;
 			}
 		);
 
@@ -266,6 +264,50 @@ foreach my $module ( sort keys %modules ) {
 		is( scalar(@bad), 0, 'No missing methods' );
 		foreach my $method (@bad) {
 			diag("$module: Cannot resolve method \$self->$method");
+		}
+	}
+
+	# Check for Wx::wxFOO constants that should be Wx::FOO
+	SKIP: {
+		if ( $module eq 'Padre::Wx::Constant' ) {
+			skip( "Ignoring module $module", 1 );
+		}
+		if ( $module eq 'Padre::Startup' ) {
+			skip( "Ignoring module $module", 1 );
+		}
+
+		my %seen   = ();
+		my $tokens = $document->find(
+			sub {
+				$_[1]->isa('PPI::Token::Word') or return '';
+				$_[1]->content =~ /^Wx::wx([A-Z].+)/ or return '';
+
+				# Is this a new one?
+				my $name = $1;
+				return '' if $seen{$name}++;
+
+				# Does the original and shortened forms of the
+				# constant actually exist?
+				Wx->can("wx$name") or return '';
+				Wx->can($name) or return '';
+
+				# wxVERSION is a special case
+				$name eq 'VERSION' and return '';
+
+				return 1;
+			}
+		);
+
+		# Filter for the constant list
+		my @bad = ();
+		if ($tokens) {
+			@bad = map { $_->content } @$tokens;
+		}
+
+		# There should be no unconverted wxCONSTANTS
+		is( scalar(@bad), 0, 'No uncoverted wxCONSTANTS' );
+		foreach my $name (@bad) {
+			diag("$module: Unconverted constant $name");
 		}
 	}
 

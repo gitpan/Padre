@@ -28,9 +28,10 @@ HTML.
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx ();
+use Padre::Wx             ();
+use Padre::Wx::HtmlWindow ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Wx::Frame';
 
 =pod
@@ -47,7 +48,7 @@ sub new {
 		undef,
 		-1,
 		'POD Viewer',
-		Wx::wxDefaultPosition,
+		Wx::DefaultPosition,
 		[ 500, 500 ],
 	);
 
@@ -55,7 +56,6 @@ sub new {
 	$self->{panel} = Wx::Panel->new( $self, -1 );
 
 	# Create the HTML widget within the panel
-	require Padre::Wx::HtmlWindow;
 	$self->{html} = Padre::Wx::HtmlWindow->new( $self->{panel}, -1 );
 
 	return $self;

@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -18,16 +18,16 @@ sub new {
 	my $self = $class->SUPER::new(
 		$frame,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxLC_REPORT | Wx::wxLC_SINGLE_SEL
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::LC_REPORT | Wx::LC_SINGLE_SEL
 	);
 	$self->{cpan} = $frame->cpan;
 
 	my $imagelist = Wx::ImageList->new( 14, 7 );
 	$imagelist->Add( Padre::Wx::Icon::icon('status/padre-syntax-error') );
 	$imagelist->Add( Padre::Wx::Icon::icon('status/padre-syntax-warning') );
-	$self->AssignImageList( $imagelist, Wx::wxIMAGE_LIST_SMALL );
+	$self->AssignImageList( $imagelist, Wx::IMAGE_LIST_SMALL );
 
 	$self->InsertColumn( 0, Wx::gettext('Status') );
 

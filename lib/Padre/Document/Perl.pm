@@ -17,7 +17,7 @@ use Padre::Role::Task ();
 use Padre::Feature    ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document
@@ -291,14 +291,14 @@ sub guess_subpath {
 
 my $keywords;
 
-sub keywords {
+sub get_calltip_keywords {
 	$keywords
 		or $keywords = YAML::Tiny::LoadFile( Padre::Util::sharefile( 'languages', 'perl5', 'perl5.yml' ) );
 }
 
 my $wordchars = join '', '$@%&_:[]{}', 0 .. 9, 'A' .. 'Z', 'a' .. 'z';
 
-sub stc_word_chars {
+sub scintilla_word_chars {
 	return $wordchars;
 }
 
@@ -306,7 +306,8 @@ sub stc_word_chars {
 # triggering a "Variable length lookbehind not implemented" error.
 # return qr/(?:(?<=^)\s*sub\s+$_[1]|(?<=[\012\015])\s*sub\s+$_[1])\b/;
 sub get_function_regex {
-	return qr/(?:^|[^# \t-])[ \t]*((?:sub|func|method)\s+$_[1]\b|\*$_[1]\s*=\s*(?:sub\b|\\\&))/;
+	my $name = quotemeta $_[1];
+	return qr/(?:^|[^# \t-])[ \t]*((?:sub|func|method)\s+$name\b|\*$name\s*=\s*(?:sub\b|\\\&))/;
 }
 
 =pod
@@ -495,7 +496,7 @@ sub beginner_check {
 	return 1;
 }
 
-sub comment_lines_str {
+sub get_comment_line_string {
 	return '#';
 }
 
@@ -530,7 +531,7 @@ sub find_unmatched_brace_response {
 	Wx::MessageBox(
 		Wx::gettext("All braces appear to be matched"),
 		Wx::gettext("Check Complete"),
-		Wx::wxOK,
+		Wx::OK,
 		$self->current->main,
 	);
 }
@@ -599,7 +600,7 @@ sub find_variable_declaration {
 		Wx::MessageBox(
 			Wx::gettext("Current cursor does not seem to point at a variable"),
 			Wx::gettext("Check cancelled"),
-			Wx::wxOK,
+			Wx::OK,
 			$self->current->main,
 		);
 		return;
@@ -640,7 +641,7 @@ sub find_variable_declaration_response {
 	Wx::MessageBox(
 		$text,
 		Wx::gettext("Search Canceled"),
-		Wx::wxOK,
+		Wx::OK,
 		$self->current->main,
 	);
 }
@@ -655,7 +656,7 @@ sub find_method_declaration {
 		Wx::MessageBox(
 			Wx::gettext("Current cursor does not seem to point at a method"),
 			Wx::gettext("Check cancelled"),
-			Wx::wxOK,
+			Wx::OK,
 			$main
 		);
 		return ();
@@ -674,7 +675,7 @@ sub find_method_declaration {
 		Wx::MessageBox(
 			sprintf( Wx::gettext("Current '%s' not found"), $token ),
 			Wx::gettext("Check cancelled"),
-			Wx::wxOK,
+			Wx::OK,
 			$main
 		);
 		return;
@@ -795,7 +796,7 @@ sub rename_variable {
 		Wx::MessageBox(
 			Wx::gettext('Current cursor does not seem to point at a variable.'),
 			Wx::gettext('Rename variable'),
-			Wx::wxOK,
+			Wx::OK,
 			$self->current->main,
 		);
 		return;
@@ -807,7 +808,7 @@ sub rename_variable {
 		Wx::gettext('Rename variable'),
 		$token,
 	);
-	return if $dialog->ShowModal == Wx::wxID_CANCEL;
+	return if $dialog->ShowModal == Wx::ID_CANCEL;
 	my $replacement = $dialog->GetValue;
 	$dialog->Destroy;
 
@@ -845,7 +846,7 @@ sub change_variable_style {
 		Wx::MessageBox(
 			Wx::gettext('Current cursor does not seem to point at a variable.'),
 			Wx::gettext('Variable case change'),
-			Wx::wxOK,
+			Wx::OK,
 			$self->current->main,
 		);
 		return;
@@ -889,7 +890,7 @@ sub rename_variable_response {
 	Wx::MessageBox(
 		$text,
 		Wx::gettext("Replace Operation Canceled"),
-		Wx::wxOK,
+		Wx::OK,
 		$self->current->main,
 	);
 }
@@ -938,7 +939,7 @@ sub introduce_temporary_variable_response {
 	Wx::MessageBox(
 		$text,
 		Wx::gettext("Replace Operation Canceled"),
-		Wx::wxOK,
+		Wx::OK,
 		$self->current->main,
 	);
 }
@@ -1465,7 +1466,7 @@ sub _pod {
 # Our opportunity to implement a context-sensitive right-click menu
 # This would be a lot more powerful if we used PPI, but since that would
 # slow things down beyond recognition, we use heuristics for now.
-sub event_on_right_down {
+sub event_on_context_menu {
 	my $self   = shift;
 	my $editor = shift;
 	my $menu   = shift;
@@ -1606,8 +1607,10 @@ sub event_mouse_moving {
 		return unless length $token;
 		return unless $editor->has_function($token);
 
-		$editor->StartStyling( $location->[2], Wx::wxSTC_INDICS_MASK );
-		$editor->SetStyling( length($token), Wx::wxSTC_INDIC2_MASK );
+		$editor->manual_highlight_show(
+			$location->[2], # Position
+			length($token), # Characters
+		);
 
 		$self->{last_highlight} = {
 			token => $token,
@@ -1621,7 +1624,7 @@ sub event_key_up {
 	my $editor = shift;
 	my $event  = shift;
 
-	if ( $event->GetKeyCode == Wx::WXK_CONTROL ) {
+	if ( $event->GetKeyCode == Wx::K_CONTROL ) {
 
 		# Ctrl key has been released, clear any highlighting
 		$self->_clear_highlight($editor);
@@ -1629,13 +1632,15 @@ sub event_key_up {
 }
 
 sub _clear_highlight {
-	my $self   = shift;
-	my $editor = shift;
-
+	my $self = shift;
 	return unless $self->{last_highlight};
 
-	$editor->StartStyling( $self->{last_highlight}{pos}, Wx::wxSTC_INDICS_MASK );
-	$editor->SetStyling( length( $self->{last_highlight}{token} ), 0 );
+	# Remove the last highlight
+	my $editor = shift;
+	$editor->manual_highlight_hide(
+		$self->{last_highlight}->{pos},
+		length $self->{last_highlight}->{token},
+	);
 	undef $self->{last_highlight};
 }
 
@@ -1790,7 +1795,7 @@ sub guess_filename_to_open {
 	return;
 }
 
-sub lexer_keywords {
+sub scintilla_key_words {
 	return [
 
 		# Perl Keywords

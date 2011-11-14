@@ -12,7 +12,7 @@ use Padre::Current  ();
 use Padre::Feature  ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -40,7 +40,7 @@ sub new {
 	my $file_new = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('New'),
+		Wx::gettext('Ne&w'),
 		$file_new,
 	);
 	$self->add_menu_action(
@@ -63,15 +63,6 @@ sub new {
 		$file_new,
 		'file.new_p6_script',
 	);
-
-	if (Padre::Feature::WIZARD_SELECTOR) {
-		$file_new->AppendSeparator;
-
-		$self->add_menu_action(
-			$file_new,
-			'file.wizard_selector',
-		);
-	}
 
 	### NOTE: Add support for plugins here
 
@@ -103,15 +94,17 @@ sub new {
 		'file.open_in_file_browser',
 	);
 
-	$self->{open_with_default_system_editor} = $self->add_menu_action(
-		$file_open,
-		'file.open_with_default_system_editor',
-	);
+	if (Padre::Constant::WIN32) {
+		$self->{open_with_default_system_editor} = $self->add_menu_action(
+			$file_open,
+			'file.open_with_default_system_editor',
+		);
 
-	$self->{open_in_command_line} = $self->add_menu_action(
-		$file_open,
-		'file.open_in_command_line',
-	);
+		$self->{open_in_command_line} = $self->add_menu_action(
+			$file_open,
+			'file.open_in_command_line',
+		);
+	}
 
 	$self->{open_example} = $self->add_menu_action(
 		$file_open,
@@ -132,7 +125,7 @@ sub new {
 	my $file_close = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Close'),
+		Wx::gettext('&Close'),
 		$file_close,
 	);
 
@@ -295,16 +288,8 @@ sub refresh {
 	$self->{open_in_file_browser}->Enable($document);
 	$self->{duplicate}->Enable($document);
 	if (Padre::Constant::WIN32) {
-
-		#Win32
 		$self->{open_with_default_system_editor}->Enable($document);
 		$self->{open_in_command_line}->Enable($document);
-	} else {
-
-		#Disabled until a unix implementation is actually working
-		#TODO remove once the unix implementation is done (see Padre::Util::FileBrowser)
-		$self->{open_with_default_system_editor}->Enable(0);
-		$self->{open_in_command_line}->Enable(0);
 	}
 	$self->{close}->Enable($document);
 	$self->{delete}->Enable($document);
@@ -397,7 +382,7 @@ sub on_recent {
 	Wx::MessageBox(
 		sprintf( Wx::gettext('File %s not found.'), $file ),
 		Wx::gettext('Open cancelled'),
-		Wx::wxOK,
+		Wx::OK,
 		$self->{main},
 	);
 }

@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Task';
 
 
@@ -79,9 +79,9 @@ sub run {
 	while (@queue) {
 
 		# Abort the task if we've been cancelled
-		if ( $self->cancel ) {
+		if ( $self->cancelled ) {
 			TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
-			$self->handle->status;
+			$self->tell_status;
 			return 1;
 
 		}
@@ -98,7 +98,7 @@ sub run {
 		closedir DIRECTORY;
 
 		# Notify our parent we are working on this directory
-		$self->handle->status( "Searching... " . $parent->unix );
+		$self->tell_status( "Searching... " . $parent->unix );
 
 		my @children = ();
 		foreach my $file (@list) {
@@ -108,9 +108,9 @@ sub run {
 			next if $file =~ /^\.git$/;
 
 			# Abort the task if we've been cancelled
-			if ( $self->cancel ) {
+			if ( $self->cancelled ) {
 				TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
-				$self->handle->status;
+				$self->tell_status;
 				return 1;
 			}
 
@@ -164,13 +164,13 @@ sub run {
 			next unless @lines;
 
 			# Found results, inform our owner
-			$self->message( OWNER => $object, @lines );
+			$self->tell_owner( $object, @lines );
 		}
 		unshift @queue, @children;
 	}
 
 	# Notify our parent we are finished searching
-	$self->handle->status;
+	$self->tell_status;
 
 	return 1;
 }

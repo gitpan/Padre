@@ -34,6 +34,7 @@ TO BE COMPLETED
 use 5.008;
 use strict;
 use warnings;
+use utf8; # Encoding of this source code
 use List::Util ();
 use File::Spec ();
 
@@ -50,7 +51,7 @@ use Padre::Logger;
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -66,8 +67,7 @@ my %RFC4646;
 
 sub label {
 	my $name = shift;
-	require Encode;
-	return $RFC4646{$name}{utf8text} ? Encode::decode( 'utf8', $RFC4646{$name}{utf8text} ) : $name;
+	return $RFC4646{$name}{utf8text} ? $RFC4646{$name}{utf8text} : $name;
 }
 
 BEGIN {
@@ -98,7 +98,7 @@ BEGIN {
 
 			# REQUIRED: The wxWidgets language (integer) identifier.
 			# http://docs.wxwidgets.org/stable/wx_languagecodes.html#languagecodes
-			wxid => Wx::wxLANGUAGE_ENGLISH_UK,
+			wxid => Wx::LANGUAGE_ENGLISH_UK,
 
 			# OPTIONAL: Recommended language fallback sequence.
 			# This is an ordered list of alternative languages
@@ -125,7 +125,7 @@ BEGIN {
 			utf8text => 'English (Australia)',
 			iso639   => 'en',
 			iso3166  => 'AU',
-			wxid     => Wx::wxLANGUAGE_ENGLISH_AUSTRALIA,
+			wxid     => Wx::LANGUAGE_ENGLISH_AUSTRALIA,
 
 			# Even though en-gb is the default language, in this
 			# specific case there is a clearly expressed desire for
@@ -141,9 +141,9 @@ BEGIN {
 		'x-unknown' => {
 			gettext  => _T('Unknown'),
 			utf8text => 'Unknown',
-			iso639   => 'en',                  # For convenience
+			iso639   => 'en',                # For convenience
 			iso3166  => undef,
-			wxid     => Wx::wxLANGUAGE_UNKNOWN,
+			wxid     => Wx::LANGUAGE_UNKNOWN,
 			fallback => [],
 		},
 
@@ -157,7 +157,7 @@ BEGIN {
 			utf8text  => 'عربي',
 			iso639    => 'ar',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_ARABIC,
+			wxid      => Wx::LANGUAGE_ARABIC,
 			fallback  => [],
 			supported => 1,
 		},
@@ -167,7 +167,7 @@ BEGIN {
 			utf8text  => 'Česky',
 			iso639    => 'cz',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_CZECH,
+			wxid      => Wx::LANGUAGE_CZECH,
 			fallback  => [],
 			supported => 1,
 		},
@@ -177,7 +177,7 @@ BEGIN {
 			utf8text  => 'Dansk',
 			iso639    => 'da',
 			iso3166   => 'DA',
-			wxid      => Wx::wxLANGUAGE_DANISH,
+			wxid      => Wx::LANGUAGE_DANISH,
 			fallback  => [ 'en-gb', 'en-us' ],
 			supported => 0,
 		},
@@ -187,7 +187,7 @@ BEGIN {
 			utf8text  => 'Deutsch',
 			iso639    => 'de',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_GERMAN,
+			wxid      => Wx::LANGUAGE_GERMAN,
 			fallback  => [],
 			supported => 1,
 		},
@@ -197,7 +197,7 @@ BEGIN {
 			utf8text => 'English',
 			iso639   => 'en',
 			iso3166  => undef,
-			wxid     => Wx::wxLANGUAGE_ENGLISH,
+			wxid     => Wx::LANGUAGE_ENGLISH,
 			fallback => [],
 		},
 
@@ -206,7 +206,7 @@ BEGIN {
 			utf8text => 'English (Canada)',
 			iso639   => 'en',
 			iso3166  => undef,
-			wxid     => Wx::wxLANGUAGE_ENGLISH_CANADA,
+			wxid     => Wx::LANGUAGE_ENGLISH_CANADA,
 			fallback => [ 'en-us', 'en-gb' ],
 		},
 
@@ -215,7 +215,7 @@ BEGIN {
 			utf8text => 'English (New Zealand)',
 			iso639   => 'en',
 			iso3166  => 'NZ',
-			wxid     => Wx::wxLANGUAGE_ENGLISH_NEW_ZEALAND,
+			wxid     => Wx::LANGUAGE_ENGLISH_NEW_ZEALAND,
 
 			# NOTE: The en-au is debatable
 			fallback => [ 'en-au', 'en-gb' ],
@@ -226,7 +226,7 @@ BEGIN {
 			utf8text => 'English (United States)',
 			iso639   => 'en',
 			iso3166  => 'US',
-			wxid     => Wx::wxLANGUAGE_ENGLISH_US,
+			wxid     => Wx::LANGUAGE_ENGLISH_US,
 			fallback => [ 'en-ca', 'en-gb' ],
 		},
 
@@ -235,7 +235,7 @@ BEGIN {
 			utf8text  => 'Español (Argentina)',
 			iso639    => 'sp',
 			iso3166   => 'AR',
-			wxid      => Wx::wxLANGUAGE_SPANISH_ARGENTINA,
+			wxid      => Wx::LANGUAGE_SPANISH_ARGENTINA,
 			fallback  => [ 'es-es', 'en-us' ],
 			supported => 0,
 		},
@@ -249,7 +249,7 @@ BEGIN {
 			utf8text  => 'Español',
 			iso639    => 'sp',
 			iso3166   => 'SP',
-			wxid      => Wx::wxLANGUAGE_SPANISH,
+			wxid      => Wx::LANGUAGE_SPANISH,
 			fallback  => [],
 			supported => 1,
 		},
@@ -259,7 +259,7 @@ BEGIN {
 			utf8text  => 'پارسی (ایران)',
 			iso639    => 'prs',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_FARSI,
+			wxid      => Wx::LANGUAGE_FARSI,
 			fallback  => [],
 			supported => 1
 		},
@@ -269,12 +269,12 @@ BEGIN {
 			utf8text  => 'Français (Canada)',
 			iso639    => 'fr',
 			iso3166   => 'CA',
-			wxid      => Wx::wxLANGUAGE_FRENCH_CANADIAN,
-			fallback  => ['fr-fr'],
+			wxid      => Wx::LANGUAGE_FRENCH_CANADIAN,
+			fallback  => ['fr'],
 			supported => 0,
 		},
 
-		'fr-fr' => {
+		'fr' => {
 
 			# Simplify until there's another French
 			# gettext   => 'French (France)',
@@ -282,8 +282,8 @@ BEGIN {
 			gettext   => _T('French'),
 			utf8text  => 'Français',
 			iso639    => 'fr',
-			iso3166   => 'FR',
-			wxid      => Wx::wxLANGUAGE_FRENCH,
+			iso3166   => undef,
+			wxid      => Wx::LANGUAGE_FRENCH,
 			fallback  => [],
 			supported => 1,
 		},
@@ -293,7 +293,7 @@ BEGIN {
 			utf8text  => 'עברית',
 			iso639    => 'he',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_HEBREW,
+			wxid      => Wx::LANGUAGE_HEBREW,
 			fallback  => [],
 			supported => 1,
 		},
@@ -303,7 +303,7 @@ BEGIN {
 			utf8text  => 'Magyar',
 			iso639    => 'hu',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_HUNGARIAN,
+			wxid      => Wx::LANGUAGE_HUNGARIAN,
 			fallback  => [],
 			supported => 1,
 		},
@@ -317,7 +317,7 @@ BEGIN {
 			utf8text  => 'Italiano',
 			iso639    => 'it',
 			iso3166   => 'IT',
-			wxid      => Wx::wxLANGUAGE_ITALIAN,
+			wxid      => Wx::LANGUAGE_ITALIAN,
 			fallback  => [],
 			supported => 1,
 		},
@@ -327,7 +327,7 @@ BEGIN {
 			utf8text  => '日本語',
 			iso639    => 'ja',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_JAPANESE,
+			wxid      => Wx::LANGUAGE_JAPANESE,
 			fallback  => ['en-us'],
 			supported => 1,
 		},
@@ -337,7 +337,7 @@ BEGIN {
 			utf8text  => '한국어',
 			iso639    => 'ko',
 			iso3166   => 'KR',
-			wxid      => Wx::wxLANGUAGE_KOREAN,
+			wxid      => Wx::LANGUAGE_KOREAN,
 			fallback  => [],
 			supported => 1,
 		},
@@ -351,7 +351,7 @@ BEGIN {
 			utf8text  => 'Nederlands',
 			iso639    => 'nl',
 			iso3166   => 'NL',
-			wxid      => Wx::wxLANGUAGE_DUTCH,
+			wxid      => Wx::LANGUAGE_DUTCH,
 			fallback  => ['nl-be'],
 			supported => 1,
 		},
@@ -361,7 +361,7 @@ BEGIN {
 			utf8text  => 'Nederlands (België)',
 			iso639    => 'nl',
 			iso3166   => 'BE',
-			wxid      => Wx::wxLANGUAGE_DUTCH_BELGIAN,
+			wxid      => Wx::LANGUAGE_DUTCH_BELGIAN,
 			fallback  => ['nl-nl'],
 			supported => 0,
 		},
@@ -371,7 +371,7 @@ BEGIN {
 			utf8text  => 'Norsk',
 			iso639    => 'no',
 			iso3166   => 'NO',
-			wxid      => Wx::wxLANGUAGE_NORWEGIAN_BOKMAL,
+			wxid      => Wx::LANGUAGE_NORWEGIAN_BOKMAL,
 			fallback  => [ 'en-gb', 'en-us' ],
 			supported => 1,
 		},
@@ -381,7 +381,7 @@ BEGIN {
 			utf8text  => 'Polski',
 			iso639    => 'pl',
 			iso3166   => 'PL',
-			wxid      => Wx::wxLANGUAGE_POLISH,
+			wxid      => Wx::LANGUAGE_POLISH,
 			fallback  => [],
 			supported => 1,
 		},
@@ -391,7 +391,7 @@ BEGIN {
 			utf8text  => 'Português (Brasil)',
 			iso639    => 'pt',
 			iso3166   => 'BR',
-			wxid      => Wx::wxLANGUAGE_PORTUGUESE_BRAZILIAN,
+			wxid      => Wx::LANGUAGE_PORTUGUESE_BRAZILIAN,
 			fallback  => ['pt-pt'],
 			supported => 1,
 		},
@@ -401,7 +401,7 @@ BEGIN {
 			utf8text  => 'Português (Europeu)',
 			iso639    => 'pt',
 			iso3166   => 'PT',
-			wxid      => Wx::wxLANGUAGE_PORTUGUESE,
+			wxid      => Wx::LANGUAGE_PORTUGUESE,
 			fallback  => ['pt-br'],
 			supported => 0,
 		},
@@ -411,7 +411,7 @@ BEGIN {
 			utf8text  => 'Русский',
 			iso639    => 'ru',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_RUSSIAN,
+			wxid      => Wx::LANGUAGE_RUSSIAN,
 			fallback  => [],
 			supported => 1,
 		},
@@ -421,7 +421,7 @@ BEGIN {
 			utf8text  => 'Türkçe',
 			iso639    => 'tr',
 			iso3166   => 'TR',
-			wxid      => Wx::wxLANGUAGE_TURKISH,
+			wxid      => Wx::LANGUAGE_TURKISH,
 			fallback  => [],
 			supported => 1,
 		},
@@ -431,7 +431,7 @@ BEGIN {
 			utf8text  => 'Chinese',
 			iso639    => 'zh',
 			iso3166   => undef,
-			wxid      => Wx::wxLANGUAGE_CHINESE,
+			wxid      => Wx::LANGUAGE_CHINESE,
 			fallback  => [ 'zh-tw', 'zh-cn', 'en-us' ],
 			supported => 0,
 		},
@@ -441,7 +441,7 @@ BEGIN {
 			utf8text  => '中文 (简体)',
 			iso639    => 'zh',
 			iso3166   => 'CN',
-			wxid      => Wx::wxLANGUAGE_CHINESE_SIMPLIFIED,
+			wxid      => Wx::LANGUAGE_CHINESE_SIMPLIFIED,
 			fallback  => [ 'zh-tw', 'en-us' ],
 			supported => 1,
 		},
@@ -451,7 +451,7 @@ BEGIN {
 			utf8text  => '正體中文 (繁體)',
 			iso639    => 'zh',
 			iso3166   => 'TW',
-			wxid      => Wx::wxLANGUAGE_CHINESE_TRADITIONAL,
+			wxid      => Wx::LANGUAGE_CHINESE_TRADITIONAL,
 			fallback  => [ 'zh-cn', 'en-us' ],
 			supported => 1,
 		},
@@ -516,7 +516,10 @@ sub rfc4646 {
 	return $RFC4646{$locale}->{actual};
 }
 
-#
+sub rfc4646_exists {
+	defined $RFC4646{ $_[0] };
+}
+
 sub iso639 {
 	my $id     = rfc4646();
 	my $iso639 = $RFC4646{$id}{iso639};

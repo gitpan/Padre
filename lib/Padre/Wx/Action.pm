@@ -8,7 +8,7 @@ use Padre::Config   ();
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 # Generate faster accessors
 use Class::XSAccessor {
@@ -109,7 +109,7 @@ sub new {
 
 # Translate on the fly when requested
 sub label {
-	Wx::gettext( $_[0]->{label} );
+	return defined $_[0]->{label} ? Wx::gettext( $_[0]->{label} ) : Wx::gettext('(Undefined)');
 }
 
 # A label textual data without any strange menu characters

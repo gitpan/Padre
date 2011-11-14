@@ -7,7 +7,7 @@ use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 use Padre::Locale         ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -30,113 +30,113 @@ sub new {
 		$main,
 		-1,
 		Wx::gettext('A Dialog'),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxCAPTION | Wx::wxCLOSE_BOX | Wx::wxSYSTEM_MENU
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::CAPTION | Wx::CLOSE_BOX | Wx::SYSTEM_MENU
 	);
 
 	$self->{action_label} = Wx::StaticText->new(
 		$self,
 		-1,
 		Wx::gettext("Action: %s"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	my $line_1 = Wx::StaticLine->new(
 		$self,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	$self->{ctrl_checkbox} = Wx::CheckBox->new(
 		$self,
 		-1,
 		Wx::gettext("CTRL"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	my $label_3 = Wx::StaticText->new(
 		$self,
 		-1,
 		Wx::gettext("+"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	$self->{alt_checkbox} = Wx::CheckBox->new(
 		$self,
 		-1,
 		Wx::gettext("ALT"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	my $label_2 = Wx::StaticText->new(
 		$self,
 		-1,
 		Wx::gettext("+"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	$self->{shift_checkbox} = Wx::CheckBox->new(
 		$self,
 		-1,
 		Wx::gettext("SHIFT"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	my $label_1 = Wx::StaticText->new(
 		$self,
 		-1,
 		Wx::gettext("+"),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 	$self->{key_box} = Wx::ComboBox->new(
 		$self,
 		-1,
 		"",
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 		[],
-		Wx::wxCB_DROPDOWN,
+		Wx::CB_DROPDOWN,
 	);
 	$self->{ok} = Wx::Button->new(
 		$self,
-		Wx::wxID_OK,
+		Wx::ID_OK,
 		"",
 	);
 	$self->{cancel} = Wx::Button->new(
 		$self,
-		Wx::wxID_CANCEL,
+		Wx::ID_CANCEL,
 		"",
 	);
 	Wx::Event::EVT_CHECKBOX( $self, $self->{shift_checkbox}->GetId, \&foo );
 	$self->SetTitle( Wx::gettext("Shortcut") );
 	$self->{key_box}->SetSelection(-1);
-	my $sizer_1 = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	my $sizer_2 = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	$self->{button_sizer} = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	my $sizer_8 = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$sizer_2->Add( $self->{action_label},   0, Wx::wxEXPAND,                                           0 );
-	$sizer_2->Add( $line_1,                 0, Wx::wxTOP | Wx::wxBOTTOM | Wx::wxEXPAND,                5 );
-	$sizer_8->Add( $self->{ctrl_checkbox},  0, Wx::wxALIGN_CENTER_VERTICAL,                            0 );
-	$sizer_8->Add( $label_3,                0, Wx::wxLEFT | Wx::wxRIGHT | Wx::wxALIGN_CENTER_VERTICAL, 8 );
-	$sizer_8->Add( $self->{alt_checkbox},   0, Wx::wxALIGN_CENTER_VERTICAL,                            0 );
-	$sizer_8->Add( $label_2,                0, Wx::wxLEFT | Wx::wxRIGHT | Wx::wxALIGN_CENTER_VERTICAL, 8 );
-	$sizer_8->Add( $self->{shift_checkbox}, 0, Wx::wxALIGN_CENTER_VERTICAL,                            0 );
-	$sizer_8->Add( $label_1,                0, Wx::wxLEFT | Wx::wxRIGHT | Wx::wxALIGN_CENTER_VERTICAL, 8 );
-	$sizer_8->Add( $self->{key_box},        0, Wx::wxALIGN_CENTER_VERTICAL,                            0 );
-	$sizer_2->Add( $sizer_8,                1, Wx::wxEXPAND,                                           0 );
+	my $sizer_1 = Wx::BoxSizer->new(Wx::HORIZONTAL);
+	my $sizer_2 = Wx::BoxSizer->new(Wx::VERTICAL);
+	$self->{button_sizer} = Wx::BoxSizer->new(Wx::HORIZONTAL);
+	my $sizer_8 = Wx::BoxSizer->new(Wx::HORIZONTAL);
+	$sizer_2->Add( $self->{action_label},   0, Wx::EXPAND,                                       0 );
+	$sizer_2->Add( $line_1,                 0, Wx::TOP | Wx::BOTTOM | Wx::EXPAND,                5 );
+	$sizer_8->Add( $self->{ctrl_checkbox},  0, Wx::ALIGN_CENTER_VERTICAL,                        0 );
+	$sizer_8->Add( $label_3,                0, Wx::LEFT | Wx::RIGHT | Wx::ALIGN_CENTER_VERTICAL, 8 );
+	$sizer_8->Add( $self->{alt_checkbox},   0, Wx::ALIGN_CENTER_VERTICAL,                        0 );
+	$sizer_8->Add( $label_2,                0, Wx::LEFT | Wx::RIGHT | Wx::ALIGN_CENTER_VERTICAL, 8 );
+	$sizer_8->Add( $self->{shift_checkbox}, 0, Wx::ALIGN_CENTER_VERTICAL,                        0 );
+	$sizer_8->Add( $label_1,                0, Wx::LEFT | Wx::RIGHT | Wx::ALIGN_CENTER_VERTICAL, 8 );
+	$sizer_8->Add( $self->{key_box},        0, Wx::ALIGN_CENTER_VERTICAL,                        0 );
+	$sizer_2->Add( $sizer_8,                1, Wx::EXPAND,                                       0 );
 	my $line_2 = Wx::StaticLine->new(
 		$self,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
-	$sizer_2->Add( $line_2, 0, Wx::wxTOP | Wx::wxBOTTOM | Wx::wxEXPAND, 5 );
-	$self->{button_sizer}->Add( $self->{ok},     1, 0,          0 );
-	$self->{button_sizer}->Add( $self->{cancel}, 1, Wx::wxLEFT, 5 );
-	$sizer_2->Add( $self->{button_sizer}, 1, Wx::wxALIGN_RIGHT,        5 );
-	$sizer_1->Add( $sizer_2,              1, Wx::wxALL | Wx::wxEXPAND, 5 );
+	$sizer_2->Add( $line_2, 0, Wx::TOP | Wx::BOTTOM | Wx::EXPAND, 5 );
+	$self->{button_sizer}->Add( $self->{ok},     1, 0,        0 );
+	$self->{button_sizer}->Add( $self->{cancel}, 1, Wx::LEFT, 5 );
+	$sizer_2->Add( $self->{button_sizer}, 1, Wx::ALIGN_RIGHT,      5 );
+	$sizer_1->Add( $sizer_2,              1, Wx::ALL | Wx::EXPAND, 5 );
 	$self->SetSizer($sizer_1);
 	$sizer_1->Fit($self);
 

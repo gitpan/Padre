@@ -21,7 +21,7 @@ use Padre::Wx;
 use Wx::Event qw( EVT_BUTTON );
 
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Wx::ListView';
 
 use Class::XSAccessor {
@@ -49,9 +49,9 @@ sub new {
 	my $self = $class->SUPER::new(
 		Padre::Current->main->bottom,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxLC_REPORT | Wx::wxLC_SINGLE_SEL
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::LC_REPORT | Wx::LC_SINGLE_SEL
 	);
 
 	$self->set_column_widths;
@@ -63,8 +63,12 @@ sub new {
 			$self->on_list_item_activated( $_[1], $main, $editor );
 		},
 	);
-	Wx::Event::EVT_RIGHT_DOWN(
-		$self, \&on_right_down,
+
+	# FIXME Find out why EVT_CONTEXT_MENU doesn't work on Ubuntu
+	Wx::Event::EVT_CONTEXT_MENU(
+
+		#Wx::Event::EVT_CONTEXT_MENU(
+		$self, \&on_context_menu,
 	);
 
 	$self->{line_count} = scalar(@$lines);
@@ -102,8 +106,8 @@ Works out the correct column widths for the list columns.
 sub set_column_widths {
 	my $self = shift;
 
-	$self->SetColumnWidth( 0, Wx::wxLIST_AUTOSIZE );
-	$self->SetColumnWidth( 1, Wx::wxLIST_AUTOSIZE );
+	$self->SetColumnWidth( 0, Wx::LIST_AUTOSIZE );
+	$self->SetColumnWidth( 1, Wx::LIST_AUTOSIZE );
 
 	return;
 }
@@ -204,13 +208,14 @@ sub relocale {
 
 =pod
 
-=head3 C<on_right_down>
+=head3 C<on_context_menu>
 
-Called when the user presses a right click or a context menu key (on Win32).
+Called when the user ask for the context menu (either a right click
+or the context menu key (Win32, GTK), or Shift+F10).
 
 =cut
 
-sub on_right_down {
+sub on_context_menu {
 	my ( $self, $event ) = @_;
 
 	return if $self->GetItemCount == 0;
@@ -234,9 +239,9 @@ sub on_right_down {
 					$msg = "$text\n";
 
 					# And copy it to clipboard
-					if ( ( length $msg > 0 ) and Wx::wxTheClipboard->Open ) {
-						Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($msg) );
-						Wx::wxTheClipboard->Close;
+					if ( ( length $msg > 0 ) and Wx::TheClipboard->Open ) {
+						Wx::TheClipboard->SetData( Wx::TextDataObject->new($msg) );
+						Wx::TheClipboard->Close;
 					}
 				}
 			}
@@ -258,9 +263,9 @@ sub on_right_down {
 			}
 
 			# And copy it to clipboard
-			if ( ( length $msg > 0 ) and Wx::wxTheClipboard->Open ) {
-				Wx::wxTheClipboard->SetData( Wx::TextDataObject->new($msg) );
-				Wx::wxTheClipboard->Close;
+			if ( ( length $msg > 0 ) and Wx::TheClipboard->Open ) {
+				Wx::TheClipboard->SetData( Wx::TextDataObject->new($msg) );
+				Wx::TheClipboard->Close;
 			}
 		}
 	);

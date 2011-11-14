@@ -16,7 +16,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -33,18 +33,18 @@ sub new {
 	my $panel = shift || $main->bottom;
 
 	my $self = $class->SUPER::new(
-		$panel, -1, Wx::wxDefaultPosition, Wx::wxDefaultSize,
-		Wx::wxNO_FULL_REPAINT_ON_RESIZE | Wx::wxCLIP_CHILDREN
+		$panel, -1, Wx::DefaultPosition, Wx::DefaultSize,
+		Wx::NO_FULL_REPAINT_ON_RESIZE | Wx::CLIP_CHILDREN
 	);
 
 	my $output = Wx::TextCtrl->new(
-		$self, -1, "", Wx::wxDefaultPosition, Wx::wxDefaultSize,
-		Wx::wxTE_READONLY | Wx::wxTE_MULTILINE | Wx::wxNO_FULL_REPAINT_ON_RESIZE
+		$self, -1, "", Wx::DefaultPosition, Wx::DefaultSize,
+		Wx::TE_READONLY | Wx::TE_MULTILINE | Wx::NO_FULL_REPAINT_ON_RESIZE
 	);
 
 	my $input = Wx::TextCtrl->new(
-		$self, -1, "", Wx::wxDefaultPosition, Wx::wxDefaultSize,
-		Wx::wxNO_FULL_REPAINT_ON_RESIZE | Wx::wxTE_PROCESS_ENTER
+		$self, -1, "", Wx::DefaultPosition, Wx::DefaultSize,
+		Wx::NO_FULL_REPAINT_ON_RESIZE | Wx::TE_PROCESS_ENTER
 	);
 
 	$self->{_output_} = $output;

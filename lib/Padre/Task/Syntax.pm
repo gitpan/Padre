@@ -7,7 +7,7 @@ use Carp         ();
 use Params::Util ();
 use Padre::Task  ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Task';
 
 
@@ -51,14 +51,14 @@ sub run {
 	# it back up to the parent Wx thread at the end of the task.
 	my $text = delete $self->{text};
 
-	# Get the function list
+	# Get the syntax model object
 	$self->{model} = $self->syntax($text);
 
 	return 1;
 }
 
 sub syntax {
-	return [];
+	return {};
 }
 
 1;

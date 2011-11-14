@@ -9,7 +9,7 @@ Padre::Wx::TreeCtrl::ScrollLock - Scroll-free transactions for tree controls
 =head1 SYNOPSIS
 
   SCOPE: {
-      my $lock = $padre_wx_treectrl->scroll_lock;
+      my $lock = $padre_wx_treectrl->lock_scroll;
   
       # Change the tree here
   }
@@ -52,7 +52,7 @@ use warnings;
 use Params::Util ();
 use Padre::Wx    ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 sub new {
 	my $class = shift;
@@ -64,7 +64,7 @@ sub new {
 	# Create the object and record the scroll position
 	return bless {
 		tree    => $tree,
-		scrolly => $tree->GetScrollPos(Wx::wxVERTICAL),
+		scrolly => $tree->GetScrollPos(Wx::VERTICAL),
 		locker  => Wx::WindowUpdateLocker->new($tree),
 	}, $class;
 }
@@ -74,7 +74,7 @@ sub DESTROY {
 	# Return the scroll position to the previous position
 	### NOTE: This just sets it to the top for now.
 	$_[0]->{tree}->SetScrollPos(
-		Wx::wxVERTICAL,
+		Wx::VERTICAL,
 		$_[0]->{scrolly},
 		0,
 	);

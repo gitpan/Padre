@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Feature  ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Wx::Menu';
 
 sub new {
@@ -52,6 +52,14 @@ sub new {
 	$self->{open_in_file_browser} = $self->add_menu_action(
 		'file.open_in_file_browser',
 	);
+
+	if (Padre::Constant::WIN32) {
+		$self->{open_in_command_line} = $self->add_menu_action(
+			'file.open_in_command_line',
+		);
+	}
+
+	$self->AppendSeparator;
 
 	$self->{find_in_files} = $self->add_menu_action(
 		'search.find_in_files',
@@ -125,8 +133,8 @@ sub new {
 	if ($document) {
 		$self->AppendSeparator;
 
-		if ( $document->can('event_on_right_down') ) {
-			$document->event_on_right_down( $editor, $self, $event );
+		if ( $document->can('event_on_context_menu') ) {
+			$document->event_on_context_menu( $editor, $self, $event );
 		}
 
 		# Let the plugins have a go

@@ -8,7 +8,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 sub config_load {
 	my $self   = shift;
@@ -24,7 +24,11 @@ sub config_load {
 		my $ctrl    = $self->$name();
 
 		# Apply this one setting to this one widget
-		if ( $ctrl->isa('Wx::CheckBox') ) {
+		if ( $ctrl->can('config_load') ) {
+			# Allow specialised widgets to load their own setting
+			$ctrl->config_load( $setting, $value );
+
+		} elsif ( $ctrl->isa('Wx::CheckBox') ) {
 			$ctrl->SetValue($value);
 
 		} elsif ( $ctrl->isa('Wx::TextCtrl') ) {
@@ -33,18 +37,20 @@ sub config_load {
 		} elsif ( $ctrl->isa('Wx::SpinCtrl') ) {
 			$ctrl->SetValue($value);
 
+		} elsif ( $ctrl->isa('Wx::FilePickerCtrl') ) {
+			$ctrl->SetPath($value);
+
+		} elsif ( $ctrl->isa('Wx::DirPickerCtrl') ) {
+			$ctrl->SetPath($value);
+
 		} elsif ( $ctrl->isa('Wx::ColourPickerCtrl') ) {
-			$ctrl->SetColour( Padre::Wx::color($value) );
+			$ctrl->SetColour( 
+				Padre::Wx::color($value)
+			);
 
 		} elsif ( $ctrl->isa('Wx::FontPickerCtrl') ) {
-			my $font = Wx::Font->new(Wx::wxNullFont);
-			local $@;
-			eval { $font->SetNativeFontInfoUserDesc($value); };
-			$font = Wx::Font->new(Wx::wxNullFont) if $@;
-
-			# SetSelectedFont(wxNullFont) doesn't work on
-			# Linux, so we only do it if the font is valid
-			$ctrl->SetSelectedFont($font) if $font->IsOk;
+			my $font = Padre::Wx::native_font($value);
+			$ctrl->SetSelectedFont( $font ) if $font->IsOk;
 
 		} elsif ( $ctrl->isa('Wx::Choice') ) {
 			my $options = $setting->options;
@@ -125,8 +131,14 @@ sub config_diff {
 		} elsif ( $ctrl->isa('Wx::SpinCtrl') ) {
 			$value = $ctrl->GetValue;
 
+		} elsif ( $ctrl->isa('Wx::FilePickerCtrl') ) {
+			$value = $ctrl->GetPath;
+
+		} elsif ( $ctrl->isa('Wx::DirPickerCtrl') ) {
+			$value = $ctrl->GetPath;
+
 		} elsif ( $ctrl->isa('Wx::ColourPickerCtrl') ) {
-			$value = $ctrl->GetColour->GetAsString(Wx::wxC2S_HTML_SYNTAX);
+			$value = $ctrl->GetColour->GetAsString(Wx::C2S_HTML_SYNTAX);
 			$value =~ s/^#// if defined $value;
 
 		} elsif ( $ctrl->isa('Wx::FontPickerCtrl') ) {

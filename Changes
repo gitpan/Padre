@@ -13,9 +13,185 @@ next production release, and synchronise their release to the Padre schedule.
 Changes which do not break API compatibility for plugins should be listed in
 the even version for the release, even during development.
 
+0.92 2011.11.11
+    - Wx::Scintilla is now stable and replaces Wx::STC in Padre (AZAWAWI)
+    - New Task 3.0 which fixes bidirectional communication and thus enables
+      services that run indefinitely in reserved threads (ADAMK)
+    - New Style 2.0 which simplifies implementations, adds style localisation
+      and allows styling of the GUI (ADAMK)
+    - Added fine-grained Wx locking mechanism so that high frequency asyncronous
+      GUI code doesn't create high frequency asyncronous flickering. Padre
+      flickers much less now on Win32 (ADAMK)
+    - Added Replace in Files using matching logic to Find in Files (ADAMK)
+    - Added plugin compatibility tracking to Padre::Search (ADAMK)
+    - Wx doesn't seem to let us change the PaneBorder setting after pane
+      creation, so leave it off and have an empty area rather than have a
+      double-width border (ADAMK)
+    - Wx constants are now Wx::FOO instead of Wx::wxFOO... and these ones are
+      actually constants instead of strange AUTOLOAD weirdness (ADAMK)
+    - We now SetEndAtLastLine(0) on editor panels so you can scroll one page
+      past the end of the document and type into relaxing clear space (ADAMK)
+    - Tabs without filename now also backed up (SEWI)
+    - The syntax highligher spawns the perl -c call with the unsaved file as
+      STDIN rather than by filename. This seems to make things that rely on
+      FindBin like Module::Install Makefile.PL files work properly (ADAMK)
+    - Some tools are more thorough about indicating they are not used (ADAMK)
+    - Added support for task parents and owners being notified when a task has
+      started running in the background (ADAMK)
+    - Task owners can now hijack status bar messages if they wish to (ADAMK)
+    - The task manager can now run without the need for threads. However,
+      every task will block the foreground and makes Padre unusable, so this
+      feature is reserved for profiling Padre's performance (ADAMK)
+    - The advanced setting threads_stacksize allows the tuning of the
+      thread stack size. On Win32 the default is dropped to 4meg (ADAMK)
+    - The advanced setting threads_maximum allows the tuning of the
+      maximum number of background worker threads (ADAMK)
+    - Padre::Wx::App will use Wx internal singleton logic instead of duplicating
+      it again for itself (ADAMK)
+    - Add more _ shortcuts in menus. Sorry to translators (DOLMEN)
+    - Only show the GTL splash screen once per version change on GTK (ADAMK)
+    - Fix freeze when opening an empty *saved* Perl script while the syntax
+      checker is active (AZAWAWI)
+    - #1207: PluginHooks not removed after plugin reload/disable (MJFO)
+    - Padre::File::HTTP: less colloquial English (ZENOG)
+    - update_pot_file.pl: add --verbose and --nocleanup for easier debugging
+      (ZENOG)
+    - #1313: Search previous button acts as next (KAARE)
+    - regex editor: insert m// operator when replace field is not visible (ZENOG)
+    - regex editor: highlight matched text in blue instead of red, not avoid
+      confusion with warnings (ZENOG)
+    - improved messages in Menu/File.pm, Goto.pm and ActionLibrary.pm (ZENOG)
+    - FindFast.pm: 'Case insensitive'->'Case sensitive' to match actual behavior
+      of the checkbox (ZENOG)
+    - Update German translation (ZENOG)
+    - Directory tree search result rendering is now throttled to four updates
+      per second. This prevents tree updates exhausting all resources and
+      strangling user input, and seems to actually get the results onto screen
+      faster because there's less lock/render passes (ADAMK)
+    - During shutdown, call view_stop early on all tools that support it so they
+      won't waste time rendering after we have hidden the main window (ADAMK)
+    - #1317 'Padre 0.90 hangs and then segfaults on i .t file' (AZAWAWI)
+    - Find in Files search result rendering is now throttled to four updates
+      per second, for similar reasons as with the directory tree search (ADAMK)
+    - 'Open in Command line' is now shown in the right click menu in win32 (AZAWAWI)
+    - 'Open in Command line' and 'Open in default system editor' are only shown
+      on win32 (AZAWAWI)
+    - Smart highlight is now hidden when a printable character is added or changed
+      in the editor (AZAWAWI)
+    - Syntax checker tasks should now return a hash containing an issues array
+      reference and stderr string keys instead of the old issues array reference
+      (AZAWAWI)
+    - Fix TODO list double click not working regression on win32 (AZAWAWI)
+    - Italic text was not being set correctly in a Padre style (AZAWAWI)
+    - "Show Standard Error" in Syntax check pane now displays in output
+      pane the syntax checker results (AZAWAWI)
+    - Moved Ctrl-Shift-R shortcut from Open Resource to Replace in Files to
+      provide symmetry with the Find in Files shortcut (ADAMK)
+    - Upgrade the syntax highlighter panel to wxFormBuilder (ADAMK)
+    - New leading and trailing space deletion that is faster and won't move
+      the editor window around (ADAMK)
+    - Added 'Solarized Light' theme contributed by Anton Ukolov ('sugar' on irc)
+      (AZAWAWI)
+    - Open resources dialog is now triggered by Ctrl-Alt-R instead of Ctrl-Shift-R
+      which is now reserved for 'Replace in Files' functionality (ADAMK, AZAWAWI)
+    - Find In Files match accounting works, and no longer hides files when we
+      only do a single render pass for files because there's only a few (ADAMK)
+    - Replaced references to wxStyledTextCtrl documentation with the original
+      Scintilla website documentation (AZAWAWI)
+    - Added how much time does syntax checking take (AZAWAWI)
+    - Added realtime VCS or local document difference calculation margin feature
+      (AZAWAWI)
+    - Added a differences popup window that can traverse differences in a document
+      and revert back changes (AZAWAWI)
+    - Added 'Next Difference' to edit menu (AZAWAWI)
+    - Plugin manager is now modal (BOWTIE, AZAWAWI)
+    - Add Patch to editor menu and removed Diff Tools (BOWTIE)
+    - Update Italian translation (SBLANDIN)
+    - Padre::Project vcs strings are now constants (AZAWAWI)
+    - "Filter through Perl" back into core (SEWI)
+    - Added a generic version control panel that provides minimal project
+      subversion/git support with the ability to view normal/unversioned and ignored
+      files (AZAWAWI)
+    - #1126 'TODO list: does not immediately show items' (AZAWAWI)
+    - Added identity_location config setting so collaborative functions such as
+      Swarm can disambiguate multiple Padre instances of the same user by
+      named locations such as "Home" or "Work" (ADAMK)
+    - Refactored the generation of templated skeleton code into a pure
+      Padre::Template generator, and IDE-aware code that wraps around it (ADAMK)
+    - Require Wx 0.9901 on all platforms to fix ticket #1184: Perl help browser
+      suppresses linebreaks (AZAWAWI)
+    - Upgrade the find in files panel to wxFormBuilder (AZAWAWI)
+    - Find in files has repeat, stop search, expand and collapse all buttons
+      (AZAWAWI)
+    - Move the key bindings dialog to the preferences dialog (AZAWAWI)
+    - Removed the bin_diff configuration parameter and the external tools panel
+      from the preferences dialog (AZAWAWI)
+    - Fix quick menu access stability bugs on Ubuntu (AZAWAWI)
+    - Fix #1318: Padre freeze? (AZAWAWI)
+    - Added SQL, C/C++, C#, XS, Python, Ruby, PHP, HTML, CSS, JavaScript, Ada,
+      COBOL, Haskell, Pascal, ActionScript, VBScript and YAML keyword
+      highlighting (AZAWAWI)
+    - Major refactoring of the editor setup and configuration code (ADAMK)
+    - Scintilla numeric resources such as margins, markers and indicators are
+      now managed in Padre::Constant (ADAMK)
+    - Recalculate the line number margin width after various events to ensure
+      the numbers always show correctly (ADAMK)
+    - Tools and panels that are hidden across a AUI geometry change recalculate
+      their layout properly when displayed again (ADAMK)
+    - Add out-of-the-box comment support for HTML, XML, LISP, Fortran, Forth,
+      Pascal, VBScript, DOS batch files, ActionScript, Tcl, COBOL, Haskell
+      (ZENOG)
+    - MATLAB source file extension is .m, not .mat (ZENOG)
+    - Add syntax checking comments pragmas. To disable Padre syntax
+      check, please type '## no padre_syntax_check' and to enable again type 
+      '## use padre_syntax_check' in your source code (AZAWAWI)
+    - Added lang_perl6_auto_detection which enables Padre to detect Perl 6 files
+      in Perl 5 files. Please note that this is not an accurate method of
+      detecting Perl 6 files (disabled by default). The previous behavior was to
+      enable it when the Perl 6 plugin is enabled (AZAWAWI)
+    - Added "Language Perl 6" tab to preferences (AZAWAWI)
+    - Ruby and Python scripts can be now be executed (AZAWAWI)
+    - Ruby, Python, Java, and C# are supported in the function list
+      (AZAWAWI, ZENOG)
+    - Ported the timeline class mechanism back to ORLite::Migrate, and switch
+      from our custom inlined version back to depending on CPAN.
+      [Removed Padre::DB::Migrate*] (ADAMK)
+    - Fix Outline focus and paint bugs that caused other right panels to 
+      misbehave when Outline is enabled (BOWTIE, AZAWAWI)
+    - Upgrade the Outline panel to wxFormBuilder (AZAWAWI)
+    - Outline panel is searchable now (AZAWAWI)
+    - Fix #1050: Window menu is confusing (ZENOG, AZAWAWI)
+    - Remove swap_ctrl_tab_alt_right configuration parameter (AZAWAWI)
+    - Added CPAN explorer that reuses MetaCPAN.org API for searching for a module
+      and uses App::cpanminus for package installation. It can list the most
+      recent and favorite CPAN releases, view their POD documentation
+      and if there is a SYNOPSIS section, one can insert it from within Padre.
+      (AZAWAWI)
+    - Fix #1291 'Code folding icons missing' (AZAWAWI)
+    - Code folding markers are now theme-able (AZAWAWI)
+    - Find and Find in Files dialogs hide the Fast Find panel (ADAMK)
+    - Hide editor objects during their (potentially long) setup so that we
+      don't see a half-formed editor in a weird position (ADAMK)
+    - Add povray mimetype and keyword lists (BRAMBLE)
+    - Fix AUTOMATED_TESTING=1 t/ errors automatically set by cpanm (AZAWAWI)
+    - Fix bad assumption in 93_padre_filename_win.t (AZAWAWI)
+
+0.91 Development version, not released
+    - Task 3.0 breaks almost all task code (ADAMK)
+    - Style 2.0 breaks all existing styles (ADAMK)
+    - Wx constants change from Wx::wxCONSTANT to Wx::CONSTANT (ADAMK)
+    - Rename internal language code 'fr-fr' to 'fr' (and .po files) for
+      consistency with other softwares, breaking old fr-fr files (DOLMEN)
+    - on_right_click becomes on_context_menu as a first step to support the
+      context menu key or Shift+F10 as alternatives (DOLMEN)
+    - Removed the comment basis for Padre::Document subclassing (ADAMK)
+    - Renaming of all methods involved in setting up an editor object (ADAMK)
+    - Removed the experimental Padre wizard API (AZAWAWI)
+
 0.90 Tue 16 Aug 2011
     - Return task instance from Padre::Role::Task::tast_request (BRAMBLE)
-    - Add solarize theme contributed by Anton Ukolov ('sugar' on irc) (BRAMBLE)
+    - Add 'Solarized Dark' theme contributed by Anton Ukolov ('sugar' on irc)
+      (BRAMBLE)
     - Improved fast find text entry colours #1290 (BRAMBLE)
     - Improved preferences colours for 'dark' themed desktops #1290 (BRAMBLE)
     - Added feature_devel_endstats (disabled by default) which makes Padre

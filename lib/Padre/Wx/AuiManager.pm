@@ -9,7 +9,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 # Due to an overly simplistic implementation at the C level,
 # Wx::AuiManager is only a SCALAR reference and cannot be
@@ -35,9 +35,9 @@ sub new {
 	# Do NOT use hints other than Rectangle on Linux/GTK
 	# or the app will crash.
 	my $flags = $self->GetFlags;
-	$flags &= ~Wx::wxAUI_MGR_TRANSPARENT_HINT;
-	$flags &= ~Wx::wxAUI_MGR_VENETIAN_BLINDS_HINT;
-	$self->SetFlags( $flags ^ Wx::wxAUI_MGR_RECTANGLE_HINT );
+	$flags &= ~Wx::AUI_MGR_TRANSPARENT_HINT;
+	$flags &= ~Wx::AUI_MGR_VENETIAN_BLINDS_HINT;
+	$self->SetFlags( $flags ^ Wx::AUI_MGR_RECTANGLE_HINT );
 
 	return $self;
 }

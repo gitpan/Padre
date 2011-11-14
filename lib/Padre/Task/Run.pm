@@ -10,7 +10,7 @@ use Params::Util ();
 use Padre::Task  ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Task';
 
 sub new {
@@ -84,7 +84,7 @@ sub run {
 sub stdout {
 	TRACE( $_[1] ) if DEBUG;
 	my $self = shift;
-	$self->handle->status( $_[0] ) if $self->running;
+	$self->tell_status( $_[0] );
 	return 1;
 }
 

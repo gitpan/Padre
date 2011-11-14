@@ -9,14 +9,13 @@ use warnings;
 use Wx                       ();
 use Padre::Wx::Role::Conduit ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::Conduit
 	Wx::Frame
 };
 
 1;
-
 
 # Copyright 2008-2011 The Padre development team as listed in Padre.pm.
 # LICENSE

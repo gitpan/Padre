@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Wx::FBP::FindInFiles ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::FBP::FindInFiles
 };
@@ -64,7 +64,7 @@ sub directory {
 	$dialog->Destroy;
 
 	# Update the dialog
-	unless ( $result == Wx::wxID_CANCEL ) {
+	unless ( $result == Wx::ID_CANCEL ) {
 		$self->find_directory->SetValue( $dialog->GetPath );
 	}
 
@@ -80,6 +80,7 @@ sub directory {
 
 sub run {
 	my $self    = shift;
+	my $main    = $self->main;
 	my $current = $self->current;
 
 	# Clear
@@ -87,7 +88,18 @@ sub run {
 
 	# Do they have a specific search term in mind?
 	my $text = $current->text;
-	$text = '' if $text =~ /\n/;
+	unless ( defined $text ) {
+		$text = '';
+	}
+	unless ( length $text ) {
+		if ( $main->has_findfast ) {
+			my $fast = $main->findfast->find_term;
+			$text = $fast if length $fast;	
+		}
+	}
+	if ( $text =~ /\n/ ) {
+		$text = '';
+	}
 
 	# Clear out and reset the search term box
 	$self->find_term->refresh($text);
@@ -96,10 +108,13 @@ sub run {
 	# Update the user interface
 	$self->refresh;
 
+	# Hide the Fast Find if visible
+	$self->main->show_findfast(0);
+
 	# Show the dialog
 	my $result = $self->ShowModal;
 
-	if ( $result == Wx::wxID_CANCEL ) {
+	if ( $result == Wx::ID_CANCEL ) {
 
 		# As we leave the Find dialog, return the user to the current editor
 		# window so they don't need to click it.

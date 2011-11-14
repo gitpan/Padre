@@ -39,7 +39,7 @@ use warnings;
 use constant      ();
 use Padre::Config ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 my $config = Padre::Config->read;
 
@@ -56,11 +56,8 @@ constant->import(
 
 		# Experimental features users can enable
 		QUICK_FIX       => $config->feature_quick_fix,
-		REPLACEINFILES  => $config->feature_replaceinfiles,
 		SYNC            => $config->feature_sync,
 		STYLE_GUI       => $config->feature_style_gui,
-		WIZARD_SELECTOR => $config->feature_wizard_selector,
-		WX_SCINTILLA    => $config->feature_wx_scintilla,
 		DEVEL_ENDSTATS  => $config->feature_devel_endstats,
 		DEVEL_TRACEUSE  => $config->feature_devel_traceuse,
 	}

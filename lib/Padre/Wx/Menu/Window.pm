@@ -10,7 +10,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -30,14 +30,6 @@ sub new {
 	$self->{main} = $main;
 
 	# File Navigation
-	$self->{window_last_visited_file} = $self->add_menu_action(
-		'window.last_visited_file',
-	);
-
-	$self->{window_oldest_visited_file} = $self->add_menu_action(
-		'window.oldest_visited_file',
-	);
-
 	$self->{window_next_file} = $self->add_menu_action(
 		'window.next_file',
 	);
@@ -46,20 +38,8 @@ sub new {
 		'window.previous_file',
 	);
 
-	# TODO: Remove this and the menu option as soon as #750 is fixed
-	#       as it's the same like Ctrl-Tab
-	$self->add_menu_action(
-		'window.last_visited_file_old',
-	);
-
-	$self->add_menu_action(
-		'window.goto_previous_position',
-	);
-
-	$self->add_menu_action(
-		'window.show_previous_positions',
-	);
-
+	$self->AppendSeparator;
+	
 	$self->{window_right_click} = $self->add_menu_action(
 		'window.right_click',
 	);
@@ -67,6 +47,14 @@ sub new {
 	$self->AppendSeparator;
 
 	# Window Navigation
+	$self->{window_goto_command_line_window} = $self->add_menu_action(
+		'window.goto_command_line_window',
+	);
+
+	$self->{window_goto_cpan_explorer_window} = $self->add_menu_action(
+		'window.goto_cpan_explorer_window',
+	) if $main->config->feature_cpan_explorer;
+
 	$self->{window_goto_functions_window} = $self->add_menu_action(
 		'window.goto_functions_window',
 	);
@@ -75,16 +63,12 @@ sub new {
 		'window.goto_outline_window',
 	);
 
-	$self->{window_goto_syntax_check_window} = $self->add_menu_action(
-		'window.goto_syntax_check_window',
-	);
-
-	$self->{window_goto_command_line_window} = $self->add_menu_action(
-		'window.goto_command_line_window',
-	);
-
 	$self->{window_goto_main_window} = $self->add_menu_action(
 		'window.goto_main_window',
+	);
+
+	$self->{window_goto_syntax_check_window} = $self->add_menu_action(
+		'window.goto_syntax_check_window',
 	);
 
 	# Save everything we need to keep
@@ -107,7 +91,6 @@ sub refresh {
 	my $enable = $pages ? 1 : 0;
 	$self->{window_next_file}->Enable($enable);
 	$self->{window_previous_file}->Enable($enable);
-	$self->{window_last_visited_file}->Enable($enable);
 	$self->{window_right_click}->Enable($enable);
 
 	return 1;

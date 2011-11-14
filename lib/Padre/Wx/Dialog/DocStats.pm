@@ -7,7 +7,7 @@ use File::Basename;
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -29,9 +29,9 @@ sub new {
 		$main,
 		-1,
 		Wx::gettext('Document Statistics'),
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxCAPTION | Wx::wxCLOSE_BOX | Wx::wxSYSTEM_MENU
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::CAPTION | Wx::CLOSE_BOX | Wx::SYSTEM_MENU
 	);
 
 	$self->{main} = $main;
@@ -55,7 +55,7 @@ sub new {
 	$self->{encoding}     = $self->label(' ');
 	$self->{doc_type}     = $self->label( ' ' x 15 );
 
-	$self->{close_button} = Wx::Button->new( $self, Wx::wxID_CANCEL, Wx::gettext('&Close') );
+	$self->{close_button} = Wx::Button->new( $self, Wx::ID_CANCEL, Wx::gettext('&Close') );
 
 	my $update_button = Wx::Button->new( $self, -1, Wx::gettext('&Update') );
 	$update_button->SetDefault;
@@ -72,9 +72,9 @@ sub new {
 	$self->{filename}->SetFont(
 		Wx::Font->new(
 			9, # TODO: size should depend on theme
-			Wx::wxDEFAULT,
-			Wx::wxNORMAL,
-			Wx::wxBOLD,
+			Wx::DEFAULT,
+			Wx::NORMAL,
+			Wx::BOLD,
 			0,
 			''
 		)
@@ -95,54 +95,54 @@ sub new {
 	$data_sizer->Add( $self->label( Wx::gettext('Document') ), 0, 0, 0 );
 	$data_sizer->Add( $self->{selection},                      0, 0, 0 );
 
-	$data_sizer->Add( $self->label( Wx::gettext('Lines') ), 0, 0,                 0 );
-	$data_sizer->Add( $self->{lines_1},                     0, Wx::wxALIGN_RIGHT, 0 );
-	$data_sizer->Add( $self->{lines_2},                     0, Wx::wxALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->label( Wx::gettext('Lines') ), 0, 0,               0 );
+	$data_sizer->Add( $self->{lines_1},                     0, Wx::ALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->{lines_2},                     0, Wx::ALIGN_RIGHT, 0 );
 
-	$data_sizer->Add( $self->label( Wx::gettext('Words') ), 0, 0,                 0 );
-	$data_sizer->Add( $self->{words_1},                     0, Wx::wxALIGN_RIGHT, 0 );
-	$data_sizer->Add( $self->{words_2},                     0, Wx::wxALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->label( Wx::gettext('Words') ), 0, 0,               0 );
+	$data_sizer->Add( $self->{words_1},                     0, Wx::ALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->{words_2},                     0, Wx::ALIGN_RIGHT, 0 );
 
-	$data_sizer->Add( $self->label( Wx::gettext('Characters (including whitespace)') ), 0, 0,                 0 );
-	$data_sizer->Add( $self->{chars_1},                                                 0, Wx::wxALIGN_RIGHT, 0 );
-	$data_sizer->Add( $self->{chars_2},                                                 0, Wx::wxALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->label( Wx::gettext('Characters (including whitespace)') ), 0, 0,               0 );
+	$data_sizer->Add( $self->{chars_1},                                                 0, Wx::ALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->{chars_2},                                                 0, Wx::ALIGN_RIGHT, 0 );
 
-	$data_sizer->Add( $self->label( Wx::gettext('Non-whitespace characters') ), 0, 0,                 0 );
-	$data_sizer->Add( $self->{nwcs_1},                                          0, Wx::wxALIGN_RIGHT, 0 );
-	$data_sizer->Add( $self->{nwcs_2},                                          0, Wx::wxALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->label( Wx::gettext('Non-whitespace characters') ), 0, 0,               0 );
+	$data_sizer->Add( $self->{nwcs_1},                                          0, Wx::ALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->{nwcs_2},                                          0, Wx::ALIGN_RIGHT, 0 );
 
 	$data_sizer->Add( $self->label( Wx::gettext('Kilobytes (kB)') ), 0, 0, 0 );
-	$data_sizer->Add( $self->{kbytes}, 0, Wx::wxALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->{kbytes}, 0, Wx::ALIGN_RIGHT, 0 );
 	$data_sizer->AddSpacer(0);
 
 	$data_sizer->Add( $self->label( Wx::gettext('Kibibytes (kiB)') ), 0, 0, 0 );
-	$data_sizer->Add( $self->{kibytes}, 0, Wx::wxALIGN_RIGHT, 0 );
+	$data_sizer->Add( $self->{kibytes}, 0, Wx::ALIGN_RIGHT, 0 );
 	$data_sizer->AddSpacer(0);
 
 	my $main_sizer = Wx::FlexGridSizer->new( 5, 1, $vertical_grid_margin * 2, 0 );
 	$main_sizer->AddGrowableCol(0);
 
-	$main_sizer->Add( $self->{filename}, 0, 0,            $border_margin );
-	$main_sizer->Add( $data_sizer,       1, Wx::wxEXPAND, $border_margin );
+	$main_sizer->Add( $self->{filename}, 0, 0,          $border_margin );
+	$main_sizer->Add( $data_sizer,       1, Wx::EXPAND, $border_margin );
 
 	my $type_sizer = Wx::FlexGridSizer->new( 6, 2, $vertical_grid_margin, $horizontal_grid_margin );
-	$type_sizer->Add( $self->label( Wx::gettext('Line break mode') ), 0, 0,            0 );
-	$type_sizer->Add( $self->{newline_type},                          0, 0,            0 );
-	$type_sizer->Add( $self->label( Wx::gettext('Encoding') ),        0, 0,            0 );
-	$type_sizer->Add( $self->{encoding},                              0, 0,            0 );
-	$type_sizer->Add( $self->label( Wx::gettext('Document type') ),   0, 0,            0 );
-	$type_sizer->Add( $self->{doc_type},                              0, 0,            0 );
-	$main_sizer->Add( $type_sizer,                                    1, Wx::wxEXPAND, 0 );
+	$type_sizer->Add( $self->label( Wx::gettext('Line break mode') ), 0, 0,          0 );
+	$type_sizer->Add( $self->{newline_type},                          0, 0,          0 );
+	$type_sizer->Add( $self->label( Wx::gettext('Encoding') ),        0, 0,          0 );
+	$type_sizer->Add( $self->{encoding},                              0, 0,          0 );
+	$type_sizer->Add( $self->label( Wx::gettext('Document type') ),   0, 0,          0 );
+	$type_sizer->Add( $self->{doc_type},                              0, 0,          0 );
+	$main_sizer->Add( $type_sizer,                                    1, Wx::EXPAND, 0 );
 
-	$main_sizer->Add( $self->horizontal_line, 1, Wx::wxEXPAND, 0 );
+	$main_sizer->Add( $self->horizontal_line, 1, Wx::EXPAND, 0 );
 
-	my $buttons = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$buttons->Add( $update_button,        0, 0,          $border_margin );
-	$buttons->Add( $self->{close_button}, 0, Wx::wxLEFT, $border_margin );
-	$main_sizer->Add( $buttons, 0, Wx::wxALIGN_RIGHT | Wx::wxALL, $border_margin );
+	my $buttons = Wx::BoxSizer->new(Wx::HORIZONTAL);
+	$buttons->Add( $update_button,        0, 0,        $border_margin );
+	$buttons->Add( $self->{close_button}, 0, Wx::LEFT, $border_margin );
+	$main_sizer->Add( $buttons, 0, Wx::ALIGN_RIGHT | Wx::ALL, $border_margin );
 
-	my $sizer = Wx::BoxSizer->new(Wx::wxHORIZONTAL);
-	$sizer->Add( $main_sizer, 1, Wx::wxALL | Wx::wxEXPAND, 5 );
+	my $sizer = Wx::BoxSizer->new(Wx::HORIZONTAL);
+	$sizer->Add( $main_sizer, 1, Wx::ALL | Wx::EXPAND, 5 );
 
 	$self->SetSizer($sizer);
 	$sizer->Fit($self);
@@ -153,12 +153,12 @@ sub new {
 
 sub horizontal_line {
 	my ($self) = @_;
-	return Wx::StaticLine->new( $self, -1, Wx::wxDefaultPosition, Wx::wxDefaultSize );
+	return Wx::StaticLine->new( $self, -1, Wx::DefaultPosition, Wx::DefaultSize );
 }
 
 sub label {
 	my ( $self, $caption ) = @_;
-	return Wx::StaticText->new( $self, -1, $caption, Wx::wxDefaultPosition, Wx::wxDefaultSize );
+	return Wx::StaticText->new( $self, -1, $caption, Wx::DefaultPosition, Wx::DefaultSize );
 }
 
 sub update_document {

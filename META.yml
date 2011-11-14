@@ -42,6 +42,9 @@ keywords:
   - replace
   - syntax
   - windows
+  - 'version control'
+  - patch
+  - diff
   - wx
   - wxwidgets
 license: perl
@@ -58,13 +61,13 @@ no_index:
     - t
     - xt
 requires:
+  Algorithm::Diff: 1.19
   App::cpanminus: 0.9923
   B::Deparse: 0
   CGI: 3.47
   Capture::Tiny: 0.06
   Class::Adapter: 1.05
   Class::Inspector: 1.22
-  Class::Unload: 0.03
   Class::XSAccessor: 1.05
   Cwd: 3.2701
   DBD::SQLite: 1.27
@@ -109,6 +112,7 @@ requires:
   Module::CoreList: 2.22
   Module::Manifest: 0.07
   ORLite: 1.48
+  ORLite::Migrate: 1.08
   POD2::Base: 0.043
   POSIX: 0
   PPI: 1.213
@@ -124,16 +128,19 @@ requires:
   Pod::Simple: 3.07
   Pod::Simple::XHTML: 3.04
   Probe::Perl: 0.01
+  Sort::Versions: 1.5
   Storable: 2.16
   Template::Tiny: 0.11
   Term::ReadLine: 0
   Text::Balanced: 2.01
-  Text::Diff: 0.35
+  Text::Diff: 1.41
   Text::FindIndent: 0.10
+  Text::Patch: 1.8
   Time::HiRes: 1.9718
   URI: 0
-  Wx: 0.91
+  Wx: 0.9901
   Wx::Perl::ProcessStream: 0.29
+  Wx::Scintilla: 0.34
   YAML::Tiny: 1.32
   perl: 5.008005
   threads: 1.71
@@ -144,4 +151,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.90
+version: 0.92

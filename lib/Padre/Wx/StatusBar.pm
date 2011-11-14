@@ -53,7 +53,7 @@ use Class::XSAccessor {
 	}
 };
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::StatusBar
@@ -92,13 +92,13 @@ sub new {
 	my $self = $class->SUPER::new(
 		$main,
 		-1,
-		Wx::wxST_SIZEGRIP | Wx::wxFULL_REPAINT_ON_RESIZE
+		Wx::ST_SIZEGRIP | Wx::FULL_REPAINT_ON_RESIZE
 	);
 
 	$self->{main} = $main;
 
 	# create the static bitmap that will hold the task load status
-	my $sbmp = Wx::StaticBitmap->new( $self, -1, Wx::wxNullBitmap );
+	my $sbmp = Wx::StaticBitmap->new( $self, -1, Wx::NullBitmap );
 	$self->_task_sbmp($sbmp);
 	$self->_task_status('foobar'); # init status to sthg defined
 	                               # Wx::Event::EVT_LEFT_DOWN(
@@ -280,7 +280,7 @@ sub update_task_status {
 	# If we're idling, just hide the icon in the statusbar
 	if ( $status eq 'idle' ) {
 		$sbmp->Hide;
-		$sbmp->SetBitmap(Wx::wxNullBitmap);
+		$sbmp->SetBitmap(Wx::NullBitmap);
 		$sbmp->SetToolTip('');
 		$self->_task_width(0);
 		return;

@@ -5,14 +5,9 @@ use strict;
 use warnings;
 use Padre::Wx::FBP::ReplaceInFiles ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::FBP::ReplaceInFiles
-};
-
-use constant CONFIG => qw{
-	find_case
-	find_regex
 };
 
 
@@ -62,7 +57,7 @@ sub directory {
 	$dialog->Destroy;
 
 	# Update the dialog
-	unless ( $result == Wx::wxID_CANCEL ) {
+	unless ( $result == Wx::ID_CANCEL ) {
 		$self->find_directory->SetValue( $dialog->GetPath );
 	}
 
@@ -78,32 +73,42 @@ sub directory {
 
 sub run {
 	my $self    = shift;
+	my $main    = $self->main;
 	my $current = $self->current;
 	my $config  = $current->config;
 
 	# Do they have a specific search term in mind?
 	my $text = $current->text;
-	$text = '' if $text =~ /\n/;
+	unless ( defined $text ) {
+		$text = '';
+	}
+	unless ( length $text ) {
+		if ( $main->has_findfast ) {
+			my $fast = $main->findfast->find_term;
+			$text = $fast if length $fast;	
+		}
+	}
+	if ( $text =~ /\n/ ) {
+		$text = '';
+	}
 
 	# Clear out and reset the search term box
 	$self->find_term->refresh($text);
-	$self->find_term->SetFocus;
-
-	# Load search preferences
-	foreach my $name (CONFIG) {
-		$self->$name()->SetValue( $config->$name() );
+	if ( length $text ) {
+		$self->replace_term->SetFocus;
+	} else {
+		$self->find_term->SetFocus;
 	}
 
 	# Update the user interface
 	$self->refresh;
 
+	# Hide the Fast Find if visible
+	$self->main->show_findfast(0);
+
 	# Show the dialog
 	my $result = $self->ShowModal;
-
-	# Save any changed preferences
-	$self->save;
-
-	if ( $result == Wx::wxID_CANCEL ) {
+	if ( $result == Wx::ID_CANCEL ) {
 
 		# As we leave the dialog return the user to the current editor
 		# window so they don't need to click it.
@@ -115,7 +120,7 @@ sub run {
 
 	# Run the search in the Replace in Files tool
 	$self->main->show_replaceinfiles;
-	$self->main->replaceinfiles->(
+	$self->main->replaceinfiles->replace(
 		root    => $self->find_directory->SaveValue,
 		search  => $self->as_search,
 		replace => $self->replace_term->GetValue,
@@ -131,33 +136,15 @@ sub refresh {
 	$self->replace->Enable( $self->find_term->GetValue ne '' );
 }
 
-# Save the dialog settings to configuration.
-# Returns the config object as a convenience.
-sub save {
-	my $self    = shift;
-	my $config  = $self->current->config;
-	my $changed = 0;
-
-	foreach my $name (CONFIG) {
-		my $value = $self->$name()->GetValue;
-		next if $config->$name() == $value;
-		$config->set( $name => $value );
-		$changed = 1;
-	}
-
-	$config->write if $changed;
-
-	return $config;
-}
-
 # Generate a search object for the current dialog state
 sub as_search {
 	my $self = shift;
 	require Padre::Search;
 	Padre::Search->new(
-		find_term  => $self->find_term->SaveValue,
-		find_case  => $self->find_case->GetValue,
-		find_regex => $self->find_regex->GetValue,
+		find_term    => $self->find_term->SaveValue,
+		find_case    => $self->find_case->GetValue,
+		find_regex   => $self->find_regex->GetValue,
+		replace_term => $self->replace_term->GetValue,
 	);
 }
 

@@ -7,7 +7,7 @@ use Params::Util          ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -29,10 +29,10 @@ sub new {
 	my $self = $class->SUPER::new(
 		$main,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxAUI_NB_TOP | Wx::wxBORDER_NONE | Wx::wxAUI_NB_SCROLL_BUTTONS | Wx::wxAUI_NB_TAB_MOVE
-			| Wx::wxAUI_NB_CLOSE_ON_ACTIVE_TAB | Wx::wxAUI_NB_WINDOWLIST_BUTTON
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::AUI_NB_TOP | Wx::BORDER_NONE | Wx::AUI_NB_SCROLL_BUTTONS | Wx::AUI_NB_TAB_MOVE
+			| Wx::AUI_NB_CLOSE_ON_ACTIVE_TAB | Wx::AUI_NB_WINDOWLIST_BUTTON
 	);
 
 	# Add ourself to the main window
@@ -49,7 +49,7 @@ sub new {
 			Floatable      => 1,
 			Dockable       => 1,
 			Layer          => 1,
-			)->CenterPane,
+			)->Center,
 	);
 	$aui->caption(
 		'notebook' => Wx::gettext('Files'),
@@ -136,6 +136,9 @@ sub on_auinotebook_page_changed {
 		@$page_history = grep { $_ != $current } @$page_history;
 		push @$page_history, $current;
 	}
+
+	# Hide the Find Fast panel when this changes
+	$main->show_findfast(0);
 
 	$main->ide->plugin_manager->plugin_event('editor_changed');
 }

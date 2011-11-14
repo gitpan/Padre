@@ -11,19 +11,19 @@ use 5.008;
 use strict;
 use warnings;
 use Carp                   ();
+use File::Spec             ();
 use Scalar::Util           ();
 use Params::Util           ();
 use Padre::Constant        ();
 use Padre::Util            ('_T');
 use Padre::Current         ();
 use Padre::Config::Setting ();
-use Padre::Config::Style   ();
 use Padre::Config::Human   ();
 use Padre::Config::Host    ();
 use Padre::Config::Upgrade ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
@@ -57,20 +57,6 @@ use Class::XSAccessor::Array {
 		project => Padre::Constant::PROJECT,
 	}
 };
-
-
-# NOTE: Do not convert the ->feature_wx_scintilla call here to use
-# Padre::Feature as it would result in a cicular dependency between
-# Padre::Config and Padre::Feature.
-sub wx_scintilla_ready {
-	my $enabled;
-	if ( Padre::Config->read->feature_wx_scintilla ) {
-		eval 'use Wx::Scintilla';
-		$enabled = 1 unless $@;
-	}
-	eval 'use Wx::STC' unless $enabled;
-	return $enabled;
-}
 
 
 
@@ -186,7 +172,10 @@ sub write {
 	# NOTE: Use a hyper-minimalist listified key/value file format
 	# so that we don't need to load YAML::Tiny before the thread fork.
 	# This should save around 400k of memory per background thread.
-	my %startup = map { $_ => $self->$_() } sort keys %STARTUP;
+	my %startup = (
+		VERSION => $VERSION,
+		map { $_ => $self->$_() } sort keys %STARTUP
+	);
 	open( my $FILE, '>', Padre::Constant::CONFIG_STARTUP ) or return 1;
 	print $FILE map {"$_\n$startup{$_}\n"} sort keys %startup or return 1;
 	close $FILE or return 1;
@@ -332,6 +321,39 @@ sub meta {
 	$SETTING{ $_[1] } or die("Missing or invalid setting name '$_[1]'");
 }
 
+sub themes {
+	my $class = shift;
+	my $core_directory = Padre::Util::sharedir('themes');
+	my $user_directory = File::Spec->catdir(
+		Padre::Constant::CONFIG_DIR,
+		'themes',
+	);
+
+	# Scan themes directories
+	my %themes = ();
+	foreach my $directory ( $user_directory, $core_directory ) {
+		next unless -d $directory;
+
+		# Search the directory
+		local *STYLEDIR;
+		unless ( opendir( STYLEDIR, $directory ) ) {
+			die "Failed to read '$directory'";
+		}
+		foreach my $file ( readdir STYLEDIR ) {
+			next unless $file =~ s/\.txt\z//;
+			next unless Params::Util::_IDENTIFIER($file);
+			next if $themes{$file};
+			$themes{$file} = File::Spec->catfile(
+				$directory,
+				"$file.txt"
+			);
+		}
+		closedir STYLEDIR;
+	}
+
+	return \%themes;
+}
+
 
 
 
@@ -373,6 +395,12 @@ setting(
 	name    => 'identity_nickname',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
+	default => '',
+);
+setting(
+	name    => 'identity_location',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HOST,
 	default => '',
 );
 
@@ -714,6 +742,34 @@ setting(
 	},
 );
 setting(
+	name    => 'main_vcs',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{vcs};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_vcs($on);
+		$main->aui->Update;
+	},
+);
+setting(
+	name    => 'main_cpan_explorer',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	apply   => sub {
+		my $main = shift;
+		my $on   = shift;
+		my $item = $main->menu->view->{cpan_explorer};
+		$item->Check($on) if $on != $item->IsChecked;
+		$main->_show_cpan_explorer($on);
+		$main->aui->Update;
+	},
+);
+setting(
 	name    => 'main_statusbar',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
@@ -776,13 +832,6 @@ setting(
 		. 'debug.set_breakpoint;'
 		. 'debug.display_value;'
 		. 'debug.quit;'
-);
-
-setting(
-	name    => 'swap_ctrl_tab_alt_right',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
 );
 
 # Directory Tree Settings
@@ -1163,6 +1212,19 @@ setting(
 	startup => 1,
 );
 setting(
+	name    => 'threads_maximum',
+	type    => Padre::Constant::INTEGER,
+	store   => Padre::Constant::HOST,
+	default => 9,
+);
+setting(
+	name  => 'threads_stacksize',
+	type  => Padre::Constant::INTEGER,
+	store => Padre::Constant::HOST,
+	default => Padre::Constant::WIN32 ? 4194304 : 0,
+	startup => 1,
+);
+setting(
 	name    => 'locale',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
@@ -1182,7 +1244,10 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HOST,
 	default => 'default',
-	options => Padre::Config::Style->styles,
+	options => Padre::Config->themes,
+	apply   => sub {
+		$_[0]->restyle;
+	},
 );
 
 # Window Geometry
@@ -1238,13 +1303,6 @@ setting(
 );
 
 # External tool integration
-
-setting(
-	name    => 'bin_diff',
-	type    => Padre::Constant::PATH,
-	store   => Padre::Constant::HOST,
-	default => '',
-);
 
 setting(
 	name  => 'bin_shell',
@@ -1313,14 +1371,6 @@ setting(
 	default => 1,
 );
 
-# Enable experimental wizard system.
-setting(
-	name    => 'feature_wizard_selector',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-);
-
 # Enable experimental quick fix system.
 setting(
 	name    => 'feature_quick_fix',
@@ -1329,27 +1379,9 @@ setting(
 	default => 0,
 );
 
-# Enable experimental Wx::Scintilla support.
-setting(
-	name    => 'feature_wx_scintilla',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-	help    => _T('Enable or disable the newer Wx::Scintilla source code editing component. ')
-		. _T('This requires an installed Wx::Scintilla and a Padre restart'),
-);
-
 # Enable experimental preference sync support.
 setting(
 	name    => 'feature_sync',
-	type    => Padre::Constant::BOOLEAN,
-	store   => Padre::Constant::HUMAN,
-	default => 0,
-);
-
-# Enable experimental Replace in Files support.
-setting(
-	name    => 'feature_replaceinfiles',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
@@ -1399,6 +1431,60 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => '',
 	help    => _T(q{Specify Devel::TraceUse options. 'feature_devel_traceuse' must be enabled.}),
+);
+
+# Toggle syntax checker annotations in editor
+setting(
+	name    => 'feature_syntax_check_annotations',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+	help    => _T('Toggle syntax checker annotations in editor')
+);
+
+# Toggle document differences feature
+setting(
+	name    => 'feature_document_diffs',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+	help    => _T('Toggle document differences feature')
+);
+
+# Toggle version control system (VCS) support
+setting(
+	name    => 'feature_vcs_support',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+	help    => _T('Toggle version control system support')
+);
+
+# Toggle MetaCPAN CPAN explorer panel
+setting(
+	name    => 'feature_cpan_explorer',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 1,
+	help    => _T('Toggle MetaCPAN CPAN explorer panel'),
+);
+
+# Toggle Diff window feature
+setting(
+	name    => 'feature_diff_window',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	help    => _T('Toggle Diff window feature that compares two buffers graphically'),
+);
+
+# Toggle Perl 6 auto detection
+setting(
+	name    => 'lang_perl6_auto_detection',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	help    => _T('Toggle Perl 6 auto detection in Perl 5 files')
 );
 
 # Window menu list shorten common path
@@ -1531,6 +1617,42 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+);
+
+#################################################
+# Version control system (VCS)
+#################################################
+
+# Show normal objects?
+setting(
+	name    => 'vcs_normal_shown',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+# Show unversioned objects?
+setting(
+	name    => 'vcs_unversioned_shown',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+# Show ignored objects?
+setting(
+	name    => 'vcs_ignored_shown',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+# Toggle experimental VCS command bar
+setting(
+	name    => 'vcs_enable_command_bar',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
 );
 
 # Non-preference settings

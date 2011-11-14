@@ -59,11 +59,10 @@ use Params::Util      ();
 use Padre::Config     ();
 use Padre::Current    ();
 use Padre::TaskHandle ();
-use Padre::TaskThread ();
 use Padre::TaskWorker ();
 use Padre::Logger;
 
-our $VERSION    = '0.90';
+our $VERSION    = '0.92';
 our $COMPATIBLE = '0.81';
 
 # Timeout values
@@ -117,7 +116,6 @@ sub new {
 	my $self    = bless {
 		active  => 0, # Are we running at the moment
 		threads => 1, # Are threads enabled
-		minimum => 0, # Workers to launch at startup
 		maximum => 5, # The most workers we should use
 		%param,
 		workers => [], # List of all workers
@@ -150,43 +148,6 @@ sub active {
 
 =pod
 
-=head2 threads
-
-The C<threads> accessor returns true if the Task Manager requires the use of
-Perl L<threads>, or false if not. This method is provided to notionally
-allow support for alternative task implementations that use processes rather
-than threads, however during the upgrade to the L<Padre::Task> 2.0 API only
-a threading backend was implemented.
-
-A future Task 2.0 backend implementation that uses processes instead of threads
-should be possible, but nobody on the current Padre team has plans to implement
-this alternative at this time. Contact the Padre team if you are interested in
-implementing the alternative backend.
-
-=cut 
-
-sub threads {
-	$_[0]->{threads};
-}
-
-=pod
-
-=head2 minimum
-
-The C<minimum> accessor returns the minimum number of workers that the task
-manager will keep spawned. This value is typically set to zero if some use
-cases of the application will not need to run tasks at all and we wish to reduce
-memory and startup time, or a small number (one or two) if startup time of the
-first few tasks is important.
-
-=cut
-
-sub minimum {
-	$_[0]->{minimum};
-}
-
-=pod
-
 =head2 maximum
 
 The C<maximum> accessor returns the maximum quantity of worker threads that the
@@ -213,26 +174,22 @@ sub maximum {
 
   $manager->start;
 
-The C<start> method bootstraps the task manager, creating C<minimum> workers
-immediately if needed.
+The C<start> method bootstraps the task manager, creating the master thread.
 
 =cut
 
 sub start {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
+
+	# Start the master if it wasn't pre-launched
 	if ( $self->{threads} ) {
-
-		# Start the master if it wasn't pre-launched for some reason
-		unless ( Padre::TaskThread->master_running ) {
-			Padre::TaskThread->master;
-		}
-
-		# Start the workers
-		foreach ( 0 .. $self->{minimum} - 1 ) {
-			$self->start_worker;
+		unless ( Padre::TaskWorker->master_running ) {
+			Padre::TaskWorker->master;
 		}
 	}
+
+	# We are now active
 	$self->{active} = 1;
 
 	# Take one initial spin through the dispatch loop to run anything
@@ -255,18 +212,16 @@ sub stop {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 
-	# Flag as disabled
+	# Disable and clear pending tasks
 	$self->{active} = 0;
-
-	# Clear out the pending queue
-	@{ $self->{queue} } = ();
+	$self->{queue}  = [];
 
 	# Shut down the master thread
 	# NOTE: We ignore the status of the thread master settings here and
 	# act only on the basis of whether or not a master thread is running.
-	if ($Padre::TaskThread::VERSION) {
-		if ( Padre::TaskThread->master_running ) {
-			Padre::TaskThread->master->stop;
+	if ($Padre::TaskWorker::VERSION) {
+		if ( Padre::TaskWorker->master_running ) {
+			Padre::TaskWorker->master->send_stop;
 		}
 	}
 
@@ -315,12 +270,12 @@ sub schedule {
 
 =pod
 
-=head2 cancel
+=head2 cancelled
 
-  $manager->cancel( $owner );
+  $manager->cancelled( $owner );
 
-The C<cancel> method is used with the "task ownership" feature of the
-L<Padre::Task> 2.0 API to signal tasks running in the background that
+The C<cancelled> method is used with the "task ownership" feature of the
+L<Padre::Task> 3.0 API to signal tasks running in the background that
 were created by a particular object that they should voluntarily abort as
 their results are no longer wanted.
 
@@ -330,23 +285,22 @@ sub cancel {
 	TRACE( $_[0] ) if DEBUG;
 	my $self  = shift;
 	my $owner = shift;
+	my $queue = $self->{queue};
 
 	# Remove any tasks from the pending queue
-	@{ $self->{queue} } =
-		grep { not defined $_->{owner} or $_->{owner} != $owner } @{ $self->{queue} };
+	@$queue = grep { !defined $_->{owner} or $_->{owner} != $owner } @$queue;
 
 	# Signal any active tasks to cooperatively abort themselves
 	foreach my $handle ( values %{ $self->{handles} } ) {
 		my $task = $handle->{task} or next;
 		next unless $task->{owner};
 		next unless $task->{owner} == $owner;
+		$handle->cancel;
 		foreach my $worker ( grep { defined $_ } @{ $self->{workers} } ) {
-			TRACE("Worker wid = $worker->{wid}")    if DEBUG;
-			TRACE("Handle wid = $handle->{worker}") if DEBUG;
 			next unless defined $handle->{worker};
 			next unless $worker->{wid} == $handle->{worker};
 			TRACE("Sending 'cancel' message to worker $worker->{wid}") if DEBUG;
-			$worker->send('cancel');
+			$worker->send_cancel;
 			return 1;
 		}
 	}
@@ -378,15 +332,13 @@ B<Padre::TaskManager>.
 sub start_worker {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-	unless ( Padre::TaskThread->master_running ) {
+	unless ( Padre::TaskWorker->master_running ) {
 		die "Master thread is unexpectedly not running";
 	}
 
 	# Start the worker via the master.
 	my $worker = Padre::TaskWorker->new;
-	Padre::TaskThread->master->send(
-		start_child => $worker,
-	);
+	Padre::TaskWorker->master->send_child($worker);
 	push @{ $self->{workers} }, $worker;
 	return $worker;
 }
@@ -408,14 +360,14 @@ sub stop_worker {
 	my $worker = delete $self->{workers}->[ $_[0] ];
 	if ( $worker->handle ) {
 
-		# Tell the worker to abandon what it is doing if it can
+		# Tell the worker to abandon what it is doing
 		if (DEBUG) {
 			my $tid = $worker->tid;
 			TRACE("Sending 'cancel' message to thread '$tid' before stopping");
 		}
-		$worker->send('cancel');
+		$worker->send_cancel;
 	}
-	$worker->stop;
+	$worker->send_stop;
 	return 1;
 }
 
@@ -437,7 +389,11 @@ ability to forcefully terminate workers.>
 sub kill_worker {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-	die "TO BE COMPLETED";
+	my $worker = delete $self->{workers}->[ $_[0] ] or return;
+
+	# Send a sigstop to the worker thread, if it is running
+	my $thread = $worker->thread or return;
+	$thread->kill('STOP');
 }
 
 =pod
@@ -571,23 +527,49 @@ sub run {
 		TRACE("Handle $hid registered for messages") if DEBUG;
 		$handles->{$hid} = $handle;
 
-		# Find the next/best worker for the task
-		my $worker = $self->best_worker($handle);
-		if ($worker) {
-			TRACE( "Handle $hid allocated worker " . $worker->wid ) if DEBUG;
+		if ( $self->{threads} ) {
+
+			# Find the next/best worker for the task
+			my $worker = $self->best_worker($handle);
+			if ($worker) {
+				TRACE( "Handle $hid allocated worker " . $worker->wid ) if DEBUG;
+			} else {
+				TRACE("Handle $hid has no worker") if DEBUG;
+				return;
+			}
+
+			# Prepare handle timing
+			$handle->start_time(time);
+
+			# Send the task to the worker for execution
+			$worker->send_task($handle);
+
 		} else {
-			TRACE("Handle $hid has no worker") if DEBUG;
-			return;
+
+			# Prepare handle timing
+			$handle->start_time(time);
+
+			# Clone the handle so we don't impact the original
+			my $copy = Padre::TaskHandle->from_array( $handle->as_array );
+
+			# Execute the task (ignore the result) and signal as we go
+			local $@;
+			eval {
+				TRACE( "Handle " . $copy->hid . " calling ->start" ) if DEBUG;
+				$copy->start( [] );
+				TRACE( "Handle " . $copy->hid . " calling ->run" ) if DEBUG;
+				$copy->run;
+				TRACE( "Handle " . $copy->hid . " calling ->stop" ) if DEBUG;
+				$copy->stop;
+			};
+			if ($@) {
+				delete $copy->{queue};
+				delete $copy->{child};
+				TRACE($@) if DEBUG;
+			}
 		}
-
-		# Prepare handle timing
-		$handle->start_time(time);
-
-		# Send the task to the worker for execution
-		$worker->send_task($handle);
 	}
 
-	# All pending tasks were dispatched
 	return 1;
 }
 
@@ -644,6 +626,11 @@ sub on_signal {
 		# Register the task as running
 		TRACE("Handle $hid added to 'running'...") if DEBUG;
 		$self->{running}->{$hid} = $handle;
+
+		# Fire the task startup handler so the parent instance of the
+		# task (or our owner) knows they can send messages to it now.
+		$handle->on_started(@$message);
+
 		return;
 	}
 
@@ -685,6 +672,35 @@ sub on_signal {
 
 	# Pass the message through to the handle
 	$handle->on_message( $method, @$message );
+}
+
+sub waitjoin {
+	TRACE( $_[0] ) if DEBUG;
+
+	foreach ( 0 .. 9 ) {
+		my $more = 0;
+
+		# Close the threads in LIFO order, just in case it matters
+		foreach my $thread ( reverse threads->list ) {
+			if ( $thread->is_joinable ) {
+				TRACE( "Thread " . $thread->tid . " joining..." ) if DEBUG;
+				$thread->join;
+			} else {
+				TRACE( "Thread " . $thread->tid . " not joinable" ) if DEBUG;
+				$more++;
+			}
+		}
+		unless ($more) {
+			TRACE("All threads joined") if DEBUG;
+			last;
+		}
+
+		# Wait a short time to let the other thread exit
+		require Time::HiRes;
+		Time::HiRes::sleep(0.1);
+	}
+
+	return 1;
 }
 
 1;

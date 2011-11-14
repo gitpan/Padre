@@ -27,7 +27,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 # Track timer Wx id values for each dwell event
 my %ID = ();
@@ -88,7 +88,7 @@ sub dwell_start {
 	}
 
 	# Start (or restart) the dwell timer.
-	$self->{$method}->Start( $msec, Wx::wxTIMER_ONE_SHOT );
+	$self->{$method}->Start( $msec, Wx::TIMER_ONE_SHOT );
 }
 
 =pod

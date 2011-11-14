@@ -108,8 +108,8 @@ if ($VERSION) {
 		require Padre::Wx;
 		Wx::MessageBox(
 			$msg,
-			Wx::gettext("Version"),
-			Wx::wxOK(),
+			Wx::gettext('Version'),
+			Wx::OK(),
 		);
 	} else {
 		print $msg;
@@ -172,7 +172,7 @@ my $ide = Padre->new(
 	session        => $SESSION,
 	actionqueue    => $ACTIONS,
 	startup_locale => $LOCALE,
-) or die "Failed to create Padre instance";
+) or die 'Failed to create Padre instance';
 
 # Start the application
 $ide->run;

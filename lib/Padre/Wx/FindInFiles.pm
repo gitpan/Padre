@@ -6,22 +6,22 @@ package Padre::Wx::FindInFiles;
 use 5.008;
 use strict;
 use warnings;
-use File::Basename        ();
-use File::Spec            ();
-use Params::Util          ();
-use Padre::Role::Task     ();
-use Padre::Wx::Role::View ();
-use Padre::Wx::Role::Main ();
-use Padre::Wx             ();
-use Padre::Wx::TreeCtrl   ();
+use File::Basename                      ();
+use File::Spec                          ();
+use Params::Util                        ();
+use Padre::Role::Task                   ();
+use Padre::Wx::Role::View               ();
+use Padre::Wx::Role::Main               ();
+use Padre::Wx                           ();
+use Padre::Wx::TreeCtrl                 ();
+use Padre::Wx::FBP::FindInFiles::Output ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
-	Padre::Wx::Role::Main
-	Padre::Wx::TreeCtrl
+	Padre::Wx::FBP::FindInFiles::Output
 };
 
 
@@ -36,14 +36,7 @@ sub new {
 	my $main  = shift;
 	my $panel = shift || $main->bottom;
 
-	# Create the underlying object
-	my $self = $class->SUPER::new(
-		$panel,
-		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxTR_SINGLE | Wx::wxTR_FULL_ROW_HIGHLIGHT | Wx::wxTR_HAS_BUTTONS | Wx::wxCLIP_CHILDREN
-	);
+	my $self = $class->SUPER::new($panel);
 
 	# Create the image list
 	my $images = Wx::ImageList->new( 16, 16 );
@@ -69,29 +62,63 @@ sub new {
 				[ 16, 16 ],
 			),
 		),
-		root => $images->Add(
-			Wx::ArtProvider::GetBitmap(
-				'wxART_HELP_FOLDER',
-				'wxART_OTHER_C',
-				[ 16, 16 ],
-			),
-		),
 	};
-	$self->AssignImageList($images);
+	my $tree = $self->{tree};
+	$tree->AssignImageList($images);
 
-	# When a find result is clicked, open it
-	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
-		$self, $self,
-		sub {
-			shift->_on_find_result_clicked(@_);
-		}
+	# Set the bitmap button icons
+	$self->{repeat}->SetBitmapLabel( Padre::Wx::Icon::find('actions/view-refresh') );
+	$self->{stop}->SetBitmapLabel( Padre::Wx::Icon::find('actions/stop') );
+	$self->{expand_all}->SetBitmapLabel( Padre::Wx::Icon::find('actions/zoom-in') );
+	$self->{collapse_all}->SetBitmapLabel( Padre::Wx::Icon::find('actions/zoom-out') );
+
+	# Set the button tooltips
+	$self->{stop}->SetToolTip( Wx::gettext('Stop search') );
+	$self->{expand_all}->SetToolTip( Wx::gettext('Expand all') );
+	$self->{collapse_all}->SetToolTip( Wx::gettext('Collapse all') );
+
+	# Create the render data store and timer
+	$self->{search_task}     = undef;
+	$self->{search_queue}    = [];
+	$self->{search_timer_id} = Wx::NewId();
+	$self->{search_timer}    = Wx::Timer->new(
+		$self,
+		$self->{search_timer_id},
 	);
+	Wx::Event::EVT_TIMER(
+		$self,
+		$self->{search_timer_id},
+		sub {
+			$self->search_timer( $_[1], $_[2] );
+		},
+	);
+	$self->{last_search} = undef;
 
-	# Inialise statistics
+	# Initialise statistics
 	$self->{files}   = 0;
 	$self->{matches} = 0;
 
 	return $self;
+}
+
+
+
+
+
+######################################################################
+# Padre::Role::Task Methods
+
+sub task_reset {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+
+	# As a convenience, reset any timers used by task message processing
+	$self->{search_task}  = undef;
+	$self->{search_queue} = [];
+	$self->{search_timer}->Stop;
+
+	# Reset normally as well
+	$self->SUPER::task_reset(@_);
 }
 
 
@@ -118,96 +145,65 @@ sub search {
 	$self->clear;
 	$self->task_request(
 		task       => 'Padre::Task::FindInFiles',
+		on_run     => 'search_run',
 		on_message => 'search_message',
 		on_finish  => 'search_finish',
 		%param,
 	);
 
-	my $root = $self->AddRoot('Root');
-	$self->SetItemText(
-		$root,
-		sprintf( Wx::gettext(q{Searching for '%s' in '%s'...}), $param{search}->find_term, $param{root} )
+	$self->{tree}->AddRoot('Root');
+	$self->{status}->SetLabel(
+		sprintf(
+			Wx::gettext(q{Searching for '%s' in '%s'...}),
+			$param{search}->find_term,
+			$param{root},
+		)
 	);
-	$self->SetItemImage( $root, $self->{images}->{root} );
+
+	# Start the render timer
+	$self->{search_timer}->Start(250);
+
+	# Enable the stop button
+	$self->{stop}->Enable;
 
 	return 1;
+}
+
+sub search_run {
+	TRACE( $_[0] ) if DEBUG;
+	my $self = shift;
+	my $task = shift;
+	$self->{search_task} = $task;
 }
 
 sub search_message {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = shift;
-	my $path = shift;
-	my $root = $self->GetRootItem;
+	push @{ $self->{search_queue} }, [@_];
+}
 
-	# Lock the tree to reduce flicker and prevent auto-scrolling
-	my $lock = $self->scroll_lock;
-
-	# Add the file node to the tree
-	require Padre::Wx::Directory::Path; # added to avoid crash in next line
-	my $name  = $path->name;
-	my $dir   = File::Spec->catfile( $task->root, $path->dirs );
-	my $full  = File::Spec->catfile( $task->root, $path->path );
-	my $lines = scalar @_;
-	my $label =
-		$lines > 1
-		? sprintf(
-		Wx::gettext('%s (%s results)'),
-		$full,
-		$lines,
-		)
-		: $full;
-	my $file = $self->AppendItem( $root, $label, $self->{images}->{file} );
-	$self->SetPlData(
-		$file,
-		{   dir  => $dir,
-			file => $name,
-		}
-	);
-
-	# Add the lines nodes to the tree
-	foreach my $row (@_) {
-
-		# Tabs don't display properly
-		$row->[1] =~ s/\t/    /g;
-		my $line = $self->AppendItem(
-			$file,
-			$row->[0] . ': ' . $row->[1],
-			$self->{images}->{result},
-		);
-		$self->SetPlData(
-			$line,
-			{   dir  => $dir,
-				file => $name,
-				line => $row->[0],
-				msg  => $row->[1],
-			}
-		);
-	}
-
-	# Update statistics
-	$self->{matches} += $lines;
-	$self->{files}   += 1;
-
-	# Ensure both the root and the new file are expanded
-	$self->Expand($root);
-	$self->Expand($file);
-
-	return 1;
+sub search_timer {
+	TRACE( $_[0] ) if DEBUG;
+	$_[0]->search_render;
 }
 
 sub search_finish {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
-	my $task = shift;
-	my $term = $task->{search}->find_term;
-	my $dir  = $task->{root};
+
+	# Render any final results
+	$self->{search_timer}->Stop;
+	$self->search_render;
 
 	# Display the summary
-	my $root = $self->GetRootItem;
+	my $task = delete $self->{search_task} or return;
+	$self->{last_search} = $task->{search};
+	my $term = $task->{search}->find_term;
+	my $dir  = $task->{root};
+	my $tree = $self->{tree};
 	if ( $self->{files} ) {
-		$self->SetItemText(
-			$root,
+		$self->{status}->SetLabel(
 			sprintf(
 				Wx::gettext(q{Search complete, found '%s' %d time(s) in %d file(s) inside '%s'}),
 				$term,
@@ -217,8 +213,7 @@ sub search_finish {
 			)
 		);
 	} else {
-		$self->SetItemText(
-			$root,
+		$self->{status}->SetLabel(
 			sprintf(
 				Wx::gettext(q{No results found for '%s' inside '%s'}),
 				$term,
@@ -227,16 +222,106 @@ sub search_finish {
 		);
 	}
 
+	# Clear support variables
+	$self->task_reset;
+
+	# Enable the repeat search button again
+	$self->{repeat}->Enable;
+	$self->{repeat}->SetToolTip( sprintf( Wx::gettext(q{Search again for '%s'}), $term ) );
+
+	# Disable the stop button
+	$self->{stop}->Disable;
+
+	# Only enable collapse all when we have results
+	if ( $self->{files} ) {
+		$self->{collapse_all}->Enable;
+	}
+
 	return 1;
 }
 
-# Private method to handle the clicking of a find result
-sub _on_find_result_clicked {
+sub search_render {
+	TRACE( $_[0] ) if DEBUG;
+	my $self  = shift;
+	my $tree  = $self->{tree};
+	my $root  = $tree->GetRootItem;
+	my $task  = $self->{search_task} or return;
+	my $queue = $self->{search_queue};
+	return unless @$queue;
+
+	# Lock the tree to reduce flicker and prevent auto-scrolling
+	my $lock = $tree->lock_scroll;
+
+	# Added to avoid crashes when calling methods on path objects
+	require Padre::Wx::Directory::Path;
+
+	# Add the file nodes to the tree
+	foreach my $entry (@$queue) {
+		my $path  = shift @$entry;
+		my $name  = $path->name;
+		my $dir   = File::Spec->catfile( $task->root, $path->dirs );
+		my $full  = File::Spec->catfile( $task->root, $path->path );
+		my $lines = scalar @$entry;
+		my $label =
+			$lines > 1
+			? sprintf(
+			Wx::gettext('%s (%s results)'),
+			$full,
+			$lines,
+			)
+			: $full;
+		my $file = $tree->AppendItem( $root, $label, $self->{images}->{file} );
+		$tree->SetPlData(
+			$file,
+			{   dir  => $dir,
+				file => $name,
+			}
+		);
+
+		# Add the lines nodes to the tree
+		foreach my $row (@$entry) {
+
+			# Tabs don't display properly
+			$row->[1] =~ s/\t/    /g;
+			my $line = $tree->AppendItem(
+				$file,
+				$row->[0] . ': ' . $row->[1],
+				$self->{images}->{result},
+			);
+			$tree->SetPlData(
+				$line,
+				{   dir  => $dir,
+					file => $name,
+					line => $row->[0],
+					msg  => $row->[1],
+				}
+			);
+		}
+
+		# Expand nodes
+		$tree->Expand($root) unless $self->{files};
+		$tree->Expand($file);
+
+		# Update statistics
+		$self->{matches} += $lines;
+		$self->{files}   += 1;
+
+		# Ensure both the root and the new file are expanded
+	}
+
+	# Flush the pending queue
+	$self->{search_queue} = [];
+
+	return 1;
+}
+
+# Handle the clicking of a find result
+sub on_find_result_clicked {
 	my ( $self, $event ) = @_;
 
-	my $item_data = $self->GetPlData( $event->GetItem ) or return;
-	my $dir       = $item_data->{dir}                   or return;
-	my $file      = $item_data->{file}                  or return;
+	my $item_data = $self->{tree}->GetPlData( $event->GetItem ) or return;
+	my $dir       = $item_data->{dir}                           or return;
+	my $file      = $item_data->{file}                          or return;
 	my $line      = $item_data->{line};
 	my $msg = $item_data->{msg} || '';
 
@@ -288,6 +373,72 @@ sub open_file_at_line {
 	return;
 }
 
+# Called when the "Repeat" button is clicked
+sub on_repeat_click {
+	my ( $self, $event ) = @_;
+
+	my $last_search = $self->{last_search} or return;
+	my $main = $self->main;
+
+	require Padre::Wx::Dialog::FindInFiles;
+	my $findinfiles = Padre::Wx::Dialog::FindInFiles->new($main);
+	$main->findinfiles->search(
+		root   => $findinfiles->find_directory->SaveValue,
+		search => $last_search,
+	);
+	$findinfiles->Destroy;
+}
+
+# Called when the "Expand all" button is clicked
+sub on_expand_all_click {
+	my ( $self, $event ) = @_;
+
+	my $tree = $self->{tree};
+	my $root = $tree->GetRootItem;
+	my ( $child, $cookie ) = $tree->GetFirstChild($root);
+	while ( $child->IsOk ) {
+		$tree->Expand($child);
+		( $child, $cookie ) = $tree->GetNextChild( $root, $cookie );
+	}
+
+	$self->_flip_button_state;
+}
+
+# Called when the "Collapse all" button is clicked
+sub on_collapse_all_click {
+	my ( $self, $event ) = @_;
+
+	my $tree = $self->{tree};
+	my $root = $tree->GetRootItem;
+	my ( $child, $cookie ) = $tree->GetFirstChild($root);
+	while ( $child->IsOk ) {
+		$tree->Collapse($child);
+		( $child, $cookie ) = $tree->GetNextChild( $root, $cookie );
+	}
+
+	$self->_flip_button_state;
+}
+
+sub _flip_button_state {
+	my $self = shift;
+
+	if ( $self->{expand_all}->IsEnabled ) {
+		$self->{expand_all}->Disable;
+		$self->{collapse_all}->Enable;
+	} else {
+		$self->{expand_all}->Enable;
+		$self->{collapse_all}->Disable;
+	}
+}
+
+# Called when the "Stop search" button is clicked
+sub on_stop_click {
+	my $self = shift;
+
+	$self->task_reset;
+	$self->{stop}->Disable;
+}
+
 ######################################################################
 # Padre::Wx::Role::View Methods
 
@@ -311,11 +462,6 @@ sub view_close {
 #####################################################################
 # General Methods
 
-sub bottom {
-	warn "Unexpectedly called Padre::Wx::Output::bottom, it should be deprecated";
-	shift->main->bottom;
-}
-
 sub gettext_label {
 	Wx::gettext('Find in Files');
 }
@@ -332,7 +478,10 @@ sub clear {
 	$self->{files}   = 0;
 	$self->{matches} = 0;
 
-	$self->DeleteAllItems;
+	$self->{tree}->DeleteAllItems;
+	$self->{repeat}->Disable;
+	$self->{expand_all}->Disable;
+	$self->{collapse_all}->Disable;
 	return 1;
 }
 

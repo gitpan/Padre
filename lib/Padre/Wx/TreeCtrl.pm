@@ -8,7 +8,7 @@ use warnings;
 use Padre::Wx                       ();
 use Padre::Wx::TreeCtrl::ScrollLock ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Wx::TreeCtrl';
 
 
@@ -18,7 +18,7 @@ our @ISA     = 'Wx::TreeCtrl';
 ######################################################################
 # ScrollLock Integration
 
-sub scroll_lock {
+sub lock_scroll {
 	Padre::Wx::TreeCtrl::ScrollLock->new( $_[0] );
 }
 
@@ -39,7 +39,7 @@ sub GetChildByText {
 	# Start with the first child
 	my ( $child, $cookie ) = $self->GetFirstChild($item);
 
-	while ($cookie) {
+	while ( $child->IsOk ) {
 
 		# Is the current child the one we want?
 		if ( $self->GetItemText($child) eq $text ) {

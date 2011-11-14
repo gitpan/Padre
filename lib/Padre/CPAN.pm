@@ -7,7 +7,7 @@ use File::Spec    ();
 use File::HomeDir ();
 use Padre::Wx     ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 
 
@@ -106,10 +106,10 @@ sub install_file {
 		'',                                  # Default directory
 		'',                                  # Default file
 		'CPAN Packages (*.tar.gz)|*.tar.gz', # wildcard
-		Wx::wxFD_OPEN | Wx::wxFD_FILE_MUST_EXIST
+		Wx::FD_OPEN | Wx::FD_FILE_MUST_EXIST
 	);
 	$dialog->CentreOnParent;
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $string = $dialog->GetPath;
@@ -133,7 +133,7 @@ sub install_url {
 		Wx::gettext('Install Local Distribution'),
 		'',
 	);
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $string = $dialog->GetValue;

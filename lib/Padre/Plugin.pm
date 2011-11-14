@@ -20,10 +20,10 @@ Padre::Plugin - Padre plug-in API 2.2
 
   # Declare the Padre interfaces this plug-in uses
   sub padre_interfaces {
-      'Padre::Plugin'         => 0.29,
-      'Padre::Document::Perl' => 0.29,
-      'Padre::Wx::Main'       => 0.29,
-      'Padre::DB'             => 0.29,
+      'Padre::Plugin'         => 0.91,
+      'Padre::Document::Perl' => 0.91,
+      'Padre::Wx::Main'       => 0.91,
+      'Padre::DB'             => 0.91,
   }
 
   # The command structure to show in the Plug-ins menu
@@ -52,8 +52,9 @@ use Params::Util   ();
 use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
+use Padre::Unload  ();
 
-our $VERSION    = '0.90';
+our $VERSION    = '0.92';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -181,21 +182,7 @@ sub plugin_icon {
 	my $file  = File::Spec->catfile( $share, 'icons', '16x16', 'logo.png' );
 	return unless -f $file;
 	return unless -r $file;
-	return Wx::Bitmap->new( $file, Wx::wxBITMAP_TYPE_PNG );
-}
-
-=pod
-
-=head2 C<plugin_wizards>
-
-The C<plugin_wizards> method will be called by Padre when it retrieves the wizard list.
-
-The default implementation returns an empty list
-
-=cut
-
-sub plugin_wizards {
-	return ();
+	return Wx::Bitmap->new( $file, Wx::BITMAP_TYPE_PNG );
 }
 
 =pod
@@ -239,10 +226,9 @@ disabled unless the user has specifically allowed experimental plug-ins.
 
 # Convenience integration with Class::Unload
 sub unload {
-	require Class::Unload;
 	my $either = shift;
 	foreach my $package (@_) {
-		Class::Unload->unload($package);
+		Padre::Unload::unload($package);
 	}
 	return 1;
 }
@@ -367,18 +353,19 @@ sub highlighting_mime_types {
     Wx::Event::EVT_MENU(
         $self->main,
         $item,
-        sub { Wx::MessageBox('sh sh sh sh', 'Mutley', Wx::wxOK, shift) },
+        sub { Wx::MessageBox('sh sh sh sh', 'Mutley', Wx::OK, shift) },
     );
   }
 
 
 If implemented in a plug-in, this method will be called when a
 context menu is about to be displayed either because the user
-pressed the right mouse button in the editor window (C<Wx::MouseEvent>)
-or because the C<Right-click> menu entry was selected in the C<Window>
-menu (C<Wx::CommandEvent>). The context menu object was created
-and populated by the Editor and then possibly augmented by the
-C<Padre::Document> type (see L<Padre::Document/event_on_right_down>).
+triggered the event right in the editor window (with a right click
+or Shift+F10 or the context menu key) or because the C<Context Menu>
+menu entry was selected in the C<Window> menu (C<Wx::CommandEvent>).
+The context menu object was created and populated by the Editor and
+then possibly augmented by the C<Padre::Document> type
+(see L<Padre::Document/event_on_context_menu>).
 
 Parameters retrieved are the objects for the document, the editor, the
 context menu (C<Wx::Menu>) and the event.
@@ -429,18 +416,17 @@ Most often, this will be when Padre itself is shutting down. Other uses may
 be when the user wishes to disable the plug-in, when the plug-in is being
 reloaded, or if the plug-in is about to be upgraded.
 
-If you have any private classes other than the standard C<Padre::Plugin::Foo>, you
-should unload them as well as the plug-in may be in the process of upgrading
+If you have any private classes other than the standard C<Padre::Plugin::Foo>,
+you should unload them as well as the plug-in may be in the process of upgrading
 and will want those classes freed up for use by the new version.
 
-The recommended way of unloading your extra classes is using
-L<Class::Unload>. Suppose you have C<My::Extra::Class> and want to unload it,
+The recommended way of unloading your extra classes is using the built in
+C<unload> method. Suppose you have C<My::Extra::Class> and want to unload it,
 simply do this in C<plugin_disable>:
 
-  require Class::Unload;
-  Class::Unload->unload('My::Extra::Class');
+  $plugin->unload('My::Extra::Class');
 
-Class::Unload takes care of all the tedious bits for you. Note that you
+The C<unload> method takes care of all the tedious bits for you. Note that you
 should B<not> unload any external C<CPAN> dependencies, as these may be needed
 by other plug-ins or Padre itself. Only classes that are part of your plug-in
 should be unloaded.

@@ -10,7 +10,7 @@ use Padre::Feature  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -45,7 +45,7 @@ sub new {
 	my $edit_select = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Select'),
+		Wx::gettext('&Select'),
 		$edit_select
 	);
 
@@ -84,7 +84,7 @@ sub new {
 	my $edit_copy = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Copy Specials'),
+		Wx::gettext('Cop&y Specials'),
 		$edit_copy
 	);
 
@@ -140,6 +140,10 @@ sub new {
 		'edit.next_problem',
 	);
 
+	$self->{next_difference} = $self->add_menu_action(
+		'edit.next_difference',
+	) if $main->config->feature_document_diffs;
+
 	if (Padre::Feature::QUICK_FIX) {
 		$self->{quick_fix} = $self->add_menu_action(
 			'edit.quick_fix',
@@ -183,7 +187,7 @@ sub new {
 	$self->{convert_encoding} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Convert Encoding'),
+		Wx::gettext('Convert &Encoding'),
 		$self->{convert_encoding}
 	);
 
@@ -205,7 +209,7 @@ sub new {
 	$self->{convert_nl} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Convert Line Endings'),
+		Wx::gettext('Convert &Line Endings'),
 		$self->{convert_nl}
 	);
 
@@ -228,7 +232,7 @@ sub new {
 	$self->{tabs} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Tabs and Spaces'),
+		Wx::gettext('Tabs and S&paces'),
 		$self->{tabs},
 	);
 
@@ -258,7 +262,7 @@ sub new {
 	$self->{case} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Upper/Lower Case'),
+		Wx::gettext('Upper/Lo&wer Case'),
 		$self->{case},
 	);
 
@@ -274,26 +278,9 @@ sub new {
 
 	$self->AppendSeparator;
 
-	# Diff tools
-	$self->{diff} = Wx::Menu->new;
-	$self->Append(
-		-1,
-		Wx::gettext('Diff Tools'),
-		$self->{diff},
-	);
-
-	$self->{diff2saved} = $self->add_menu_action(
-		$self->{diff},
-		'edit.diff2saved',
-	);
-	$self->{diff}->AppendSeparator;
-	$self->{applydiff2file} = $self->add_menu_action(
-		$self->{diff},
-		'edit.applydiff2file',
-	);
-	$self->{applydiff2project} = $self->add_menu_action(
-		$self->{diff},
-		'edit.applydiff2project',
+	# Add Patch/Diff
+	$self->{patch_diff} = $self->add_menu_action(
+		'edit.patch_diff',
 	);
 
 	$self->{filter_tool} = $self->add_menu_action(
@@ -336,12 +323,13 @@ sub refresh {
 	my $editor   = $current->editor || 0;
 	my $document = $current->document;
 	my $hasdoc   = $document ? 1 : 0;
-	my $comment  = $hasdoc ? ( $document->comment_lines_str ? 1 : 0 ) : 0;
+	my $comment  = $hasdoc ? ( $document->get_comment_line_string ? 1 : 0 ) : 0;
 	my $newline  = $hasdoc ? $document->newline_type : '';
 	my $quickfix = $hasdoc && $document->can('get_quick_fix_provider');
 
 	# Handle the simple cases
 	$self->{next_problem}->Enable($hasdoc);
+	$self->{next_difference}->Enable($hasdoc) if defined $self->{next_difference};
 	if (Padre::Feature::QUICK_FIX) {
 		$self->{quick_fix}->Enable($quickfix);
 	}
@@ -357,9 +345,7 @@ sub refresh {
 	$self->{convert_encoding_system}->Enable($hasdoc);
 	$self->{convert_encoding_utf8}->Enable($hasdoc);
 	$self->{convert_encoding_to}->Enable($hasdoc);
-	$self->{diff2saved}->Enable($hasdoc);
-	$self->{applydiff2file}->Enable(0);
-	$self->{applydiff2project}->Enable(0);
+
 	$self->{insert_from_file}->Enable($hasdoc);
 	$self->{case_upper}->Enable($hasdoc);
 	$self->{case_lower}->Enable($hasdoc);
@@ -380,6 +366,7 @@ sub refresh {
 	$self->{delete_trailing}->Enable($hasdoc);
 	$self->{show_as_hex}->Enable($hasdoc);
 	$self->{show_as_decimal}->Enable($hasdoc);
+	$self->{patch_diff}->Enable($hasdoc);
 
 	# Handle the complex cases
 	$self->{undo}->Enable($editor);

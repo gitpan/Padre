@@ -11,7 +11,7 @@ use Class::Adapter::Builder
 	ISA      => 'Wx::TextEntryDialog',
 	AUTOLOAD => 1;
 
-our $VERSION    = '0.90';
+our $VERSION    = '0.92';
 our $COMPATIBLE = '0.26';
 
 sub new {
@@ -47,7 +47,7 @@ sub ShowModal {
 
 	# Get the return value as normal
 	my $rv = $self->{OBJECT}->ShowModal(@_);
-	unless ( $rv == Wx::wxID_OK ) {
+	unless ( $rv == Wx::ID_OK ) {
 
 		# They hit Cancel
 		return $rv;

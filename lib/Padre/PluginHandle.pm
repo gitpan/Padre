@@ -8,7 +8,7 @@ use Params::Util   ();
 use Padre::Current ();
 use Padre::Locale  ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 use overload
 	'bool' => sub () {1},
@@ -346,7 +346,7 @@ sub disable {
 			next if $hook->[0] eq $self->object;
 			push @new_list, $hook;
 		}
-		$self->{hooks}->{$hookname} = \@new_list;
+		$manager->{hooks}->{$hookname} = \@new_list;
 	}
 
 	# Update the status

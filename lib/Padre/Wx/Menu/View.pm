@@ -8,13 +8,12 @@ use warnings;
 use Padre::Constant          ();
 use Padre::Current           ();
 use Padre::Feature           ();
-use Padre::Config::Style     ();
 use Padre::Wx                ();
 use Padre::Wx::ActionLibrary ();
 use Padre::Wx::Menu          ();
 use Padre::Locale            ();
 
-our $VERSION    = '0.90';
+our $VERSION    = '0.92';
 our $COMPATIBLE = '0.87';
 our @ISA        = 'Padre::Wx::Menu';
 
@@ -44,20 +43,23 @@ sub new {
 	$self->AppendSeparator;
 
 	# Show or hide GUI elements
+	$self->{command_line} = $self->add_menu_action(
+		'view.command_line',
+	);
+
+	$self->{cpan_explorer} = $self->add_menu_action('view.cpan_explorer')
+		if $main->config->feature_cpan_explorer;
+
 	$self->{functions} = $self->add_menu_action(
 		'view.functions',
 	);
 
-	$self->{todo} = $self->add_menu_action(
-		'view.todo',
+	$self->{directory} = $self->add_menu_action(
+		'view.directory',
 	);
 
 	$self->{outline} = $self->add_menu_action(
 		'view.outline',
-	);
-
-	$self->{directory} = $self->add_menu_action(
-		'view.directory',
 	);
 
 	$self->{output} = $self->add_menu_action(
@@ -68,9 +70,12 @@ sub new {
 		'view.syntaxcheck',
 	);
 
-	$self->{command_line} = $self->add_menu_action(
-		'view.command_line',
+	$self->{todo} = $self->add_menu_action(
+		'view.todo',
 	);
+
+	$self->{vcs} = $self->add_menu_action('view.vcs')
+		if $main->config->feature_vcs_support;
 
 	$self->{toolbar} = $self->add_menu_action(
 		'view.toolbar',
@@ -87,7 +92,7 @@ sub new {
 		$self->{view_as_highlighting} = Wx::Menu->new;
 		$self->Append(
 			-1,
-			Wx::gettext("View Document As..."),
+			Wx::gettext("&View Document As..."),
 			$self->{view_as_highlighting}
 		);
 
@@ -166,7 +171,7 @@ sub new {
 		$self->{fontsize} = Wx::Menu->new;
 		$self->Append(
 			-1,
-			Wx::gettext('Font Size'),
+			Wx::gettext('Font Si&ze'),
 			$self->{fontsize}
 		);
 
@@ -198,7 +203,7 @@ sub new {
 	$self->{language} = Wx::Menu->new;
 	$self->Append(
 		-1,
-		Wx::gettext('Language'),
+		Wx::gettext('Lan&guage'),
 		$self->{language}
 	);
 
@@ -262,6 +267,9 @@ sub refresh {
 	$self->{calltips}->Check( $config->editor_calltips );
 	$self->{command_line}->Check( $config->main_command_line );
 	$self->{syntaxcheck}->Check( $config->main_syntaxcheck );
+	$self->{vcs}->Check( $config->main_vcs ) if $config->feature_vcs_support;
+	$self->{cpan_explorer}->Check( $config->main_cpan_explorer )
+		if $config->feature_cpan_explorer;
 	$self->{toolbar}->Check( $config->main_toolbar );
 
 	if (Padre::Feature::FOLDING) {
@@ -275,11 +283,11 @@ sub refresh {
 	# Check state for word wrap is document-specific
 	if ($document) {
 		my $editor = $document->editor;
-		my $mode   = $editor->GetWrapMode;
+		my $mode   = $editor->get_wrap_mode;
 		my $wrap   = $self->{word_wrap};
-		if ( $mode eq Wx::wxSTC_WRAP_WORD and not $wrap->IsChecked ) {
+		if ( $mode eq 'WORD' and not $wrap->IsChecked ) {
 			$wrap->Check(1);
-		} elsif ( $mode eq Wx::wxSTC_WRAP_NONE and $wrap->IsChecked ) {
+		} elsif ( $mode eq 'NONE' and $wrap->IsChecked ) {
 			$wrap->Check(0);
 		}
 

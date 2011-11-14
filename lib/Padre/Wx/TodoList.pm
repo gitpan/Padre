@@ -5,12 +5,13 @@ use strict;
 use warnings;
 use Scalar::Util          ();
 use Params::Util          ();
+use Padre::Feature        ();
 use Padre::Role::Task     ();
 use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -34,8 +35,8 @@ sub new {
 	my $self = $class->SUPER::new(
 		$panel,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 	);
 
 	# Temporary store for the todo list.
@@ -49,25 +50,25 @@ sub new {
 		$self,
 		-1,
 		'',
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
-		Wx::wxTE_PROCESS_ENTER | Wx::wxSIMPLE_BORDER,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+		Wx::TE_PROCESS_ENTER | Wx::SIMPLE_BORDER,
 	);
 
 	# Create the Todo list
 	$self->{list} = Wx::ListBox->new(
 		$self,
 		-1,
-		Wx::wxDefaultPosition,
-		Wx::wxDefaultSize,
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
 		[],
-		Wx::wxLB_SINGLE | Wx::wxBORDER_NONE
+		Wx::LB_SINGLE | Wx::BORDER_NONE
 	);
 
 	# Create a sizer
-	my $sizer = Wx::BoxSizer->new(Wx::wxVERTICAL);
-	$sizer->Add( $self->{search}, 0, Wx::wxALL | Wx::wxEXPAND );
-	$sizer->Add( $self->{list},   1, Wx::wxALL | Wx::wxEXPAND );
+	my $sizer = Wx::BoxSizer->new(Wx::VERTICAL);
+	$sizer->Add( $self->{search}, 0, Wx::ALL | Wx::EXPAND );
+	$sizer->Add( $self->{list},   1, Wx::ALL | Wx::EXPAND );
 
 	# Fits panel layout
 	$self->SetSizerAndFit($sizer);
@@ -82,12 +83,17 @@ sub new {
 		}
 	);
 
-	# Handle double click on list
-	# overwrite this handler to avoid stealing the focus back from the editor
-	Wx::Event::EVT_LEFT_DCLICK(
-		$self->{list},
-		sub { return; }
-	);
+	# Handle double click on list.
+	# Overwrite to avoid stealing the focus back from the editor.
+	# On Windows this appears to kill the double-click feature entirely.
+	unless (Padre::Constant::WIN32) {
+		Wx::Event::EVT_LEFT_DCLICK(
+			$self->{list},
+			sub {
+				return;
+			}
+		);
+	}
 
 	# Handle key events
 	Wx::Event::EVT_KEY_UP(
@@ -96,9 +102,9 @@ sub new {
 			my ( $this, $event ) = @_;
 
 			my $code = $event->GetKeyCode;
-			if ( $code == Wx::WXK_RETURN ) {
+			if ( $code == Wx::K_RETURN ) {
 				$self->on_list_item_activated($event);
-			} elsif ( $code == Wx::WXK_ESCAPE ) {
+			} elsif ( $code == Wx::K_ESCAPE ) {
 
 				# Escape key clears search and returns focus
 				# to the editor
@@ -120,7 +126,7 @@ sub new {
 			my $event = shift;
 			my $code  = $event->GetKeyCode;
 
-			if ( $code == Wx::WXK_DOWN || $code == Wx::WXK_UP || $code == Wx::WXK_RETURN ) {
+			if ( $code == Wx::K_DOWN || $code == Wx::K_UP || $code == Wx::K_RETURN ) {
 
 				# Up/Down and return keys focus on the functions lists
 				$self->{list}->SetFocus;
@@ -130,7 +136,7 @@ sub new {
 				}
 				$self->{list}->Select($selection);
 
-			} elsif ( $code == Wx::WXK_ESCAPE ) {
+			} elsif ( $code == Wx::K_ESCAPE ) {
 
 				# Escape key clears search and returns the
 				# focus to the editor.
@@ -153,6 +159,10 @@ sub new {
 	);
 
 	$main->add_refresh_listener($self);
+
+	if (Padre::Feature::STYLE_GUI) {
+		$self->main->theme->apply($self);
+	}
 
 	return $self;
 }
@@ -223,7 +233,7 @@ sub refresh {
 
 	# Flush and hide the list if there is no active document
 	unless ($document) {
-		my $lock = $self->main->lock('UPDATE');
+		my $lock = $self->lock_update;
 		$search->Hide;
 		$list->Hide;
 		$list->Clear;
@@ -287,7 +297,7 @@ sub render {
 
 	# Show the components and populate the function list
 	SCOPE: {
-		my $lock = $self->main->lock('UPDATE');
+		my $lock = $self->lock_update;
 		$search->Show(1);
 		$list->Show(1);
 		$list->Clear;

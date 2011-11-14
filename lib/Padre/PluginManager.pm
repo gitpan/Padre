@@ -39,7 +39,7 @@ use Padre::PluginHandle    ();
 use Padre::Wx              ();
 use Padre::Wx::Menu::Tools ();
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 
 
@@ -754,8 +754,7 @@ sub _unload_plugin {
 	}
 
 	# Unload the plug-in class itself
-	require Class::Unload;
-	Class::Unload->unload($module);
+	Padre::Unload::unload($module);
 
 	# Finally, remove the handle (and flush the sort order)
 	delete $self->{plugins}->{$module};
@@ -1139,12 +1138,12 @@ sub test_a_plugin {
 		$default_dir = File::Basename::dirname($last_filename);
 	}
 	my $dialog = Wx::FileDialog->new(
-		$main, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::wxFD_OPEN,
+		$main, Wx::gettext('Open file'), $default_dir, '', '*.*', Wx::FD_OPEN,
 	);
 	unless (Padre::Constant::WIN32) {
 		$dialog->SetWildcard("*");
 	}
-	if ( $dialog->ShowModal == Wx::wxID_CANCEL ) {
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
 		return;
 	}
 	my $filename = $dialog->GetFilename;
@@ -1163,7 +1162,7 @@ sub test_a_plugin {
 				$plugin_folder_name
 			),
 			'Error loading plug-in',
-			Wx::wxOK, $main
+			Wx::OK, $main
 		);
 		return;
 	}

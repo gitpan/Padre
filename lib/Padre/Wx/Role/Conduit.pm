@@ -26,7 +26,7 @@ use Storable ();
 use Wx       ();
 use Padre::Logger;
 
-our $VERSION = '0.90';
+our $VERSION = '0.92';
 
 our $SIGNAL : shared;
 
@@ -56,6 +56,7 @@ sub signal {
 	} elsif (DEBUG) {
 		TRACE("Cannot send Wx::PlThreadEvent as \$CONDUIT is undef");
 	}
+	return 1;
 }
 
 # Pass the event through to the event handler

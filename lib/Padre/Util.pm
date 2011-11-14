@@ -31,12 +31,13 @@ use Cwd             ();
 use File::Spec      ();
 use List::Util      ();
 use Padre::Constant (); ### NO other Padre:: dependencies
+### Seriously guys, I fscking mean it.
 
 # If we make $VERSION an 'our' variable the parse_variable() function breaks
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.90';
+	$VERSION    = '0.92';
 	$COMPATIBLE = '0.81';
 }
 
@@ -56,18 +57,6 @@ our $DISTRO    = undef;
 #use constant WIN32 => !!( $^O eq 'MSWin32' );
 #use constant MAC   => !!( $^O eq 'darwin' );
 #use constant UNIX => !( WIN32 or MAC );
-
-# Padre targets the three largest Wx backends
-# 1. Win32 Native
-# 2. Mac OS X Native
-# 3. Unix GTK
-# The following defined reusable constants for these platforms,
-# suitable for use in Wx platform-specific adaptation code.
-# Currently (and a bit naively) we align these to the platforms.
-# NOTE: They're now in Padre::Constant, if you miss them, please use them from there
-#use constant WXWIN32 => WIN32;
-#use constant WXMAC   => MAC;
-#use constant WXGTK   => UNIX;
 
 # The local newline type
 # NOTE: It's now in Padre::Constant, if you miss them, please use it from there
@@ -477,8 +466,8 @@ sub sharefile {
 }
 
 sub splash {
-	my $original = Padre::Util::sharefile('padre-splash-ccnc.bmp');
-	return -f $original ? $original : Padre::Util::sharefile('padre-splash.bmp');
+	my $original = Padre::Util::sharefile('padre-splash-ccnc.png');
+	return -f $original ? $original : Padre::Util::sharefile('padre-splash.png');
 }
 
 sub find_perldiag_translations {
@@ -554,6 +543,186 @@ sub process_memory {
 		require Padre::Util::Win32;
 		return Padre::Util::Win32::GetCurrentProcessMemorySize();
 	}
+	return;
+}
+
+# Select and focus on the line within the editor provided
+sub select_line_in_editor {
+	my $line   = shift;
+	my $editor = shift;
+	$editor->EnsureVisible($line);
+	$editor->goto_pos_centerize( $editor->GetLineIndentPosition($line) );
+	$editor->SetFocus;
+
+	return;
+}
+
+=pod
+
+=head2 C<run_in_directory>
+
+    Padre::Util::run_in_directory( $command, $directory );
+
+Runs the provided C<command> in the C<directory>. On win32 platforms, executes
+the command to provide *true* background process executions without window
+popups on each execution. on non-win32 platforms, it runs a C<system>
+command.
+
+Returns 1 on success and 0 on failure.
+=cut
+sub run_in_directory {
+	my ( $cmd, $directory ) = @_;
+
+	# Make sure we execute from the correct directory
+	if (Padre::Constant::WIN32) {
+		require Padre::Util::Win32;
+		my $retval = Padre::Util::Win32::ExecuteProcessAndWait(
+			directory  => $directory,
+			file       => 'cmd.exe',
+			parameters => "/C $cmd",
+		);
+		return $retval ? 1 : 0;
+	} else {
+		require File::pushd;
+		my $pushd  = File::pushd::pushd($directory);
+		my $retval = system $cmd;
+		return ( $retval == 0 ) ? 1 : 0;
+	}
+}
+
+=pod
+
+=head2 C<run_in_directory_two>
+
+Plugin replacment for perl command qx{...} to avoid black lines in non *inux os
+
+	qx{...};
+	run_in_directory_two('...');
+
+optional parameters are dir and return type
+
+	run_in_directory_two('...', $dir);
+	run_in_directory_two('...', $dir, type);
+
+also
+
+	run_in_directory_two('...', type);
+
+return type 1 default, returns a string
+
+nb you might need to chomp result but thats for you.
+
+return type 0 hash_ref
+
+=over
+
+=item example 1,
+
+	Padre::Util::run_in_directory_two('svn --version --quiet');
+
+	"1.6.12
+	"
+
+=item example 2,
+
+	Padre::Util::run_in_directory_two('svn --version --quiet', 0);
+
+	\ {
+		error    "",
+		input    "svn --version --quiet",
+		output   "1.6.12
+	"
+	}
+
+=back
+
+=cut
+
+#######
+# function Padre::Util::run_in_directory_two
+#######
+sub run_in_directory_two {
+	my $cmd_line = shift;
+	my $location = shift;
+	my $return_option = shift;
+
+	if ( defined $location ) {
+		if ( $location =~ /\d/ ) {
+			$return_option = $location;
+			$location = undef;
+		}
+
+	}
+
+	my %ret_ioe;
+	$ret_ioe{input} = $cmd_line;
+
+	$cmd_line =~ m/((?:\w+)\s)/;
+	my $cmd_app = $1;
+
+	if ( defined $return_option ) {
+		$return_option = ( $return_option =~ m/[0|1|2]/ ) ? $return_option : 1;
+	} else {
+		$return_option = 1;
+	}
+
+	# Create a temporary file for standard output redirection
+	require File::Temp;
+	my $std_out = File::Temp->new( UNLINK => 1 );
+
+	# Create a temporary file for standard error redirection
+	my $std_err = File::Temp->new( UNLINK => 1 );
+
+	my $temp_dir = File::Temp->newdir();
+
+	my $directory;
+	if ( defined $location ) {
+		$directory = ($location) ? $location : $temp_dir;
+	} else {
+		$directory = $temp_dir;
+	}
+
+	my @cmd = (
+		$cmd_line,
+		'1>' . $std_out->filename,
+		'2>' . $std_err->filename,
+	);
+
+	# We need shell redirection (list context does not give that)
+	# Run command in directory
+	Padre::Util::run_in_directory( "@cmd", $directory );
+
+
+	use File::Slurp;
+	# Slurp command standard input and output
+	$ret_ioe{output} = File::Slurp::read_file $std_out->filename;
+	# chomp $ret_ioe{output};
+
+	# Slurp command standard error
+	$ret_ioe{error} = File::Slurp::read_file $std_err->filename;
+	# chomp $ret_ioe{error};
+	if ( $ret_ioe{error} && ( $return_option eq 1 ) ) {
+		$return_option = 2;
+	}
+
+	return $ret_ioe{output} if ( $return_option eq 1 );
+	return $ret_ioe{error} if ( $return_option eq 2 );
+	return \%ret_ioe;
+
+}
+
+sub tidy_list {
+	my $list = shift;
+
+	require Padre::Wx;
+	for ( 0 .. $list->GetColumnCount - 1 ) {
+		$list->SetColumnWidth( $_, Wx::LIST_AUTOSIZE_USEHEADER() );
+		my $header_width = $list->GetColumnWidth($_);
+		$list->SetColumnWidth( $_, Wx::LIST_AUTOSIZE() );
+		my $column_width = $list->GetColumnWidth($_);
+		$list->SetColumnWidth( $_, ( $header_width >= $column_width ) ? $header_width : $column_width );
+	}
+
 	return;
 }
 

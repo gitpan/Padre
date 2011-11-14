@@ -17,7 +17,7 @@ BEGIN {
 		exit 0;
 	}
 
-	plan tests => 15;
+	plan tests => 16;
 }
 
 use Padre::Logger;
@@ -111,8 +111,8 @@ sub timeout {
 	# Run the shutdown process
 	$timer1 = undef;
 	$timer2 = undef;
-	ok( $manager->stop, '->stop ok' );
-	sleep(1);
+	ok( $manager->stop,     '->stop ok' );
+	ok( $manager->waitjoin, '->waitjoin ok' );
 
 	# $window->Show(0) if $window;
 	$wxapp->ExitMainLoop;
