@@ -5,7 +5,7 @@
 use 5.008005;
 use strict;
 use lib 'privinc';
-use inc::Module::Install 1.00;
+use inc::Module::Install 1.04;
 use POSIX qw(locale_h);
 
 # Workaround for the fact that Module::Install loads the modules
@@ -78,12 +78,12 @@ requires 'Capture::Tiny'            => '0.06';
 requires 'CGI'                      => '3.47';
 requires 'Class::Adapter'           => '1.05';
 requires 'Class::Inspector'         => '1.22';
-requires 'Class::XSAccessor'        => '1.05';
+requires 'Class::XSAccessor'        => '1.13';
 requires 'Cwd'                      => '3.2701';
 requires 'Data::Dumper'             => '2.101';
-requires 'DBD::SQLite'              => '1.27';
+requires 'DBD::SQLite'              => '1.35';
 requires 'DBI'                      => '1.58';
-requires 'Debug::Client'            => '0.11';
+requires 'Debug::Client'            => '0.16';
 requires 'Devel::Dumpvar'           => '0.04';
 requires 'Devel::Refactor'          => '0.05';
 requires 'Encode'                   => '2.26';
@@ -121,7 +121,7 @@ requires 'LWP::UserAgent'           => '5.815';
 requires 'Module::Build'            => '0.3603';
 requires 'Module::CoreList'         => '2.22';
 requires 'Module::Manifest'         => '0.07';
-requires 'ORLite'                   => '1.48';
+requires 'ORLite'                   => '1.51';
 requires 'ORLite::Migrate'          => '1.08';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.14';
@@ -151,26 +151,23 @@ requires 'threads'                  => '1.71';
 requires 'threads::shared'          => '1.33';
 requires 'URI'                      => '0';
 requires 'version'                  => '0.80';
-requires 'Win32'                    => '0.31' if win32;
-requires 'Win32::Shortcut'          => '0.07' if win32;
-requires 'Win32::TieRegistry'       => '0.26' if win32;
-requires 'Wx'                       => '0.9901';
-requires 'Wx::Perl::ProcessStream'  => '0.29';
-requires 'Wx::Scintilla'            => '0.34';
-requires 'YAML::Tiny'               => '1.32';
-test_requires 'Test::More'          => '0.88';
-test_requires 'Test::MockObject'    => '1.09';
-test_requires 'Test::Script'        => '1.07';
-test_requires 'Test::Exception'     => '0.27';
-test_requires 'Test::NoWarnings'    => '0.084';
+requires 'Win32'              => '0.31' if win32;
+requires 'Win32::Shortcut'    => '0.07' if win32;
+requires 'Win32::TieRegistry' => '0.26' if win32;
+requires 'Wx'                 => '0.9901';
+requires 'Wx::Perl::ProcessStream' => '0.29';
+requires 'Wx::Scintilla'           => '0.34';
+requires 'YAML::Tiny'              => '1.32';
+test_requires 'Test::More'         => '0.88';
+test_requires 'Test::MockObject'   => '1.09';
+test_requires 'Test::Script'       => '1.07';
+test_requires 'Test::Exception'    => '0.27';
+test_requires 'Test::NoWarnings'   => '0.084';
 
 # Special dependencies
 
 # In the Padre.ppd file we need to list IO-stringy instead
 requires 'IO::Scalar' => '2.110';
-
-# Temporarily disabled as we have cloned a private copy
-# requires 'ORLite::Migrate' => '1.06';
 
 # Add later, once we native support portability
 # requires 'Portable' => '0.12' if win32;

@@ -5,18 +5,18 @@ package Padre::Wx::Dialog::PerlFilter;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx             ();
+use Padre::Wx 'RichText';
 use Padre::Wx::Icon       ();
 use Padre::Wx::Role::Main ();
 
-# RichTextCtrl
-use Wx::RichText ();
-
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
 };
+
+
+
 
 
 ######################################################################
@@ -390,7 +390,7 @@ English explanation of the regular expression
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl 5 itself.

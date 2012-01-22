@@ -6,14 +6,16 @@ package Padre::Wx::FBP::Replace;
 # To change this module edit the original .fbp file and regenerate.
 # DO NOT MODIFY THIS FILE BY HAND!
 
-use 5.008;
+use 5.008005;
+use utf8;
 use strict;
 use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
-use Padre::Wx::History::ComboBox ();
+use Padre::Wx::ComboBox::FindTerm ();
+use Padre::Wx::ComboBox::History ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -32,13 +34,20 @@ sub new {
 		Wx::DEFAULT_DIALOG_STYLE,
 	);
 
+	Wx::Event::EVT_CLOSE(
+		$self,
+		sub {
+			shift->on_close(@_);
+		},
+	);
+
 	my $m_staticText2 = Wx::StaticText->new(
 		$self,
 		-1,
 		Wx::gettext("Search &Term:"),
 	);
 
-	$self->{find_term} = Padre::Wx::History::ComboBox->new(
+	$self->{find_term} = Padre::Wx::ComboBox::FindTerm->new(
 		$self,
 		-1,
 		"",
@@ -57,14 +66,6 @@ sub new {
 		},
 	);
 
-	$self->{find_regex} = Wx::CheckBox->new(
-		$self,
-		-1,
-		Wx::gettext("&Regular Expression"),
-		Wx::DefaultPosition,
-		Wx::DefaultSize,
-	);
-
 	my $m_staticline2 = Wx::StaticLine->new(
 		$self,
 		-1,
@@ -76,10 +77,10 @@ sub new {
 	my $m_staticText3 = Wx::StaticText->new(
 		$self,
 		-1,
-		Wx::gettext("Replace With:"),
+		Wx::gettext("Replace &With:"),
 	);
 
-	$self->{replace_term} = Padre::Wx::History::ComboBox->new(
+	$self->{replace_term} = Padre::Wx::ComboBox::History->new(
 		$self,
 		-1,
 		"",
@@ -114,28 +115,20 @@ sub new {
 		Wx::DefaultSize,
 	);
 
-	$self->{find_reverse} = Wx::CheckBox->new(
+	$self->{find_regex} = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("Search &Backwards"),
+		Wx::gettext("Regular E&xpression"),
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 	);
 
-	$self->{find_first} = Wx::CheckBox->new(
+	Wx::Event::EVT_CHECKBOX(
 		$self,
-		-1,
-		Wx::gettext("Cl&ose Window on Hit"),
-		Wx::DefaultPosition,
-		Wx::DefaultSize,
-	);
-
-	$self->{replace_all} = Wx::CheckBox->new(
-		$self,
-		-1,
-		Wx::gettext("Replace All"),
-		Wx::DefaultPosition,
-		Wx::DefaultSize,
+		$self->{find_regex},
+		sub {
+			shift->refresh(@_);
+		},
 	);
 
 	my $m_staticline1 = Wx::StaticLine->new(
@@ -149,11 +142,10 @@ sub new {
 	$self->{find_next} = Wx::Button->new(
 		$self,
 		Wx::ID_OK,
-		Wx::gettext("Find &Next"),
+		Wx::gettext("&Find Next"),
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 	);
-	$self->{find_next}->SetDefault;
 
 	Wx::Event::EVT_BUTTON(
 		$self,
@@ -170,6 +162,31 @@ sub new {
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 	);
+	$self->{replace}->SetDefault;
+
+	Wx::Event::EVT_BUTTON(
+		$self,
+		$self->{replace},
+		sub {
+			shift->replace_clicked(@_);
+		},
+	);
+
+	$self->{replace_all} = Wx::Button->new(
+		$self,
+		-1,
+		Wx::gettext("Replace &All"),
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+	);
+
+	Wx::Event::EVT_BUTTON(
+		$self,
+		$self->{replace_all},
+		sub {
+			shift->replace_all_clicked(@_);
+		},
+	);
 
 	$self->{cancel} = Wx::Button->new(
 		$self,
@@ -179,30 +196,36 @@ sub new {
 		Wx::DefaultSize,
 	);
 
+	Wx::Event::EVT_BUTTON(
+		$self,
+		$self->{cancel},
+		sub {
+			shift->on_close(@_);
+		},
+	);
+
 	my $fgSizer2 = Wx::FlexGridSizer->new( 2, 2, 0, 10 );
 	$fgSizer2->AddGrowableCol(1);
 	$fgSizer2->SetFlexibleDirection(Wx::BOTH);
 	$fgSizer2->SetNonFlexibleGrowMode(Wx::FLEX_GROWMODE_SPECIFIED);
 	$fgSizer2->Add( $self->{find_case}, 1, Wx::ALL, 5 );
-	$fgSizer2->Add( $self->{find_reverse}, 1, Wx::ALL, 5 );
-	$fgSizer2->Add( $self->{find_first}, 1, Wx::ALL, 5 );
-	$fgSizer2->Add( $self->{replace_all}, 0, Wx::ALL, 5 );
 
 	my $buttons = Wx::BoxSizer->new(Wx::HORIZONTAL);
 	$buttons->Add( $self->{find_next}, 0, Wx::ALL, 5 );
 	$buttons->Add( $self->{replace}, 0, Wx::ALL, 5 );
-	$buttons->Add( 20, 0, 1, Wx::EXPAND, 5 );
+	$buttons->Add( $self->{replace_all}, 0, Wx::ALL, 5 );
+	$buttons->Add( 30, 0, 1, Wx::EXPAND, 5 );
 	$buttons->Add( $self->{cancel}, 0, Wx::ALL, 5 );
 
 	my $vsizer = Wx::BoxSizer->new(Wx::VERTICAL);
 	$vsizer->Add( $m_staticText2, 0, Wx::LEFT | Wx::RIGHT | Wx::TOP, 5 );
 	$vsizer->Add( $self->{find_term}, 0, Wx::ALIGN_CENTER_VERTICAL | Wx::ALL | Wx::EXPAND, 5 );
-	$vsizer->Add( $self->{find_regex}, 0, Wx::ALL, 5 );
 	$vsizer->Add( $m_staticline2, 0, Wx::ALL | Wx::EXPAND, 5 );
 	$vsizer->Add( $m_staticText3, 0, Wx::LEFT | Wx::RIGHT | Wx::TOP, 5 );
 	$vsizer->Add( $self->{replace_term}, 0, Wx::ALL | Wx::EXPAND, 5 );
 	$vsizer->Add( $m_staticline3, 0, Wx::EXPAND | Wx::ALL, 5 );
 	$vsizer->Add( $fgSizer2, 1, Wx::BOTTOM | Wx::EXPAND, 5 );
+	$vsizer->Add( $self->{find_regex}, 0, Wx::ALL, 5 );
 	$vsizer->Add( $m_staticline1, 0, Wx::ALL | Wx::EXPAND, 5 );
 	$vsizer->Add( $buttons, 0, Wx::EXPAND, 5 );
 
@@ -219,10 +242,6 @@ sub find_term {
 	$_[0]->{find_term};
 }
 
-sub find_regex {
-	$_[0]->{find_regex};
-}
-
 sub replace_term {
 	$_[0]->{replace_term};
 }
@@ -231,16 +250,8 @@ sub find_case {
 	$_[0]->{find_case};
 }
 
-sub find_reverse {
-	$_[0]->{find_reverse};
-}
-
-sub find_first {
-	$_[0]->{find_first};
-}
-
-sub replace_all {
-	$_[0]->{replace_all};
+sub find_regex {
+	$_[0]->{find_regex};
 }
 
 sub find_next {
@@ -251,6 +262,14 @@ sub replace {
 	$_[0]->{replace};
 }
 
+sub replace_all {
+	$_[0]->{replace_all};
+}
+
+sub on_close {
+	$_[0]->main->error('Handler method on_close for event Padre::Wx::FBP::Replace.OnClose not implemented');
+}
+
 sub refresh {
 	$_[0]->main->error('Handler method refresh for event find_term.OnText not implemented');
 }
@@ -259,9 +278,17 @@ sub find_next_clicked {
 	$_[0]->main->error('Handler method find_next_clicked for event find_next.OnButtonClick not implemented');
 }
 
+sub replace_clicked {
+	$_[0]->main->error('Handler method replace_clicked for event replace.OnButtonClick not implemented');
+}
+
+sub replace_all_clicked {
+	$_[0]->main->error('Handler method replace_all_clicked for event replace_all.OnButtonClick not implemented');
+}
+
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

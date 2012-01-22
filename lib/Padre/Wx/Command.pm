@@ -16,7 +16,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -94,11 +94,11 @@ sub view_panel {
 }
 
 sub view_label {
-	shift->gettext_label(@_);
+	Wx::gettext('Command');
 }
 
 sub view_close {
-	shift->main->show_command_line(0);
+	shift->main->show_command(0);
 }
 
 
@@ -258,11 +258,6 @@ sub outn {
 #####################################################################
 # General Methods
 
-sub gettext_label {
-	Wx::gettext('Command');
-}
-
-
 sub select {
 	my $self   = shift;
 	my $parent = $self->GetParent;
@@ -287,7 +282,7 @@ sub relocale {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

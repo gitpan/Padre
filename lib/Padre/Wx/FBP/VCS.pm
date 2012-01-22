@@ -6,13 +6,14 @@ package Padre::Wx::FBP::VCS;
 # To change this module edit the original .fbp file and regenerate.
 # DO NOT MODIFY THIS FILE BY HAND!
 
-use 5.008;
+use 5.008005;
+use utf8;
 use strict;
 use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -252,9 +253,9 @@ sub new {
 	$checkbox_sizer->Add( $self->{show_ignored}, 0, Wx::ALL, 2 );
 
 	my $main_sizer = Wx::BoxSizer->new(Wx::VERTICAL);
-	$main_sizer->Add( $button_sizer, 0, Wx::EXPAND, 5 );
-	$main_sizer->Add( $self->{list}, 1, Wx::ALL | Wx::EXPAND, 5 );
-	$main_sizer->Add( $checkbox_sizer, 0, Wx::EXPAND, 2 );
+	$main_sizer->Add( $button_sizer, 0, Wx::ALL | Wx::EXPAND, 5 );
+	$main_sizer->Add( $self->{list}, 1, Wx::EXPAND | Wx::LEFT | Wx::RIGHT, 5 );
+	$main_sizer->Add( $checkbox_sizer, 0, Wx::EXPAND | Wx::LEFT | Wx::RIGHT, 5 );
 	$main_sizer->Add( $self->{status}, 0, Wx::ALL | Wx::EXPAND, 5 );
 
 	$self->SetSizer($main_sizer);
@@ -309,7 +310,7 @@ sub on_show_ignored_click {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

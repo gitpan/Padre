@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use ORLite::Migrate::Timeline ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'ORLite::Migrate::Timeline';
 
 
@@ -16,6 +16,22 @@ our @ISA     = 'ORLite::Migrate::Timeline';
 
 ######################################################################
 # Schema Migration (reverse chronological for readability)
+
+sub upgrade13 {
+	my $self = shift;
+
+	# Drop the syntax highlight table as we now have current
+	# Scintilla and the pressure to have highlighter plugins
+	# is greatly reduced.
+	$self->do('DROP TABLE syntax_highlight');
+
+	# Reindex to take advantage of SQLite 3.7.8 improvements
+	# to indexing speed and layout that arrived between the
+	# release of Padre 0.92 and 0.94
+	$self->do('REINDEX');
+
+	return 1;
+}
 
 sub upgrade12 {
 	my $self = shift;
@@ -309,7 +325,7 @@ END_SQL
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

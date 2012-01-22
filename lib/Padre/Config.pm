@@ -15,20 +15,20 @@ use File::Spec             ();
 use Scalar::Util           ();
 use Params::Util           ();
 use Padre::Constant        ();
-use Padre::Util            ('_T');
+use Padre::Util            ();
 use Padre::Current         ();
 use Padre::Config::Setting ();
 use Padre::Config::Human   ();
 use Padre::Config::Host    ();
-use Padre::Config::Upgrade ();
+use Padre::Locale::T;
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION    = '0.94';
+our $COMPATIBLE = '0.93';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
 
 BEGIN {
-
 	# Master storage of the settings
 	%SETTING = ();
 
@@ -37,10 +37,6 @@ BEGIN {
 
 	# A cache for startup.yml settings
 	%STARTUP = ();
-
-	# The configuration revision.
-	# (Functionally similar to the database revision)
-	$REVISION = 1;
 
 	# Storage for the default config object
 	$SINGLETON = undef;
@@ -56,6 +52,12 @@ use Class::XSAccessor::Array {
 		human   => Padre::Constant::HUMAN,
 		project => Padre::Constant::PROJECT,
 	}
+};
+
+my $PANEL_OPTIONS = {
+	left   => _T('Left Panel'),
+	right  => _T('Right Panel'),
+	bottom => _T('Bottom Panel'),
 };
 
 
@@ -75,7 +77,7 @@ sub settings {
 #
 # setting( %params );
 #
-# create a new setting, with %params used to feed the new object.
+# Create a new setting, with %params used to feed the new object.
 #
 sub setting {
 
@@ -90,8 +92,11 @@ sub setting {
 	}
 
 	# Generate the accessor
-	eval $object->code;
-	Carp::croak("Failed to compile setting $object->{name}: $@") if $@;
+	SCOPE: {
+		local $@;
+		eval $object->code;
+		Carp::croak("Failed to compile setting $object->{name}: $@") if $@;
+	}
 
 	# Save the setting
 	$SETTING{$name} = $object;
@@ -149,8 +154,6 @@ sub read {
 
 		# Hand off to the constructor
 		$SINGLETON = $class->new( $host, $human );
-
-		Padre::Config::Upgrade::check($SINGLETON);
 	}
 
 	return $SINGLETON;
@@ -161,11 +164,13 @@ sub write {
 	my $self = shift;
 
 	# Save the user configuration
-	$self->[Padre::Constant::HUMAN]->{version} = $REVISION;
+	delete $self->[Padre::Constant::HUMAN]->{version};
+	delete $self->[Padre::Constant::HUMAN]->{Version};
 	$self->[Padre::Constant::HUMAN]->write;
 
 	# Save the host configuration
-	$self->[Padre::Constant::HOST]->{version} = $REVISION;
+	delete $self->[Padre::Constant::HOST]->{version};
+	delete $self->[Padre::Constant::HOST]->{Version};
 	$self->[Padre::Constant::HOST]->write;
 
 	# Write the startup subset of the configuration.
@@ -177,7 +182,7 @@ sub write {
 		map { $_ => $self->$_() } sort keys %STARTUP
 	);
 	open( my $FILE, '>', Padre::Constant::CONFIG_STARTUP ) or return 1;
-	print $FILE map {"$_\n$startup{$_}\n"} sort keys %startup or return 1;
+	print $FILE map { "$_\n$startup{$_}\n" } sort keys %startup or return 1;
 	close $FILE or return 1;
 
 	return 1;
@@ -203,7 +208,10 @@ sub clone {
 ######################################################################
 # Main Methods
 
-# Fetches an explicitly named default
+sub meta {
+	$SETTING{ $_[1] } or die("Missing or invalid setting name '$_[1]'");
+}
+
 sub default {
 	my $self = shift;
 	my $name = shift;
@@ -249,7 +257,7 @@ sub set {
 	# We don't need to do additional checks on Padre::Constant::ASCII
 	my $type  = $setting->type;
 	my $store = $setting->store;
-	if ( !defined($type) ) {
+	unless ( defined $type ) {
 		Carp::croak("Setting '$name' has undefined type");
 	}
 	if ( $type == Padre::Constant::BOOLEAN ) {
@@ -302,23 +310,33 @@ sub set {
 # to the application.
 sub apply {
 	TRACE( $_[0] ) if DEBUG;
-	my $self    = shift;
-	my $name    = shift;
-	my $value   = shift;
-	my $current = Padre::Current::_CURRENT(@_);
+	my $self = shift;
+	my $name = shift;
+	my $new  = shift;
 
-	# Set the config value
-	$self->set( $name => $value );
+	# Does the setting exist?
+	my $setting = $SETTING{$name};
+	unless ($setting) {
+		Carp::croak("The configuration setting '$name' does not exist");
+	}
 
-	# Does this setting have an apply hook
-	my $code = $SETTING{$name}->apply;
-	$code->( $current->main, $value ) if $code;
+	my $old = $self->$name();
+	if ( $old ne $new ) {
+		# Set the config value
+		$self->set( $name => $new );
+
+		# Does this setting have an apply hook
+		my $code = do {
+			require Padre::Config::Apply;
+			Padre::Config::Apply->can($name);
+		};
+		if ( $code ) {
+			my $current = Padre::Current::_CURRENT(@_);
+			$code->( $current->main, $new, $old );
+		}
+	}
 
 	return 1;
-}
-
-sub meta {
-	$SETTING{ $_[1] } or die("Missing or invalid setting name '$_[1]'");
 }
 
 sub themes {
@@ -507,14 +525,11 @@ setting(
 
 # Window
 setting(
-	name  => 'main_title',
-	type  => Padre::Constant::ASCII,
-	store => Padre::Constant::HUMAN,
+	name    => 'main_title',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
 	default => ( Padre::Constant::PORTABLE ? 'Padre Portable' : 'Padre' ),
-	apply => sub {
-		$_[0]->lock('refresh_title');
-	},
-	help => _T('Contents of the window title') . _T('Several placeholders like the filename can be used'),
+	help    => _T('Contents of the window title') . _T('Several placeholders like the filename can be used'),
 );
 
 setting(
@@ -522,10 +537,7 @@ setting(
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => '%m %f',
-	apply   => sub {
-		$_[0]->lock('refresh_title');
-	},
-	help => _T('Contents of the status bar') . _T('Several placeholders like the filename can be used'),
+	help    => _T('Contents of the status bar') . _T('Several placeholders like the filename can be used'),
 );
 
 setting(
@@ -534,16 +546,6 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => Padre::Constant::DEFAULT_SINGLEINSTANCE,
 	startup => 1,
-	apply   => sub {
-		my $main  = shift;
-		my $value = shift;
-		if ($value) {
-			$main->single_instance_start;
-		} else {
-			$main->single_instance_stop;
-		}
-		return 1;
-	},
 );
 
 setting(
@@ -552,16 +554,6 @@ setting(
 	store   => Padre::Constant::HOST,
 	default => Padre::Constant::DEFAULT_SINGLEINSTANCE_PORT,
 	startup => 1,
-	apply   => sub {
-		my $main = shift;
-		if ( $main->config->main_singleinstance ) {
-
-			# Restart on the new port or the next attempt
-			# to use it will produce a new instance.
-			$main->single_instance_stop;
-			$main->single_instance_start;
-		}
-	},
 );
 
 setting(
@@ -569,40 +561,23 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	apply   => sub {
-		my $main  = shift;
-		my $value = shift;
-
-		# Update the lock status
-		$main->aui->lock_panels($value);
-
-		# The toolbar can't dynamically switch between
-		# tearable and non-tearable so rebuild it.
-		# TO DO: Review this assumption
-
-		# (Ticket #668)
-		no warnings;
-		if ($Padre::Wx::ToolBar::DOCKABLE) {
-			$main->rebuild_toolbar;
-		}
-
-		return 1;
-	}
 );
+
 setting(
 	name    => 'main_functions',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{functions};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_functions($on);
-		$main->aui->Update;
-	},
 );
+
+setting(
+	name    => 'main_functions_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'right',
+	options => $PANEL_OPTIONS,
+);
+
 setting(
 	name    => 'main_functions_order',
 	type    => Padre::Constant::ASCII,
@@ -613,44 +588,45 @@ setting(
 		'alphabetical'              => _T('Alphabetical Order'),
 		'alphabetical_private_last' => _T('Alphabetical Order (Private Last)'),
 	},
-	apply => sub {
-		$_[0]->lock('refresh_functions');
-	}
 );
+
 setting(
 	name    => 'main_outline',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{outline};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_outline($on);
-		$main->aui->Update;
-	},
 );
+
+setting(
+	name    => 'main_outline_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'right',
+	options => $PANEL_OPTIONS,
+);
+
 setting(
 	name    => 'main_todo',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 );
+
+setting(
+	name    => 'main_todo_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'right',
+	options => $PANEL_OPTIONS,
+);
+
 setting(
 	name    => 'main_directory',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{directory};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_directory($on);
-		$main->aui->Update;
-	},
 );
+
 setting(
 	name    => 'main_directory_order',
 	type    => Padre::Constant::ASCII,
@@ -660,115 +636,142 @@ setting(
 		first => _T('Directories First'),
 		mixed => _T('Directories Mixed'),
 	},
-	apply => sub {
-		$_[0]->lock('refresh_directory');
-	},
 );
+
 setting(
 	name    => 'main_directory_panel',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
 	default => 'left',
-	options => {
-		'left'  => _T('Project Tools (Left)'),
-		'right' => _T('Document Tools (Right)'),
-	},
-	apply => sub {
-		my $main  = shift;
-		my $value = shift;
-
-		# Is it visible and on the wrong side?
-		return 1 unless $main->has_directory;
-		my $directory = $main->directory;
-		return 1 unless $directory->IsShown;
-		return 1 unless $directory->side ne $value;
-
-		# Hide and reshow the tool with the new setting
-		$directory->panel->hide($directory);
-		$main->directory_panel->show($directory);
-		$main->Layout;
-		$main->Update;
-
-		return 1;
-	}
+	options => $PANEL_OPTIONS,
 );
+
 setting(
-	name  => 'main_directory_root',
-	type  => Padre::Constant::ASCII,
-	store => Padre::Constant::HOST,
+	name    => 'main_directory_root',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HOST,
 	default => File::HomeDir->my_documents || '',
-	apply => sub {
-		$_[0]->lock('refresh_directory');
-	},
 );
+
 setting(
 	name    => 'main_output',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{output};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_output($on);
-		$main->aui->Update;
-	},
 );
+
 setting(
-	name    => 'main_command_line',
-	type    => Padre::Constant::BOOLEAN,
+	name    => 'main_output_panel',
+	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HUMAN,
-	default => 0,
+	default => 'bottom',
+	options => $PANEL_OPTIONS,
 );
+
 setting(
 	name    => 'main_output_ansi',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
 );
+
 setting(
-	name    => 'main_syntaxcheck',
+	name    => 'main_command',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{syntaxcheck};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_syntaxcheck($on);
-		$main->aui->Update;
-	},
 );
+
+setting(
+	name    => 'main_command_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'bottom',
+	options => $PANEL_OPTIONS,
+);
+
+setting(
+	name    => 'main_syntax',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+setting(
+	name    => 'main_syntax_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'bottom',
+	options => $PANEL_OPTIONS,
+);
+
 setting(
 	name    => 'main_vcs',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{vcs};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_vcs($on);
-		$main->aui->Update;
-	},
 );
+
 setting(
-	name    => 'main_cpan_explorer',
+	name    => 'main_vcs_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'right',
+	options => $PANEL_OPTIONS,
+);
+
+setting(
+	name    => 'main_cpan',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		my $main = shift;
-		my $on   = shift;
-		my $item = $main->menu->view->{cpan_explorer};
-		$item->Check($on) if $on != $item->IsChecked;
-		$main->_show_cpan_explorer($on);
-		$main->aui->Update;
-	},
 );
+
+setting(
+	name    => 'main_cpan_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'right',
+	options => $PANEL_OPTIONS,
+);
+
+setting(
+	name    => 'main_foundinfiles_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'bottom',
+	options => $PANEL_OPTIONS,
+);
+
+setting(
+	name    => 'main_replaceinfiles_panel',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'bottom',
+	options => $PANEL_OPTIONS,
+);
+
+setting(
+	name    => 'main_breakpoints',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+setting(
+	name    => 'main_debugoutput',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
+setting(
+	name    => 'main_debugger',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+);
+
 setting(
 	name    => 'main_statusbar',
 	type    => Padre::Constant::BOOLEAN,
@@ -776,27 +779,25 @@ setting(
 	default => 1,
 	help    => _T('Show or hide the status bar at the bottom of the window.'),
 );
+
 setting(
 	name  => 'main_toolbar',
 	type  => Padre::Constant::BOOLEAN,
 	store => Padre::Constant::HUMAN,
-	apply => sub {
-		$_[0]->show_toolbar( $_[1] );
-	},
 
 	# Toolbars are not typically used for Mac apps.
 	# Hide it by default so Padre looks "more Mac'ish"
 	# NOTE: Or at least, so we were told. Opinions apparently vary.
 	default => Padre::Constant::MAC ? 0 : 1,
-
 );
+
 setting(
 	name  => 'main_toolbar_items',
 	type  => Padre::Constant::ASCII,
 	store => Padre::Constant::HUMAN,
 
 	# This lives here until a better place is found:
-	# This is a list of toolbar items, seperated by ;
+	# This is a list of toolbar items, separated by ;
 	# The following items are supported:
 	#   action
 	#     Insert the action
@@ -820,18 +821,13 @@ setting(
 		. 'search.find;'
 		. 'search.replace;' . '|;'
 		. 'edit.comment_toggle;' . '|;'
-		. 'file.doc_stat;' . '|;'
 		. 'search.open_resource;'
 		. 'search.quick_menu_access;' . '|;'
 		. 'run.run_document;'
 		. 'run.stop;' . '|;'
-		. 'debug.step_in;'
-		. 'debug.step_over;'
-		. 'debug.step_out;'
-		. 'debug.run;'
+		. 'debug.launch;'
 		. 'debug.set_breakpoint;'
-		. 'debug.display_value;'
-		. 'debug.quit;'
+		. 'debug.quit;'. '|;'
 );
 
 # Directory Tree Settings
@@ -856,36 +852,24 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	apply   => sub {
-		$_[0]->editor_linenumbers( $_[1] );
-	},
 );
 setting(
 	name    => 'editor_eol',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		$_[0]->editor_eol( $_[1] );
-	},
 );
 setting(
 	name    => 'editor_whitespace',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		$_[0]->editor_whitespace( $_[1] );
-	},
 );
 setting(
 	name    => 'editor_indentationguides',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		$_[0]->editor_indentationguides( $_[1] );
-	},
 );
 setting(
 	name    => 'editor_calltips',
@@ -909,16 +893,6 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		if ($Padre::Feature::VERSION) {
-			Padre::Feature::FOLDING() or return;
-		} else {
-			$_[0]->feature_folding or return;
-		}
-		if ( $_[0]->can('editor_folding') ) {
-			$_[0]->editor_folding( $_[1] );
-		}
-	},
 );
 setting(
 	name    => 'editor_fold_pod',
@@ -945,9 +919,6 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	apply   => sub {
-		$_[0]->editor_currentline( $_[1] );
-	},
 );
 setting(
 	name    => 'editor_currentline_color',
@@ -972,9 +943,6 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
-	apply   => sub {
-		$_[0]->editor_rightmargin( $_[1] );
-	},
 );
 setting(
 	name    => 'editor_right_margin_column',
@@ -1143,9 +1111,9 @@ setting(
 	name    => 'lang_perl5_lexer',
 	type    => Padre::Constant::ASCII,
 	store   => Padre::Constant::HOST,
-	default => 'stc',
+	default => '',
 	options => {
-		'stc'                             => _T('Scintilla'),
+		''                                => _T('Scintilla'),
 		'Padre::Document::Perl::Lexer'    => _T('PPI Experimental'),
 		'Padre::Document::Perl::PPILexer' => _T('PPI Standard'),
 	},
@@ -1218,9 +1186,9 @@ setting(
 	default => 9,
 );
 setting(
-	name  => 'threads_stacksize',
-	type  => Padre::Constant::INTEGER,
-	store => Padre::Constant::HOST,
+	name    => 'threads_stacksize',
+	type    => Padre::Constant::INTEGER,
+	store   => Padre::Constant::HOST,
 	default => Padre::Constant::WIN32 ? 4194304 : 0,
 	startup => 1,
 );
@@ -1245,9 +1213,6 @@ setting(
 	store   => Padre::Constant::HOST,
 	default => 'default',
 	options => Padre::Config->themes,
-	apply   => sub {
-		$_[0]->restyle;
-	},
 );
 
 # Window Geometry
@@ -1305,9 +1270,9 @@ setting(
 # External tool integration
 
 setting(
-	name  => 'bin_shell',
-	type  => Padre::Constant::PATH,
-	store => Padre::Constant::HOST,
+	name    => 'bin_shell',
+	type    => Padre::Constant::PATH,
+	store   => Padre::Constant::HOST,
 	default => Padre::Constant::WIN32 ? 'cmd.exe' : '',
 );
 
@@ -1439,7 +1404,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	help    => _T('Toggle syntax checker annotations in editor')
+	help    => _T('Enable syntax checker annotations in the editor')
 );
 
 # Toggle document differences feature
@@ -1448,7 +1413,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	help    => _T('Toggle document differences feature')
+	help    => _T('Enable document differences feature')
 );
 
 # Toggle version control system (VCS) support
@@ -1457,16 +1422,16 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	help    => _T('Toggle version control system support')
+	help    => _T('Enable version control system support')
 );
 
 # Toggle MetaCPAN CPAN explorer panel
 setting(
-	name    => 'feature_cpan_explorer',
+	name    => 'feature_cpan',
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
-	help    => _T('Toggle MetaCPAN CPAN explorer panel'),
+	help    => _T('Enable the CPAN Explorer, powered by MetaCPAN'),
 );
 
 # Toggle Diff window feature
@@ -1476,6 +1441,15 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => 0,
 	help    => _T('Toggle Diff window feature that compares two buffers graphically'),
+);
+
+# Experimental command line interface
+setting(
+	name    => 'feature_command',
+	type    => Padre::Constant::BOOLEAN,
+	store   => Padre::Constant::HUMAN,
+	default => 0,
+	help    => _T('Enable the experimental command line interface'),
 );
 
 # Toggle Perl 6 auto detection
@@ -1795,14 +1769,14 @@ a own value.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute it and/or modify it under the
 same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

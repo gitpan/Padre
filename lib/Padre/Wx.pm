@@ -5,9 +5,10 @@ package Padre::Wx;
 use 5.008;
 use strict;
 use warnings;
-use constant       ();
-use Params::Util   ();
-use Padre::Current ();
+use constant        ();
+use Params::Util    ();
+use Padre::Constant ();
+use Padre::Current  ();
 
 # Threading must be loaded before Wx loads
 use threads;
@@ -16,15 +17,12 @@ use threads::shared;
 # Load every exportable constant into here, so that they come into
 # existence in the Wx:: packages, allowing everywhere else in the code to
 # use them without braces.
-# use Wx               (':everything');
-use Wx                 ('wxTheClipboard');
-use Wx::Event          (':everything');
-use Wx::DND            ();
-use Wx::AUI            ();
-use Wx::RichText       ();
-use Wx::Socket         ();
+use Wx         ('wxTheClipboard');
+use Wx::Event  (':everything');
+use Wx::AUI    ();
+use Wx::Socket ();
 
-our $VERSION    = '0.92';
+our $VERSION    = '0.94';
 our $COMPATIBLE = '0.43';
 
 BEGIN {
@@ -48,8 +46,19 @@ BEGIN {
 use constant {
 	DEFAULT_COLOUR => Wx::Colour->new( 0xFF, 0xFF, 0xFF ),
 	NULL_FONT      => Wx::Font->new( Wx::NullFont ),
-	EDITOR_FONT    => Wx::Font->new( 10, Wx::TELETYPE, Wx::NORMAL, Wx::NORMAL ),
+	EDITOR_FONT    => Wx::Font->new( 9, Wx::TELETYPE, Wx::NORMAL, Wx::NORMAL ),
 };
+
+sub import {
+	my $class = shift;
+	my @load  = grep { not $_->VERSION } map { "Wx::$_" } @_;
+	if ( @load ) {
+		local $@;
+		eval join "\n", map { "require $_;" } @load;
+		Padre::Wx::Constant::load();
+	}
+	return 1;
+}
 
 
 
@@ -104,8 +113,7 @@ sub native_font {
 	my $nfont = eval {
 		my $font = Wx::Font->new( Wx::NullFont );
 		$font->SetNativeFontInfoUserDesc($string);
-		die unless $font->IsOk;
-                return $font;
+		$font->IsOk ? $font : undef;
 	};
         return $nfont if $nfont;
 	return NULL_FONT;
@@ -120,12 +128,12 @@ sub editor_font {
 
 	# Attempt to apply the font string
 	local $@;
-	eval {
-		my $font = Wx::Font->new( 10, Wx::TELETYPE, Wx::NORMAL, Wx::NORMAL );
+	my $efont = eval {
+		my $font = Wx::Font->new( 9, Wx::TELETYPE, Wx::NORMAL, Wx::NORMAL );
 		$font->SetNativeFontInfoUserDesc($string);
-		return $font if $font->IsOk;
+		$font->IsOk ? $font : undef;
 	};
-
+	return $efont if $efont;
 	return EDITOR_FONT;
 }
 
@@ -171,6 +179,26 @@ sub launch_irc {
 	return;
 }
 
+# Launch a browser window for a local file
+sub launch_file {
+	require URI::file;
+	launch_browser( URI::file->new_abs(shift) );
+}
+
+
+
+
+
+######################################################################
+# Wx::Event Convenience Functions
+
+# FIXME Find out why EVT_CONTEXT_MENU doesn't work on Ubuntu
+if ( Padre::Constant::UNIX ) {
+	*Wx::Event::EVT_CONTEXT = *Wx::Event::EVT_RIGHT_DOWN;
+} else {
+	*Wx::Event::EVT_CONTEXT = *Wx::Event::EVT_CONTEXT_MENU;
+}
+
 1;
 
 =pod
@@ -191,7 +219,7 @@ use them without braces.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

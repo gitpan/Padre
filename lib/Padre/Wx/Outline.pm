@@ -13,7 +13,7 @@ use Padre::Wx               ();
 use Padre::Wx::FBP::Outline ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -89,8 +89,7 @@ sub new {
 				# Escape key clears search and returns focus
 				# to the editor
 				$self->{search}->SetValue('');
-				my $editor = $self->current->editor;
-				$editor->SetFocus if $editor;
+				$self->main->editor_focus;
 			}
 
 			$event->Skip(1);
@@ -192,7 +191,7 @@ sub view_panel {
 }
 
 sub view_label {
-	shift->gettext_label;
+	Wx::gettext('Outline');
 }
 
 sub view_close {
@@ -290,10 +289,6 @@ sub render {
 # Sets the focus on the search field
 sub focus_on_search {
 	$_[0]->{search}->SetFocus;
-}
-
-sub gettext_label {
-	Wx::gettext('Outline');
 }
 
 sub clear {
@@ -449,10 +444,9 @@ sub add_subtree {
 sub select_line_in_editor {
 	my $self   = shift;
 	my $line   = shift;
-	my $editor = $self->current->editor;
+	my $editor = $self->current->editor or return;
 	if (   defined $line
 		&& ( $line =~ /^\d+$/o )
-		&& ( defined $editor )
 		&& ( $line <= $editor->GetLineCount ) )
 	{
 		$line--;
@@ -463,7 +457,7 @@ sub select_line_in_editor {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

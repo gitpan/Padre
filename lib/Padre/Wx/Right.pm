@@ -9,7 +9,7 @@ use Padre::Constant       ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -39,14 +39,14 @@ sub new {
 			PaneBorder     => 0,
 			CloseButton    => 0,
 			DestroyOnClose => 0,
-			MaximizeButton => 0,
+			MaximizeButton => 1,
 			Position       => 3,
 			Layer          => 3,
 			CaptionVisible => $unlock,
 			Floatable      => $unlock,
 			Dockable       => $unlock,
 			Movable        => $unlock,
-			BestSize       => [ 265, -1 ],
+			BestSize       => [ 235, -1 ],
 			)->Right->Hide,
 	);
 	$aui->caption(
@@ -81,7 +81,7 @@ sub show {
 	$self->InsertPage(
 		0,
 		$page,
-		$page->gettext_label,
+		$page->view_label,
 		1,
 	);
 
@@ -140,7 +140,7 @@ sub hide {
 sub refresh {
 	my $self = shift;
 	foreach my $i ( 0 .. $self->GetPageCount - 1 ) {
-		$self->SetPageText( $i, $self->GetPage($i)->gettext_label );
+		$self->SetPageText( $i, $self->GetPage($i)->view_label );
 	}
 	return;
 }
@@ -148,7 +148,7 @@ sub refresh {
 sub relocale {
 	my $self = shift;
 	foreach my $i ( 0 .. $self->GetPageCount - 1 ) {
-		$self->SetPageText( $i, $self->GetPage($i)->gettext_label );
+		$self->SetPageText( $i, $self->GetPage($i)->view_label );
 	}
 
 	return;
@@ -177,7 +177,7 @@ sub on_close {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

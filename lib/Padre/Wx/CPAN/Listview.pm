@@ -7,7 +7,7 @@ use Params::Util qw{_INSTANCE};
 use Padre::Wx       ();
 use Padre::Wx::Icon ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'Wx::ListView';
 
 sub new {
@@ -45,10 +45,6 @@ sub bottom {
 sub main {
 	$_[0]->GetGrandParent;
 }
-
-#sub gettext_label {
-#	Wx::gettext('Syntax Check');
-#}
 
 sub clear {
 	my $self = shift;
@@ -109,7 +105,7 @@ sub on_list_item_activated {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

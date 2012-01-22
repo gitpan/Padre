@@ -9,15 +9,15 @@ Padre::Plugin - Padre plug-in API 2.2
 =head1 SYNOPSIS
 
   package Padre::Plugin::Foo;
-
+  
   use strict;
   use base 'Padre::Plugin';
-
+  
   # The plug-in name to show in the Plug-in Manager and menus
   sub plugin_name {
       'Example Plug-in';
   }
-
+  
   # Declare the Padre interfaces this plug-in uses
   sub padre_interfaces {
       'Padre::Plugin'         => 0.91,
@@ -25,7 +25,7 @@ Padre::Plugin - Padre plug-in API 2.2
       'Padre::Wx::Main'       => 0.91,
       'Padre::DB'             => 0.91,
   }
-
+  
   # The command structure to show in the Plug-ins menu
   sub menu_plugins_simple {
       my $self = shift;
@@ -36,7 +36,7 @@ Padre::Plugin - Padre plug-in API 2.2
           ],
       ];
   }
-
+  
   1;
 
 =cut
@@ -52,9 +52,8 @@ use Params::Util   ();
 use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
-use Padre::Unload  ();
 
-our $VERSION    = '0.92';
+our $VERSION    = '0.94';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -109,6 +108,7 @@ sub plugin_directory_share {
 	if ( $ENV{PADRE_DEV} ) {
 		my $bin = do {
 			no warnings;
+			require FindBin;
 			$FindBin::Bin;
 		};
 		my $root = File::Spec->catdir(
@@ -228,6 +228,7 @@ disabled unless the user has specifically allowed experimental plug-ins.
 sub unload {
 	my $either = shift;
 	foreach my $package (@_) {
+		require Padre::Unload;
 		Padre::Unload::unload($package);
 	}
 	return 1;
@@ -293,7 +294,7 @@ sub DESTROY {
       'application/json'       => 'Padre::Plugin::JavaScript::Document',
   }
 
-The C<registered_documents> methods can be used by a plug-in to define
+The C<registered_documents> method can be used by a plug-in to define
 document types for which the plug-in provides a document class
 (which is used by Padre to enable functionality beyond the level of
 a plain text file with simple Scintilla highlighting).
@@ -317,25 +318,41 @@ sub registered_documents {
 	return ();
 }
 
-=head2 C<provided_highlighters>
+=head2 C<registered_highlighters>
 
-Default method returning an empty array.
+    sub registered_highlighters {
+        'Padre::Plugin::MyPlugin::Perl' => {
+            name => _T("My Highlighter"),
+            mime => [ qw{
+                application/x-perl
+                application/x-perl6
+                text/x-pod
+            } ],
+        },
+	'Padre::Plugin::MyPlugin::C' => {
+            name => _T("My Highlighter"),
+            mime => [ qw{
+                text/x-csrc
+                text/x-c++src
+                text/x-perlxs
+            } ],
+        },
+    }
 
-TO DO. See L<Padre::Document>.
+The C<registered_documents> method can be used by a plug-in to define custom
+syntax highlighters for use with one or more MIME types.
+
+As shown in the example above, highlighters are described as a module name
+and an attribute that describes a visible name for the highlighter and a
+reference to a list of the mime types that the highlighter should be applied
+to.
+
+Defining a new syntax highlighter will automatically cause that
+highlighter to be used by default for the MIME type.
 
 =cut
 
-sub provided_highlighters {
-	return ();
-}
-
-=head2 C<highlighting_mime_types>
-
-TO DO. See L<Padre::Document>.
-
-=cut
-
-sub highlighting_mime_types {
+sub registered_highlighters {
 	return ();
 }
 
@@ -842,7 +859,9 @@ method.
 =cut
 
 sub ide {
-	$IDE{ Scalar::Util::refaddr( $_[0] ) };
+	$IDE{ Scalar::Util::refaddr( $_[0] ) }
+	or
+	Carp::croak("Called ->ide or related method on non-existance plugin'$_[0]'");
 }
 
 =pod
@@ -855,14 +874,7 @@ L<Padre::Wx::Main> (main window) object.
 =cut
 
 sub main {
-	my $self = shift;
-
-	# TODO sometimes Padre crashes here claiming that thing is undef:
-	if ( not defined $IDE{ Scalar::Util::refaddr($self) } ) {
-		Carp::cluck("UNDEF !!! $_[0]");
-		return $self->main; # fixes warning from badcode tests
-	}
-	$IDE{ Scalar::Util::refaddr($self) }->wx->main;
+	$_[0]->ide->wx->main;
 }
 
 =pod
@@ -888,7 +900,7 @@ L<Padre>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl 5 itself.

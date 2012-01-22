@@ -18,8 +18,9 @@ BEGIN {
 	}
 }
 
-# Need truncate
-use ORLite 1.48 ();
+# Force newer ORLite and SQLite for performance improvements
+use DBD::SQLite 1.35 ();
+use ORLite      1.51 ();
 
 # Remove the trailing -DEBUG to get debugging info on ORLite magic
 use ORLite::Migrate 1.08 {
@@ -27,7 +28,7 @@ use ORLite::Migrate 1.08 {
 	file         => Padre::Constant::CONFIG_HOST,
 	timeline     => 'Padre::DB::Timeline',
 	tables       => [ 'Modules' ],
-	user_version => 12, # Confirm we have the correct schema version
+	user_version => 13, # Confirm we have the correct schema version
 	array        => 1,  # Smaller faster array objects
 	xsaccessor   => 0,  # XS acceleration for the generated code
 	shim         => 1,  # Overlay classes can fully override methods
@@ -43,16 +44,7 @@ BEGIN {
 	}
 }
 
-# Overlay classes to enhance the ORLite defaults
-use Padre::DB::Plugin             ();
-use Padre::DB::Bookmark           ();
-use Padre::DB::History            ();
-use Padre::DB::HostConfig         ();
-use Padre::DB::LastPositionInFile ();
-use Padre::DB::Session            ();
-use Padre::DB::SessionFile        ();
-
-our $VERSION    = '0.92';
+our $VERSION    = '0.94';
 our $COMPATIBLE = '0.26';
 
 
@@ -93,16 +85,20 @@ sub find_snippets {
 	return $class->selectall_arrayref( $sql, {}, @bind );
 }
 
-#
-# Vacuum database to keep it small and fast
-#
+# Vacuum database to keep it small and fast.
+# This will generally be run every time Padre shuts down, so may
+# contains bits and pieces of things other than the actual VACUUM.
 sub vacuum {
-	TRACE("VACUUM database") if DEBUG;
-	my $page_size = Padre::DB->pragma("page_size");
-	Padre::DB->do("VACUUM");
-	if (DEBUG) {
+	if ( DEBUG ) {
+		TRACE("VACUUM ANALYZE database");
+		my $page_size = Padre::DB->pragma("page_size");
+		Padre::DB->do('VACUUM');
+		Padre::DB->do('ANALYZE');
 		my $diff = Padre::DB->pragma('page_size') - $page_size;
-		TRACE("Page count difference after VACUUM: $diff");
+		TRACE("Page count difference after VACUUM ANALYZE: $diff");
+	} else {
+		Padre::DB->do('VACUUM');
+		Padre::DB->do('ANALYZE');
 	}
 	return;
 }
@@ -111,7 +107,7 @@ sub vacuum {
 
 __END__
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
@@ -434,7 +430,7 @@ Adam Kennedy E<lt>adamk@cpan.orgE<gt>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.

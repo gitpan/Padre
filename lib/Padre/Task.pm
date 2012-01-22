@@ -163,7 +163,7 @@ use Params::Util      ();
 use Padre::Current    ();
 use Padre::Role::Task ();
 
-our $VERSION    = '0.92';
+our $VERSION    = '0.94';
 our $COMPATIBLE = '0.91';
 
 =pod
@@ -369,6 +369,26 @@ sub from_string {
 
 =pod
 
+=head2 locks
+
+The C<locks> method returns a list of locks that the task needs to reserve in
+order to execute safely.
+
+The meaning, usage, and available quantity of the required locks are tracked by
+the task manager. Enforcement of resource limits may be strict, or may only
+serve as hints to the scheduler.
+
+Returns a list of strings, or the null list if the task is light with trivial
+or no resource consumption.
+
+=cut
+
+sub locks {
+	return ();
+}
+
+=pod
+
 =head2 schedule
 
   $task->schedule;
@@ -547,7 +567,7 @@ desires of the task manager.
 =cut
 
 sub cancelled {
-	return 1 unless defined $_[0]->{handle};
+	return unless defined $_[0]->{handle};
 	return shift->{handle}->cancelled;
 }
 
@@ -621,7 +641,7 @@ L<Padre>, L<Process>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl 5 itself.

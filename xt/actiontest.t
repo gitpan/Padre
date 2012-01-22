@@ -21,9 +21,9 @@ unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
 	plan skip_all => 'Needs DISPLAY';
 }
 
-if ( $^O eq 'MSWin32' ) {
-	plan skip_all => 'Crashing currently blocks the entire test suite on Win32';
-}
+# if ( $^O eq 'MSWin32' ) {
+	# plan skip_all => 'Crashing currently blocks the entire test suite on Win32';
+# }
 
 my $devpl;
 
@@ -54,11 +54,10 @@ my @actions = (
 	'view.lockinterface,view.lockinterface',
 	'view.output,view.output',
 	'view.functions,view.functions',
-	'view.command_line,view.command_line',
 	'view.todo,view.todo',
 	'view.outline,view.outline',
 	'view.directory,internal.wait10,view.directory', # Let it prepare the list
-	'view.syntaxcheck,internal.wait10,view.syntaxcheck',
+	'view.syntax,internal.wait10,view.syntax',
 	'view.statusbar,view.statusbar',
 	'view.toolbar,view.toolbar',
 	'view.lines,view.lines',
@@ -72,7 +71,6 @@ my @actions = (
 	'view.word_wrap,view.word_wrap',
 	'view.font_increase,view.font_decrease,view.font_reset',
 	'view.full_screen,view.full_screen,',
-	'search.find,view.close_panel',
 	'file.new,file.new,window.next_file',
 	'file.new,file.new,window.previous_file',
 );

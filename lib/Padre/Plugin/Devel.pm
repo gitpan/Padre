@@ -7,7 +7,7 @@ use Padre::Wx     ();
 use Padre::Util   ();
 use Padre::Plugin ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'Padre::Plugin';
 
 
@@ -22,7 +22,7 @@ sub padre_interfaces {
 		'Padre::Plugin'                       => 0.91,
 		'Padre::Wx'                           => 0.91,
 		'Padre::Wx::Main'                     => 0.91,
-		'Padre::Wx::History::TextEntryDialog' => 0.85,
+		'Padre::Wx::TextEntryDialog::History' => 0.85,
 	);
 }
 
@@ -317,7 +317,7 @@ under the same terms as Perl itself.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

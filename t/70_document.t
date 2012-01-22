@@ -14,6 +14,10 @@ sub editor_file_size_limit {
 	return 500000;
 }
 
+sub lang_perl6_auto_detection {
+	return 0;
+}
+
 package main;
 
 use strict;
@@ -55,13 +59,13 @@ use t::lib::Padre;
 use t::lib::Padre::Editor;
 use Padre::Document;
 use Padre::Document::Perl;
-use Padre::MimeTypes;
+use Padre::MIME;
 use Padre::Locale ();
 
 my $config = PadreTest::Config->new;
 
 # Fake that Perl 6 support is enabled
-Padre::MimeTypes->add_mime_class( 'application/x-perl6', 'Padre::Document::Perl' );
+Padre::MIME->find('application/x-perl6')->plugin('Padre::Document::Perl');
 
 my $editor_1 = t::lib::Padre::Editor->new;
 my $doc_1 = Padre::Document->new( config => $config );

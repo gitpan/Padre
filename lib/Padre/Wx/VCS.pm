@@ -3,14 +3,16 @@ package Padre::Wx::VCS;
 use 5.008;
 use strict;
 use warnings;
+use Padre::Feature        ();
 use Padre::Role::Task     ();
-use Padre::Wx::Role::View ();
 use Padre::Wx             ();
+use Padre::Wx::Util       ();
+use Padre::Wx::Role::View ();
 use Padre::Wx::FBP::VCS   ();
 use Padre::Task::VCS      ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -77,7 +79,7 @@ sub new {
 	$self->{list}->AssignImageList( $images, Wx::IMAGE_LIST_SMALL );
 
 	# Tidy the list
-	Padre::Util::tidy_list( $self->{list} );
+	Padre::Wx::Util::tidy_list( $self->{list} );
 
 	# Update the checkboxes with their corresponding values in the
 	# configuration
@@ -108,7 +110,7 @@ sub view_panel {
 }
 
 sub view_label {
-	shift->gettext_label(@_);
+	Wx::gettext('Version Control');
 }
 
 sub view_close {
@@ -137,10 +139,6 @@ sub on_refresh_click {
 
 #####################################################################
 # General Methods
-
-sub gettext_label {
-	Wx::gettext('Version Control');
-}
 
 # Clear everything...
 sub clear {
@@ -328,7 +326,7 @@ sub render {
 	$self->set_icon_image( $self->{sort_column}, $self->{sort_desc} );
 
 	# Tidy the list
-	Padre::Util::tidy_list($list);
+	Padre::Wx::Util::tidy_list($list);
 
 	return 1;
 }
@@ -430,7 +428,7 @@ sub on_list_item_activated {
 				$main->{diff}->select_next_difference;
 				Wx::Event::EVT_IDLE( $main, undef );
 			},
-		) if $main->config->feature_document_diffs;
+		) if Padre::Feature::DIFF_DOCUMENT;
 
 	};
 	$main->error( Wx::gettext('Error while trying to perform Padre action') ) if $@;
@@ -557,7 +555,7 @@ sub on_revert_click {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

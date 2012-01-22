@@ -11,7 +11,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -29,7 +29,7 @@ our @ISA     = qw{
 sub new {
 	my $class = shift;
 	my $main  = shift;
-	my $panel = shift || $main->right;
+	my $panel = shift || $main->bottom;
 
 	# Create the parent panel, which will contain the search and tree
 	my $self = $class->SUPER::new(
@@ -109,8 +109,7 @@ sub new {
 				# Escape key clears search and returns focus
 				# to the editor
 				$self->{search}->SetValue('');
-				my $editor = $self->current->editor;
-				$editor->SetFocus if $editor;
+				$self->main->editor_focus;
 			}
 
 			$event->Skip(1);
@@ -141,8 +140,7 @@ sub new {
 				# Escape key clears search and returns the
 				# focus to the editor.
 				$self->{search}->SetValue('');
-				my $editor = $self->current->editor;
-				$editor->SetFocus if $editor;
+				$self->main->editor_focus;
 			}
 
 			$event->Skip(1);
@@ -179,7 +177,7 @@ sub view_panel {
 }
 
 sub view_label {
-	shift->gettext_label(@_);
+	Wx::gettext('To Do');
 }
 
 sub view_close {
@@ -196,7 +194,6 @@ sub view_close {
 
 sub on_list_item_activated {
 	my $self   = shift;
-	my $event  = shift;
 	my $editor = $self->current->editor or return;
 	my $nth    = $self->{list}->GetSelection;
 	my $todo   = $self->{model}->[$nth] or return;
@@ -214,10 +211,6 @@ sub on_list_item_activated {
 
 ######################################################################
 # General Methods
-
-sub gettext_label {
-	Wx::gettext('To-do');
-}
 
 # Sets the focus on the search field
 sub focus_on_search {
@@ -314,7 +307,7 @@ sub render {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

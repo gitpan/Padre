@@ -23,7 +23,7 @@ use DBD::SQLite   ();
 # TO DO: Bug report dispatched. Likely to be fixed in 0.77.
 use version ();
 
-our $VERSION    = '0.92';
+our $VERSION    = '0.94';
 our $COMPATIBLE = '0.81';
 
 # Since everything is used OO-style, we will be require'ing
@@ -538,7 +538,7 @@ is the L<Wx::App> subclass. Does not really do much.
 
 This is the main Find dialog
 
-=item L<Padre::Wx::FindFast>
+=item L<Padre::Wx::Panel::FindFast>
 
 This is the newer Firefox like inline search box.
 
@@ -557,9 +557,9 @@ The code for drag and drop
 holds an editor text control instance (one for each buffer/file).
 This is a subclass of L<Wx::Scintilla::TextCtrl> also known as Scintilla.
 
-=item L<Padre::Wx::History::ComboBox>
+=item L<Padre::Wx::ComboBox::History>
 
-=item L<Padre::Wx::History::TextEntryDialog>
+=item L<Padre::Wx::TextEntryDialog::History>
 
 =item L<Padre::Wx::Main>
 
@@ -610,7 +610,7 @@ See also L<http://padre.perlide.org/contact.html>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 L<http://padre.perlide.org/>
 
 =head1 LICENSE
@@ -812,7 +812,7 @@ Tatsuhiko Miyagawa for consulting on our I18N and L10N support.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

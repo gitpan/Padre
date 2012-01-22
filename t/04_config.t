@@ -2,10 +2,10 @@
 
 use strict;
 use warnings;
-use constant NUMBER_OF_CONFIG_OPTIONS => 145;
+use constant NUMBER_OF_CONFIG_OPTIONS => 159;
 
 # Move of Debug to Run Menu
-use Test::More tests => NUMBER_OF_CONFIG_OPTIONS * 2 + 28;
+use Test::More tests => NUMBER_OF_CONFIG_OPTIONS * 2 + 24;
 use Test::NoWarnings;
 use File::Spec::Functions ':ALL';
 use File::Temp ();
@@ -31,8 +31,6 @@ isa_ok( $config,        'Padre::Config' );
 isa_ok( $config->host,  'Padre::Config::Host' );
 isa_ok( $config->human, 'Padre::Config::Human' );
 is( $config->project,        undef, '->project is undef' );
-is( $config->host->version,  undef, '->host->version is undef' );
-is( $config->human->version, undef, '->human->version is undef' );
 
 # Loading the config file should not result in Wx loading
 is( $Wx::VERSION, undef, 'Wx was not loaded during config read' );
@@ -51,7 +49,7 @@ foreach my $name (@names) {
 
 # The config version number is a requirement for every config and
 # the only key which is allowed to live in an empty config.
-my %test_config = ( Version => $Padre::Config::VERSION );
+my %test_config = ();
 
 # ... and that they don't leave a permanent state.
 is_deeply(
@@ -68,10 +66,6 @@ ok( $config->write, '->write ok' );
 
 # Saving the config file should not result in Wx loading
 is( $Wx::VERSION, undef, 'Wx was not loaded during config write' );
-
-# Check that we have a version for the parts now
-is( $config->host->version,  1, '->host->version is set' );
-is( $config->human->version, 1, '->human->version is set' );
 
 # Set values on both the human and host sides
 ok( $config->set( main_lockinterface => 0 ),
@@ -96,6 +90,7 @@ is( $Wx::VERSION, undef, 'Wx is never loaded during config operations' );
 # Check clone support
 my $copy = $config->clone;
 is_deeply( $copy, $config, '->clone ok' );
+
 
 
 
@@ -130,6 +125,6 @@ SCOPE: {
 
 	# Configuration should ignore a value not in configuration and go
 	# with the default instead.
-	is( $bad->default('lang_perl5_lexer'), 'stc', 'Default Perl 5 lexer ok' );
-	is( $bad->lang_perl5_lexer,            'stc', '->lang_perl5_lexer matches default' );
+	is( $bad->default('lang_perl5_lexer'), '', 'Default Perl 5 lexer ok' );
+	is( $bad->lang_perl5_lexer,            '', '->lang_perl5_lexer matches default' );
 }

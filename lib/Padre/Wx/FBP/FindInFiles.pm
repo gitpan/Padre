@@ -6,14 +6,17 @@ package Padre::Wx::FBP::FindInFiles;
 # To change this module edit the original .fbp file and regenerate.
 # DO NOT MODIFY THIS FILE BY HAND!
 
-use 5.008;
+use 5.008005;
+use utf8;
 use strict;
 use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
-use Padre::Wx::History::ComboBox ();
+use Padre::Wx::Choice::Files ();
+use Padre::Wx::ComboBox::FindTerm ();
+use Padre::Wx::ComboBox::History ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -32,13 +35,20 @@ sub new {
 		Wx::DEFAULT_DIALOG_STYLE,
 	);
 
+	Wx::Event::EVT_KEY_UP(
+		$self,
+		sub {
+			shift->on_key_up(@_);
+		},
+	);
+
 	my $m_staticText2 = Wx::StaticText->new(
 		$self,
 		-1,
-		Wx::gettext("Search &Term") . ":",
+		Wx::gettext("Search &Term:"),
 	);
 
-	$self->{find_term} = Padre::Wx::History::ComboBox->new(
+	$self->{find_term} = Padre::Wx::ComboBox::FindTerm->new(
 		$self,
 		-1,
 		"",
@@ -60,10 +70,10 @@ sub new {
 	my $m_staticText3 = Wx::StaticText->new(
 		$self,
 		-1,
-		Wx::gettext("Directory") . ":",
+		Wx::gettext("Directory:"),
 	);
 
-	$self->{find_directory} = Padre::Wx::History::ComboBox->new(
+	$self->{find_directory} = Padre::Wx::ComboBox::History->new(
 		$self,
 		-1,
 		"",
@@ -93,17 +103,17 @@ sub new {
 	my $m_staticText4 = Wx::StaticText->new(
 		$self,
 		-1,
-		Wx::gettext("File Types") . ":",
+		Wx::gettext("File Types:"),
 	);
 
-	$self->{find_types} = Wx::ComboBox->new(
+	$self->{find_types} = Padre::Wx::Choice::Files->new(
 		$self,
 		-1,
-		"",
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 		[],
 	);
+	$self->{find_types}->SetSelection(0);
 
 	my $m_staticline2 = Wx::StaticLine->new(
 		$self,
@@ -215,6 +225,10 @@ sub find {
 	$_[0]->{find};
 }
 
+sub on_key_up {
+	$_[0]->main->error('Handler method on_key_up for event Padre::Wx::FBP::FindInFiles.OnKeyUp not implemented');
+}
+
 sub refresh {
 	$_[0]->main->error('Handler method refresh for event find_term.OnText not implemented');
 }
@@ -225,7 +239,7 @@ sub directory {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

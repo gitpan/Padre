@@ -8,7 +8,7 @@ use Padre::Util              ();
 use Padre::Task::Syntax      ();
 use Parse::ErrorString::Perl ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'Padre::Task::Syntax';
 
 sub new {
@@ -27,9 +27,7 @@ sub new {
 		$args{perl} = $args{document}->get_interpreter;
 	}
 
-	my $self = $class->SUPER::new(%args);
-
-	return $self;
+	$class->SUPER::new(%args);
 }
 
 sub syntax {
@@ -132,9 +130,10 @@ sub syntax {
 # 	## use padre_syntax_check
 #
 sub _parse_comment_pragmas {
-	my ( $self, $text ) = @_;
+	my $self = shift;
+	my $text = shift;
+	my $n    = "\\cM?\\cJ";
 
-	my $n = "\\cM?\\cJ";
 	if ( $text =~ /$n\s*\#\#\s+(use|no)\s+padre_syntax_check\s*/ ) {
 
 		# Only process when there is 'use|no padre_syntax_check'
@@ -158,7 +157,7 @@ sub _parse_comment_pragmas {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

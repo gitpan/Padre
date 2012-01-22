@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'Padre::Task';
 
 
@@ -164,6 +164,19 @@ sub run {
 			my $buffer = do { local $/; <$fh> };
 			close $fh;
 
+			# Is this the correct MIME type
+			if ( $self->{mime} ) {
+				require Padre::MIME;
+				my $type = Padre::MIME->detect(
+					file => $fullname,
+					text => $buffer,
+				);
+				unless ( defined $type and $type eq $self->{mime} ) {
+					TRACE("Skipped $fullname: Not a $self->{mime} (got " . ($type || 'undef') . ")") if DEBUG;
+					next;
+				}
+			}
+
 			# Allow the search object to do the main work
 			local $@;
 			my $count = eval { $self->{search}->replace_all( \$buffer ) };
@@ -198,7 +211,7 @@ sub run {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -8,11 +8,11 @@ use Padre::DB             ();
 use Padre::Wx             ();
 use Padre::Wx::Icon       ();
 use Padre::Wx::Role::Main ();
-use Padre::MimeTypes      ();
+use Padre::MIME      ();
 use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Main
@@ -578,7 +578,10 @@ sub render {
 
 			# display package name if it is a Perl file
 			my $pkg = '';
-			my $mime_type = Padre::MimeTypes->guess_mimetype( undef, $file );
+			my $mime_type = Padre::MIME->detect(
+				file  => $file,
+				perl6 => $self->config->lang_perl6_auto_detection,
+			);
 			if ( $mime_type eq 'application/x-perl' or $mime_type eq 'application/x-perl6' ) {
 				my $contents = Padre::Util::slurp($file);
 				if ( $contents && $$contents =~ /\s*package\s+(.+);/ ) {
@@ -605,7 +608,10 @@ sub render {
 			} else {
 
 				# display package name if it is a Perl file
-				my $mime_type = Padre::MimeTypes->guess_mimetype( undef, $file );
+				my $mime_type = Padre::MIME->detect(
+					file => $file,
+					perl6 => $self->config->lang_perl6_auto_detection,
+				);
 				if ( $mime_type eq 'application/x-perl' or $mime_type eq 'application/x-perl6' ) {
 					my $contents = Padre::Util::slurp($file);
 					if ( $contents && $$contents =~ /\s*package\s+(.+);/ ) {
@@ -682,14 +688,14 @@ Ahmad M. Zawawi E<lt>ahmad.zawawi at gmail.comE<gt>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

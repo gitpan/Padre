@@ -3,8 +3,9 @@ package Padre::Wx::Theme;
 use 5.008;
 use strict;
 use warnings;
-use File::Spec       ();
+use Storable         ();
 use IO::File         ();
+use File::Spec       ();
 use Scalar::Util     ();
 use Params::Util     ();
 use Padre::Constant  ();
@@ -13,7 +14,7 @@ use Padre::Wx        ();
 use Padre::Wx::Style ();
 use Wx::Scintilla    ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 
 # Locate the directories containing styles
 use constant {
@@ -67,10 +68,10 @@ my %FALLBACK = (
 	'application/x-psgi'     => 'application/x-perl',
 	'application/x-php'      => 'application/perl',      # Temporary solution
 	'application/json'       => 'application/javascript',
-	'application/javascript' => 'text/x-c',
-	'text/x-java-source'     => 'text/x-c',
-	'text/x-c++src'          => 'text/x-c',
-	'text/x-csharp'          => 'text/x-c',
+	'application/javascript' => 'text/x-csrc',
+	'text/x-java'            => 'text/x-csrc',
+	'text/x-c++src'          => 'text/x-csrc',
+	'text/x-csharp'          => 'text/x-csrc',
 );
 
 
@@ -202,7 +203,7 @@ sub find {
 
 sub new {
 	my $class = shift;
-	my $self = bless { @_, code => {} }, $class;
+	my $self  = bless { @_, code => {} }, $class;
 	unless ( defined $self->name ) {
 		die "No default en-gb name for style";
 	}
@@ -211,6 +212,12 @@ sub new {
 	}
 
 	return $self;
+}
+
+sub clone {
+	my $self  = shift;
+	my $class = Scalar::Util::blessed($self);
+	return bless { %$self }, $class;
 }
 
 sub load {
@@ -414,9 +421,19 @@ sub apply {
 
 	if ( Params::Util::_INSTANCE( $object, 'Padre::Wx::Editor' ) ) {
 		# This is an editor style
-		my $document = $object->{Document} or return;
+		my $document = $object->document   or return;
 		my $mimetype = $document->mimetype or return;
 		$self->mime($mimetype)->apply($object);
+
+		# Apply custom caret line background color
+		my $bg = $self->{editor_currentline_color};
+		unless ( defined $bg ) {
+			$bg = $object->config->editor_currentline_color;
+		}
+		$object->SetCaretLineBackground( Padre::Wx::color($bg) );
+
+		# Refresh the line numbers in case the font has changed
+		$object->refresh_line_numbers;
 
 	} else {
 		# This is a GUI style, chase the inheritance tree.
@@ -451,15 +468,20 @@ sub clear {
 		# the basic font settings.
 		$object->StyleResetDefault;
 
-		# Reset the font from configuration (which Scintilla considers part of
-		# the "style" but Padre doesn't allow to be changed as a "style")
+		# Find the font to initialise with
+		my $editor_font = $self->{editor_font};
+		unless ( defined $editor_font ) {
+			$editor_font = $object->config->editor_font;
+		}
+
+		# Reset the font, which Scintilla considers part of the
+		# "style" but Padre doesn't allow to be changed as a "style"
 		require Padre::Wx;
-		my $config = $object->config;
-		my $font   = Padre::Wx::editor_font( $config->editor_font );
+		my $font = Padre::Wx::editor_font($editor_font);
 		$object->SetFont($font);
 		$object->StyleSetFont( Wx::Scintilla::STYLE_DEFAULT, $font );
 
-		# Clear all styles back to the default
+		# Reset all styles to the recently set default
 		$object->StyleClearAll;
 
 	} else {
@@ -474,7 +496,7 @@ sub clear {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

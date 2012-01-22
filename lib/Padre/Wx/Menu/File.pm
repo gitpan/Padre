@@ -12,7 +12,7 @@ use Padre::Current  ();
 use Padre::Feature  ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -43,6 +43,12 @@ sub new {
 		Wx::gettext('Ne&w'),
 		$file_new,
 	);
+
+	$self->{duplicate} = $self->add_menu_action(
+		$file_new,
+		'file.duplicate',
+	);
+
 	$self->add_menu_action(
 		$file_new,
 		'file.new_p5_script',
@@ -158,6 +164,13 @@ sub new {
 		'file.close_some',
 	);
 
+	$file_close->AppendSeparator;
+
+	$self->{delete} = $self->add_menu_action(
+		$file_close,
+		'file.delete',
+	);
+
 	### End of close submenu
 
 	# Reload file(s)
@@ -184,14 +197,6 @@ sub new {
 	);
 
 	### End of reload submenu
-
-	$self->{duplicate} = $self->add_menu_action(
-		'file.duplicate',
-	);
-
-	$self->{delete} = $self->add_menu_action(
-		'file.delete',
-	);
 
 	$self->AppendSeparator;
 
@@ -230,11 +235,11 @@ sub new {
 	$self->AppendSeparator;
 
 	# Print files
-	$self->{print} = $self->add_menu_action(
-		'file.print',
-	);
+	# $self->{print} = $self->add_menu_action(
+		# 'file.print',
+	# );
 
-	$self->AppendSeparator;
+	# $self->AppendSeparator;
 
 	# Recent things
 	$self->{recentfiles} = Wx::Menu->new;
@@ -264,7 +269,7 @@ sub new {
 
 	# Word Stats
 	$self->{docstat} = $self->add_menu_action(
-		'file.doc_stat',
+		'file.properties',
 	);
 
 	$self->AppendSeparator;
@@ -302,7 +307,7 @@ sub refresh {
 	$self->{save_as}->Enable($document);
 	$self->{save_intuition}->Enable($document);
 	$self->{save_all}->Enable($document);
-	$self->{print}->Enable($document);
+	#$self->{print}->Enable($document);
 	defined( $self->{open_session} ) and $self->{open_selection}->Enable($document);
 	defined( $self->{save_session} ) and $self->{save_session}->Enable($document);
 	$self->{docstat}->Enable($document);
@@ -389,7 +394,7 @@ sub on_recent {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

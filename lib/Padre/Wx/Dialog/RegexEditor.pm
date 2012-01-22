@@ -5,18 +5,18 @@ package Padre::Wx::Dialog::RegexEditor;
 use 5.008;
 use strict;
 use warnings;
-use Padre::Wx             ();
+use Padre::Wx 'RichText';
 use Padre::Wx::Icon       ();
 use Padre::Wx::Role::Main ();
 
-# RichTextCtrl
-use Wx::RichText ();
-
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
 };
+
+
+
 
 
 ######################################################################
@@ -57,7 +57,6 @@ sub new {
 
 	return $self;
 }
-
 
 #
 # A private method that returns a hash of regex groups along with their meaning
@@ -500,7 +499,6 @@ sub _modifier_keys {
 	return qw{ ignore_case single_line multi_line extended	global};
 }
 
-
 # -- public methods
 
 sub show {
@@ -790,14 +788,12 @@ Padre::Wx::Dialog::RegexEditor - dialog to make it easy to create a regular expr
 
 =head1 DESCRIPTION
 
-
 The C<Regex Editor> provides an interface to easily create regular
 expressions used in Perl.
 
 The user can insert a regular expression (the surrounding C</> characters are not
 needed) and a text. The C<Regex Editor> will automatically display the matching
 text in the bottom right window.
-
 
 At the top of the window the user can select any of the four
 regular expression modifiers:
@@ -836,7 +832,7 @@ English explanation of the regular expression
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl 5 itself.

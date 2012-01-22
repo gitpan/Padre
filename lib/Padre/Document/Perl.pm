@@ -17,8 +17,9 @@ use Padre::Role::Task ();
 use Padre::Feature    ();
 use Padre::Logger;
 
-our $VERSION = '0.92';
-our @ISA     = qw{
+our $VERSION    = '0.94';
+our $COMPATIBLE = '0.93';
+our @ISA        = qw{
 	Padre::Role::Task
 	Padre::Document
 };
@@ -68,7 +69,7 @@ sub ppi_dump {
 }
 
 sub ppi_set {
-	my $self = shift;
+	my $self     = shift;
 	my $document = Params::Util::_INSTANCE( shift, 'PPI::Document' );
 	unless ($document) {
 		Carp::croak('Did not provide a PPI::Document');
@@ -76,6 +77,17 @@ sub ppi_set {
 
 	# Serialize and overwrite the current text
 	$self->text_set( $document->serialize );
+}
+
+sub ppi_replace {
+	my $self     = shift;
+	my $document = Params::Util::_INSTANCE( shift, 'PPI::Document' );
+	unless ($document) {
+		Carp::croak('Did not provide a PPI::Document');
+	}
+
+	# Serialize and overwrite the current text
+	$self->text_replace( $document->serialize );	
 }
 
 sub ppi_find {
@@ -98,7 +110,7 @@ sub ppi_transform {
 	unless ( $transform->document($document) ) {
 		Carp::croak("Transform failed");
 	}
-	$self->ppi_set($document);
+	$self->ppi_replace($document);
 
 	return 1;
 }
@@ -148,7 +160,7 @@ sub set_highlighter {
 	# configuration variable
 	my $limit;
 	if ( $module eq 'Padre::Document::Perl::PPILexer' ) {
-		$limit = $self->current->config->lang_perl5_lexer_ppi_limit;
+		$limit = $self->config->lang_perl5_lexer_ppi_limit;
 	} elsif ( $module eq 'Padre::Document::Perl::Lexer' ) {
 		$limit = 4000;
 	} elsif ( $module eq 'Padre::Plugin::Kate' ) {
@@ -165,7 +177,7 @@ sub set_highlighter {
 
 	if ( defined $limit and $length > $limit ) {
 		TRACE("Forcing STC highlighting") if DEBUG;
-		$module = 'stc';
+		$module = '';
 	}
 
 	return $self->SUPER::set_highlighter($module);
@@ -187,7 +199,7 @@ sub guess_filename {
 	}
 
 	my $text    = $self->text_get;
-	my $project = $self->current->project;
+	my $project = $self->project;
 
 	# Is this a test?
 	if ( $text =~ /(?:use Test::|plan \=\>)/ ) {
@@ -328,7 +340,7 @@ sub get_command {
 	my $arg_ref = shift || {};
 	my $debug   = exists $arg_ref->{debug} ? $arg_ref->{debug} : 0;
 	my $trace   = exists $arg_ref->{trace} ? $arg_ref->{trace} : 0;
-	my $config  = $self->current->config;
+	my $config  = $self->config;
 
 	# Use a temporary file if run_save is set to 'unsaved'
 	my $filename =
@@ -415,7 +427,7 @@ sub get_interpreter {
 	my $arg_ref = shift || {};
 	my $debug   = exists $arg_ref->{debug} ? $arg_ref->{debug} : 0;
 	my $trace   = exists $arg_ref->{trace} ? $arg_ref->{trace} : 0;
-	my $config  = $self->current->config;
+	my $config  = $self->config;
 
 	# The configuration value is cheaper to get compared to cperl(),
 	# try it first.
@@ -494,10 +506,6 @@ sub beginner_check {
 	}
 
 	return 1;
-}
-
-sub get_comment_line_string {
-	return '#';
 }
 
 sub find_unmatched_brace {
@@ -749,7 +757,7 @@ sub _find_method {
 		# Scan for declarations in all module files.
 		# TODO: This is horrendously slow to be running in the foreground.
 		# TODO: This is pretty crude and doesn't integrate with the project system.
-		my $project = $self->current->project;
+		my $project = $self->project;
 		if ($project) {
 			require File::Find::Rule;
 			my @files = File::Find::Rule->file->name('*.pm')->in( File::Spec->catfile( $project->root, 'lib' ) );
@@ -1034,14 +1042,10 @@ EOC
 	my $dialog = Padre::Wx::Dialog::RefactorSelectFunction->new( $editor->main, \@functions );
 	$dialog->show;
 	if ( $dialog->{cancelled} ) {
-
-		#$dialog->Destroy;
 		return ();
 	}
 
 	my $subname = $dialog->get_function_name;
-
-	#$dialog->Destroy;
 
 	# make the change to the selected text
 	$editor->BeginUndoAction; # do the edit atomically
@@ -1049,10 +1053,13 @@ EOC
 
 	# with the change made
 	# locate the function:
-	my ( $start, $end ) = Padre::Util::get_matches(
-		$editor->GetText,
-		$self->get_function_regex($subname),
-		$editor->GetSelection, # Provides two params
+	require Padre::Search;
+	my ( $start, $end ) = Padre::Search->matches(
+		text     => $editor->GetText,
+		regex    => $self->get_function_regex($subname),
+		submatch => 1,
+		from     => $editor->GetSelectionStart,
+		to       => $editor->GetSelectionEnd,
 	);
 	unless ( defined $start ) {
 
@@ -1478,21 +1485,19 @@ sub event_on_context_menu {
 	# when pressing Windows context "right click" key
 	my $pos = $editor->GetCurrentPos;
 
-	my $introduced_separator = 0;
+	my $separator = 0;
 
 	my ( $location, $token ) = $self->get_current_symbol($pos);
 
 	# Append variable specific menu items if it's a variable
 	if ( defined $location and $token =~ /^[\$\*\@\%\&]/ ) {
-		$menu->AppendSeparator if not $introduced_separator++;
+		$menu->AppendSeparator unless $separator++;
 
 		$menu->add_menu_action(
-			$menu,
 			'perl.find_variable',
 		);
 
 		$menu->add_menu_action(
-			$menu,
 			'perl.rename_variable',
 		);
 
@@ -1523,33 +1528,25 @@ sub event_on_context_menu {
 			$style,
 			'perl.variable_from_camel_case_ucfirst',
 		);
-
-		# End variable style sub-menu
-	} # end if it's a variable
-
+	}
 
 	if ( defined $location and $token =~ /^\w+$/ ) {
+		$menu->AppendSeparator unless $separator++;
+
 		$menu->add_menu_action(
-			$menu,
 			'perl.find_method',
 		);
 	}
 
-
-	my $select_start = $editor->GetSelectionStart;
-	my $select_end   = $editor->GetSelectionEnd;
-
 	# Is something selected
-	if ( $select_start != $select_end ) {
-		$menu->AppendSeparator if not $introduced_separator++;
+	if ( $editor->GetSelectionLength ) {
+		$menu->AppendSeparator unless $separator++;
 
 		$menu->add_menu_action(
-			$menu,
 			'perl.introduce_temporary',
 		);
 
 		$menu->add_menu_action(
-			$menu,
 			'perl.edit_with_regex_editor',
 		);
 	}
@@ -1795,44 +1792,9 @@ sub guess_filename_to_open {
 	return;
 }
 
-sub scintilla_key_words {
-	return [
-
-		# Perl Keywords
-		[   qw(NULL __FILE__ __LINE__ __PACKAGE__ __DATA__ __END__ AUTOLOAD
-				BEGIN CORE DESTROY END EQ GE GT INIT LE LT NE CHECK abs accept
-				alarm and atan2 bind binmode bless caller chdir chmod chomp chop
-				chown chr chroot close closedir cmp connect continue cos crypt
-				dbmclose dbmopen defined delete die do dump each else elsif endgrent
-				endhostent endnetent endprotoent endpwent endservent eof eq eval
-				exec exists exit exp fcntl fileno flock for foreach fork format
-				formline ge getc getgrent getgrgid getgrnam gethostbyaddr gethostbyname
-				gethostent getlogin getnetbyaddr getnetbyname getnetent getpeername
-				getpgrp getppid getpriority getprotobyname getprotobynumber getprotoent
-				getpwent getpwnam getpwuid getservbyname getservbyport getservent
-				getsockname getsockopt glob gmtime goto grep gt hex if index
-				int ioctl join keys kill last lc lcfirst le length link listen
-				local localtime lock log lstat lt map mkdir msgctl msgget msgrcv
-				msgsnd my ne next no not oct open opendir or ord our pack package
-				pipe pop pos print printf prototype push quotemeta qu
-				rand read readdir readline readlink readpipe recv redo
-				ref rename require reset return reverse rewinddir rindex rmdir
-				scalar seek seekdir select semctl semget semop send setgrent
-				sethostent setnetent setpgrp setpriority setprotoent setpwent
-				setservent setsockopt shift shmctl shmget shmread shmwrite shutdown
-				sin sleep socket socketpair sort splice split sprintf sqrt srand
-				stat study sub substr symlink syscall sysopen sysread sysseek
-				system syswrite tell telldir tie tied time times truncate
-				uc ucfirst umask undef unless unlink unpack unshift untie until
-				use utime values vec wait waitpid wantarray warn while write
-				xor given when default say state UNITCHECK)
-		],
-	];
-}
-
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

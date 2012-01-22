@@ -10,7 +10,7 @@ use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx::Theme      ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Choice
@@ -19,7 +19,7 @@ our @ISA     = qw{
 # Provide a custom config_load hook so that Padre::Wx::Role::Config will let
 # let us load our own data instead of doing it for us.
 
-sub config_load {
+sub config_set {
 	my $self    = shift;
 	my $setting = shift;
 	my $value   = shift;
@@ -51,7 +51,7 @@ sub config_load {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

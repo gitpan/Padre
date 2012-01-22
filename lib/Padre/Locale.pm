@@ -42,16 +42,17 @@ use File::Spec ();
 # Padre::Wx should not implement anything using Wx modules.
 # We make an exception in this case, because we're only using the locale
 # logic in Wx, which isn't related to widgets anyway.
-use Padre::Constant ();
-use Padre::Util     ('_T');
-use Padre::Config   ();
-use Padre::Wx       ();
+use Padre::Constant  ();
+use Padre::Util      ();
+use Padre::Config    ();
+use Padre::Wx        ();
+use Padre::Locale::T;
 use Padre::Logger;
 
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data
@@ -67,7 +68,7 @@ my %RFC4646;
 
 sub label {
 	my $name = shift;
-	return $RFC4646{$name}{utf8text} ? $RFC4646{$name}{utf8text} : $name;
+	return $RFC4646{$name}->{utf8text} ? $RFC4646{$name}->{utf8text} : $name;
 }
 
 BEGIN {
@@ -614,6 +615,7 @@ sub encoding_from_string {
 
 	# Because Encode::Guess is slow and expensive, do an initial fast
 	# regexp scan for the simplest and most common "ascii" encoding.
+	return 'ascii' unless defined $content;
 	return 'ascii' unless $content =~ /[^[:ascii:]]/;
 
 	# FIX ME
@@ -682,7 +684,7 @@ sub encoding_from_string {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

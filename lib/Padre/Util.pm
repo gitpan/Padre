@@ -26,7 +26,6 @@ use strict;
 use warnings;
 use Carp            ();
 use Exporter        ();
-use FindBin         ();
 use Cwd             ();
 use File::Spec      ();
 use List::Util      ();
@@ -37,8 +36,8 @@ use Padre::Constant (); ### NO other Padre:: dependencies
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.92';
-	$COMPATIBLE = '0.81';
+	$VERSION    = '0.94';
+	$COMPATIBLE = '0.93';
 }
 
 our @ISA       = 'Exporter';
@@ -257,68 +256,6 @@ sub parse_variable {
 
 =pod
 
-=head2 C<get_matches>
-
-Parameters:
-
-=over
-
-=item * The text in which we need to search
-
-=item * The regular expression
-
-=item * The offset within the text where we the last match started so the next
-forward match must start after this.
-
-=item * The offset within the text where we the last match ended so the next
-backward match must end before this.
-
-=item * backward bit (1 = search backward, 0 = search forward) - Optional. Defaults to 0.
-
-=back
-
-=cut
-
-sub get_matches {
-	my ( $text, $regex, $from, $to, $backward ) = @_;
-	die 'missing parameters' if @_ < 4;
-
-	require Encode;
-	$text  = Encode::encode( 'utf-8', $text );
-	$regex = Encode::encode( 'utf-8', $regex );
-
-	my @matches = ();
-	while ( $text =~ /$regex/mg ) {
-		my $e = pos($text);
-		unless ( defined($1) ) {
-			print STDERR 'WARNING (' . join( ",", map { $_ || ''; } ( caller(0) ) ) . "): $regex has no \$1 match\n";
-			next;
-		}
-		my $s = $e - length($1);
-		push @matches, [ $s, $e ];
-	}
-
-	my $pair;
-	if ($backward) {
-		$pair = List::Util::first { $to > $_->[1] } reverse @matches;
-		if ( not $pair and @matches ) {
-			$pair = $matches[-1];
-		}
-	} else {
-		$pair = List::Util::first { $from < $_->[0] } @matches;
-		if ( not $pair and @matches ) {
-			$pair = $matches[0];
-		}
-	}
-
-	my ( $start, $end );
-	( $start, $end ) = @$pair if $pair;
-
-	return ( $start, $end, @matches );
-}
-
-=pod
-
 =head2 C<_T>
 
 The C<_T> function is used for strings that you do not want to translate
@@ -411,6 +348,7 @@ sub share {
 	my $plugin = shift;
 
 	if ( $ENV{PADRE_DEV} ) {
+		require FindBin;
 		my $root = File::Spec->rel2abs(
 			File::Spec->catdir(
 				$FindBin::Bin,
@@ -431,22 +369,6 @@ sub share {
 		$plugin_dir = File::Spec->catdir( $root, "Padre-Plugin-$plugin", 'lib', 'Padre', 'Plugin', $plugin, 'share' );
 		return $plugin_dir;
 	}
-
-	#    if ( defined $ENV{PADRE_PAR_PATH} ) {
-	#        # File::ShareDir new style path
-	#        my $path = File::Spec->catdir(
-	#            $ENV{PADRE_PAR_PATH},
-	#            'inc', 'auto', 'share', 'dist', 'Padre'
-	#        );
-	#        return $path if -d $path;
-	#
-	#        # File::ShareDir old style path
-	#        $path = File::Spec->catdir(
-	#            $ENV{PADRE_PAR_PATH},
-	#            'inc', 'share'
-	#        );
-	#        return $path if -d $path;
-	#    }
 
 	# Rely on automatic handling of everything
 	require File::ShareDir;
@@ -491,29 +413,6 @@ sub find_perldiag_translations {
 	return @tr;
 }
 
-### DEPRECATED
-sub get_project_rcs {
-	if ( $VERSION > 0.84 ) {
-		warn "Deprecated Padre::Util::get_project_rcs called by " . scalar caller();
-	}
-	require Padre::Current;
-	my $manager = Padre::Current->ide->project_manager;
-	my $project = $manager->from_root(shift) or return;
-	return $project->vcs;
-}
-
-### DEPRECATED
-sub get_project_dir {
-	if ( $VERSION > 0.84 ) {
-		warn "Deprecated Padre::Util::get_project_dir called by " . scalar caller();
-	}
-	require Padre::Current;
-	my $file    = shift or return;
-	my $manager = Padre::Current->ide->project_manager;
-	my $project = $manager->from_file($file) or return;
-	return $project->root;
-}
-
 
 
 
@@ -522,13 +421,10 @@ sub get_project_dir {
 # Logging and Debugging
 
 sub humanbytes {
-
-	my $Bytes = $_[0] || 0;
-
+	my $bytes = $_[0] || 0;
 	eval { require Format::Human::Bytes; };
-	return $Bytes if $@; # Doesn't look good, but works
-
-	return Format::Human::Bytes::base2( $Bytes, 1 );
+	return $bytes if $@; # Doesn't look good, but works
+	return Format::Human::Bytes::base2( $bytes, 1 );
 
 }
 
@@ -546,17 +442,6 @@ sub process_memory {
 	return;
 }
 
-# Select and focus on the line within the editor provided
-sub select_line_in_editor {
-	my $line   = shift;
-	my $editor = shift;
-	$editor->EnsureVisible($line);
-	$editor->goto_pos_centerize( $editor->GetLineIndentPosition($line) );
-	$editor->SetFocus;
-
-	return;
-}
-
 =pod
 
 =head2 C<run_in_directory>
@@ -569,7 +454,9 @@ popups on each execution. on non-win32 platforms, it runs a C<system>
 command.
 
 Returns 1 on success and 0 on failure.
+
 =cut
+
 sub run_in_directory {
 	my ( $cmd, $directory ) = @_;
 
@@ -692,14 +579,13 @@ sub run_in_directory_two {
 	# Run command in directory
 	Padre::Util::run_in_directory( "@cmd", $directory );
 
-
-	use File::Slurp;
 	# Slurp command standard input and output
-	$ret_ioe{output} = File::Slurp::read_file $std_out->filename;
+	$ret_ioe{output} = slurp($std_out->filename);
 	# chomp $ret_ioe{output};
 
 	# Slurp command standard error
-	$ret_ioe{error} = File::Slurp::read_file $std_err->filename;
+	$ret_ioe{error} = slurp($std_err->filename);
+
 	# chomp $ret_ioe{error};
 	if ( $ret_ioe{error} && ( $return_option eq 1 ) ) {
 		$return_option = 2;
@@ -711,21 +597,6 @@ sub run_in_directory_two {
 
 }
 
-sub tidy_list {
-	my $list = shift;
-
-	require Padre::Wx;
-	for ( 0 .. $list->GetColumnCount - 1 ) {
-		$list->SetColumnWidth( $_, Wx::LIST_AUTOSIZE_USEHEADER() );
-		my $header_width = $list->GetColumnWidth($_);
-		$list->SetColumnWidth( $_, Wx::LIST_AUTOSIZE() );
-		my $column_width = $list->GetColumnWidth($_);
-		$list->SetColumnWidth( $_, ( $header_width >= $column_width ) ? $header_width : $column_width );
-	}
-
-	return;
-}
-
 1;
 
 __END__
@@ -734,7 +605,7 @@ __END__
 
 =head1 COPYRIGHT
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -744,7 +615,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

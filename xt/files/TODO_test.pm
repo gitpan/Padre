@@ -238,13 +238,13 @@ sub new {
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
 	# so we don't accidentally trigger any configuration writes.
-	$self->_show_todo( $config->main_todo );
-	$self->_show_functions( $config->main_functions );
-	$self->_show_outline( $config->main_outline );
-	$self->_show_directory( $config->main_directory );
-	$self->_show_output( $config->main_output );
-	$self->_show_command_line( $config->main_command_line );
-	$self->_show_syntaxcheck( $config->main_syntaxcheck );
+	$self->show_view( todo      => $config->main_todo      );
+	$self->show_view( syntax    => $config->main_syntax    );
+	$self->show_view( output    => $config->main_output    );
+	$self->show_view( outline   => $config->main_outline   );
+	$self->show_view( command   => $config->main_command   );
+	$self->show_view( functions => $config->main_functions );
+	$self->show_view( directory => $config->main_directory );
 
 	# Lock the panels if needed
 	$self->aui->lock_panels( $config->main_lockinterface );
@@ -260,7 +260,10 @@ sub new {
 	# to show it, it showed at the top) so now we always turn the status bar on
 	# at the beginning and hide it in the timer, if it was not needed
 	#$statusbar->Show;
-	my $timer = Wx::Timer->new( $self, Padre::Wx::Main::TIMER_POSTINIT );
+	my $timer = Wx::Timer->new(
+		$self,
+		Padre::Wx::Main::TIMER_POSTINIT,
+	);
 	Wx::Event::EVT_TIMER(
 		$self,
 		Padre::Wx::Main::TIMER_POSTINIT,
@@ -305,7 +308,7 @@ sub on_open_in_file_browser {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -315,7 +318,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

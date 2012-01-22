@@ -6,14 +6,15 @@ package Padre::Wx::FBP::CPAN;
 # To change this module edit the original .fbp file and regenerate.
 # DO NOT MODIFY THIS FILE BY HAND!
 
-use 5.008;
+use 5.008005;
+use utf8;
 use strict;
 use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx::HtmlWindow ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -29,6 +30,13 @@ sub new {
 		Wx::DefaultPosition,
 		[ 235, 530 ],
 		Wx::TAB_TRAVERSAL,
+	);
+
+	Wx::Event::EVT_CHAR(
+		$self,
+		sub {
+			shift->on_search_text(@_);
+		},
 	);
 
 	$self->{m_notebook} = Wx::Notebook->new(
@@ -288,7 +296,7 @@ sub new {
 }
 
 sub on_search_text {
-	$_[0]->main->error('Handler method on_search_text for event search.OnText not implemented');
+	$_[0]->main->error('Handler method on_search_text for event Padre::Wx::FBP::CPAN.OnChar not implemented');
 }
 
 sub on_search_list_column_click {
@@ -329,7 +337,7 @@ sub on_install_click {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

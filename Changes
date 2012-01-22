@@ -13,6 +13,110 @@ next production release, and synchronise their release to the Padre schedule.
 Changes which do not break API compatibility for plugins should be listed in
 the even version for the release, even during development.
 
+0.94 2012.01.22
+    - Redesigned the Preferences dialog (ADAMK)
+    - Completed the Padre::Delta module for applying document updates, diffs or
+      other small automated changes to a document without moving the scroll
+      position or cursor (ADAMK)
+    - Converted the FindFast panel to wxFormBuilder (ADAMK)
+    - Converted the Replace dialog to wxFormBuilder (ADAMK)
+    - Converted the Plugin Manager dialog to wxFormBuilder (ADAMK)
+    - Converted the Document Statistics dialog to wxFormBuilder (ADAMK)
+    - The modification indicator on the notebook tab is now set correctly even
+      during automated mass document changes (ADAMK)
+    - Removed Padre::DB::SyntaxHighlighter as the need for custom highlighting
+      plugins is greatly reduced now we have Wx::Scintilla (ADAMK)
+    - Move back from badly conceived "Smart" gettext usage to a more regular
+      usage at the urging of the translation team (ADAMK)
+    - Moved Wx::Scintilla specific lexer and highlighter registration out of
+      Padre::MimeTypes and into Padre::Wx::Scintilla so we can use
+      Padre::MimeTypes in background threads (ADAMK)
+    - Rewrote MIME support as Padre::MIME, which does not rely on Padre::Config
+      and can be loaded and used in background threads more easily (ADAMK)
+    - Added Debug2 interface, you will need Debug::Client 0.16, please view wiki
+      for more information (BOWTIE)
+    - Force upgrades to DBD::SQLite 1.35 and ORLite 1.51 for major performance
+      improvements which should make Padre block a bit less (ADAMK)
+    - In addition to VACUUM on shutdown, also ANALYZE for a further small
+      performance improvement (ADAMK)
+    - Removed redundant Module Tools/Install CPAN Module (AZAWAWI)
+    - Spanish tramslation from atylerrice (GCI student)
+    - Added watch items to Debug2 interface, requires Debug::Client 0.16, also
+      reintroduced S for loaded please view wiki for more information (BOWTIE)
+    - Moved rarely used "Dupliate" and "Delete" file menu options to
+      "new" and "close" submenus (SEWI)
+    - Try to avoid failing silently when there are major load-time failures
+      and on Win32 ask if we can reset configuration directory (ADAMK)
+    - Fixed detection of XML files with non-.xml extensions (ADAMK)
+    - Moved Wx-specific code out of Padre::Util into Padre::Wx::Util (ADAMK)
+    - Moving the _T function to the dedicated Padre::Locale::T (ADAMK)
+    - The Replace dialogs don't use Find Fast term unless visible (ADAMK)
+    - Search results now match correctly at the first position (ADAMK)
+    - Search match caret is now at the start of the match selection (ADAMK)
+    - Added MIME type and content detection for wxFormBuilder files (ADAMK)
+    - Scintilla lexer selection now obeys MIME type inheritance (ADAMK)
+    - Added shared Padre::Wx::ComboBox::FindTerm widget for search dialogs,
+      that will hint when the search term is an illegal regex (ADAMK)
+    - Hitting F3 after a find or replace dialog is closed repeats the last
+      search with all settings (regex, etc) retained until the user changes a
+      document or moves the selection off the previous selected result (ADAMK)
+    - Added main window deactivation hook to hide Find Fast panel (ADAMK)
+    - Added main window activation hook to rescan the directory tree, rerun
+      syntax checking, and rerun vcs indicators (ADAMK)
+    - Hitting enter in the Function List search box will clear the search after
+      you have been taken to the first function (ADAMK)
+    - When Find Fast is closed, return scroll and selection to the original
+      location (ADAMK)
+    - Syntax check status is reflected in the label for the Syntax Check output
+      so you can see the result when it is not at the front (ADAMK)
+    - When syntax check fails, only show markers for the errors in the file that
+      is being displayed in the editor (ADAMK)
+    - The replace_term history combobox class no longer prepopulates with an
+      assumed replace term you probably don't want (ADAMK)
+    - Recursive search and replace dialogs support type filtering (ADAMK)
+    - Hex/decimal conversion: make error message generic (ZENOG)
+    - Plugin manager: complete translation (ZENOG)
+    - Update German translation (ZENOG)
+    - HTML for Padre::Wx::HtmlWindow is rendered in the background (ADAMK)
+    - Clicking on a result from a Find in Files search will now find the
+      correct line even if it has moved since the search was run (ADAMK)
+    - The context menu now correctly appears at the cursor on Win32 (ADAMK)
+    - Changed the order of the context menu entries to more closely match
+      the typical ordering of other editors (ADAMK)
+    - Refactored the comment logic to allow sloppier smart selection (ADAMK)
+    - Migrated the Function List tool to use the Padre::Search internals (ADAMK)
+    - Hide the experimental command line feature in advanced preferences (ADAMK)
+    - Padre::Search::editor_replace_all now uses Padre::Delta (ADAMK)
+    - Padre::Search::matches now supports submatch option (ADAMK)
+    - Added basic tests for Debugger panels (BOWTIE)
+    - Save All is much faster and won't flicker or defocus cursors (ADAMK)
+    - The Reload actions now restore cursor position (more) correctly and
+      don't defocus the current editor (ADAMK)
+    - The location of most tools can now be configured (ADAMK)
+    - The bloat reduction features can now be configured (ADAMK)
+    - Fixed Ticket #1377 Search dialog claims unsuccessful search even
+      though it was successful (ADAMK)
+    - Fixed Ticket #1298 Changing font in preferences is not applied to
+      existing editors (ADAMK)
+    - Fixed Ticket #1294 Space in text field for pref
+      "editor_right_margin_colum" stops Padre (ADAMK)
+    - Fixed Ticket #1363 Miss depend - File::Slurp (ADAMK)
+    - The editor style preview now correctly updates in real time (ADAMK)
+    - Migrate the vertical align feature to Padre::Delta (ADAMK)
+    - Function List sort order can be changed via right click menu (ADAMK)
+    - Added support for the R statistics programming language (ADAMK)
+
+0.93 Development version, not released
+    - The Padre::Wx::Main method ->pages was removed (ADAMK)
+    - Padre::MimeTypes replaced by Padre::MIME and Padre::Wx::Scintilla (ADAMK)
+    - Padre::Project::headline method now returns the relative path, with the
+      full path version moved to Padre::Project::headline_path (ADAMK)
+    - Padre::Search changes relating to "Replace" and "Count All" logic (ADAMK)
+    - The long-deprecated gettext_label method has been deleted (ADAMK)
+    - The old search function Padre::Util::get_matches has beedn deleted (ADAMK)
+    - Refactored most _show methods into a single show_view method (ADAMK)
+    - Removed the unused Padre::Config versioning system (ADAMK)
+
 0.92 2011.11.11
     - Wx::Scintilla is now stable and replaces Wx::STC in Padre (AZAWAWI)
     - New Task 3.0 which fixes bidirectional communication and thus enables
@@ -2106,7 +2210,7 @@ the even version for the release, even during development.
     - Fixed bookmark-related crash (#172) (SvenDowideit)
     - Fixed syntax-checker related focus glitch (#173) (SvenDowideit)
     - Removed JavaScript plugin from the main distribution (SZABGAB)
-    - Major menu refactoring. Each menu is now implemented in a seperate
+    - Major menu refactoring. Each menu is now implemented in a separate
       class, with independant ->refresh methods and much improved
       encapsulation as a result. (ADAMK)
     - Rewrote the Padre bootstrap sequence. Not only does Padre start in

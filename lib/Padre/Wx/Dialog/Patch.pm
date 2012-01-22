@@ -3,14 +3,12 @@ package Padre::Wx::Dialog::Patch;
 use 5.008;
 use strict;
 use warnings;
-use File::Slurp           ();
+use Padre::Util           ();
 use Padre::Wx             ();
 use Padre::Wx::FBP::Patch ();
 use Padre::Logger;
 
-# use Data::Printer { caller_info => 1 };
-
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::FBP::Patch
 };
@@ -35,27 +33,20 @@ sub new {
 # Method run
 #######
 sub run {
-	my $self    = shift;
-	my $current = $self->current;
+	my $self = shift;
 
 	# auto-fill dialogue
-	$self->set_up();
+	$self->set_up;
 
 	# TODO but I want nonModal, ie $self->Show;
 	# Show the dialog
 	my $result = $self->ShowModal;
-
 	if ( $result == Wx::ID_CANCEL ) {
 
 		# As we leave the Find dialog, return the user to the current editor
 		# window so they don't need to click it.
-		my $editor = $current->editor;
-		$editor->SetFocus if $editor;
-
-		# Clean up
+		$self->main->editor_focus;
 		$self->Destroy;
-
-		return;
 	}
 
 	return;
@@ -204,9 +195,6 @@ sub current_files {
 			$self->{open_file_info}->{$_}->{'changed'} = 1;
 		}
 	}
-
-	# nb enable Data::Printer above to use
-	# p $self->{open_file_info};
 
 	return;
 }
@@ -409,12 +397,12 @@ sub apply_patch {
 
 	if ( -e $file1_url ) {
 		TRACE("found file1 => $file1_name: $file1_url") if DEBUG;
-		$source = File::Slurp::read_file($file1_url);
+		$source = Padre::Util::slurp($file1_url);
 	}
 
 	if ( -e $file2_url ) {
 		TRACE("found file2 => $file2_name: $file2_url") if DEBUG;
-		$diff = File::Slurp::read_file($file2_url);
+		$diff = Padre::Util::slurp($file2_url);
 		unless ( $file2_url =~ /(patch|diff)$/sxm ) {
 			$main->info( Wx::gettext('Patch file should end in .patch or .diff, you should reselect & try again') );
 			return;
@@ -482,8 +470,9 @@ sub make_patch_diff {
 			TRACE($our_diff) if DEBUG;
 
 			my $patch_file = $file1_url . '.patch';
-
-			File::Slurp::write_file( $patch_file, $our_diff );
+			open( my $fh, '>', $patch_file ) or die "open: $!";
+			print $fh $our_diff;
+			close $fh;
 			TRACE("writing file: $patch_file") if DEBUG;
 
 			$main->setup_editor($patch_file);
@@ -522,8 +511,9 @@ sub test_svn {
 	if ( File::Which::which('svn') ) {
 
 		# test svn version
-		if ( $svn_client_version = Padre::Util::run_in_directory_two('svn --version --quiet') ) {
-			chomp($svn_client_version);
+		$svn_client_version = Padre::Util::run_in_directory_two('svn --version --quiet');
+		if ( $svn_client_version ) {
+			chomp $svn_client_version;
 
 			require Sort::Versions;
 
@@ -573,8 +563,9 @@ sub make_patch_svn {
 			TRACE($diff_str) if DEBUG;
 
 			my $patch_file = $file1_url . '.patch';
-
-			File::Slurp::write_file( $patch_file, $diff_str );
+			open( my $fh, '>', $patch_file ) or die "open: $!";
+			print $fh $diff_str;
+			close $fh;
 			TRACE("writing file: $patch_file") if DEBUG;
 
 			$main->setup_editor($patch_file);
@@ -716,7 +707,7 @@ Adam Kennedy E<lt>adamk@cpan.orgE<gt>
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl 5 itself.
@@ -726,7 +717,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

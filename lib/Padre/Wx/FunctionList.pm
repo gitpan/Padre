@@ -12,7 +12,7 @@ use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx             ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
@@ -80,9 +80,7 @@ sub new {
 		$self,
 		$self->{list},
 		sub {
-			my ( $this, $event ) = @_;
-			$self->on_list_item_activated($event);
-			return;
+			$self->on_list_item_activated($_[1]);
 		}
 	);
 
@@ -102,53 +100,16 @@ sub new {
 	Wx::Event::EVT_KEY_UP(
 		$self->{list},
 		sub {
-			my ( $this, $event ) = @_;
-
-			my $code = $event->GetKeyCode;
-			if ( $code == Wx::K_RETURN ) {
-				$self->on_list_item_activated($event);
-			} elsif ( $code == Wx::K_ESCAPE ) {
-
-				# Escape key clears search and returns focus
-				# to the editor
-				$self->{search}->SetValue('');
-				my $editor = $self->current->editor;
-				$editor->SetFocus if $editor;
-			}
-
-			$event->Skip(1);
-			return;
-		}
+			$self->on_search_key_up($_[1]);
+		},
 	);
 
 	# Handle char events in search box
 	Wx::Event::EVT_CHAR(
 		$self->{search},
 		sub {
-			my ( $this, $event ) = @_;
-
-			my $code = $event->GetKeyCode;
-			if ( $code == Wx::K_DOWN || $code == Wx::K_UP || $code == Wx::K_RETURN ) {
-
-				# Up/Down and return keys focus on the functions lists
-				$self->{list}->SetFocus;
-				my $selection = $self->{list}->GetSelection;
-				if ( $selection == -1 && $self->{list}->GetCount > 0 ) {
-					$selection = 0;
-				}
-				$self->{list}->Select($selection);
-			} elsif ( $code == Wx::K_ESCAPE ) {
-
-				# Escape key clears search and returns focus
-				# to the editor
-				$self->{search}->SetValue('');
-				my $editor = $self->current->editor;
-				$editor->SetFocus if $editor;
-			}
-
-			$event->Skip(1);
-			return;
-		}
+			$self->on_search_char($_[1]);
+		},
 	);
 
 	# React to user search
@@ -158,6 +119,14 @@ sub new {
 		sub {
 			$self->render;
 		}
+	);
+
+	# Right click menu
+	Wx::Event::EVT_CONTEXT(
+		$self,
+		sub {
+			$self->on_context_menu($_[1]);
+		},
 	);
 
 	if (Padre::Feature::STYLE_GUI) {
@@ -179,7 +148,7 @@ sub view_panel {
 }
 
 sub view_label {
-	shift->gettext_label;
+	Wx::gettext('Functions');
 }
 
 sub view_close {
@@ -197,6 +166,52 @@ sub view_stop {
 #####################################################################
 # Event Handlers
 
+sub on_search_key_up {
+	my $self  = shift;
+	my $event = shift;
+	my $code  = $event->GetKeyCode;
+
+	if ( $code == Wx::K_RETURN ) {
+		$self->on_list_item_activated($event);
+		$self->{search}->SetValue('');
+
+	} elsif ( $code == Wx::K_ESCAPE ) {
+
+		# Escape key clears search and returns focus
+		# to the editor
+		$self->{search}->SetValue('');
+		$self->main->editor_focus;
+	}
+
+	$event->Skip(1);
+}
+
+sub on_search_char {
+	my $self  = shift;
+	my $event = shift;
+	my $code  = $event->GetKeyCode;
+
+	if ( $code == Wx::K_DOWN || $code == Wx::K_UP || $code == Wx::K_RETURN ) {
+
+		# Up/Down and return keys focus on the functions lists
+		$self->{list}->SetFocus;
+		my $selection = $self->{list}->GetSelection;
+		if ( $selection == -1 && $self->{list}->GetCount > 0 ) {
+			$selection = 0;
+		}
+		$self->{list}->Select($selection);
+
+	} elsif ( $code == Wx::K_ESCAPE ) {
+
+		# Escape key clears search and returns focus
+		# to the editor
+		$self->{search}->SetValue('');
+		$self->main->editor_focus;
+	}
+
+	$event->Skip(1);
+}
+
 sub on_list_item_activated {
 	my $self   = shift;
 	my $event  = shift;
@@ -211,9 +226,31 @@ sub on_list_item_activated {
 	return;
 }
 
-# Sets the focus on the search field
-sub focus_on_search {
-	$_[0]->{search}->SetFocus;
+sub on_context_menu {
+	my $self  = shift;
+	my $event = shift;
+
+	require Padre::Wx::FunctionList::Menu;
+	my $menu = Padre::Wx::FunctionList::Menu->new( $self, $event );
+
+	# Try to determine where to show the context menu
+	if ( $event->isa('Wx::MouseEvent') ) {
+		# Position is already window relative
+		$self->PopupMenu( $menu->wx, $event->GetX, $event->GetY );
+
+	} elsif ( $event->can('GetPosition') ) {
+		# Assume other event positions are screen relative
+		my $screen = $event->GetPosition;
+		my $client = $self->ScreenToClient($screen);
+		$self->PopupMenu( $menu->wx, $client->x, $client->y );
+
+	} else {
+		# Probably a wxCommandEvent
+		# TO DO Capture a better location from the mouse directly
+		$self->PopupMenu( $menu->wx, 50, 50 );
+	}
+
+	$event->Skip(0);
 }
 
 
@@ -223,8 +260,9 @@ sub focus_on_search {
 ######################################################################
 # General Methods
 
-sub gettext_label {
-	Wx::gettext('Functions');
+# Sets the focus on the search field
+sub focus_on_search {
+	$_[0]->{search}->SetFocus;
 }
 
 sub refresh {
@@ -335,7 +373,7 @@ sub render {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

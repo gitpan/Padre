@@ -6,14 +6,15 @@ package Padre::Wx::FBP::Find;
 # To change this module edit the original .fbp file and regenerate.
 # DO NOT MODIFY THIS FILE BY HAND!
 
-use 5.008;
+use 5.008005;
+use utf8;
 use strict;
 use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
-use Padre::Wx::History::ComboBox ();
+use Padre::Wx::ComboBox::FindTerm ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -32,13 +33,20 @@ sub new {
 		Wx::DEFAULT_DIALOG_STYLE,
 	);
 
+	Wx::Event::EVT_CLOSE(
+		$self,
+		sub {
+			shift->on_close(@_);
+		},
+	);
+
 	my $m_staticText2 = Wx::StaticText->new(
 		$self,
 		-1,
-		Wx::gettext("Search &Term") . ":",
+		Wx::gettext("Search &Term:"),
 	);
 
-	$self->{find_term} = Padre::Wx::History::ComboBox->new(
+	$self->{find_term} = Padre::Wx::ComboBox::FindTerm->new(
 		$self,
 		-1,
 		"",
@@ -68,7 +76,7 @@ sub new {
 	$self->{find_regex} = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("&Regular Expression"),
+		Wx::gettext("Regular E&xpression"),
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 	);
@@ -89,14 +97,6 @@ sub new {
 		Wx::DefaultSize,
 	);
 
-	$self->{find_first} = Wx::CheckBox->new(
-		$self,
-		-1,
-		Wx::gettext("Cl&ose Window on Hit"),
-		Wx::DefaultPosition,
-		Wx::DefaultSize,
-	);
-
 	my $m_staticline1 = Wx::StaticLine->new(
 		$self,
 		-1,
@@ -108,7 +108,7 @@ sub new {
 	$self->{find_next} = Wx::Button->new(
 		$self,
 		Wx::ID_OK,
-		Wx::gettext("Find &Next"),
+		Wx::gettext("&Find Next"),
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 	);
@@ -138,6 +138,14 @@ sub new {
 		Wx::DefaultSize,
 	);
 
+	Wx::Event::EVT_BUTTON(
+		$self,
+		$self->{cancel},
+		sub {
+			shift->on_close(@_);
+		},
+	);
+
 	my $fgSizer2 = Wx::FlexGridSizer->new( 2, 2, 0, 10 );
 	$fgSizer2->AddGrowableCol(1);
 	$fgSizer2->SetFlexibleDirection(Wx::BOTH);
@@ -145,12 +153,11 @@ sub new {
 	$fgSizer2->Add( $self->{find_regex}, 1, Wx::ALL, 5 );
 	$fgSizer2->Add( $self->{find_reverse}, 1, Wx::ALL, 5 );
 	$fgSizer2->Add( $self->{find_case}, 1, Wx::ALL, 5 );
-	$fgSizer2->Add( $self->{find_first}, 1, Wx::ALL, 5 );
 
 	my $buttons = Wx::BoxSizer->new(Wx::HORIZONTAL);
 	$buttons->Add( $self->{find_next}, 0, Wx::ALL, 5 );
 	$buttons->Add( $self->{find_all}, 0, Wx::ALL, 5 );
-	$buttons->Add( 20, 0, 1, Wx::EXPAND, 5 );
+	$buttons->Add( 30, 0, 1, Wx::EXPAND, 5 );
 	$buttons->Add( $self->{cancel}, 0, Wx::ALL, 5 );
 
 	my $vsizer = Wx::BoxSizer->new(Wx::VERTICAL);
@@ -186,16 +193,16 @@ sub find_case {
 	$_[0]->{find_case};
 }
 
-sub find_first {
-	$_[0]->{find_first};
-}
-
 sub find_next {
 	$_[0]->{find_next};
 }
 
 sub find_all {
 	$_[0]->{find_all};
+}
+
+sub on_close {
+	$_[0]->main->error('Handler method on_close for event Padre::Wx::FBP::Find.OnClose not implemented');
 }
 
 sub refresh {
@@ -208,7 +215,7 @@ sub find_next_clicked {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

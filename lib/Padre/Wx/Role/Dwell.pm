@@ -27,7 +27,7 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 
 # Track timer Wx id values for each dwell event
 my %ID = ();
@@ -119,7 +119,7 @@ sub dwell_stop {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl 5 itself.

@@ -11,7 +11,7 @@ use Padre::Util             ();
 use PPI                     ();
 use Padre::Wx::FBP::About   ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::FBP::About
 };
@@ -20,77 +20,39 @@ use constant {
 	OFFSET => 24,
 };
 
-#######
-# new
-#######
-sub new {
+sub run {
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
-
+	
 	# Always show the first tab regardless of which one
 	# was selected in wxFormBuilder.
 	$self->notebook->ChangeSelection(0);
 
-	$self->CenterOnParent;
-
-	return $self;
-}
-
-#######
-# Method run
-#######
-sub run {
-	my $self    = shift;
-	my $current = $self->current;
-
-	# auto-fill dialogue
-	$self->_set_up();
-
-	# Show the dialog
-	my $result = $self->ShowModal;
-
-	if ( $result == Wx::ID_CANCEL ) {
-
-		# As we leave the About dialog, return the user to the current editor
-		# window so they don't need to click it.
-		my $editor = $current->editor;
-		$editor->SetFocus if $editor;
-
-		# Clean up
-		$self->Destroy;
-
-		return;
-	}
-
-	return;
-}
-
-#######
-# Method _set_up
-#######
-sub _set_up {
-	my $self = shift;
-	
-	$self->app_name->SetLabel("Padre $VERSION:-");
-
-	# load the image
+	# Load the platform-adaptive splash image
 	$self->{splash}->SetBitmap( Wx::Bitmap->new( Padre::Util::splash, Wx::BITMAP_TYPE_PNG ) );
+	# $self->creator->SetLabel("G\x{e1}bor Szab\x{f3}"); # don't work
+	$self->creator->SetLabel('Created by Gábor Szabó'); # works
+	
+	# Set the system information
+	$self->{output}->ChangeValue( $self->_information );
 
-	$self->creator->SetLabel('Gábor Szabó');
+	# Set the translators
+	$self->_translation;
 
-	$self->_translation();
+	$self->CenterOnParent;
+	
+	# Show the dialog
+	$self->ShowModal;
 
-	$self->_information();
-
-	return;
+	# As we leave the About dialog, return the user to the current editor
+	# window so they don't need to click it.
+	$self->main->editor_focus;
+	$self->Destroy;
 }
 
-#######
-# Composed Method _translation
-#######
 sub _translation {
 	my $self = shift;
-	
+
 	#TODO will all translators please add there name
 	# in native language please and uncommet please
 
@@ -134,29 +96,22 @@ sub _translation {
 	return;
 }
 
-#######
-# Composed Method _core_info
-#######
 sub _information {
-	my $self = shift;
-
+	my $self   = shift;
 	my $output = "\n";
 	$output .= sprintf "%*s %s\n", OFFSET, 'Padre', $VERSION;
-
-	$output .= $self->_core_info();
-	$output .= $self->_wx_info();
-
+	$output .= $self->_core_info;
+	$output .= $self->_wx_info;
 	$output .= "Other...\n";
-	$output .= sprintf "%*s %s\n", OFFSET, 'PPI', $PPI::VERSION;
+	$output .= sprintf "%*s %s\n", OFFSET, 'PPI',   $PPI::VERSION;
+	
+	require Debug::Client;
+	$output .= sprintf "%*s %s\n", OFFSET, 'Debug::Client', $Debug::Client::VERSION;
+	
 	$output .= sprintf "%*s %s\n", OFFSET, Wx::gettext('Config'), Padre::Constant::CONFIG_DIR;
-
-	$self->{output}->ChangeValue($output);
-	return;
+	return $output;
 }
 
-#######
-# Composed Method _core_info
-#######
 sub _core_info {
 	my $self = shift;
 
@@ -182,8 +137,6 @@ sub _core_info {
 
 	# Yes, THIS variable should have this upper case char :-)
 	my $perl_version = $^V || $];
-
-	# $perl_version = "$perl_version";
 	$perl_version =~ s/^v//;
 	$output .= sprintf "%*s %s\n", OFFSET, 'Perl', $perl_version;
 
@@ -199,24 +152,20 @@ sub _core_info {
 	return $output;
 }
 
-#######
-# Composed Method _wx_info
-#######
 sub _wx_info {
 	my $self = shift;
 
-	my $output .= "Wx...\n";
+	my $output = "Wx...\n";
 	$output .= sprintf "%*s %s\n", OFFSET, 'Wx', $Wx::VERSION;
 
 	# Reformat the native wxWidgets version string slightly
 	my $wx_widgets = Wx::wxVERSION_STRING();
 	$wx_widgets =~ s/^wx\w+\s+//;
 	$output .= sprintf "%*s %s\n", OFFSET, 'WxWidgets', $wx_widgets;
-	$output .= sprintf "%*s %s\n", OFFSET, 'unicode', Wx::wxUNICODE();
+	$output .= sprintf "%*s %s\n", OFFSET, 'unicode',   Wx::wxUNICODE();
 
 	require Alien::wxWidgets;
-	my $alien = $Alien::wxWidgets::VERSION;
-	$output .= sprintf "%*s %s\n", OFFSET, 'Alien::wxWidgets', $alien;
+	$output .= sprintf "%*s %s\n", OFFSET, 'Alien::wxWidgets', $Alien::wxWidgets::VERSION;
 
 	$output .= sprintf "%*s %s\n", OFFSET, 'Wx::Perl::ProcessStream', $Wx::Perl::ProcessStream::VERSION;
 
@@ -226,14 +175,9 @@ sub _wx_info {
 	return $output;
 }
 
-
-
-
 1;
 
-__END__
-
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

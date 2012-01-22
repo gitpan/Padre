@@ -10,7 +10,7 @@ use Padre::Feature  ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -88,22 +88,22 @@ sub new {
 		$edit_copy
 	);
 
-	$self->add_menu_action(
+	$self->{copy_filename} = $self->add_menu_action(
 		$edit_copy,
 		'edit.copy_filename',
 	);
 
-	$self->add_menu_action(
+	$self->{copy_basename} = $self->add_menu_action(
 		$edit_copy,
 		'edit.copy_basename',
 	);
 
-	$self->add_menu_action(
+	$self->{copy_dirname} = $self->add_menu_action(
 		$edit_copy,
 		'edit.copy_dirname',
 	);
 
-	$self->add_menu_action(
+	$self->{copy_content} = $self->add_menu_action(
 		$edit_copy,
 		'edit.copy_content',
 	);
@@ -142,13 +142,11 @@ sub new {
 
 	$self->{next_difference} = $self->add_menu_action(
 		'edit.next_difference',
-	) if $main->config->feature_document_diffs;
+	) if Padre::Feature::DIFF_DOCUMENT;
 
-	if (Padre::Feature::QUICK_FIX) {
-		$self->{quick_fix} = $self->add_menu_action(
-			'edit.quick_fix',
-		);
-	}
+	$self->{quick_fix} = $self->add_menu_action(
+		'edit.quick_fix',
+	) if Padre::Feature::QUICK_FIX;
 
 	$self->{autocomp} = $self->add_menu_action(
 		'edit.autocomp',
@@ -373,12 +371,18 @@ sub refresh {
 	$self->{redo}->Enable($editor);
 	$self->{paste}->Enable($editor);
 
+	# Copy specials
+	$self->{copy_filename}->Enable($hasdoc);
+	$self->{copy_basename}->Enable($hasdoc);
+	$self->{copy_dirname}->Enable($hasdoc);
+	$self->{copy_content}->Enable($hasdoc);
+
 	return 1;
 }
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

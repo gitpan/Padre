@@ -14,11 +14,10 @@ use Params::Util          ();
 use Padre::Feature        ();
 use Padre::Wx::Role::View ();
 use Padre::Wx::Role::Main ();
-use Padre::Wx             ();
+use Padre::Wx 'RichText';
 use Padre::Logger;
-use Wx::RichText; # Is this necesary?
 
-our $VERSION = '0.92';
+our $VERSION = '0.94';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
@@ -83,7 +82,7 @@ sub view_panel {
 }
 
 sub view_label {
-	shift->gettext_label(@_);
+	Wx::gettext('Output');
 }
 
 sub view_close {
@@ -191,10 +190,6 @@ sub setup_bindings {
 
 #####################################################################
 # General Methods
-
-sub gettext_label {
-	Wx::gettext('Output');
-}
 
 # From Sean Healy on wxPerl mailing list.
 # Tweaked to avoid strings copying as much as possible.
@@ -420,7 +415,7 @@ sub style_busy {
 
 sub set_font {
 	my $self = shift;
-	my $font = Wx::Font->new( 10, Wx::TELETYPE, Wx::NORMAL, Wx::NORMAL );
+	my $font = Wx::Font->new( 9, Wx::TELETYPE, Wx::NORMAL, Wx::NORMAL );
 	my $name = $self->config->editor_font;
 	if ( defined $name and length $name ) {
 		$font->SetNativeFontInfoUserDesc($name);
@@ -438,7 +433,7 @@ sub relocale {
 
 1;
 
-# Copyright 2008-2011 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
