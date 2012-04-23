@@ -1,21 +1,23 @@
-package Padre::Wx::TodoList;
+package Padre::Wx::TaskList;
 
 use 5.008005;
 use strict;
 use warnings;
-use Scalar::Util          ();
-use Params::Util          ();
-use Padre::Feature        ();
-use Padre::Role::Task     ();
-use Padre::Wx::Role::View ();
-use Padre::Wx::Role::Main ();
-use Padre::Wx             ();
+use Scalar::Util             ();
+use Params::Util             ();
+use Padre::Feature           ();
+use Padre::Role::Task        ();
+use Padre::Wx::Role::View    ();
+use Padre::Wx::Role::Main    ();
+use Padre::Wx::Role::Context ();
+use Padre::Wx                ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
+	Padre::Wx::Role::Context
 	Wx::Panel
 };
 
@@ -39,7 +41,7 @@ sub new {
 		Wx::DefaultSize,
 	);
 
-	# Temporary store for the todo list.
+	# Temporary store for the task list.
 	$self->{model} = [];
 
 	# Remember the last document we were looking at
@@ -158,6 +160,8 @@ sub new {
 
 	$main->add_refresh_listener($self);
 
+	$self->context_bind;
+
 	if (Padre::Feature::STYLE_GUI) {
 		$self->main->theme->apply($self);
 	}
@@ -173,16 +177,16 @@ sub new {
 # Padre::Wx::Role::View Methods
 
 sub view_panel {
-	return 'right';
+	return 'bottom';
 }
 
 sub view_label {
-	Wx::gettext('To Do');
+	Wx::gettext('Task List');
 }
 
 sub view_close {
 	$_[0]->task_reset;
-	$_[0]->main->show_todo(0);
+	$_[0]->main->show_tasks(0);
 }
 
 
@@ -196,11 +200,27 @@ sub on_list_item_activated {
 	my $self   = shift;
 	my $editor = $self->current->editor or return;
 	my $nth    = $self->{list}->GetSelection;
-	my $todo   = $self->{model}->[$nth] or return;
+	my $task   = $self->{model}->[$nth] or return;
 
 	# Move the selection to where we last saw it
-	$editor->goto_pos_centerize( $todo->{pos} );
+	$editor->goto_pos_centerize( $task->{pos} );
 	$editor->SetFocus;
+
+	return;
+}
+
+
+
+
+
+######################################################################
+# Padre::Wx::Role::Context Methods
+
+sub context_menu {
+	my $self = shift;
+	my $menu = shift;
+
+	$self->context_append_options( $menu => 'main_tasks_panel' );
 
 	return;
 }
@@ -248,7 +268,7 @@ sub refresh {
 
 	# Unlike the Function List widget we copied to make this,
 	# don't bother with a background task, since this is much quicker.
-	my $regexp = $current->config->todo_regexp;
+	my $regexp = $current->config->main_tasks_regexp;
 	my $text   = $document->text_get;
 	my @items  = ();
 	eval {
@@ -294,8 +314,8 @@ sub render {
 		$search->Show(1);
 		$list->Show(1);
 		$list->Clear;
-		foreach my $todo ( reverse @$model ) {
-			my $text = $todo->{text};
+		foreach my $task ( reverse @$model ) {
+			my $text = $task->{text};
 			if ( $text =~ /$string/i ) {
 				$list->Insert( $text, 0 );
 			}

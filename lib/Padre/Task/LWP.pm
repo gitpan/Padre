@@ -30,13 +30,14 @@ use Padre::Constant ();
 use Params::Util    ();
 use Padre::Task     ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Task';
 
 use Class::XSAccessor {
 	getters => {
-		request  => 'request',
-		response => 'response',
+		cookie_file => 'cookie_file',
+		request     => 'request',
+		response    => 'response',
 	}
 };
 
@@ -138,13 +139,26 @@ sub run {
 	}
 	$self->{request} = $request;
 
+	# Hang on to the usage of cookies... do we really need this?
+	require HTTP::Cookies;
+	my $cookie_jar = undef;
+	if ( $self->cookie_file ) {
+		$cookie_jar = HTTP::Cookies->new(
+			file     => $self->cookie_file,
+			autosave => 1,
+		);
+	}
+
 	# Initialise the user agent
 	require LWP::UserAgent;
 	my $useragent = LWP::UserAgent->new(
-		agent   => "Padre/$VERSION",
-		timeout => 60,
+		agent      => "Padre/$VERSION",
+		timeout    => 60,
+		cookie_jar => $cookie_jar,
 	);
-	$useragent->env_proxy unless Padre::Constant::WIN32;
+	unless (Padre::Constant::WIN32) {
+		$useragent->env_proxy;
+	}
 
 	# Execute the request.
 	# It's not up to us to judge success or failure at this point,

@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 #
 # Constructor.
@@ -37,6 +37,13 @@ sub apply {
 			next if $include->type eq 'no';
 			if ( not $include->pragma ) {
 				my $module = $include->module;
+
+				#deal with ''
+				next if $module eq '';
+
+				#makes this Padre::Plugin freindly
+				next if $module =~ /^Padre::/;
+
 				eval "require $module";
 				if ($@) {
 					push @items, {
@@ -79,7 +86,6 @@ sub apply {
 						}
 					}
 				}
-
 			}
 		}
 	}

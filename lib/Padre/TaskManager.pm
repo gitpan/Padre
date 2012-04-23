@@ -62,7 +62,7 @@ use Padre::TaskHandle ();
 use Padre::TaskWorker ();
 use Padre::Logger;
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.81';
 
 # Timeout values
@@ -283,7 +283,8 @@ their results are no longer wanted.
 =cut
 
 sub cancel {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self  = shift;
 	my $owner = shift;
 	my $queue = $self->{queue};
@@ -413,7 +414,8 @@ remain on the queue.
 =cut
 
 sub run {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 
 	# Do nothing if we somehow arrive here when the task manager isn't on.
@@ -435,13 +437,13 @@ sub run {
 		}
 
 		# Can we execute the task at this position in the queue?
-		unless ( $self->good_task($queue->[$i]) ) {
+		unless ( $self->good_task( $queue->[$i] ) ) {
 			$i++;
 			next;
 		}
 
 		# Prepare the confirmed-good task
-		my $task   = splice( @$queue, $i, 1 );
+		my $task = splice( @$queue, $i, 1 );
 		my $handle = Padre::TaskHandle->new($task);
 		unless ( $handle->prepare ) {
 
@@ -517,10 +519,10 @@ Returns a L<Padre::Task> object, or C<undef> if there is no task to execute.
 =cut
 
 sub good_task {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = shift;
-
 	return 1;
 }
 
@@ -548,7 +550,8 @@ which the task can be run.
 =cut
 
 sub best_worker {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
 	my $handle  = shift;
 	my $task    = $handle->class;
@@ -620,7 +623,8 @@ state of the child worker.
 =cut
 
 sub on_signal {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self    = shift;
 	my $message = shift;
 	unless ( $self->{active} ) {
@@ -648,7 +652,7 @@ sub on_signal {
 	if ( $method eq 'STARTED' ) {
 
 		# Register the task as running
-		TRACE("Handle $hid added to 'running'...") if DEBUG;
+		# TRACE("Handle $hid added to 'running'...") if DEBUG;
 		$self->{running}->{$hid} = $handle;
 
 		# Fire the task startup handler so the parent instance of the
@@ -669,7 +673,7 @@ sub on_signal {
 
 		# Remove from the running list to guarantee no more events
 		# will be sent to the handle (and thus to the task)
-		TRACE("Handle $hid removed from 'running'...") if DEBUG;
+		# TRACE("Handle $hid removed from 'running'...") if DEBUG;
 		delete $self->{running}->{$hid};
 
 		# Free up the worker for other tasks
@@ -685,7 +689,7 @@ sub on_signal {
 		$handle->on_stopped(@$message);
 
 		# Remove from the task list to destroy the task
-		TRACE("Handle $hid completed on_stopped...") if DEBUG;
+		# TRACE("Handle $hid completed on_stopped...") if DEBUG;
 		delete $self->{handles}->{$hid};
 
 		# This should have released a worker to process

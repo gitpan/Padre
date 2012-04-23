@@ -15,7 +15,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx::HtmlWindow ();
 use Padre::Wx::TreeCtrl ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -38,15 +38,7 @@ sub new {
 		-1,
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
-		Wx::TR_FULL_ROW_HIGHLIGHT | Wx::TR_SINGLE,
-	);
-
-	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
-		$self,
-		$self->{tree},
-		sub {
-			shift->on_tree_item_activated(@_);
-		},
+		Wx::TR_FULL_ROW_HIGHLIGHT | Wx::TR_SINGLE | Wx::NO_BORDER,
 	);
 
 	Wx::Event::EVT_TREE_SEL_CHANGED(
@@ -62,7 +54,7 @@ sub new {
 		-1,
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
-		Wx::STATIC_BORDER,
+		Wx::NO_BORDER,
 	);
 
 	$self->{show_stderr} = Wx::Button->new(
@@ -96,10 +88,6 @@ sub new {
 	$self->Layout;
 
 	return $self;
-}
-
-sub on_tree_item_activated {
-	$_[0]->main->error('Handler method on_tree_item_activated for event tree.OnTreeItemActivated not implemented');
 }
 
 sub on_tree_item_selection_changed {

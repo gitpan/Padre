@@ -9,7 +9,7 @@ use File::Spec      ();
 use Padre::Constant ();
 use Padre::Current  ();
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.93';
 
 
@@ -21,7 +21,7 @@ our $COMPATIBLE = '0.93';
 
 sub new {
 	my $class = shift;
-	my $self  = bless { @_ }, $class;
+	my $self = bless {@_}, $class;
 
 	# Flag to indicate this root is specifically provided by a user
 	# and is not intuited.

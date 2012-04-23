@@ -219,7 +219,7 @@ sub new {
 	);
 
 	# Scintilla Event Hooks
-	Wx::Event::EVT_STC_UPDATEUI( $self, -1, \&on_stc_update_ui );
+	Wx::Event::EVT_STC_UPDATEUI( $self, -1, \&on_stc_updateui );
 	Wx::Event::EVT_STC_CHANGE( $self, -1, \&on_stc_change );
 	Wx::Event::EVT_STC_STYLENEEDED( $self, -1, \&on_stc_style_needed );
 	Wx::Event::EVT_STC_CHARADDED( $self, -1, \&on_stc_char_added );
@@ -238,7 +238,7 @@ sub new {
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
 	# so we don't accidentally trigger any configuration writes.
-	$self->show_view( todo      => $config->main_todo      );
+	$self->show_view( tasks     => $config->main_tasks      );
 	$self->show_view( syntax    => $config->main_syntax    );
 	$self->show_view( output    => $config->main_output    );
 	$self->show_view( outline   => $config->main_outline   );
@@ -260,18 +260,7 @@ sub new {
 	# to show it, it showed at the top) so now we always turn the status bar on
 	# at the beginning and hide it in the timer, if it was not needed
 	#$statusbar->Show;
-	my $timer = Wx::Timer->new(
-		$self,
-		Padre::Wx::Main::TIMER_POSTINIT,
-	);
-	Wx::Event::EVT_TIMER(
-		$self,
-		Padre::Wx::Main::TIMER_POSTINIT,
-		sub {
-			$_[0]->timer_start;
-		},
-	);
-	$timer->Start( 1, 1 );
+	$self->dwell_start( timer_start => 1 );
 
 	return $self;
 }

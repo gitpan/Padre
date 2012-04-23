@@ -12,7 +12,7 @@ use Padre::Locale   ();
 use Padre::Wx       ();
 use Padre::Wx::Menu ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -102,12 +102,12 @@ sub new {
 	$self->add_menu_action(
 		'help.about',
 	);
-	
+
 	# Add the About2
 	$self->add_menu_action(
 		'help.about2',
 	);
-	
+
 	return $self;
 }
 

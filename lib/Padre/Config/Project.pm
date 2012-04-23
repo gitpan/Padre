@@ -10,7 +10,7 @@ use File::Basename ();
 use YAML::Tiny     ();
 use Params::Util   ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 
 
@@ -21,7 +21,7 @@ our $VERSION = '0.94';
 
 sub new {
 	my $class = shift;
-	bless { @_ }, $class;
+	bless {@_}, $class;
 }
 
 sub dirname {

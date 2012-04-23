@@ -5,7 +5,7 @@ use strict;
 use warnings;
 use Padre::Task::FunctionList ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Task::FunctionList';
 
 # TODO: the regex containing func|method should either reuse what
@@ -26,7 +26,7 @@ our $sub_search_re = qr{
 			|
 			(?:^|$newline)\s*
 			(?:
-				(?:sub|func|method)\s+(\w+(?:::\w+)*)
+				(?:sub|func|method|before|after|around|override|augment)\s+(\w+(?:::\w+)*)
 				|
 				\* (\w+(?:::\w+)*) \s*=\s* (?: sub\b | \\\& )
 			)

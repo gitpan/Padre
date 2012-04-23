@@ -13,6 +13,70 @@ next production release, and synchronise their release to the Padre schedule.
 Changes which do not break API compatibility for plugins should be listed in
 the even version for the release, even during development.
 
+0.96 2012.04.19
+    - The "Todo" or "To Do" or "To-do" or "TODO" list has always been a
+      problem when it comes to naming. Renamed to "Task List" to align
+      with Microsoft Visual Studio's solution to this problem (ADAMK)
+    - Removed borders from the Outline tool elements (ADAMK)
+    - Clicking a file in the Replace in Files output opens the file (ADAMK)
+    - Added Padre::Wx::Role::Idle and moved all tree ctrl item activate
+      events to use it to evade a item_activated event bug (ADAMK)
+    - Added Padre::Wx::Role::Context and changed most panel tools to use
+      it for generating context menus (ADAMK)
+    - Update Debug2 to use SQL parameter markers (tome, BOWTIE)
+    - disable Debug2 tool-bar icons against unsaved files (tome, BOWTIE)
+    - Debug2 now shows margin_marker breakpoints on file load (tome, BOWTIE)
+    - tweaked on load to include reload and only once (BOWTIE)
+    - Debug2 now checks for perl files more thoroughly (BOWTIE)
+    - Added proper POD documentation for Padre::Cache (ADAMK)
+    - Delay clearing the outline content so it doesn't flicker so heavily
+      all of the time (ADAMK)
+    - Added a dozen or so new file types to Padre::MIME, including
+      several that we explicitly do not support (ADAMK)
+    - Added Padre::Comment to hold a registry and abstraction for the
+      different comment styles in supported documents (ADAMK)
+    - Added display variable data from click in debugger panel (BOWTIE)
+    - The Evaluate Expression dialog now has a "Watch" feature (ADAMK)
+    - Added Padre::SLOC for calculating Source Lines of Code metrics (ADAMK)
+    - Completed right click relocation of panels for the main tools (ADAMK)
+    - Added Padre::Locale::Format for localising the display of numbers,
+      and datetime values (ADAMK)
+    - Inlined the small amount of code we use from Format::Human::Bytes and
+      remove the dependency (ADAMK)
+    - Switching to the thread-safe Wx::PostEvent when sending events from
+      the background, which should dramatically reduce segfaults (DOOTSON)
+    - Added COCOMO modelling to the project statistics dialog (ADAMK)
+    - Added BASH support to default.txt theme (BOWTIE)
+    - Variable data now shown in corresponding colour (BOWTIE)
+    - Migrating to new ORLite 2.0 API (ADAMK)
+    - Padre::Plugin::unload(@packages) now works (AZAWAWI)
+    - Padre::PluginHandel was only checking for error, 
+      not handling return = 0, it is now (BOWTIE)
+    - Re-enable outline panel to display MooseX::Declare Method modifiers
+      (BOWTIE)
+    - Convert p-p-xx-yy -> p-p-xx in P-Plugin making getting config easy 
+      (BOWTIE)
+    - Require 5.010 as an experiment. (SZABGAB)
+    - Update Debugger, tests and dependencies to use Debug::Client 0.18 as this
+      is now Perl 5.16.0 ready (BOWTIE)
+    - Notify plugins when either a save-as (possible mime-type change) or new
+      document event occurs (AZAWAWI)
+    - Update German translation (ZENOG)
+    - Make show_local_variables default in Debug2 (BOWTIE) reverting
+    - perl5db.pl needs to be given absolute filenames (BOWTIE)
+    - Debug2 now shows display_value on selection (BOWTIE)
+    - change Status-Bar 'R/W' to 'Read Write' (BOWTIE)
+    - add +1 to Current Line so % is display correctly in Status-Bar (BOWTIE)
+    - bumped Debug-Client requirement to 0.20 (BOWTIE)
+    - 
+
+0.95 Development version, not released
+    - Moved Padre::Wx::Role::Dwell to ::Timer as scope expanded (ADAMK)
+    - Removed Padre::Wx::Role::Form which was intended as a replacement for
+      Padre::Wx::Dialog but was never used by anyone for anything (ADAMK)
+    - Removed Padre::Document::get_comment_line_string (ADAMK)
+    - Padre::Util::humanbytes is not Padre::Locale::Format::bytes (ADAMK)
+
 0.94 2012.01.22
     - Redesigned the Preferences dialog (ADAMK)
     - Completed the Padre::Delta module for applying document updates, diffs or
@@ -698,7 +762,7 @@ the even version for the release, even during development.
 0.80 2011.01.29
     - use Text::FindIndent 0.10 to eliminate some warnings #1089 (SZABGAB)
     - Update German translation (ZENOG)
-    - Added a dwell timer via Padre::Wx::Role::Dwell (ADAMK)
+    - Added a dwell timer via Padre::Wx::Role::Timer (ADAMK)
     - The directory tree search box now has a 1/3rd second dwell (ADAMK)
     - Find in Files results convert tabs to 4 spaces to avoid the ugly
       squares in the results (ADAMK)

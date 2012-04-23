@@ -36,7 +36,7 @@ use Padre::Constant (); ### NO other Padre:: dependencies
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.94';
+	$VERSION    = '0.96';
 	$COMPATIBLE = '0.93';
 }
 
@@ -304,36 +304,6 @@ sub _T {
 
 
 #####################################################################
-# Developer-Only Functions
-
-# This is pretty hacky
-sub svn_directory_revision {
-	my $dir = shift;
-
-	# Find the entries file
-	my $entries = File::Spec->catfile( $dir, '.svn', 'entries' );
-	return unless -f $entries;
-
-	# Find the headline revision
-	local $/ = undef;
-	open( my $fh, "<", $entries ) or return;
-	my $buffer = <$fh>;
-	close $fh;
-
-	# Find the first number after the first occurance of "dir".
-	unless ( $buffer =~ /\bdir\b\s+(\d+)/m ) {
-		return;
-	}
-
-	# Quote this to prevent certain aliasing bugs
-	return "$1";
-}
-
-
-
-
-
-#####################################################################
 # Shared Resources
 
 =head2 C<share>
@@ -419,14 +389,6 @@ sub find_perldiag_translations {
 
 ######################################################################
 # Logging and Debugging
-
-sub humanbytes {
-	my $bytes = $_[0] || 0;
-	eval { require Format::Human::Bytes; };
-	return $bytes if $@; # Doesn't look good, but works
-	return Format::Human::Bytes::base2( $bytes, 1 );
-
-}
 
 # Returns the memory currently used by this application:
 sub process_memory {
@@ -529,14 +491,14 @@ return type 0 hash_ref
 # function Padre::Util::run_in_directory_two
 #######
 sub run_in_directory_two {
-	my $cmd_line = shift;
-	my $location = shift;
+	my $cmd_line      = shift;
+	my $location      = shift;
 	my $return_option = shift;
 
 	if ( defined $location ) {
 		if ( $location =~ /\d/ ) {
 			$return_option = $location;
-			$location = undef;
+			$location      = undef;
 		}
 
 	}
@@ -580,11 +542,12 @@ sub run_in_directory_two {
 	Padre::Util::run_in_directory( "@cmd", $directory );
 
 	# Slurp command standard input and output
-	$ret_ioe{output} = slurp($std_out->filename);
+	$ret_ioe{output} = slurp( $std_out->filename );
+
 	# chomp $ret_ioe{output};
 
 	# Slurp command standard error
-	$ret_ioe{error} = slurp($std_err->filename);
+	$ret_ioe{error} = slurp( $std_err->filename );
 
 	# chomp $ret_ioe{error};
 	if ( $ret_ioe{error} && ( $return_option eq 1 ) ) {
@@ -592,7 +555,7 @@ sub run_in_directory_two {
 	}
 
 	return $ret_ioe{output} if ( $return_option eq 1 );
-	return $ret_ioe{error} if ( $return_option eq 2 );
+	return $ret_ioe{error}  if ( $return_option eq 2 );
 	return \%ret_ioe;
 
 }

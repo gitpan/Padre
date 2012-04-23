@@ -11,7 +11,7 @@ use Padre::Wx::Menu ();
 use Padre::Current  ();
 use Padre::Feature  ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -40,7 +40,7 @@ sub new {
 	);
 
 	$self->AppendSeparator;
-	
+
 	$self->{window_right_click} = $self->add_menu_action(
 		'window.right_click',
 	);

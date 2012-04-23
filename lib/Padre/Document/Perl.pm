@@ -17,7 +17,7 @@ use Padre::Role::Task ();
 use Padre::Feature    ();
 use Padre::Logger;
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.93';
 our @ISA        = qw{
 	Padre::Role::Task
@@ -69,7 +69,7 @@ sub ppi_dump {
 }
 
 sub ppi_set {
-	my $self     = shift;
+	my $self = shift;
 	my $document = Params::Util::_INSTANCE( shift, 'PPI::Document' );
 	unless ($document) {
 		Carp::croak('Did not provide a PPI::Document');
@@ -80,14 +80,14 @@ sub ppi_set {
 }
 
 sub ppi_replace {
-	my $self     = shift;
+	my $self = shift;
 	my $document = Params::Util::_INSTANCE( shift, 'PPI::Document' );
 	unless ($document) {
 		Carp::croak('Did not provide a PPI::Document');
 	}
 
 	# Serialize and overwrite the current text
-	$self->text_replace( $document->serialize );	
+	$self->text_replace( $document->serialize );
 }
 
 sub ppi_find {
@@ -371,7 +371,14 @@ sub get_command {
 
 	my $dir = File::Basename::dirname($filename);
 	chdir $dir;
-	my $shortname = File::Basename::basename($filename);
+
+	# perl5db.pl needs to be given absolute filenames
+	my $shortname;
+	if ($debug) {
+		$shortname = $filename;
+	} else {
+		$shortname = File::Basename::basename($filename);
+	}
 
 	my @commands = (qq{"$perl"});
 	push @commands, '-d' if $debug;
@@ -767,7 +774,7 @@ sub _find_method {
 					close $fh;
 					my @subs = $lines =~ /sub\s+(\w+)/g;
 					if ( $lines =~ /use MooseX::Declare;/ ) {
-						push @subs, ( $lines =~ /\bmethod\s+(\w+)/g );
+						push @subs, ( $lines =~ /\bmethod|before|after|around|override|augment\s+(\w+)/g );
 					}
 
 					if ( $lines =~ /use (?:MooseX::)?Method::Signatures;/ ) {

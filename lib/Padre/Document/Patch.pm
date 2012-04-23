@@ -5,17 +5,16 @@ use strict;
 use warnings;
 use Padre::Document;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Document
 };
 
 
-sub event_on_context_menu
-{
+sub event_on_context_menu {
 	my ( $self, $editor, $menu, $event ) = @_;
 	$menu->{patch_diff} = $menu->add_menu_action(
-	    'edit.patch_diff',
+		'edit.patch_diff',
 	);
 }
 

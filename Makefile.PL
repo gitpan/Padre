@@ -2,7 +2,7 @@
 # that we force the Perl version check (and fail) early.
 # Unicode is also considered to finally be "stable" at 5.8.5, so we will
 # set our dependency on that.
-use 5.008005;
+use 5.010000;
 use strict;
 use lib 'privinc';
 use inc::Module::Install 1.04;
@@ -29,6 +29,11 @@ BEGIN {
 # This _SHOULD_ theoretically make the "require Test::NoWarnings".
 # stuff above here no longer needed.
 configure_requires 'ExtUtils::MakeMaker' => '6.52';
+
+# Force an explicit configure_requires dependency on module that is
+# SUPPOSED to be in the Perl core but that some Perl vendors seem to
+# be splitting out into separate modules (spotted first on centos)
+configure_requires 'ExtUtils::Embed' => '1.250601';
 
 # the above line does not seem to force an upgrade
 # the below code might work but not tested
@@ -68,7 +73,7 @@ name 'Padre';
 license 'perl';
 author 'Gabor Szabo';
 all_from 'lib/Padre.pm';
-requires 'perl' => '5.008005';
+requires 'perl' => '5.010000';
 
 # General dependencies
 requires 'Algorithm::Diff'          => '1.19';
@@ -83,7 +88,7 @@ requires 'Cwd'                      => '3.2701';
 requires 'Data::Dumper'             => '2.101';
 requires 'DBD::SQLite'              => '1.35';
 requires 'DBI'                      => '1.58';
-requires 'Debug::Client'            => '0.16';
+requires 'Debug::Client'            => '0.20';
 requires 'Devel::Dumpvar'           => '0.04';
 requires 'Devel::Refactor'          => '0.05';
 requires 'Encode'                   => '2.26';
@@ -104,7 +109,6 @@ requires 'File::Temp'               => '0.20';
 requires 'File::Which'              => '1.08';
 requires 'File::pushd'              => '1.00';
 requires 'FindBin'                  => 0;
-requires 'Format::Human::Bytes'     => '0.06';
 requires 'Getopt::Long'             => 0;
 requires 'HTML::Entities'           => '3.57';
 requires 'HTML::Parser'             => '3.58';
@@ -121,8 +125,8 @@ requires 'LWP::UserAgent'           => '5.815';
 requires 'Module::Build'            => '0.3603';
 requires 'Module::CoreList'         => '2.22';
 requires 'Module::Manifest'         => '0.07';
-requires 'ORLite'                   => '1.51';
-requires 'ORLite::Migrate'          => '1.08';
+requires 'ORLite'                   => '1.96';
+requires 'ORLite::Migrate'          => '1.10';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.14';
 requires 'Parse::ExuberantCTags'    => '1.00';
@@ -159,10 +163,13 @@ requires 'Wx::Perl::ProcessStream' => '0.29';
 requires 'Wx::Scintilla'           => '0.34';
 requires 'YAML::Tiny'              => '1.32';
 test_requires 'Test::More'         => '0.88';
-test_requires 'Test::MockObject'   => '1.09';
-test_requires 'Test::Script'       => '1.07';
-test_requires 'Test::Exception'    => '0.27';
-test_requires 'Test::NoWarnings'   => '0.084';
+
+# Ticket #1419: Padre and the soon to be Perl 5.16
+test_requires 'Test::Warn'       => '0.24';
+test_requires 'Test::MockObject' => '1.09';
+test_requires 'Test::Script'     => '1.07';
+test_requires 'Test::Exception'  => '0.27';
+test_requires 'Test::NoWarnings' => '0.084';
 
 # Special dependencies
 

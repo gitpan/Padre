@@ -7,7 +7,7 @@ use File::Spec    ();
 use File::HomeDir ();
 use Padre::Wx     ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 
 
@@ -124,7 +124,7 @@ sub install_url {
 	# Ask what we should install
 	my $dialog = Wx::TextEntryDialog->new(
 		$main,
-		Wx::gettext('Enter URL to install\ne.g. http://svn.ali.as/cpan/releases/Config-Tiny-2.00.tar.gz'),
+		Wx::gettext("Enter URL to install\ne.g. http://svn.ali.as/cpan/releases/Config-Tiny-2.00.tar.gz"),
 		Wx::gettext('Install Local Distribution'),
 		'',
 	);

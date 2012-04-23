@@ -24,7 +24,7 @@ use warnings;
 use Params::Util   ();
 use Padre::Current ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 =pod
 
@@ -74,11 +74,9 @@ Get the L<Padre::Wx::Main> main window that this object is a child of.
 =cut
 
 sub main {
-	my $main = shift->GetParent;
-	while ( not Params::Util::_INSTANCE( $main, 'Padre::Wx::Main' ) ) {
-		$main = $main->GetParent or return Padre::Current->main;
-	}
-	return $main;
+	my $main = Wx::GetTopLevelParent(shift);
+	return $main if Params::Util::_INSTANCE( $main, 'Padre::Wx::Main' );
+	return $main->GetParent;
 }
 
 =pod
@@ -139,7 +137,7 @@ the element being update, which should be much less noticable.
 =cut
 
 sub lock_update {
-	Wx::WindowUpdateLocker->new($_[0]);
+	Wx::WindowUpdateLocker->new( $_[0] );
 }
 
 1;

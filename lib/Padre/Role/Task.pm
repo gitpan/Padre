@@ -99,7 +99,7 @@ use Scalar::Util   ();
 use Padre::Current ();
 use Padre::Logger;
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.91';
 
 # Use a shared sequence for object revisioning greatly
@@ -144,7 +144,8 @@ L<Padre::TaskManager> instance.
 =cut
 
 sub task_manager {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	return $_[0]->can('current')
 		? $_[0]->current->ide->task_manager
 		: Padre::Current->ide->task_manager;
@@ -159,7 +160,8 @@ The C<task_revision> accessor returns the current task revision for an object.
 =cut
 
 sub task_revision {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 
 	# Set a revision if this is the first time
@@ -174,7 +176,7 @@ sub task_revision {
 		Scalar::Util::weaken( $INDEX{ $self->{task_revision} } );
 	}
 
-	TRACE("Owner revision is $self->{task_revision}") if DEBUG;
+	# TRACE("Owner revision is $self->{task_revision}") if DEBUG;
 	return $self->{task_revision};
 }
 
@@ -192,7 +194,8 @@ allowing them to terminate elegantly (if they handle
 =cut
 
 sub task_reset {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	if ( $self->{task_revision} ) {
 		delete $INDEX{ $self->{task_revision} };
@@ -246,7 +249,8 @@ Any other parameters are passed through the constructor method of the task.
 =cut
 
 sub task_request {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self  = shift;
 	my %param = @_;
 

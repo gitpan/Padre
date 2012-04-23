@@ -22,7 +22,7 @@ unless ( $ENV{DISPLAY} or $^O eq 'MSWin32' ) {
 }
 
 # if ( $^O eq 'MSWin32' ) {
-	# plan skip_all => 'Crashing currently blocks the entire test suite on Win32';
+# plan skip_all => 'Crashing currently blocks the entire test suite on Win32';
 # }
 
 my $devpl;
@@ -54,7 +54,7 @@ my @actions = (
 	'view.lockinterface,view.lockinterface',
 	'view.output,view.output',
 	'view.functions,view.functions',
-	'view.todo,view.todo',
+	'view.tasks,view.tasks',
 	'view.outline,view.outline',
 	'view.directory,internal.wait10,view.directory', # Let it prepare the list
 	'view.syntax,internal.wait10,view.syntax',

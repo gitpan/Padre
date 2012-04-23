@@ -13,7 +13,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -34,7 +34,7 @@ sub new {
 	$self->{main} = $main;
 
 	# Differences window
-	if(Padre::Feature::DIFF_WINDOW) {
+	if (Padre::Feature::DIFF_WINDOW) {
 		$self->add_menu_action(
 			'tools.diff_window',
 		);

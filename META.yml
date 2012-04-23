@@ -10,8 +10,10 @@ build_requires:
   Test::More: 0.88
   Test::NoWarnings: 0.084
   Test::Script: 1.07
+  Test::Warn: 0.24
 configure_requires:
   Alien::wxWidgets: 0.46
+  ExtUtils::Embed: 1.250601
   ExtUtils::MakeMaker: 6.62
 distribution_type: module
 dynamic_config: 1
@@ -74,7 +76,7 @@ requires:
   DBD::SQLite: 1.35
   DBI: 1.58
   Data::Dumper: 2.101
-  Debug::Client: 0.16
+  Debug::Client: 0.20
   Devel::Dumpvar: 0.04
   Devel::Refactor: 0.05
   Encode: 2.26
@@ -94,7 +96,6 @@ requires:
   File::Which: 1.08
   File::pushd: 1.00
   FindBin: 0
-  Format::Human::Bytes: 0.06
   Getopt::Long: 0
   HTML::Entities: 3.57
   HTML::Parser: 3.58
@@ -112,8 +113,8 @@ requires:
   Module::Build: 0.3603
   Module::CoreList: 2.22
   Module::Manifest: 0.07
-  ORLite: 1.51
-  ORLite::Migrate: 1.08
+  ORLite: 1.96
+  ORLite::Migrate: 1.10
   POD2::Base: 0.043
   POSIX: 0
   PPI: 1.213
@@ -143,7 +144,7 @@ requires:
   Wx::Perl::ProcessStream: 0.29
   Wx::Scintilla: 0.34
   YAML::Tiny: 1.32
-  perl: 5.008005
+  perl: 5.010000
   threads: 1.71
   threads::shared: 1.33
   version: 0.80
@@ -152,4 +153,4 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.94
+version: 0.96

@@ -118,7 +118,7 @@ use Scalar::Util    ();
 use Padre::Plugin   ();
 use Padre::Constant ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Plugin';
 
 # Track the number of times actions are used
@@ -171,7 +171,11 @@ sub plugin_enable {
 		next if exists $ACTION{$name};
 
 		$ACTION{$name} = 0;
-		$action->add_event( sub { $ACTION{$name}++ } );
+		$action->add_event(
+			sub {
+				$ACTION{$name}++;
+			}
+		);
 	}
 
 	return 1;
@@ -243,7 +247,7 @@ sub _generate {
 	if ( defined $revision ) {
 
 		# This is a developer build
-		$report{'DEV'}            = 1;
+		$report{'dev'}            = 1;
 		$report{'padre.version'}  = $Padre::VERSION;
 		$report{'padre.revision'} = $revision;
 	} else {
@@ -282,8 +286,16 @@ sub _generate {
 
 # Report data to server
 sub report {
-	my $self   = shift;
-	my $report = $self->_generate;
+	my $self = shift;
+
+	#my $report = $self->_generate;
+	# my $server = $self->config->config_sync_server;
+	# my $url    = join '/', $server, $VERSION, $report->{instance_id};
+
+	# my $query  = {
+	# instance_id =>
+	# data => JSON::encode_json($report),
+	# };
 
 	# TO DO: Enable as soon as the server is functional:
 	#	$self->task_request(

@@ -13,7 +13,7 @@ use Padre::Wx::ActionLibrary ();
 use Padre::Wx::Menu          ();
 use Padre::Locale            ();
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.87';
 our @ISA        = 'Padre::Wx::Menu';
 
@@ -75,8 +75,8 @@ sub new {
 		'view.syntax',
 	);
 
-	$self->{todo} = $self->add_menu_action(
-		'view.todo',
+	$self->{tasks} = $self->add_menu_action(
+		'view.tasks',
 	);
 
 	if (Padre::Feature::VCS) {
@@ -256,7 +256,7 @@ sub refresh {
 
 	# Simple check state cases from configuration
 	$self->{eol}->Check( $config->editor_eol );
-	$self->{todo}->Check( $config->main_todo );
+	$self->{tasks}->Check( $config->main_tasks );
 	$self->{lines}->Check( $config->editor_linenumbers );
 	$self->{output}->Check( $config->main_output );
 	$self->{syntax}->Check( $config->main_syntax );
@@ -271,6 +271,7 @@ sub refresh {
 	$self->{whitespaces}->Check( $config->editor_whitespace );
 	$self->{lockinterface}->Check( $config->main_lockinterface );
 	$self->{indentation_guide}->Check( $config->editor_indentationguides );
+
 	if (Padre::Feature::VCS) {
 		$self->{vcs}->Check( $config->main_vcs );
 	}
@@ -329,17 +330,12 @@ sub refresh {
 }
 
 sub sorted {
-	my $self  = shift;
-	my %names = map {
-		$_ => Wx::gettext( Padre::MIME->find($_)->name )
-	} Padre::MIME->types;
+	my $self = shift;
+	my %names = map { $_ => Wx::gettext( Padre::MIME->find($_)->name ) } Padre::MIME->types;
 
 	# Can't do "return sort", must sort to a list first
-	my @sorted = sort {
-		( $b eq 'text/plain' ) <=> ( $a eq 'text/plain' )
-		or
-		$names{$a} cmp $names{$b}
-	} keys %names;
+	my @sorted =
+		sort { ( $b eq 'text/plain' ) <=> ( $a eq 'text/plain' ) or $names{$a} cmp $names{$b} } keys %names;
 
 	return @sorted;
 }

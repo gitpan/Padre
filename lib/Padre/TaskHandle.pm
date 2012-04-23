@@ -11,7 +11,7 @@ use Storable                 ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION  = '0.94';
+our $VERSION  = '0.96';
 our $SEQUENCE = 0;
 
 
@@ -22,7 +22,8 @@ our $SEQUENCE = 0;
 # Constructor and Accessors
 
 sub new {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	bless {
 		hid  => ++$SEQUENCE,
 		task => $_[1],
@@ -86,7 +87,8 @@ sub idle_time {
 
 # Called in the child thread to set the task and handle up for processing.
 sub start {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	$self->{child} = 1;
 	$self->{queue} = shift;
@@ -110,7 +112,8 @@ sub stop {
 # Serialisation
 
 sub as_array {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = $self->task;
 	return [
@@ -121,12 +124,13 @@ sub as_array {
 }
 
 sub from_array {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $class = shift;
 	my $array = shift;
 
 	# Load the task class first so we can deserialize
-	TRACE("$class: Loading $array->[1]") if DEBUG;
+	TRACE("Loading $array->[1]") if DEBUG;
 	eval "require $array->[1];";
 	die $@ if $@;
 
@@ -144,7 +148,8 @@ sub from_array {
 # Parent-Only Methods
 
 sub prepare {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = $self->{task};
 
@@ -158,11 +163,13 @@ sub prepare {
 		TRACE("Exception in task during 'prepare': $@") if DEBUG;
 		return !1;
 	}
+
 	return !!$rv;
 }
 
 sub on_started {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = $self->{task};
 
@@ -174,7 +181,8 @@ sub on_started {
 }
 
 sub on_message {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self   = shift;
 	my $method = shift;
 	my $task   = $self->{task};
@@ -223,7 +231,8 @@ sub on_message {
 }
 
 sub on_status {
-	TRACE( $_[1] ) if DEBUG;
+
+	# TRACE( $_[1] ) if DEBUG;
 	my $self = shift;
 
 	# If we don't have an owner, use the general status bar
@@ -249,7 +258,8 @@ sub on_status {
 }
 
 sub on_stopped {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 
 	# The first parameter is the updated Task object.
@@ -274,7 +284,8 @@ sub on_stopped {
 }
 
 sub finish {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = $self->{task};
 	my $rv   = eval { $task->finish; };
@@ -293,7 +304,8 @@ sub finish {
 # Worker-Only Methods
 
 sub run {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
 	my $task = $self->task;
 
@@ -416,8 +428,9 @@ sub inbox {
 # Bidirectional Communication
 
 sub signal {
-	TRACE( $_[0] ) if DEBUG;
-	Padre::Wx::Role::Conduit->signal( Storable::freeze( [ shift->hid => @_ ] ) );
+
+	# TRACE( $_[0] ) if DEBUG;
+	Padre::Wx::Role::Conduit->signal( [ shift->hid => @_ ] );
 }
 
 sub tell_parent {
@@ -442,12 +455,14 @@ sub tell_child {
 }
 
 sub tell_owner {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	shift->signal( OWNER => @_ );
 }
 
 sub tell_status {
-	TRACE( $_[0] ) if DEBUG;
+
+	# TRACE( $_[0] ) if DEBUG;
 	shift->signal( STATUS => @_ ? @_ : '' );
 }
 

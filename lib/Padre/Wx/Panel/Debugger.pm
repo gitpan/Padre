@@ -13,9 +13,9 @@ use Padre::Wx::Icon          ();
 use Padre::Wx::Role::View    ();
 use Padre::Wx::FBP::Debugger ();
 use Padre::Logger;
-use Debug::Client 0.16 ();
+use Debug::Client 0.20 ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::FBP::Debugger
@@ -95,6 +95,12 @@ sub set_up {
 
 	#turn off unless in project
 	$self->{show_global_variables}->Disable;
+	$self->{show_local_variables}->Enable;
+
+	# $self->{show_local_variables}->SetValue(1);
+	# $self->{local_variables} = 1;
+	$self->{show_local_variables}->SetValue(0);
+	$self->{local_variables} = 0;
 
 	# Setup the debug button icons
 	$self->{debug}->SetBitmapLabel( Padre::Wx::Icon::find('actions/morpho2') );
@@ -235,6 +241,11 @@ sub debug_perl {
 	my $document = $current->document;
 	my $editor   = $current->editor;
 
+	# test for valid perl document
+	if ( $document->mimetype !~ m/perl/ ) {
+		return;
+	}
+
 	# display panels
 	$main->show_debugoutput(1);
 
@@ -260,7 +271,15 @@ sub debug_perl {
 
 	#TODO I think this is where the Fup filenames are comming from, see POD in main
 	# Get the filename
-	my $filename = defined( $document->{file} ) ? $document->{file}->filename : undef;
+	# my $filename = defined( $document->{file} ) ? $document->{file}->filename : undef;
+
+	#changed due to define is deprecated in perl 5.15.7
+	my $filename;
+	if ( defined $document->{file} ) {
+		$filename = $document->{file}->filename;
+	} else {
+		$filename = undef;
+	}
 
 	# TODO: improve the message displayed to the user
 	# If the document is not saved, simply return for now
@@ -286,8 +305,9 @@ sub debug_perl {
 
 	$self->{file} = $filename;
 
-	#Todo list request Ouch
-	my ( $module, $file, $row, $content ) = $self->{client}->get;
+	#Now we ask where are we
+	$self->{client}->get;
+	$self->{client}->get_lineinfo;
 
 	my $save = ( $self->{save}->{$filename} ||= {} );
 
@@ -422,7 +442,11 @@ sub debug_step_in {
 	my $main = $self->main;
 
 	#ToDo list request ouch
-	my ( $module, $file, $row, $content ) = $self->{client}->step_in;
+	my @list_request;
+	eval { @list_request = $self->{client}->step_in(); };
+	my $module = $self->{client}->module;
+	$self->{client}->get_lineinfo;
+
 	if ( $module eq '<TERMINATED>' ) {
 		TRACE('TERMINATED') if DEBUG;
 		$self->{trace_status} = 'Trace = off';
@@ -445,7 +469,11 @@ sub debug_step_over {
 	my $main = $self->main;
 
 	#ToDo list request ouch
-	my ( $module, $file, $row, $content ) = $self->{client}->step_over;
+	my @list_request;
+	eval { @list_request = $self->{client}->step_over(); };
+	my $module = $self->{client}->module;
+	$self->{client}->get_lineinfo;
+
 	if ( $module eq '<TERMINATED>' ) {
 		TRACE('TERMINATED') if DEBUG;
 		$self->{trace_status} = 'Trace = off';
@@ -469,7 +497,11 @@ sub debug_step_out {
 	my $main = $self->main;
 
 	#ToDo list request ouch
-	my ( $module, $file, $row, $content ) = $self->{client}->step_out;
+	my @list_request;
+	eval { @list_request = $self->{client}->step_out(); };
+	my $module = $self->{client}->module;
+	$self->{client}->get_lineinfo;
+
 	if ( $module eq '<TERMINATED>' ) {
 		TRACE('TERMINATED') if DEBUG;
 		$self->{trace_status} = 'Trace = off';
@@ -493,8 +525,12 @@ sub debug_run_till {
 	my $param = shift;
 	my $main  = $self->main;
 
-	#ToDo list request ouch
-	my ( $module, $file, $row, $content ) = $self->{client}->run($param);
+	my @list_request;
+	eval { @list_request = $self->{client}->run($param); };
+
+	my $temp_buffer = $self->{client}->buffer;
+	my $module      = $self->{client}->module;
+	$self->{client}->get_lineinfo;
 	if ( $module eq '<TERMINATED>' ) {
 		TRACE('TERMINATED') if DEBUG;
 		$self->{trace_status} = 'Trace = off';
@@ -503,7 +539,7 @@ sub debug_run_till {
 		return;
 	}
 
-	$main->{debugoutput}->debug_output( $self->{client}->buffer );
+	$main->{debugoutput}->debug_output($temp_buffer);
 	$self->_set_debugger;
 
 	return;
@@ -601,7 +637,9 @@ sub display_value {
 	my $variable = $self->_debug_get_variable or return;
 
 	$self->{var_val}{$variable} = BLANK;
-	$self->update_variables( $self->{var_val} );
+
+	# $self->update_variables( $self->{var_val} );
+	$self->_output_variables;
 
 	return;
 }
@@ -833,8 +871,11 @@ sub _bp_autoload {
 	#TODO is there a better way
 	$self->{current_file} = $document->filename;
 
-	my $sql_select = "WHERE filename = \"$self->{current_file}\"";
-	my @tuples     = $self->{debug_breakpoints}->select($sql_select);
+	# my $sql_select = "WHERE filename = \"$self->{current_file}\"";
+	my $sql_select = "WHERE filename = ?";
+
+	# my @tuples = $self->{debug_breakpoints}->select($sql_select);
+	my @tuples = $self->{debug_breakpoints}->select( $sql_select, $self->{current_file} );
 
 	for ( 0 .. $#tuples ) {
 
@@ -858,6 +899,36 @@ sub _bp_autoload {
 	return;
 }
 
+#######
+# Event Handler _on_list_item_selected
+# equivalent to p|x the varaible
+#######
+sub _on_list_item_selected {
+	my $self          = shift;
+	my $event         = shift;
+	my $main          = $self->main;
+	my $index         = $event->GetIndex + 1;
+	my $variable_name = $event->GetText;
+
+	#ToDo inspired by task_manager, I think the next step is playing with DB::
+	my $variable_value = $self->{client}->__send_np( "x \\" . $variable_name );
+	my $black_size     = keys %{ $self->{var_val} };
+	my $blue_size      = keys %{ $self->{auto_var_val} };
+
+	# my $gray_size = keys $self->{auto_x_var};
+	# print "blach = $black_size, blue = $blue_size, gray = $gray_size \n";
+
+	if ( $index <= $black_size ) {
+		$main->{debugoutput}->debug_output_black( $variable_name . " = " . $variable_value );
+	} elsif ( $index <= ( $black_size + $blue_size ) ) {
+		$main->{debugoutput}->debug_output_blue( $variable_name . " = " . $variable_value );
+	} else {
+		$main->{debugoutput}->debug_output_dark_gray( $variable_name . " = " . $variable_value );
+	}
+
+	return;
+}
+
 ###############################################
 # event handler top row
 #######
@@ -866,6 +937,14 @@ sub _bp_autoload {
 sub on_debug_clicked {
 	my $self = shift;
 	my $main = $self->main;
+
+	# test for valid perl document
+	if ( $main->current->document->mimetype !~ m/perl/ ) {
+		return;
+	}
+
+	$self->debug_perl;
+	return unless $self->{client};
 
 	$self->{quit_debugger}->Enable;
 
@@ -898,7 +977,6 @@ sub on_debug_clicked {
 	$self->{display_options}->Enable;
 
 	$self->{debug}->Hide;
-	$self->debug_perl;
 	$main->aui->Update;
 	if ( $main->{debugoutput} ) {
 		$main->{debugoutput}->debug_output( $self->{client}->get_h_var('h') );

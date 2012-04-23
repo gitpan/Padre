@@ -7,7 +7,7 @@ use Padre::Constant   ();
 use Padre::Role::Task ();
 use Padre::Document   ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Document

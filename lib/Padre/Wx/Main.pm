@@ -54,25 +54,22 @@ use Padre::Wx::AuiManager     ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Wx::Role::Conduit  ();
 use Padre::Wx::Role::Dialog   ();
+use Padre::Wx::Role::Timer    ();
+use Padre::Wx::Role::Idle     ();
 use Padre::Locale::T;
 use Padre::Logger;
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.91';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
 	Padre::Wx::Role::Dialog
+	Padre::Wx::Role::Timer
+	Padre::Wx::Role::Idle
 	Wx::Frame
 };
 
 use constant SECONDS => 1000;
-
-# Wx timer ids
-use constant {
-	TIMER_FILECHECK => Wx::NewId(),
-	TIMER_POSTINIT  => Wx::NewId(),
-	TIMER_NTH       => Wx::NewId(),
-};
 
 # Convenience until we get a config param or something
 use constant BACKUP_INTERVAL => 30;
@@ -301,18 +298,7 @@ sub new {
 	Wx::Event::EVT_STC_UPDATEUI(
 		$self, -1,
 		sub {
-			shift->{_do_update_ui} = 1;
-		}
-	);
-
-	Wx::Event::EVT_IDLE(
-		$self,
-		sub {
-			my $self = shift;
-			if ( $self->{_do_update_ui} ) {
-				$self->{_do_update_ui} = undef;
-				$self->on_stc_update_ui;
-			}
+			$_[0]->idle_method('on_stc_updateui');
 		}
 	);
 
@@ -323,13 +309,13 @@ sub new {
 	# Show the tools that the configuration dictates.
 	# Use the fast and crude internal versions here only,
 	# so we don't accidentally trigger any configuration writes.
-	$self->show_view( todo      => $config->main_todo      );
+	$self->show_view( tasks     => $config->main_tasks );
 	$self->show_view( functions => $config->main_functions );
-	$self->show_view( outline   => $config->main_outline   );
+	$self->show_view( outline   => $config->main_outline );
 	$self->show_view( directory => $config->main_directory );
-	$self->show_view( syntax    => $config->main_syntax    );
-	$self->show_view( output    => $config->main_output    );
-	if (Padre::Feature::COMMAND)                             {
+	$self->show_view( syntax    => $config->main_syntax );
+	$self->show_view( output    => $config->main_output );
+	if (Padre::Feature::COMMAND) {
 		$self->show_view( command => $config->main_command );
 	}
 	if (Padre::Feature::VCS) {
@@ -362,15 +348,7 @@ sub new {
 	# at the beginning and hide it in the timer, if it was not needed
 	# TO DO: there might be better ways to fix that issue...
 	#$statusbar->Show;
-	my $timer = Wx::Timer->new( $self, TIMER_POSTINIT );
-	Wx::Event::EVT_TIMER(
-		$self,
-		TIMER_POSTINIT,
-		sub {
-			$_[0]->timer_start;
-		},
-	);
-	$timer->Start( 1, 1 );
+	$self->dwell_start( timer_start => 1 );
 
 	return $self;
 }
@@ -457,30 +435,15 @@ sub timer_start {
 	# Check for new plug-ins and alert the user to them
 	$manager->alert_new;
 
-	# Start the change detection timer
-	my $timer1 = Wx::Timer->new( $self, TIMER_FILECHECK );
-	Wx::Event::EVT_TIMER(
-		$self,
-		TIMER_FILECHECK,
-		sub {
-			$_[0]->timer_check_overwrite;
-		},
-	);
-	$timer1->Start( $config->update_file_from_disk_interval * SECONDS, 0 );
-
-	# Start the second-generation task manager
+	# Start the task manager
 	$self->ide->task_manager->start;
 
+	# Start the change detection timer
+	my $interval = $config->update_file_from_disk_interval * SECONDS;
+	$self->poll_start( timer_check_overwrite => $interval );
+
 	# Give a chance for post-start code to run, then do the nth-start logic
-	my $timer2 = Wx::Timer->new( $self, TIMER_NTH );
-	Wx::Event::EVT_TIMER(
-		$self,
-		TIMER_NTH,
-		sub {
-			$_[0]->timer_nth;
-		},
-	);
-	$timer2->Start( 1 * SECONDS, 1 );
+	$self->dwell_start( timer_nth => 5 * SECONDS );
 
 	return;
 }
@@ -531,7 +494,7 @@ Accessors to GUI elements:
 
 =item * C<functions>
 
-=item * C<todo>
+=item * C<tasks>
 
 =item * C<outline>
 
@@ -576,7 +539,7 @@ use Class::XSAccessor {
 		has_vcs            => 'vcs',
 		has_cpan           => 'cpan',
 		has_functions      => 'functions',
-		has_todo           => 'todo',
+		has_tasks          => 'tasks',
 		has_outline        => 'outline',
 		has_directory      => 'directory',
 		has_find           => 'find',
@@ -682,7 +645,8 @@ BEGIN {
 			$self->{command} = Padre::Wx::Command->new($self);
 		}
 		return $self->{command};
-	} if Padre::Feature::COMMAND;
+		}
+		if Padre::Feature::COMMAND;
 }
 
 sub functions {
@@ -694,13 +658,13 @@ sub functions {
 	return $self->{functions};
 }
 
-sub todo {
+sub tasks {
 	my $self = shift;
-	unless ( defined $self->{todo} ) {
-		require Padre::Wx::TodoList;
-		$self->{todo} = Padre::Wx::TodoList->new($self);
+	unless ( defined $self->{tasks} ) {
+		require Padre::Wx::TaskList;
+		$self->{tasks} = Padre::Wx::TaskList->new($self);
 	}
-	return $self->{todo};
+	return $self->{tasks};
 }
 
 sub syntax {
@@ -983,7 +947,7 @@ sub load_files {
 	# previous time we used Padre open (if they still exist)
 	if ( $startup eq 'last' ) {
 		my $session = Padre::DB::Session->last_padre_session;
-		$self->open_session($session) if defined($session);
+		$self->open_session($session) if defined $session;
 		return;
 	}
 
@@ -1036,7 +1000,7 @@ L<Wx::WindowUpdateLocker> class.
 You should use an update lock during GUI construction/modification to
 prevent screen flicker. As a side effect of not updating, the GUI changes
 happen B<significantly> faster as well. Update locks should only be held for
-short periods of time, as the operating system will begin to treat your\
+short periods of time, as the operating system will begin to treat your
 application as "hung" if an update lock persists for more than a few
 seconds. In this situation, you may begin to see GUI corruption.
 
@@ -1966,20 +1930,20 @@ sub refresh_functions {
 
 =pod
 
-=head3 C<refresh_todo>
+=head3 C<refresh_tasks>
 
-    $main->refresh_todo;
+    $main->refresh_tasks;
 
 Force a refresh of the TODO list on the right.
 
 =cut
 
-sub refresh_todo {
+sub refresh_tasks {
 	my $self = shift;
-	return unless $self->has_todo;
+	return unless $self->has_tasks;
 	return if $self->locked('REFRESH');
-	return unless $self->menu->view->{todo}->IsChecked;
-	$self->todo->refresh( $self->current );
+	return unless $self->menu->view->{tasks}->IsChecked;
+	$self->tasks->refresh( $self->current );
 	return;
 }
 
@@ -2239,7 +2203,7 @@ if the view is not currently being shown.
 sub find_view {
 	my $self = shift;
 	my $page = shift;
-	foreach my $name ( PANELS ) {
+	foreach my $name (PANELS) {
 		my $has = "has_$name";
 		next unless $self->$has();
 		my $panel = $self->$name();
@@ -2266,20 +2230,21 @@ sub show_view {
 	my $show = shift;
 	my $has  = "has_$name";
 
-	if ( $show ) {
+	if ($show) {
 		my $config = $self->config;
 		my $where  = "main_${name}_panel";
-		my $lock   = $self->lock('UPDATE', 'AUI');
+		my $lock   = $self->lock( 'UPDATE', 'AUI' );
 		my $page   = $self->$name();
-		my $panel  = $config->can($where)
-		           ? $config->$where()
-		           : $page->view_panel;
+		my $panel =
+			  $config->can($where)
+			? $config->$where()
+			: $page->view_panel;
 		$self->$panel()->show($page);
 
 	} elsif ( $self->$has() ) {
-		my $page   = $self->$name();
-		my $panel  = $self->find_view($page) or return;
-		my $lock   = $self->lock('UPDATE', 'AUI');
+		my $page  = $self->$name();
+		my $panel = $self->find_view($page) or return;
+		my $lock  = $self->lock( 'UPDATE', 'AUI' );
 		$self->$panel()->hide($page);
 	}
 
@@ -2310,9 +2275,9 @@ sub show_functions {
 
 =pod
 
-=head3 C<show_todo>
+=head3 C<show_tasks>
 
-    $main->show_todo( $visible );
+    $main->show_tasks( $visible );
 
 Show the I<to do> panel on the right if C<$visible> is true. Hide it
 otherwise. If C<$visible> is not provided, the method defaults to show
@@ -2320,14 +2285,14 @@ the panel.
 
 =cut
 
-sub show_todo {
+sub show_tasks {
 	my $self = shift;
 	my $show = ( @_ ? ( $_[0] ? 1 : 0 ) : 1 );
-	my $item = $self->menu->view->{todo};
-	my $lock = $self->lock( 'UPDATE', 'AUI', 'CONFIG', 'refresh_todo' );
+	my $item = $self->menu->view->{tasks};
+	my $lock = $self->lock( 'UPDATE', 'AUI', 'CONFIG', 'refresh_tasks' );
 	$item->Check($show) unless $show == $item->IsChecked;
-	$self->config->set( main_todo => $show );
-	$self->show_view( todo => $show );
+	$self->config->set( main_tasks => $show );
+	$self->show_view( tasks => $show );
 }
 
 =pod
@@ -3288,26 +3253,29 @@ associated to C<$session>. Note that C<$session> should already exist.
 =cut
 
 sub save_session {
-	my ( $self, $session, @session ) = @_;
+	my $self    = shift;
+	my $session = shift;
+	my $lock    = $self->lock('DB');
 
-	my $transaction = $self->lock('DB');
-	foreach my $file (@session) {
+	foreach my $file (@_) {
 		$file->set( session => $session->id );
 		$file->insert;
 	}
 
-	Padre::DB->do( 'UPDATE session SET last_update=? WHERE id=?', {}, time, $session->id );
-
+	Padre::DB->do(
+		'UPDATE session SET last_update = ? WHERE id = ?', {},
+		time, $session->id,
+	);
 }
 
 sub save_current_session {
 	my $self = shift;
+	$self->ide->{session_autosave} or return;
 
-	return if not $self->ide->{session_autosave};
-
+	my $lock = $self->lock('DB');
 	my ($session) = Padre::DB::Session->select(
 		'where id = ?',
-		$self->{ide}->{session}
+		$self->{ide}->{session},
 	);
 
 	$session ||= Padre::DB::Session->last_padre_session;
@@ -3318,13 +3286,13 @@ sub save_current_session {
 		return;
 	}
 
-	# session exist, remove all files associated to it
-	Padre::DB::SessionFile->delete(
-		'where session = ?',
-		$session->id
+	# Session exist, remove all files associated to it
+	Padre::DB::SessionFile->delete_where(
+		'session = ?',
+		$session->id,
 	);
 
-	# capture session and save it
+	# Capture session and save it
 	my @session = $self->capture_session;
 	$self->save_session( $session, @session );
 
@@ -3511,6 +3479,7 @@ sub search_next {
 	my $matched = $editor->matched;
 	if ( $search and $matched and $search->equals( $matched->[0] ) ) {
 		if ( $matched->[1] == $position1 and $matched->[2] == $position2 ) {
+
 			# Continue the existing search from the end of the match
 			$editor->SetSelection( $position2, $position2 );
 			return !!$search->search_next($editor);
@@ -3613,7 +3582,7 @@ If no files are open, do nothing.
 =cut
 
 sub replace_next {
-	my $self   = shift;
+	my $self = shift;
 	my $editor = $self->current->editor or return;
 	if ( Params::Util::_INSTANCE( $_[0], 'Padre::Search' ) ) {
 		$self->{search} = shift;
@@ -3676,19 +3645,19 @@ sub on_brace_matching {
 }
 
 sub comment_toggle {
-	my $self   = shift;
+	my $self = shift;
 	my $editor = $self->current->editor or return;
 	$editor->comment_toggle;
 }
 
 sub comment_indent {
-	my $self   = shift;
+	my $self = shift;
 	my $editor = $self->current->editor or return;
 	$editor->comment_indent;
 }
 
 sub comment_outdent {
-	my $self   = shift;
+	my $self = shift;
 	my $editor = $self->current->editor or return;
 	$editor->comment_outdent;
 }
@@ -3772,6 +3741,9 @@ sub on_activate {
 	# Ensure we are focused on the current document
 	$self->editor_focus;
 
+	# Start the file overwrite check timer
+	$self->poll_start( timer_check_overwrite => -1 );
+
 	return 1;
 }
 
@@ -3792,6 +3764,9 @@ sub on_deactivate {
 
 	# Hide the Find Fast panel if it is showing
 	$self->show_findfast(0);
+
+	# Stop polling for file changes
+	$self->poll_stop('timer_check_overwrite');
 
 	return 1;
 }
@@ -3941,7 +3916,7 @@ sub on_close_window {
 	$config->set( nth_startup => $config->nth_startup + 1 );
 
 	# Write the configuration to disk
-	$ide->save_config;
+	$ide->config->write;
 	$event->Skip(1);
 
 	# Stop the task manager.
@@ -3983,7 +3958,10 @@ sub update_last_session {
 	# Write the current session to the database
 	my $transaction = $self->lock('DB');
 	my $session     = Padre::DB::Session->last_padre_session;
-	Padre::DB::SessionFile->delete( 'where session = ?', $session->id );
+	Padre::DB::SessionFile->delete_where(
+		'session = ?',
+		$session->id,
+	);
 	$self->save_session( $session, $self->capture_session );
 }
 
@@ -4031,8 +4009,8 @@ sub setup_editors {
 		}
 	}
 
-	my $manager = $self->{ide}->plugin_manager;
-	$manager->plugin_event('editor_changed');
+	# Notify plugins that an editor has been changed
+	$self->{ide}->plugin_manager->plugin_event('editor_changed');
 
 	return;
 }
@@ -4151,6 +4129,15 @@ sub setup_editor {
 
 	if (Padre::Feature::CURSORMEMORY) {
 		$editor->restore_cursor_position;
+	}
+
+	if ( $document->mimetype =~ m/perl/ ) {
+		require Padre::Breakpoints;
+		Padre::Breakpoints->show_breakpoints;
+		foreach my $editor ( $self->editors ) {
+			$editor->SetMarginWidth( 1, 16 );
+		}
+		return;
 	}
 
 	# Notify plugins
@@ -4527,7 +4514,7 @@ Opens C<$filename> in the default system editor
 
 sub on_open_with_default_system_editor {
 	require Padre::Util::FileBrowser;
-	Padre::Util::FileBrowser->open_with_default_system_editor($_[1]);
+	Padre::Util::FileBrowser->open_with_default_system_editor( $_[1] );
 }
 
 =pod
@@ -4542,7 +4529,7 @@ Opens a command line/shell using the working directory of C<$filename>
 
 sub on_open_in_command_line {
 	require Padre::Util::FileBrowser;
-	Padre::Util::FileBrowser->open_in_command_line($_[1]);
+	Padre::Util::FileBrowser->open_in_command_line( $_[1] );
 }
 
 =pod
@@ -4613,6 +4600,15 @@ sub reload_editor {
 	$editor->SetCurrentPos($position);
 	$editor->SetAnchor($position);
 
+	if ( $document->mimetype =~ m/perl/ ) {
+		require Padre::Breakpoints;
+		Padre::Breakpoints->show_breakpoints();
+		foreach my $editor ( $self->editors ) {
+			$editor->SetMarginWidth( 1, 16 );
+		}
+		return;
+	}
+
 	# Refresh the editor title to remove any unsaved marker
 	$editor->refresh_notebook;
 
@@ -4632,8 +4628,8 @@ Returns true upon success, false otherwise.
 =cut
 
 sub reload_editors {
-	my $self     = shift;
-	my @editors  = @_;
+	my $self    = shift;
+	my @editors = @_;
 
 	# Show a progress dialog as this may be long running
 	require Padre::Wx::Progress;
@@ -4649,8 +4645,8 @@ sub reload_editors {
 	my $total    = scalar @editors;
 	my $notebook = $self->notebook;
 	foreach my $i ( 0 .. $#editors ) {
-		$progress->update( $i, ($i + 1) . "/$total" );
-		$self->reload_editor($editors[$i]) or return 0;
+		$progress->update( $i, ( $i + 1 ) . "/$total" );
+		$self->reload_editor( $editors[$i] ) or return 0;
 	}
 
 	# Notify the plugin manager of the changed files
@@ -4699,8 +4695,7 @@ sub reload_dialog {
 		title      => Wx::gettext('Reload Files'),
 		list_title => Wx::gettext('&Select files to reload:'),
 		buttons    => [
-			[
-				Wx::gettext('&Reload selected'),
+			[   Wx::gettext('&Reload selected'),
 				sub {
 					$_[0]->main->reload_editors(@_);
 				},
@@ -4723,7 +4718,7 @@ false otherwise.
 =cut
 
 sub on_save {
-	my $self     = shift;
+	my $self = shift;
 	my $document = shift || $self->current->document;
 	return unless $document;
 
@@ -4844,6 +4839,9 @@ sub on_save_as {
 	}
 
 	$self->refresh;
+
+	# Notify plugins about a possible mimetype change
+	$self->{ide}->plugin_manager->plugin_event('editor_changed');
 
 	return 1;
 }
@@ -4977,7 +4975,7 @@ sub on_save_all {
 	my @modified = $self->documents_modified or return 1;
 
 	# Save the unmodified documents
-	foreach my $document ( @modified ) {
+	foreach my $document (@modified) {
 		$self->on_save($document) or return 0;
 	}
 
@@ -5248,8 +5246,7 @@ sub on_close_some {
 		title      => Wx::gettext('Close some files'),
 		list_title => Wx::gettext('Select files to close:'),
 		buttons    => [
-			[
-				'Close selected',
+			[   'Close selected',
 				sub {
 					$_[0]->main->close_some(@_);
 				},
@@ -5712,9 +5709,9 @@ sub editor_currentline {
 }
 
 sub editor_currentline_color {
-	my $self  = shift;
-	my $name  = shift;
-	my $lock  = $self->lock('CONFIG');
+	my $self = shift;
+	my $name = shift;
+	my $lock = $self->lock('CONFIG');
 	$self->config->set( editor_currentline_color => $name );
 
 	# Apply the color to all editors
@@ -6165,9 +6162,9 @@ sub on_stc_style_needed {
 
 =pod
 
-=head3 C<on_stc_update_ui>
+=head3 C<on_stc_updateui>
 
-    $main->on_stc_update_ui;
+    $main->on_stc_updateui;
 
 Handler called on every movement of the cursor. No return value.
 
@@ -6176,7 +6173,7 @@ Handler called on every movement of the cursor. No return value.
 # NOTE: Any blocking here is HIGHLY visible to the user
 # so you should be extremely cautious in here. Everything
 # in this sub should be super super fast.
-sub on_stc_update_ui {
+sub on_stc_updateui {
 	my $self = shift;
 
 	# Avoid recursion
@@ -6395,7 +6392,7 @@ the document. No return value.
 sub timer_check_overwrite {
 	my $self  = shift;
 	my $doc   = $self->current->document or return;
-	my $state = $doc->has_changed_on_disk; # 1 = updated, 0 = unchanged, -1 = deleted
+	my $state = $doc->has_changed_on_disk;         # 1 = updated, 0 = unchanged, -1 = deleted
 
 	return unless $state;
 	return if $doc->{_already_popup_file_changed};
@@ -6721,6 +6718,9 @@ sub new_document_from_string {
 	$document->editor->setup_document;
 	$document->rebless;
 	$document->colourize;
+
+	# Notify plugins that an editor has been changed
+	$self->{ide}->plugin_manager->plugin_event('editor_changed');
 
 	return $document;
 }

@@ -53,7 +53,7 @@ use YAML::Tiny     ();
 use Padre::DB      ();
 use Padre::Wx      ();
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.43';
 
 # Link plug-ins back to their IDE
@@ -229,7 +229,7 @@ sub unload {
 	my $either = shift;
 	foreach my $package (@_) {
 		require Padre::Unload;
-		Padre::Unload::unload($package);
+		Padre::Unload->unload($package);
 	}
 	return 1;
 }
@@ -329,7 +329,7 @@ sub registered_documents {
                 text/x-pod
             } ],
         },
-	'Padre::Plugin::MyPlugin::C' => {
+        'Padre::Plugin::MyPlugin::C' => {
             name => _T("My Highlighter"),
             mime => [ qw{
                 text/x-csrc
@@ -373,7 +373,6 @@ sub registered_highlighters {
         sub { Wx::MessageBox('sh sh sh sh', 'Mutley', Wx::OK, shift) },
     );
   }
-
 
 If implemented in a plug-in, this method will be called when a
 context menu is about to be displayed either because the user
@@ -486,7 +485,10 @@ sub config_read {
 
 	# Retrieve the config string from the database
 	my $class = Scalar::Util::blessed($self);
-	my @row   = Padre::DB->selectrow_array(
+
+	#convert p-p-xx-yy -> p-p-xx
+	$class =~ s/^(Padre::Plugin::)(\w+)(?:::.+)/$1$2/;
+	my @row = Padre::DB->selectrow_array(
 		'select config from plugin where name = ?', {},
 		$class,
 	);
@@ -528,6 +530,9 @@ sub config_write {
 
 	# Write the config string to the database
 	my $class = Scalar::Util::blessed($self);
+
+	#convert p-p-xx-yy -> p-p-xx
+	$class =~ s/^(Padre::Plugin::)(\w+)(?:::.+)/$1$2/;
 	Padre::DB->do(
 		'update plugin set config = ? where name = ?', {},
 		$string, $class,
@@ -860,8 +865,7 @@ method.
 
 sub ide {
 	$IDE{ Scalar::Util::refaddr( $_[0] ) }
-	or
-	Carp::croak("Called ->ide or related method on non-existance plugin'$_[0]'");
+		or Carp::croak("Called ->ide or related method on non-existance plugin'$_[0]'");
 }
 
 =pod

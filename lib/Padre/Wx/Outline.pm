@@ -3,21 +3,25 @@ package Padre::Wx::Outline;
 use 5.008;
 use strict;
 use warnings;
-use Scalar::Util            ();
-use Params::Util            ();
-use Padre::Feature          ();
-use Padre::Role::Task       ();
-use Padre::Wx::Role::View   ();
-use Padre::Wx::Role::Main   ();
-use Padre::Wx               ();
-use Padre::Wx::FBP::Outline ();
+use Scalar::Util             ();
+use Params::Util             ();
+use Padre::Feature           ();
+use Padre::Role::Task        ();
+use Padre::Wx                ();
+use Padre::Wx::Role::Idle    ();
+use Padre::Wx::Role::View    ();
+use Padre::Wx::Role::Main    ();
+use Padre::Wx::Role::Context ();
+use Padre::Wx::FBP::Outline  ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Role::Task
+	Padre::Wx::Role::Idle
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
+	Padre::Wx::Role::Context
 	Padre::Wx::FBP::Outline
 };
 
@@ -59,6 +63,15 @@ sub new {
 	};
 	$tree->AssignImageList($images);
 
+	# Binding for the idle time tree activation
+	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
+		$self,
+		$self->{tree},
+		sub {
+			$_[0]->idle_method( item_activated => $_[1]->GetItem );
+		},
+	);
+
 	Wx::Event::EVT_TEXT(
 		$self,
 		$self->{search},
@@ -97,6 +110,8 @@ sub new {
 		}
 	);
 
+	$self->context_bind;
+
 	if (Padre::Feature::STYLE_GUI) {
 		$self->main->theme->apply($self);
 	}
@@ -112,28 +127,26 @@ sub new {
 # Event Handlers
 
 sub on_tree_item_right_click {
-	my $self   = shift;
-	my $event  = shift;
-	my $show   = 0;
-	my $menu   = Wx::Menu->new;
-	my $tree   = $self->{tree};
-	my $pldata = $tree->GetPlData( $event->GetItem );
+	my $self  = shift;
+	my $event = shift;
+	my $tree  = $self->{tree};
+	my $item  = $event->GetItem or return;
+	my $data  = $tree->GetPlData($item) or return;
+	my $show  = 0;
+	my $menu  = Wx::Menu->new;
 
-	if ( defined($pldata) && defined( $pldata->{line} ) && $pldata->{line} > 0 ) {
+	if ( defined $data->{line} and $data->{line} > 0 ) {
 		my $goto = $menu->Append( -1, Wx::gettext('&Go to Element') );
 		Wx::Event::EVT_MENU(
 			$self, $goto,
 			sub {
-				$self->on_tree_item_set_focus($event);
+				$self->item_activated($item);
 			},
 		);
 		$show++;
 	}
 
-	if (   defined($pldata)
-		&& defined( $pldata->{type} )
-		&& ( $pldata->{type} eq 'modules' || $pldata->{type} eq 'pragmata' ) )
-	{
+	if ( defined $data->{type} and $data->{type} =~ /^(?:modules|pragmata)$/ ) {
 		my $pod = $menu->Append( -1, Wx::gettext('Open &Documentation') );
 		Wx::Event::EVT_MENU(
 			$self, $pod,
@@ -142,7 +155,7 @@ sub on_tree_item_right_click {
 				# TO DO Fix this wasting of objects (cf. Padre::Wx::Menu::Help)
 				require Padre::Wx::Browser;
 				my $help = Padre::Wx::Browser->new;
-				$help->help( $pldata->{name} );
+				$help->help( $data->{name} );
 				$help->SetFocus;
 				$help->Show(1);
 				return;
@@ -160,23 +173,17 @@ sub on_tree_item_right_click {
 	return;
 }
 
-# Method alias
-sub on_tree_item_activated {
-	shift->on_tree_item_set_focus(@_);
-}
 
-sub on_tree_item_set_focus {
-	my $self      = shift;
-	my $event     = shift;
-	my $tree      = $self->{tree};
-	my $selection = $tree->GetSelection;
-	if ( $selection and $selection->IsOk ) {
-		my $item = $tree->GetPlData($selection);
-		if ( defined $item ) {
-			$self->select_line_in_editor( $item->{line} );
-		}
-	}
-	return;
+
+
+
+######################################################################
+# Padre::Wx::Role::Context Methods
+
+sub context_menu {
+	my $self = shift;
+	my $menu = shift;
+	$self->context_append_options( $menu => 'main_outline_panel' );
 }
 
 
@@ -226,9 +233,10 @@ sub task_finish {
 }
 
 sub render {
-	my $self        = shift;
-	my $data        = $self->{data};
-	my $search_term = quotemeta $self->{search}->GetValue;
+	my $self = shift;
+	my $data = $self->{data};
+	my $term = quotemeta $self->{search}->GetValue;
+	my $lock = Wx::WindowUpdateLocker->new( $self->{tree} );
 
 	# Clear any old content
 	$self->clear;
@@ -286,6 +294,15 @@ sub render {
 ######################################################################
 # General Methods
 
+sub item_activated {
+	my $self = shift;
+	my $item = shift or return;
+	my $tree = $self->{tree};
+	my $data = $tree->GetPlData($item) or return;
+	my $line = $data->{line} or return;
+	$self->select_line_in_editor($line);
+}
+
 # Sets the focus on the search field
 sub focus_on_search {
 	$_[0]->{search}->SetFocus;
@@ -305,9 +322,6 @@ sub refresh {
 
 	# Cancel any existing outline task
 	$self->task_reset;
-
-	# Always clear! :)
-	$self->clear;
 
 	# Hide the widgets when no files are open
 	unless ($document) {
@@ -339,8 +353,10 @@ sub refresh {
 }
 
 sub disable {
-	$_[0]->{search}->Hide;
-	$_[0]->{tree}->Hide;
+	my $self = shift;
+	$self->{search}->Hide;
+	$self->{tree}->Hide;
+	$self->clear;
 }
 
 sub enable {
@@ -356,9 +372,9 @@ sub enable {
 
 sub add_subtree {
 	my ( $self, $pkg, $type, $root ) = @_;
-	my $tree        = $self->{tree};
-	my $search_term = quotemeta $self->{search}->GetValue;
-	my $images      = $self->{images};
+	my $tree   = $self->{tree};
+	my $term   = quotemeta $self->{search}->GetValue;
+	my $images = $self->{images};
 
 	my %type_caption = (
 		pragmata   => Wx::gettext('Pragmata'),
@@ -409,7 +425,7 @@ sub add_subtree {
 
 		foreach my $item (@sorted_entries) {
 			my $name = $item->{name};
-			next if $name !~ /$search_term/;
+			next if $name !~ /$term/;
 			my $item = $tree->AppendItem(
 				$type_elem,
 				$name, -1, -1,
@@ -425,7 +441,7 @@ sub add_subtree {
 		}
 	}
 	if ( defined $type_elem ) {
-		if ( length $search_term > 0 ) {
+		if ( length $term > 0 ) {
 			$tree->Expand($type_elem);
 		} else {
 			if ( $type eq 'methods' ) {

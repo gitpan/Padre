@@ -52,7 +52,7 @@ use strict;
 use warnings;
 use Padre::Feature ();
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.93';
 
 
@@ -174,6 +174,19 @@ sub main_output {
 
 sub main_output_panel {
 	apply_panel( output => @_ );
+}
+
+sub main_tasks {
+	my $main = shift;
+	my $new  = shift;
+	my $item = $main->menu->view->{tasks};
+	my $lock = $main->lock( 'UPDATE', 'AUI' );
+	$item->Check($new) if $new != $item->IsChecked;
+	$main->show_view( tasks => $new );
+}
+
+sub main_tasks_panel {
+	apply_panel( tasks => @_ );
 }
 
 sub main_syntax {

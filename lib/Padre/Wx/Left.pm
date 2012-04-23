@@ -9,7 +9,7 @@ use Padre::Constant       ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -46,7 +46,7 @@ sub new {
 			MaximizeButton => 0,
 			Position       => 4,
 			Layer          => 2,
-			BestSize       => [ 215, -1 ],
+			BestSize       => [ 220, -1 ],
 			)->Left->Hide,
 	);
 	$aui->caption(

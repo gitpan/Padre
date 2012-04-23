@@ -14,7 +14,7 @@ use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx::TreeCtrl ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -38,6 +38,7 @@ sub new {
 		"",
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
+		Wx::SIMPLE_BORDER,
 	);
 
 	$self->{tree} = Padre::Wx::TreeCtrl->new(
@@ -45,15 +46,7 @@ sub new {
 		-1,
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
-		Wx::TR_HAS_BUTTONS | Wx::TR_HIDE_ROOT | Wx::TR_LINES_AT_ROOT | Wx::TR_SINGLE,
-	);
-
-	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
-		$self,
-		$self->{tree},
-		sub {
-			shift->on_tree_item_activated(@_);
-		},
+		Wx::TR_HAS_BUTTONS | Wx::TR_HIDE_ROOT | Wx::TR_LINES_AT_ROOT | Wx::TR_SINGLE | Wx::NO_BORDER,
 	);
 
 	my $main_sizer = Wx::BoxSizer->new(Wx::VERTICAL);
@@ -64,10 +57,6 @@ sub new {
 	$self->Layout;
 
 	return $self;
-}
-
-sub on_tree_item_activated {
-	$_[0]->main->error('Handler method on_tree_item_activated for event tree.OnTreeItemActivated not implemented');
 }
 
 1;

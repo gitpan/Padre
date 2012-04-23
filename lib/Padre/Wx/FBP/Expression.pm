@@ -13,7 +13,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -50,6 +50,14 @@ sub new {
 		Wx::TE_PROCESS_ENTER,
 	);
 
+	Wx::Event::EVT_COMBOBOX(
+		$self,
+		$self->{code},
+		sub {
+			shift->on_combobox(@_);
+		},
+	);
+
 	Wx::Event::EVT_TEXT(
 		$self,
 		$self->{code},
@@ -78,7 +86,23 @@ sub new {
 		$self,
 		$self->{evaluate},
 		sub {
-			shift->on_evaluate(@_);
+			shift->evaluate_clicked(@_);
+		},
+	);
+
+	$self->{watch} = Wx::ToggleButton->new(
+		$self,
+		-1,
+		Wx::gettext("Watch"),
+		Wx::DefaultPosition,
+		Wx::DefaultSize,
+	);
+
+	Wx::Event::EVT_TOGGLEBUTTON(
+		$self,
+		$self->{watch},
+		sub {
+			shift->watch_clicked(@_);
 		},
 	);
 
@@ -96,17 +120,22 @@ sub new {
 	);
 
 	my $bSizer36 = Wx::BoxSizer->new(Wx::HORIZONTAL);
-	$bSizer36->Add( $self->{code}, 1, Wx::ALL | Wx::EXPAND, 3 );
-	$bSizer36->Add( $self->{evaluate}, 0, Wx::ALL, 3 );
+	$bSizer36->Add( $self->{code}, 1, Wx::EXPAND | Wx::LEFT | Wx::TOP, 5 );
+	$bSizer36->Add( $self->{evaluate}, 0, Wx::LEFT | Wx::TOP, 5 );
+	$bSizer36->Add( $self->{watch}, 0, Wx::LEFT | Wx::RIGHT | Wx::TOP, 5 );
 
 	my $bSizer35 = Wx::BoxSizer->new(Wx::VERTICAL);
 	$bSizer35->Add( $bSizer36, 0, Wx::EXPAND, 3 );
-	$bSizer35->Add( $self->{output}, 1, Wx::ALL | Wx::EXPAND, 3 );
+	$bSizer35->Add( $self->{output}, 1, Wx::ALL | Wx::EXPAND, 5 );
 
 	$self->SetSizerAndFit($bSizer35);
 	$self->Layout;
 
 	return $self;
+}
+
+sub on_combobox {
+	$_[0]->main->error('Handler method on_combobox for event code.OnCombobox not implemented');
 }
 
 sub on_text {
@@ -117,8 +146,12 @@ sub on_text_enter {
 	$_[0]->main->error('Handler method on_text_enter for event code.OnTextEnter not implemented');
 }
 
-sub on_evaluate {
-	$_[0]->main->error('Handler method on_evaluate for event evaluate.OnButtonClick not implemented');
+sub evaluate_clicked {
+	$_[0]->main->error('Handler method evaluate_clicked for event evaluate.OnButtonClick not implemented');
+}
+
+sub watch_clicked {
+	$_[0]->main->error('Handler method watch_clicked for event watch.OnToggleButton not implemented');
 }
 
 1;

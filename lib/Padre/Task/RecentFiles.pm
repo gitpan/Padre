@@ -7,7 +7,7 @@ use Padre::Task     ();
 use Padre::Constant ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Task';
 
 
@@ -65,7 +65,8 @@ sub run {
 	my @recent = ();
 	foreach my $file ( @{ $self->{history} } ) {
 		next if $skip{$file};
-		TRACE("Checking $file\n") if DEBUG;
+
+		# TRACE("Checking $file\n") if DEBUG;
 
 		# Abort the task if we've been cancelled
 		if ( $self->cancelled ) {

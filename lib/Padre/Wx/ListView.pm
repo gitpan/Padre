@@ -7,11 +7,11 @@ use strict;
 use warnings;
 use Padre::Wx ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Wx::ListView';
 
 sub lock_update {
-	Wx::WindowUpdateLocker->new($_[0]);
+	Wx::WindowUpdateLocker->new( $_[0] );
 }
 
 # Set all columns at once and autosize

@@ -12,7 +12,7 @@ use Padre::Current  ();
 use Padre::Feature  ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -236,7 +236,7 @@ sub new {
 
 	# Print files
 	# $self->{print} = $self->add_menu_action(
-		# 'file.print',
+	# 'file.print',
 	# );
 
 	# $self->AppendSeparator;
@@ -267,9 +267,14 @@ sub new {
 
 	$self->AppendSeparator;
 
-	# Word Stats
+	# Document Statistics
 	$self->{docstat} = $self->add_menu_action(
 		'file.properties',
+	);
+
+	# Project Statistics
+	$self->add_menu_action(
+		'file.sloccount',
 	);
 
 	$self->AppendSeparator;
@@ -307,6 +312,7 @@ sub refresh {
 	$self->{save_as}->Enable($document);
 	$self->{save_intuition}->Enable($document);
 	$self->{save_all}->Enable($document);
+
 	#$self->{print}->Enable($document);
 	defined( $self->{open_session} ) and $self->{open_selection}->Enable($document);
 	defined( $self->{save_session} ) and $self->{save_session}->Enable($document);
@@ -380,8 +386,8 @@ sub on_recent {
 	# Because we filter for files that exist to generate the recent files
 	# list, anything that doesn't exist must have been deleted a short
 	# time ago. So we can remove it from history, it won't be coming back.
-	Padre::DB::History->delete(
-		'where name = ? and type = ?',
+	Padre::DB::History->delete_where(
+		'name = ? and type = ?',
 		$file, 'files',
 	);
 	Wx::MessageBox(

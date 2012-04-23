@@ -3,20 +3,22 @@ package Padre::Wx::FunctionList;
 use 5.008005;
 use strict;
 use warnings;
-use Carp                  ();
-use Scalar::Util          ();
-use Params::Util          ();
-use Padre::Feature        ();
-use Padre::Role::Task     ();
-use Padre::Wx::Role::View ();
-use Padre::Wx::Role::Main ();
-use Padre::Wx             ();
+use Carp                     ();
+use Scalar::Util             ();
+use Params::Util             ();
+use Padre::Feature           ();
+use Padre::Role::Task        ();
+use Padre::Wx::Role::View    ();
+use Padre::Wx::Role::Main    ();
+use Padre::Wx::Role::Context ();
+use Padre::Wx                ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::View
 	Padre::Wx::Role::Main
+	Padre::Wx::Role::Context
 	Wx::Panel
 };
 
@@ -80,7 +82,7 @@ sub new {
 		$self,
 		$self->{list},
 		sub {
-			$self->on_list_item_activated($_[1]);
+			$self->on_list_item_activated( $_[1] );
 		}
 	);
 
@@ -100,7 +102,7 @@ sub new {
 	Wx::Event::EVT_KEY_UP(
 		$self->{list},
 		sub {
-			$self->on_search_key_up($_[1]);
+			$self->on_search_key_up( $_[1] );
 		},
 	);
 
@@ -108,7 +110,7 @@ sub new {
 	Wx::Event::EVT_CHAR(
 		$self->{search},
 		sub {
-			$self->on_search_char($_[1]);
+			$self->on_search_char( $_[1] );
 		},
 	);
 
@@ -121,13 +123,8 @@ sub new {
 		}
 	);
 
-	# Right click menu
-	Wx::Event::EVT_CONTEXT(
-		$self,
-		sub {
-			$self->on_context_menu($_[1]);
-		},
-	);
+	# Bind the context menu
+	$self->context_bind;
 
 	if (Padre::Feature::STYLE_GUI) {
 		$self->main->theme->apply( $self->{list} );
@@ -157,6 +154,26 @@ sub view_close {
 
 sub view_stop {
 	$_[0]->task_reset;
+}
+
+
+
+
+
+#####################################################################
+# Padre::Wx::Role::Context Methods
+
+sub context_menu {
+	my $self = shift;
+	my $menu = shift;
+
+	$self->context_append_options( $menu => 'main_functions_order' );
+
+	$menu->AppendSeparator;
+
+	$self->context_append_options( $menu => 'main_functions_panel' );
+
+	return;
 }
 
 
@@ -235,16 +252,19 @@ sub on_context_menu {
 
 	# Try to determine where to show the context menu
 	if ( $event->isa('Wx::MouseEvent') ) {
+
 		# Position is already window relative
 		$self->PopupMenu( $menu->wx, $event->GetX, $event->GetY );
 
 	} elsif ( $event->can('GetPosition') ) {
+
 		# Assume other event positions are screen relative
 		my $screen = $event->GetPosition;
 		my $client = $self->ScreenToClient($screen);
 		$self->PopupMenu( $menu->wx, $client->x, $client->y );
 
 	} else {
+
 		# Probably a wxCommandEvent
 		# TO DO Capture a better location from the mouse directly
 		$self->PopupMenu( $menu->wx, 50, 50 );

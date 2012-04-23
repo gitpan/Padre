@@ -19,9 +19,9 @@ and navigation of documents.
 use 5.008;
 use strict;
 use warnings;
-use Time::HiRes               ();
-use Params::Util              ();
-use Wx::Scintilla        0.34 ();
+use Time::HiRes  ();
+use Params::Util ();
+use Wx::Scintilla 0.34 ();
 use Padre::Constant           ();
 use Padre::Config             ();
 use Padre::Feature            ();
@@ -30,14 +30,14 @@ use Padre::DB                 ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Wx::Role::Main     ();
-use Padre::Wx::Role::Dwell    ();
+use Padre::Wx::Role::Timer    ();
 use Padre::Logger;
 
-our $VERSION    = '0.94';
+our $VERSION    = '0.96';
 our $COMPATIBLE = '0.91';
 our @ISA        = (
 	'Padre::Wx::Role::Main',
-	'Padre::Wx::Role::Dwell',
+	'Padre::Wx::Role::Timer',
 	'Wx::Scintilla::TextCtrl',
 );
 
@@ -45,7 +45,7 @@ use constant {
 
 	# Convenience colour constants
 	# NOTE: DO NOT USE "orange" string since it is actually red on win32
-	ORANGE     => Wx::Colour->new( 255, 165, 0 ),
+	ORANGE     => Wx::Colour->new( 255,  165,  0 ),
 	RED        => Wx::Colour->new("red"),
 	GREEN      => Wx::Colour->new("green"),
 	BLUE       => Wx::Colour->new("blue"),
@@ -130,7 +130,7 @@ sub new {
 		Padre::Constant::MARGIN_MARKER,
 		Wx::Scintilla::SC_MARGIN_SYMBOL,
 	);
-	if ( Padre::Feature::FOLDING ) {
+	if (Padre::Feature::FOLDING) {
 		$self->SetMarginType(
 			Padre::Constant::MARGIN_FOLD,
 			Wx::Scintilla::SC_MARGIN_SYMBOL,
@@ -162,11 +162,12 @@ sub new {
 	);
 	$self->MarkerDefine(
 		Padre::Constant::MARKER_BREAKPOINT,
+
 		# Wx::Scintilla::MARK_SMALLRECT,
 		Wx::Scintilla::SC_MARK_DOTDOTDOT,
 		BLUE,
 		BLUE,
-	);	
+	);
 	$self->MarkerDefine(
 		Padre::Constant::MARKER_NOT_BREAKABLE,
 		Wx::Scintilla::SC_MARK_DOTDOTDOT,
@@ -204,19 +205,40 @@ sub new {
 
 	# Setup the editor indicators which we will use in smart, warning and error highlighting
 	# Indicator #0: Green round box indicator for smart highlighting
-	$self->IndicatorSetStyle( Padre::Constant::INDICATOR_SMART_HIGHLIGHT, Wx::Scintilla::INDIC_ROUNDBOX );
+	$self->IndicatorSetStyle(
+		Padre::Constant::INDICATOR_SMART_HIGHLIGHT,
+		Wx::Scintilla::INDIC_ROUNDBOX,
+	);
 
 	# Indicator #1, Orange squiggle for warning highlighting
-	$self->IndicatorSetForeground( Padre::Constant::INDICATOR_WARNING, ORANGE );
-	$self->IndicatorSetStyle( Padre::Constant::INDICATOR_WARNING, Wx::Scintilla::INDIC_SQUIGGLE );
+	$self->IndicatorSetForeground(
+		Padre::Constant::INDICATOR_WARNING,
+		ORANGE,
+	);
+	$self->IndicatorSetStyle(
+		Padre::Constant::INDICATOR_WARNING,
+		Wx::Scintilla::INDIC_SQUIGGLE,
+	);
 
 	# Indicator #2, Red squiggle for error highlighting
-	$self->IndicatorSetForeground( Padre::Constant::INDICATOR_ERROR, RED );
-	$self->IndicatorSetStyle( Padre::Constant::INDICATOR_ERROR, Wx::Scintilla::INDIC_SQUIGGLE );
+	$self->IndicatorSetForeground(
+		Padre::Constant::INDICATOR_ERROR,
+		RED,
+	);
+	$self->IndicatorSetStyle(
+		Padre::Constant::INDICATOR_ERROR,
+		Wx::Scintilla::INDIC_SQUIGGLE,
+	);
 
 	# Indicator #3, underline for mouse-clickable tokens
-	$self->IndicatorSetForeground( Padre::Constant::INDICATOR_UNDERLINE, BLUE );
-	$self->IndicatorSetStyle( Padre::Constant::INDICATOR_UNDERLINE, Wx::Scintilla::INDIC_PLAIN );
+	$self->IndicatorSetForeground(
+		Padre::Constant::INDICATOR_UNDERLINE,
+		BLUE,
+	);
+	$self->IndicatorSetStyle(
+		Padre::Constant::INDICATOR_UNDERLINE,
+		Wx::Scintilla::INDIC_PLAIN,
+	);
 
 	# Basic event bindings
 	Wx::Event::EVT_SET_FOCUS(
@@ -291,15 +313,10 @@ sub new {
 	# Capture change events that result in an actual change to the text
 	# of the document, so we can refire content-dependent editor tools.
 	$self->SetModEventMask(
-		Wx::Scintilla::SC_PERFORMED_USER |
-		Wx::Scintilla::SC_PERFORMED_UNDO |
-		Wx::Scintilla::SC_PERFORMED_REDO |
-		Wx::Scintilla::SC_MOD_INSERTTEXT |
-		Wx::Scintilla::SC_MOD_DELETETEXT
-	);
+		Wx::Scintilla::SC_PERFORMED_USER | Wx::Scintilla::SC_PERFORMED_UNDO | Wx::Scintilla::SC_PERFORMED_REDO
+			| Wx::Scintilla::SC_MOD_INSERTTEXT | Wx::Scintilla::SC_MOD_DELETETEXT );
 	Wx::Event::EVT_STC_CHANGE(
-		$self,
-		$self,
+		$self, $self,
 		sub {
 			shift->on_change(@_);
 		},
@@ -322,7 +339,7 @@ sub document {
 }
 
 sub notebook {
-	Params::Util::_INSTANCE($_[0]->GetParent, 'Padre::Wx::Notebook');
+	Params::Util::_INSTANCE( $_[0]->GetParent, 'Padre::Wx::Notebook' );
 }
 
 
@@ -337,7 +354,7 @@ sub on_set_focus {
 	TRACE() if DEBUG;
 	my $self     = shift;
 	my $event    = shift;
-	my $document = $self->{Document} or return;
+	my $document = $self->document or return;
 	TRACE( "Focus received file:" . $document->get_title ) if DEBUG;
 
 	# Update the line number width
@@ -349,6 +366,7 @@ sub on_set_focus {
 	# Try to avoid refreshing here, it is an excessive waste of resources.
 	# Instead, put them in the events that ACTUALLY change application
 	# state.
+	$self->on_change;
 
 	# TO DO
 	# This is called even if the mouse is moved away from padre and back
@@ -373,6 +391,7 @@ sub on_set_focus {
 
 # When the focus is leaving the editor
 sub on_kill_focus {
+	TRACE( $_[0] ) if DEBUG;
 	my $self  = shift;
 	my $event = shift;
 
@@ -410,7 +429,7 @@ sub on_key_up {
 	}
 
 	# Doc specific processing
-	my $doc = $self->{Document} or return;
+	my $doc = $self->document or return;
 	if ( $doc->can('event_key_up') ) {
 		$doc->event_key_up( $self, $event );
 	}
@@ -429,7 +448,7 @@ sub on_char {
 	# in the editor
 	$self->smart_highlight_hide;
 
-	my $document = $self->{Document} or return;
+	my $document = $self->document or return;
 	if ( $document->can('event_on_char') ) {
 		$document->event_on_char( $self, $event );
 	}
@@ -465,7 +484,7 @@ sub on_change_dwell {
 		$main->refresh_functions($current);
 		$main->refresh_outline($current);
 		$main->refresh_syntax($current);
-		$main->refresh_todo($current);
+		$main->refresh_tasks($current);
 		$main->refresh_diff($current);
 	}
 
@@ -478,7 +497,7 @@ sub on_mouse_moving {
 	my $event = shift;
 
 	if ( $event->Moving ) {
-		my $doc = $self->{Document} or return;
+		my $doc = $self->document or return;
 		if ( $doc->can('event_mouse_moving') ) {
 			$doc->event_mouse_moving( $self, $event );
 		}
@@ -538,7 +557,7 @@ sub on_left_up {
 		}
 	}
 
-	my $doc = $self->{Document};
+	my $doc = $self->document;
 	if ( $doc and $doc->can('event_on_left_up') ) {
 		$doc->event_on_left_up( $self, $event );
 	}
@@ -572,7 +591,7 @@ sub on_middle_up {
 		$self->Paste;
 	}
 
-	my $doc = $self->{Document};
+	my $doc = $self->document;
 	if ( $doc->can('event_on_middle_up') ) {
 		$doc->event_on_middle_up( $self, $event );
 	}
@@ -595,16 +614,19 @@ sub on_context_menu {
 
 	# Try to determine where to show the context menu
 	if ( $event->isa('Wx::MouseEvent') ) {
+
 		# Position is already window relative
 		$self->PopupMenu( $menu->wx, $event->GetX, $event->GetY );
 
 	} elsif ( $event->can('GetPosition') ) {
+
 		# Assume other event positions are screen relative
 		my $screen = $event->GetPosition;
 		my $client = $self->ScreenToClient($screen);
 		$self->PopupMenu( $menu->wx, $client->x, $client->y );
 
 	} else {
+
 		# Probably a wxCommandEvent
 		# TO DO Capture a better location from the mouse directly
 		$self->PopupMenu( $menu->wx, 1, 1 );
@@ -646,9 +668,9 @@ sub set_document {
 }
 
 sub SetWordChars {
-	my $self = shift;
+	my $self     = shift;
 	my $document = shift;
-	if ( $document ) {
+	if ($document) {
 		$self->SUPER::SetWordChars( $document->scintilla_word_chars );
 	} else {
 		$self->SUPER::SetWordChars('');
@@ -659,7 +681,7 @@ sub SetWordChars {
 sub SetLexer {
 	my $self  = shift;
 	my $lexer = shift;
-	if ( Params::Util::_INSTANCE($lexer, 'Padre::Document') ) {
+	if ( Params::Util::_INSTANCE( $lexer, 'Padre::Document' ) ) {
 		$lexer = $lexer->mimetype;
 	}
 	unless ( Params::Util::_NUMBER($lexer) ) {
@@ -680,7 +702,7 @@ sub SetKeyWords {
 
 	# Handle the higher order cases
 	my $keywords = shift;
-	if ( Params::Util::_INSTANCE($keywords, 'Padre::Document') ) {
+	if ( Params::Util::_INSTANCE( $keywords, 'Padre::Document' ) ) {
 		$keywords = $keywords->mimetype;
 	}
 	unless ( Params::Util::_ARRAY0($keywords) ) {
@@ -752,6 +774,7 @@ sub setup_config {
 	# Enable the symbol margin if anything needs it
 	if ( Padre::Feature::DIFF_DOCUMENT or $config->main_syntax ) {
 		if ( $self->GetMarginWidth(1) == 0 ) {
+
 			# Set margin 1 as a 16 pixel symbol margin
 			$self->SetMarginWidth( Padre::Constant::MARGIN_MARKER, 16 );
 		}
@@ -765,7 +788,7 @@ sub setup_config {
 sub setup_document {
 	my $self     = shift;
 	my $config   = $self->config;
-	my $document = $self->{Document};
+	my $document = $self->document;
 
 	# Reset word characters, most languages don't change it
 	$self->SetWordChars('');
@@ -787,7 +810,7 @@ sub setup_document {
 		# Please enable it when the lexer is changed because it is
 		# the one that creates the code folding for that particular
 		# document
-		if ( Padre::Feature::FOLDING ) {
+		if (Padre::Feature::FOLDING) {
 			$self->show_folding( $config->editor_folding );
 		}
 	}
@@ -811,7 +834,7 @@ sub setup_document {
 
 # Return the character at a given position as a perl string
 sub GetTextAt {
-	chr $_[0]->GetCharAt($_[1]);
+	chr $_[0]->GetCharAt( $_[1] );
 }
 
 sub GetSelectionLength {
@@ -849,13 +872,13 @@ sub get_selection_block {
 
 	# Trim off the bottom lines while no content is selected
 	while ( $endp == $self->PositionFromLine($endl) ) {
-		$endp = $self->GetLineEndPosition(--$endl);
+		$endp = $self->GetLineEndPosition( --$endl );
 		return ( $startl, $endl ) if $startl == $endl;
 	}
 
 	# Trim off the top lines while no content is selected
 	while ( $startp == $self->GetLineEndPosition($startl) ) {
-		$startp = $self->PositionFromLine(++$startl);
+		$startp = $self->PositionFromLine( ++$startl );
 		return ( $startl, $endl ) if $startl == $endl;
 	}
 
@@ -1116,7 +1139,7 @@ sub select_to_matching_brace {
 
 sub refresh_notebook {
 	my $self     = shift;
-	my $document = $self->{Document} or return;
+	my $document = $self->document or return;
 	my $notebook = Params::Util::_INSTANCE(
 		$self->GetParent,
 		'Padre::Wx::Notebook',
@@ -1130,11 +1153,12 @@ sub refresh_notebook {
 	my $old      = $notebook->GetPageText($id);
 	my $filename = $document->filename || '';
 	my $modified = $self->GetModify ? '*' : ' ';
-	my $title    = $modified . (
+	my $title    = $modified
+		. (
 		$filename
 		? File::Basename::basename($filename)
 		: substr( $old, 1 )
-	);
+		);
 
 	# Fixed ticket #190: Massive GDI object leakages
 	# http://padre.perlide.org/ticket/190
@@ -1146,9 +1170,7 @@ sub refresh_notebook {
 
 sub refresh_line_numbers {
 	my $self = shift;
-	$self->show_line_numbers(
-		$self->config->editor_linenumbers
-	);
+	$self->show_line_numbers( $self->config->editor_linenumbers );
 }
 
 # Calculate the maximum possible width, and set to that plus a few pixels.
@@ -1160,7 +1182,7 @@ sub show_line_numbers {
 	my $width = 0;
 
 	if ($on) {
-		$width  = $self->TextWidth(
+		$width = $self->TextWidth(
 			Wx::Scintilla::STYLE_LINENUMBER,
 			"m" x List::Util::max( 2, length $self->GetLineCount )
 		) + 5; # 5 pixel left "margin of the margin
@@ -1231,10 +1253,10 @@ sub _auto_indent {
 	my $prev_line = $self->LineFromPosition($pos) - 1;
 	return if $prev_line < 0;
 
-	my $indent_style = $self->{Document}->get_indentation_style;
+	my $indent_style = $self->document->get_indentation_style;
 
 	my $content = $self->GetLine($prev_line);
-	my $eol     = $self->{Document}->newline;
+	my $eol     = $self->document->newline;
 	$content =~ s/$eol$//;
 	my $indent = ( $content =~ /^(\s+)/ ? $1 : '' );
 
@@ -1273,7 +1295,7 @@ sub _auto_deindent {
 	my $pos  = $self->GetCurrentPos;
 	my $line = $self->LineFromPosition($pos);
 
-	my $indent_style = $self->{Document}->get_indentation_style;
+	my $indent_style = $self->document->get_indentation_style;
 
 	my $content = $self->GetLine($line);
 	my $indent = ( $content =~ /^(\s+)/ ? $1 : '' );
@@ -1408,7 +1430,7 @@ sub convert_eols {
 	my $mode    = $WXEOL{$newline};
 
 	# Apply the change to the underlying document
-	my $document = $self->{Document} or return;
+	my $document = $self->document or return;
 	$document->set_newline_type($newline);
 
 	# Convert and Set the EOL mode in the editor
@@ -1497,17 +1519,11 @@ sub _convert_paste_eols {
 sub comment_toggle {
 	my $self     = shift;
 	my $document = $self->document or return;
-	my $comment  = $document->get_comment_line_string or return;
+	my $comment  = $document->mime->comment or return;
 	my ( $start, $end ) = @_ ? @_ : $self->get_selection_block;
 
-	# Find the comment pattern for this file type
-	# TO DO This is a bit dodgy, and probably won't work
-	if ( Params::Util::_ARRAY($comment) ) {
-		$comment = $comment->[0];
-	}
-
 	# The block is uncommented if any non-blank line within it is
-	my $commented = qr/^\s*\Q$comment\E/;
+	my $commented = $comment->line_match;
 	foreach my $line ( $start .. $end ) {
 		my $text = $self->GetLine($line);
 		next unless $text =~ /\S/;
@@ -1525,16 +1541,20 @@ sub comment_toggle {
 sub comment_indent {
 	my $self     = shift;
 	my $document = $self->document or return;
-	my $comment  = $document->get_comment_line_string or return;
-	my ( $start, $end ) = @_ ? @_ : $self->get_selection_block;
+	my $comment  = $document->mime->comment or return;
+	my $left     = $comment->left;
+	my $right    = $comment->right;
+	my @targets  = ();
 
-	my @targets = ();
-	if ( Params::Util::_ARRAY($comment) ) {
+	my ( $start, $end ) = @_ ? @_ : $self->get_selection_block;
+	if ($right) {
+
 		# Handle languages which use multi-line comment
-		push @targets, [ $end,   $end,   $comment->[1] ];
-		push @targets, [ $start, $start, $comment->[0] ];
+		push @targets, [ $end,   $end,   "$left " ];
+		push @targets, [ $start, $start, " $right" ];
 
 	} else {
+
 		# Handle line-by-line comments
 		$comment .= ' ';
 		for ( my $line = $end; $line >= $start; $line-- ) {
@@ -1544,7 +1564,7 @@ sub comment_indent {
 			# Insert the comment after the indent to retain safe tab
 			# usage for those people that use them.
 			my $pos = $self->GetLineIndentPosition($line);
-			push @targets, [ $pos, $pos, $comment ];
+			push @targets, [ $pos, $pos, "$left " ];
 		}
 	}
 
@@ -1557,17 +1577,21 @@ sub comment_indent {
 sub comment_outdent {
 	my $self     = shift;
 	my $document = $self->document or return;
-	my $comment  = $document->get_comment_line_string or return;
-	my ( $start, $end ) = @_ ? @_ : $self->get_selection_block;
+	my $comment  = $document->mime->comment or return;
+	my $left     = $comment->left;
+	my $right    = $comment->right;
+	my @targets  = ();
 
-	my @targets = ();
+	my ( $start, $end ) = @_ ? @_ : $self->get_selection_block;
 	if ( Params::Util::_ARRAY($comment) ) {
+
 		# Handle languages which use multi-line comment
 		# TO DO to be completed
 
 	} else {
+
 		# Handle line-by-line comments
-		my $regexp = qr/^(\s*)(\Q$comment\E[ \t]*)/;
+		my $regexp = qr/^(\s*)(\Q$left\E ?)/;
 		for ( my $line = $end; $line >= $start; $line-- ) {
 			my $text = $self->GetLine($line);
 			next unless $text =~ /\S/;
@@ -1617,7 +1641,7 @@ sub find_line {
 	my $line = shift;
 
 	# Handle the trivial case with no hint text
-	unless ( @_ ) {
+	unless (@_) {
 		return $self->line($line);
 	}
 
@@ -1637,6 +1661,7 @@ sub find_line {
 	my $low  = $line;
 	my $high = $line;
 	while ( $low >= 0 or $high <= $max ) {
+
 		# Search down one line
 		if ( $high <= $max ) {
 			if ( $self->GetLine($high) =~ $regex ) {
@@ -1660,12 +1685,12 @@ sub find_line {
 sub find_function {
 	my $self     = shift;
 	my $name     = shift;
-	my $document = $self->{Document} or return;
+	my $document = $self->document or return;
 	my $regex    = $document->get_function_regex($name) or return;
 
 	# Run the search
 	require Padre::Search;
-	my ( $from,  $to  ) = $self->GetSelection;
+	my ( $from,  $to )  = $self->GetSelection;
 	my ( $start, $end ) = Padre::Search->matches(
 		text     => $self->GetText,
 		regex    => $regex,
@@ -1747,9 +1772,7 @@ sub goto_function {
 sub goto_line_centerize {
 	my $self = shift;
 	my $line = $self->find_line(@_);
-	$self->goto_pos_centerize(
-		$self->GetLineIndentPosition($line)
-	);
+	$self->goto_pos_centerize( $self->GetLineIndentPosition($line) );
 }
 
 # CREDIT: Borrowed from Kephra
@@ -1763,9 +1786,7 @@ sub goto_pos_centerize {
 	$self->SetAnchor($pos);
 
 	# Move to the position
-	$self->ScrollToLine(
-		$self->line( $line - $self->LinesOnScreen / 2 )
-	);
+	$self->ScrollToLine( $self->line( $line - $self->LinesOnScreen / 2 ) );
 	$self->SetFocus;
 
 	return 1;
@@ -1785,9 +1806,7 @@ sub goto_selection_centerize {
 	# Move to the mid-point of the selection as a starting point.
 	# If the selection is bigger than the screen,
 	# move the caret back onto the screen.
-	$self->ScrollToLine(
-		$self->line( ( $sline + $eline - $self->LinesOnScreen ) / 2 )
-	);
+	$self->ScrollToLine( $self->line( ( $sline + $eline - $self->LinesOnScreen ) / 2 ) );
 	$self->EnsureCaretVisible;
 
 	return 1;
@@ -2126,7 +2145,7 @@ BEGIN {
 		if ($on) {
 
 			# Setup a margin to hold fold markers
-			 # This one needs to be mouse-aware.
+			# This one needs to be mouse-aware.
 			$self->SetMarginSensitive(
 				Padre::Constant::MARGIN_FOLD,
 				1,
@@ -2140,13 +2159,14 @@ BEGIN {
 			# as the themes will override them
 			my $w = Wx::Colour->new("white");
 			my $b = Wx::Colour->new("black");
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEREND,     Wx::Scintilla::SC_MARK_BOXPLUSCONNECTED,  $w, $b );
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEROPENMID, Wx::Scintilla::SC_MARK_BOXMINUSCONNECTED, $w, $b );
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERMIDTAIL, Wx::Scintilla::SC_MARK_TCORNER,           $w, $b );
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERTAIL,    Wx::Scintilla::SC_MARK_LCORNER,           $w, $b );
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERSUB,     Wx::Scintilla::SC_MARK_VLINE,             $w, $b );
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDER,        Wx::Scintilla::SC_MARK_BOXPLUS,           $w, $b );
-			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEROPEN,    Wx::Scintilla::SC_MARK_BOXMINUS,          $w, $b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEREND, Wx::Scintilla::SC_MARK_BOXPLUSCONNECTED, $w, $b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEROPENMID, Wx::Scintilla::SC_MARK_BOXMINUSCONNECTED, $w,
+				$b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERMIDTAIL, Wx::Scintilla::SC_MARK_TCORNER,  $w, $b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERTAIL,    Wx::Scintilla::SC_MARK_LCORNER,  $w, $b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERSUB,     Wx::Scintilla::SC_MARK_VLINE,    $w, $b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDER,        Wx::Scintilla::SC_MARK_BOXPLUS,  $w, $b );
+			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEROPEN,    Wx::Scintilla::SC_MARK_BOXMINUS, $w, $b );
 
 			# Activate
 			$self->SetProperty( 'fold' => 1 );
@@ -2286,7 +2306,7 @@ BEGIN {
 	#
 	*store_cursor_position = sub {
 		my $self     = shift;
-		my $document = $self->{Document} or return;
+		my $document = $self->document or return;
 		my $file     = $document->{file} or return;
 		Padre::DB::LastPositionInFile->set_last_pos(
 			$file->filename,
@@ -2303,7 +2323,7 @@ BEGIN {
 	#
 	*restore_cursor_position = sub {
 		my $self     = shift;
-		my $document = $self->{Document} or return;
+		my $document = $self->document or return;
 		my $file     = $document->{file} or return;
 		my $filename = $file->filename;
 		my $position = Padre::DB::LastPositionInFile->get_last_pos($filename);

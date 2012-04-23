@@ -53,21 +53,20 @@ use Class::XSAccessor {
 	}
 };
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::StatusBar
 };
 
 use constant {
-	FILENAME    => 0,
-	TASKLOAD    => 1,
-	MIMETYPE    => 2,
-	NEWLINE     => 3,
-	POSTRING    => 4,
-	RDONLY      => 5,
+	FILENAME => 0,
+	TASKLOAD => 1,
+	MIMETYPE => 2,
+	NEWLINE  => 3,
+	POSTRING => 4,
+	RDONLY   => 5,
 };
-
 
 
 
@@ -215,9 +214,9 @@ sub refresh {
 		$self->SetStatusText( $status, FILENAME );
 	}
 	$self->SetStatusText( $mime_name, MIMETYPE );
-	$self->SetStatusText( $newline,   NEWLINE  );
+	$self->SetStatusText( $newline,   NEWLINE );
 	$self->SetStatusText( $postring,  POSTRING );
-	$self->SetStatusText( $rdstatus,  RDONLY   );
+	$self->SetStatusText( $rdstatus,  RDONLY );
 	$self->SetStatusWidths(
 		-1,
 		$self->_task_width,
@@ -311,7 +310,8 @@ sub update_pos {
 	my $start   = $editor->PositionFromLine($line);
 	my $lines   = $editor->GetLineCount;
 	my $char    = $position - $start;
-	my $percent = int( 100 * $line / $lines );
+	my $percent = int( 100 * ( $line + 1 ) / $lines );
+
 
 	my $format = '%' . length( $lines + 1 ) . 's,%-3s %3s%%';
 	my $postring = sprintf( $format, ( $line + 1 ), $char, $percent );
@@ -408,7 +408,7 @@ sub is_read_only {
 	my $document = $self->current->document;
 	return '' unless defined($document);
 
-	return $document->is_readonly ? Wx::gettext('Read Only') : Wx::gettext('R/W');
+	return $document->is_readonly ? Wx::gettext('Read Only') : Wx::gettext('Read Write');
 }
 
 

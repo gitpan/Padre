@@ -22,7 +22,7 @@ use Params::Util          ();
 use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::AuiNotebook
@@ -227,9 +227,7 @@ change once we get specialised non-text entry tabs.
 =cut
 
 sub editors {
-	return grep {
-		Params::Util::_INSTANCE($_, 'Padre::Wx::Editor')
-	} $_[0]->pages;
+	return grep { Params::Util::_INSTANCE( $_, 'Padre::Wx::Editor' ) } $_[0]->pages;
 }
 
 =pod
@@ -335,7 +333,7 @@ sub find_pane_by_label {
 	my $self   = shift;
 	my $label  = shift;
 	my @labels = $self->labels;
-	my ($id)   = grep { $label eq $labels[$_][0] } 0 .. $#labels;
+	my ($id) = grep { $label eq $labels[$_][0] } 0 .. $#labels;
 	return $id;
 }
 

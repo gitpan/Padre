@@ -9,8 +9,8 @@ Padre::Sync - Utility functions for handling remote Configuration Syncing
 =head1 DESCRIPTION
 
 The C<Padre::Sync> class contains logic for communicating with a remote 
-L<Madre::Sync> server. This class interacts with the L<Padre::Wx::Dialog::Sync>
-class for user interface display.
+L<Madre::Sync> server. This class interacts with the
+L<Padre::Wx::Dialog::Sync> class for user interface display.
 
 =head1 METHODS
 
@@ -19,18 +19,19 @@ class for user interface display.
 use 5.008;
 use strict;
 use warnings;
-use Carp           ();
-use File::Spec     ();
-use Scalar::Util   ();
-use Params::Util   ();
-use JSON::XS       ();
-use LWP::UserAgent ();
-use HTTP::Cookies  ();
-use HTTP::Request::Common qw/GET POST DELETE PUT/;
-use Padre::Current  ();
-use Padre::Constant ();
+use Carp                  ();
+use File::Spec            ();
+use Scalar::Util          ();
+use Params::Util          ();
+use JSON::XS              ();
+use LWP::UserAgent        ();
+use HTTP::Cookies         ();
+use HTTP::Request::Common ();
+use Padre::Current        ();
+use Padre::Constant       ();
 
-our $VERSION = '0.94';
+our $VERSION    = '0.96';
+our $COMPATIBLE = '0.95';
 
 
 
@@ -55,20 +56,15 @@ First argument should be a Padre object.
 sub new {
 	my $class = shift;
 	my $ide = Params::Util::_INSTANCE( shift, 'Padre' );
-	unless ($ide) {
-		Carp::croak("Creation of a Padre::Sync without a Padre not possible");
-	}
+	Carp::croak("Failed to create Padre::Sync") unless $ide;
 
 	# Create the useragent.
 	# We need this to handle login actions.
 	# Save cookies for state management from Padre session to session
-	# is this even wanted? remove at padre close?
-	my $ua = LWP::UserAgent->new;
-
-	#push @{ $ua->requests_redirectable }, 'POST';
-	$ua->timeout(5);
-	$ua->cookie_jar(
-		HTTP::Cookies->new(
+	# NOTE: Is this even wanted? Remove at padre close?
+	my $ua = LWP::UserAgent->new(
+		timeout    => 10,
+		cookie_jar => HTTP::Cookies->new(
 			file => File::Spec->catfile(
 				Padre::Constant::CONFIG_DIR,
 				'lwp_cookies.dat',
@@ -81,7 +77,6 @@ sub new {
 		ide   => $ide,
 		state => 'not_logged_in',
 		ua    => $ua,
-		json  => JSON::XS->new,
 		@_,
 	}, $class;
 
@@ -130,35 +125,35 @@ sub ua {
 
 Attempts to register a user account with the information provided on the
 Sync server. 
+
 Parameters: a list of key value pairs to be interpreted as POST parameters
-Returns error string if user state is already logged in or serverside error occurs.
+
+Returns error string if user state is already logged in or serverside error
+occurs.
 
 =cut
 
 sub register {
 	my $self   = shift;
-	my $params = shift;
-	my $server = $self->config->config_sync_server;
-
-	return 'Registration Failure'      unless %$params;
-	return 'Failure: no server found.' unless $server;
+	my %params = @_;
 
 	if ( $self->{state} ne 'not_logged_in' ) {
 		return 'Failure: cannot register account, user already logged in.';
 	}
 
-	# this crashes if server is unavailable. FIXME
-	my $response = $self->ua->request(
-		POST "$server/register",
+	# BUG: This crashes if server is unavailable.
+	my $server = $self->server or return 'Failure: no server found.';
+	my $response = $self->POST(
+		"$server/register",
 		'Content-Type' => 'application/json',
-		'Content'      => $self->{json}->encode($params),
+		'Content'      => $self->encode( \%params ),
 	);
 	if ( $response->code == 201 ) {
 		return 'Account registered successfully. Please log in.';
 	}
 
 	local $@;
-	my $h = eval { $self->{json}->decode( $response->content ) };
+	my $h = eval { $self->decode( $response->content ); };
 
 	return "Registration failure(Server): $h->{error}" if $h->{error};
 	return "Registration failure(Padre): $@" if $@;
@@ -175,18 +170,14 @@ be updated if login successful.
 =cut
 
 sub login {
-	my $self   = shift;
-	my $params = [@_];
-	my $server = $self->config->config_sync_server;
-
-	return 'Failure: no server found.' unless $server;
+	my $self = shift;
 
 	if ( $self->{state} ne 'not_logged_in' ) {
 		return 'Failure: cannot log in, user already logged in.';
 	}
 
-	my $response = $self->ua->request( POST "$server/login", $params );
-
+	my $server = $self->server or return 'Failure: no server found.';
+	my $response = $self->POST( "$server/login", [ {@_} ] );
 	if ( $response->content !~ /Wrong username or password/i
 		and ( $response->code == 200 or $response->code == 302 ) )
 	{
@@ -207,17 +198,14 @@ State will be updated.
 =cut
 
 sub logout {
-	my $self   = shift;
-	my $server = $self->config->config_sync_server;
-
-	return 'Failure: no server found.' if not $server;
+	my $self = shift;
 
 	if ( $self->{state} ne 'logged_in' ) {
 		return 'Failure: cannot logout, user not logged in.';
 	}
 
-	my $response = $self->ua->request( GET "$server/logout" );
-
+	my $server = $self->server or return 'Failure: no server found.';
+	my $response = $self->GET("$server/logout");
 	if ( $response->code == 200 ) {
 		$self->{state} = 'not_logged_in';
 		return 'Logged out successfully.';
@@ -230,24 +218,21 @@ sub logout {
 
 =head2 C<server_delete>
 
-Given a logged in session, will attempt to delete the config currently stored
-on the Sync server (if one currently exists).
+Given a logged in session, will attempt to delete the config currently
+stored on the Sync server (if one currently exists).
 Will fail if not logged in.
 
 =cut
 
 sub server_delete {
-	my $self   = shift;
-	my $server = $self->config->config_sync_server;
-
-	return 'Failure: no server found.' if not $server;
+	my $self = shift;
 
 	if ( $self->{state} ne 'logged_in' ) {
 		return 'Failure: user not logged in.';
 	}
 
-	my $response = $self->ua->request( DELETE "$server/config" );
-
+	my $server = $self->server or return 'Failure: no server found.';
+	my $response = $self->DELETE("$server/config");
 	if ( $response->code == 204 ) {
 		return 'Configuration deleted successfully.';
 	}
@@ -266,27 +251,20 @@ the Sync server.
 =cut
 
 sub local_to_server {
-	my $self   = shift;
-	my $server = $self->config->config_sync_server;
-
-	return 'Failure: no server found.' if not $server;
+	my $self = shift;
 
 	if ( $self->{state} ne 'logged_in' ) {
 		return 'Failure: user not logged in.';
 	}
 
-	my $conf = $self->config->human;
-
-	# theres gotta be a better way to do this
-	my %h;
-	for my $k ( keys %$conf ) {
-		$h{$k} = $conf->{$k};
-	}
-
-	my $response = $self->ua->request(
-		PUT "$server/config",
+	# NOTE: There has be a better way to do this
+	my $conf     = $self->config->human;
+	my %copy     = %$conf;
+	my $server   = $self->server or return 'Failure: no server found.';
+	my $response = $self->PUT(
+		"$server/config",
 		'Content-Type' => 'application/json',
-		'Content'      => $self->{json}->encode( \%h ),
+		'Content'      => $self->encode( \%copy ),
 	);
 	if ( $response->code == 204 ) {
 		return 'Configuration uploaded successfully.';
@@ -299,37 +277,36 @@ sub local_to_server {
 
 =head2 C<server_to_local>
 
-Given a logged in session, will replace the local config with what is stored on 
-the server. 
+Given a logged in session, will replace the local config with what is stored
+on the server. 
 TODO: is validation of config before replacement required?
 
 =cut
 
 sub server_to_local {
-	my $self   = shift;
-	my $config = $self->config;
-	my $server = $config->config_sync_server;
-
-	return 'Failure: no server found.' unless $server;
+	my $self = shift;
 
 	if ( $self->{state} ne 'logged_in' ) {
 		return 'Failure: user not logged in.';
 	}
 
-	my $response = $self->ua->request(
-		GET "$server/config",
+	my $server = $self->server or return 'Failure: no server found.';
+	my $response = $self->GET(
+		"$server/config",
 		'Accept' => 'application/json',
 	);
 
 	local $@;
 	my $json;
-	eval { $json = $self->{json}->decode( $response->content ); };
+	eval { $json = $self->decode( $response->content ); };
 	return 'Failed to deserialize serverside configuration.' if $@;
 
-	# Apply each setting to the global config. should only be HUMAN settings
+	# Apply each setting to the global config. should only be HUMAN
+	# settings.
 	delete $json->{Version};
 	delete $json->{version};
 	my @errors;
+	my $config = $self->config;
 	for my $key ( keys %$json ) {
 		my $meta = eval { $config->meta($key); };
 		unless ( $meta and $meta->store == Padre::Constant::HUMAN ) {
@@ -368,6 +345,44 @@ sub english_status {
 	return "State unknown: $self->{state}";
 }
 
+
+
+
+
+######################################################################
+# Support Methods
+
+sub encode {
+	JSON::XS->new->encode( $_[1] );
+}
+
+sub decode {
+	JSON::XS->new->decode( $_[1] );
+}
+
+sub server {
+	my $self   = shift;
+	my $server = $self->config->config_sync_server;
+	$server =~ s/\/$// if $server;
+	return $server;
+}
+
+sub GET {
+	shift->ua->request( HTTP::Request::Common::GET(@_) );
+}
+
+sub POST {
+	shift->ua->request( HTTP::Request::Common::POST(@_) );
+}
+
+sub PUT {
+	shift->ua->request( HTTP::Request::Common::PUT(@_) );
+}
+
+sub DELETE {
+	shift->ua->request( HTTP::Request::Common::DELETE(@_) );
+}
+
 1;
 
 =pod
@@ -380,8 +395,8 @@ L<Padre>, L<Padre::Config>
 
 Copyright 2008-2012 The Padre development team as listed in Padre.pm.
 
-This program is free software; you can redistribute it and/or modify it under the
-same terms as Perl 5 itself.
+This program is free software; you can redistribute it and/or modify it
+under the same terms as Perl 5 itself.
 
 =cut
 

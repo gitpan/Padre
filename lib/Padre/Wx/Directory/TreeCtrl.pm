@@ -6,15 +6,17 @@ use warnings;
 use File::Path                 ();
 use File::Spec                 ();
 use File::Basename             ();
-use Padre::Util                ('_T');
 use Padre::Constant            ();
 use Padre::Wx                  ();
 use Padre::Wx::TreeCtrl        ();
+use Padre::Wx::Role::Idle      ();
 use Padre::Wx::Role::Main      ();
 use Padre::Wx::Directory::Path ();
+use Padre::Locale::T;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
+	Padre::Wx::Role::Idle
 	Padre::Wx::Role::Main
 	Padre::Wx::TreeCtrl
 };
@@ -69,7 +71,9 @@ sub new {
 	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
 		$self, $self,
 		sub {
-			shift->on_tree_item_activated(@_);
+			$_[0]->idle_method(
+				on_tree_item_activated => $_[1]->GetItem,
+			);
 		}
 	);
 
@@ -107,7 +111,7 @@ sub new {
 # Called when the item is actived
 sub on_tree_item_activated {
 	my $self   = shift;
-	my $item   = shift->GetItem;
+	my $item   = shift;
 	my $data   = $self->GetPlData($item);
 	my $parent = $self->GetParent;
 
@@ -137,7 +141,7 @@ sub key_up {
 
 	my $current = $self->current;
 	my $main    = $current->main;
-	my $project = $current->project;
+	my $project = $current->project or return;
 	my $item_id = $self->GetSelection;
 	my $data    = $self->GetPlData($item_id) or return;
 	my $file    = File::Spec->catfile( $project->root, $data->path );

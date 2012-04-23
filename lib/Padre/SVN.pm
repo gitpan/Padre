@@ -7,7 +7,7 @@ use strict;
 use warnings;
 use File::Spec ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 # Find the mime type for a file
 sub file_mimetype {
@@ -18,7 +18,7 @@ sub file_mimetype {
 # Find and parse the properties file
 sub file_props {
 	my $file = shift;
-	my $base = find_props($file);
+	my $base = find_props($file) or return undef;
 	return parse_props($base);
 }
 
@@ -28,7 +28,7 @@ sub find_props {
 	my ( $v, $d, $f ) = File::Spec->splitpath($file);
 	my $path = File::Spec->catpath(
 		$v,
-		File::Spec->catdir( $d, '.svn', 'prop' ),
+		File::Spec->catdir( $d, '.svn', 'props' ),
 		$f . '.svn-work',
 	);
 	return $path if -f $path;
@@ -53,15 +53,16 @@ sub parse_props {
 	my $key    = undef;
 	my $value  = undef;
 	while ( my $line = <$fh> ) {
-		if ( $vbytes ) {
+		if ($vbytes) {
 			my $l = length $line;
 			if ( $l == $vbytes + 1 ) {
+
 				# Perfect content length
 				chomp($line);
 				$hash{$key} = $value . $line;
-				$vbytes = 0;
-				$key    = undef;
-				$value  = undef;
+				$vbytes     = 0;
+				$key        = undef;
+				$value      = undef;
 				next;
 			}
 			if ( $l > $vbytes ) {
@@ -72,9 +73,10 @@ sub parse_props {
 			die "Found value longer than specified length";
 		}
 
-		if ( $kbytes ) {
+		if ($kbytes) {
 			my $l = length $line;
 			if ( $l == $kbytes + 1 ) {
+
 				# Perfect content length
 				chomp($line);
 				$key .= $line;

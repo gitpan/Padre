@@ -9,6 +9,7 @@ use utf8;
 
 # Non-Padre modules we need in order to do the single-instance
 # check should be loaded early to simplify the load order.
+use version       ();
 use Carp          ();
 use Cwd           ();
 use File::Spec    ();
@@ -19,12 +20,8 @@ use YAML::Tiny    ();
 use DBI           ();
 use DBD::SQLite   ();
 
-# load this before things are messed up to produce versions like '0,76'!
-# TO DO: Bug report dispatched. Likely to be fixed in 0.77.
-use version ();
-
-our $VERSION    = '0.94';
-our $COMPATIBLE = '0.81';
+our $VERSION    = '0.96';
+our $COMPATIBLE = '0.95';
 
 # Since everything is used OO-style, we will be require'ing
 # everything other than the bare essentials
@@ -34,7 +31,7 @@ use Padre::DB       ();
 use Padre::Logger;
 
 # Generate faster accessors
-use Class::XSAccessor 1.05 {
+use Class::XSAccessor 1.13 {
 	getters => {
 		original_cwd    => 'original_cwd',
 		opts            => 'opts',
@@ -42,6 +39,7 @@ use Class::XSAccessor 1.05 {
 		task_manager    => 'task_manager',
 		plugin_manager  => 'plugin_manager',
 		project_manager => 'project_manager',
+		sync_manager    => 'sync_manager',
 	},
 	accessors => {
 		actions     => 'actions',
@@ -162,6 +160,12 @@ sub new {
 		conduit => $wx->conduit,
 	);
 
+	# Create the sync manager
+	# require Padre::ServerManager;
+	# $self->{sync_manager} = Padre::ServerManager->new(
+	# ide => $self,
+	# );
+
 	# Startup completed, let go of the database
 	Padre::DB->commit;
 
@@ -260,23 +264,6 @@ sub run {
 
 	TRACE("Switching into runtime mode") if DEBUG;
 	$self->wx->MainLoop;
-}
-
-# Save the YAML configuration file
-sub save_config {
-	$_[0]->config->write;
-}
-
-
-
-
-
-#####################################################################
-# Project Management
-
-# Temporary pass-through
-sub project {
-	$_[0]->project_manager->project( $_[1] );
 }
 
 1;
@@ -385,7 +372,6 @@ is running inside Padre or not.
 
   padre --index
 
-
 =head1 SQLite
 
 Padre is using an SQLite database (F<~/.padre/config.db>) for two
@@ -437,7 +423,7 @@ Delete All Ending space does just what it says.
 
 Delete Leading Space will ask How many leading spaces and act accordingly.
 
-=head1 Code layout
+=head1 ARCHITECTURE
 
 =over 4
 
@@ -571,8 +557,8 @@ handles everything the menu should know and do.
 
 =item L<Padre::Wx::Output>
 
-the output window at the bottom of the editor displaying the output
-of running code using C<F5>.
+the output window at the bottom of the editor displaying the output of
+running code using C<F5>.
 
 =item L<Padre::Wx::HtmlWindow>
 
@@ -595,6 +581,45 @@ Implementing the continuous syntax check of Perl code.
 handles everything the toolbar should know and do.
 
 =back
+
+=head1 METHODS
+
+The C<Padre> class itself provides a number of convenience methods.
+
+=head2 C<ide>
+
+  my $ide = Padre->ide;
+
+The static C<ide> method returns the L<Padre> singleton object if the IDE
+has been created, or throws an exception if the IDE has not been created.
+
+=head2 C<new>
+
+  my $ide = Padre->new(%options);
+
+The C<new> constructor creates the new singleton L<Padre> object, or throws
+an exception if the IDE has already been created.
+
+It takes a set of parsed command line options as a parameter, storing them
+until they are needed at startup.
+
+=head2 C<wx>
+
+  my $app = Padre->wx;
+
+The static C<wx> method is a convenience wrapper around the underlying
+global variable C<$Wx::TheApp> provided by the L<Wx> module.
+
+For convenience reasons, it can also be used as an instance method.
+
+Returns a L<Wx::App> object, or C<undef> if the application object has not
+yet been created.
+
+=head2 C<run>
+
+  $padre->run;
+
+The C<run> method starts the Padre IDE and enters the Wx main loop.
 
 =head1 BUGS
 
@@ -686,6 +711,8 @@ Kaare Rasmussen (KAARE) E<lt>kaare@cpan.orgE<gt>
 Keedi Kim - 김도형 (KEEDI)
 
 Kenichi Ishigaki - 石垣憲一 (ISHIGAKI) E<lt>ishigaki@cpan.orgE<gt>
+
+Kevin Dawson (BOWTIE) E<lt>bowtie@cpan.orgE<gt>
 
 Mark Grimes E<lt>mgrimes@cpan.orgE<gt>
 

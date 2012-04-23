@@ -10,7 +10,7 @@ use Padre::Wx             ();
 use Padre::Wx::Role::Main ();
 use Padre::Wx::Theme      ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Choice
@@ -37,6 +37,7 @@ sub config_set {
 		# and not of the translated label.
 		# Doing sort in Wx will probably break this.
 		foreach my $option ( sort keys %$options ) {
+
 			# Don't localise the label as Padre::Wx::Theme will do
 			# the localisation for us in this special case.
 			my $label = $options->{$option};

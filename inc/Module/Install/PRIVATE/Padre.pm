@@ -13,7 +13,7 @@ use File::Find ();
 use Config;
 use ExtUtils::Embed;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 use base qw{ Module::Install::Base };
 
 sub setup_padre {
@@ -111,7 +111,7 @@ sub check_wx_version {
 			return;
 		}
 		unless ( Wx::wxUNICODE() ) {
-			nono("Padre needs wxWidgest to be compiled with Unicode support (--enable-unicode)");
+			nono("Padre needs wxWidgets to be compiled with Unicode support (--enable-unicode)");
 		}
 	}
 

@@ -7,7 +7,7 @@ use Params::Util              ();
 use Padre::DB                 ();
 use Padre::Wx::FBP::Bookmarks ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Wx::FBP::Bookmarks';
 
 
@@ -66,9 +66,7 @@ sub run_set {
 	# Save it to the database
 	SCOPE: {
 		my $transaction = $self->main->lock('DB');
-		Padre::DB::Bookmark->delete(
-			'where name = ?', $name,
-		);
+		Padre::DB::Bookmark->delete_where( 'name = ?', $name );
 		Padre::DB::Bookmark->create(
 			name => $name,
 			file => $path,

@@ -15,7 +15,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx::ComboBox::FindTerm ();
 use Padre::Wx::ComboBox::History ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -56,6 +56,14 @@ sub new {
 		[
 			"search",
 		],
+	);
+
+	Wx::Event::EVT_COMBOBOX(
+		$self,
+		$self->{find_term},
+		sub {
+			shift->refresh(@_);
+		},
 	);
 
 	Wx::Event::EVT_TEXT(
@@ -271,7 +279,7 @@ sub on_close {
 }
 
 sub refresh {
-	$_[0]->main->error('Handler method refresh for event find_term.OnText not implemented');
+	$_[0]->main->error('Handler method refresh for event find_term.OnCombobox not implemented');
 }
 
 sub find_next_clicked {

@@ -10,7 +10,7 @@ use Wx::Scintilla::Constant ();
 use Padre::Logger qw(TRACE);
 
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx
 	Padre::Wx::FBP::Diff
@@ -127,7 +127,7 @@ CODE
 				$lines_added++;
 
 				my @lines = split /^/, $text;
-				$left_editor->AnnotationSetText( $line-1, "\n" x (scalar @lines - 1) );
+				$left_editor->AnnotationSetText( $line - 1, "\n" x ( scalar @lines - 1 ) );
 				$right_editor->StartStyling( $right_editor->PositionFromLine($line), 0xFF );
 				$right_editor->SetStyling( length($text), 2 );
 			}

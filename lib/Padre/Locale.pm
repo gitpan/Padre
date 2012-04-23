@@ -42,17 +42,17 @@ use File::Spec ();
 # Padre::Wx should not implement anything using Wx modules.
 # We make an exception in this case, because we're only using the locale
 # logic in Wx, which isn't related to widgets anyway.
-use Padre::Constant  ();
-use Padre::Util      ();
-use Padre::Config    ();
-use Padre::Wx        ();
+use Padre::Constant ();
+use Padre::Util     ();
+use Padre::Config   ();
+use Padre::Wx       ();
 use Padre::Locale::T;
 use Padre::Logger;
 
 use constant DEFAULT  => 'en-gb';
 use constant SHAREDIR => Padre::Util::sharedir('locale');
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 # The RFC4646 table is the primary language data table and contains
 # mappings from a Padre-supported language to all the relevant data

@@ -13,7 +13,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -179,10 +179,18 @@ sub new {
 		Wx::LC_REPORT | Wx::LC_SINGLE_SEL,
 	);
 
+	Wx::Event::EVT_LIST_ITEM_SELECTED(
+		$self,
+		$self->{variables},
+		sub {
+			shift->_on_list_item_selected(@_);
+		},
+	);
+
 	$self->{show_local_variables} = Wx::CheckBox->new(
 		$self,
 		-1,
-		Wx::gettext("Show Local Variables (y 0)"),
+		Wx::gettext("Show Local Variables"),
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
 	);
@@ -413,7 +421,7 @@ sub new {
 		Wx::BU_AUTODRAW,
 	);
 	$self->{evaluate_expression}->SetToolTip(
-		Wx::gettext("p expr \nSame as print {\$DB::OUT} expr in the current package. In particular, because this is just Perl's own print function.\n\nx [maxdepth] expr\nEvaluates its expression in list context and dumps out the result in a pretty-printed fashion. Nested data structures are printed out recursively,")
+		Wx::gettext("Evaluate expression\n\t\$ -> p\n\t\@ -> x\n\t% -> x\n\np expr \nSame as print {\$DB::OUT} expr in the current package. In particular, because this is just Perl's own print function.\n\nx [maxdepth] expr\nEvaluates its expression in list context and dumps out the result in a pretty-printed fashion. Nested data structures are printed out recursively,")
 	);
 
 	Wx::Event::EVT_BUTTON(
@@ -563,6 +571,10 @@ sub new {
 	return $self;
 }
 
+sub show_local_variables {
+	$_[0]->{show_local_variables};
+}
+
 sub trace {
 	$_[0]->{trace};
 }
@@ -597,6 +609,10 @@ sub on_display_value_clicked {
 
 sub on_quit_debugger_clicked {
 	$_[0]->main->error('Handler method on_quit_debugger_clicked for event quit_debugger.OnButtonClick not implemented');
+}
+
+sub _on_list_item_selected {
+	$_[0]->main->error('Handler method _on_list_item_selected for event variables.OnListItemSelected not implemented');
 }
 
 sub on_show_local_variables_checked {

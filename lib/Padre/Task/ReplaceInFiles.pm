@@ -9,7 +9,7 @@ use Padre::Search ();
 use Padre::Task   ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Task';
 
 
@@ -172,7 +172,7 @@ sub run {
 					text => $buffer,
 				);
 				unless ( defined $type and $type eq $self->{mime} ) {
-					TRACE("Skipped $fullname: Not a $self->{mime} (got " . ($type || 'undef') . ")") if DEBUG;
+					TRACE( "Skipped $fullname: Not a $self->{mime} (got " . ( $type || 'undef' ) . ")" ) if DEBUG;
 					next;
 				}
 			}

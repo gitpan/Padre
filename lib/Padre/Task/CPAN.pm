@@ -7,7 +7,7 @@ use Padre::Task     ();
 use Padre::Constant ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Task';
 
 # Maximum number of MetaCPAN results
@@ -184,7 +184,7 @@ sub metacpan_pod {
 			synopsis     => '',
 			distro       => $module,
 			download_url => $download_url,
-	};
+		};
 	}
 
 	# The pod text is here

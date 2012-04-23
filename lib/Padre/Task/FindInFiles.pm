@@ -4,12 +4,11 @@ use 5.008;
 use strict;
 use warnings;
 use File::Spec    ();
-use Time::HiRes   ();
-use Padre::Search ();
 use Padre::Task   ();
+use Padre::Search ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = 'Padre::Task';
 
 
@@ -81,7 +80,7 @@ sub run {
 
 		# Abort the task if we've been cancelled
 		if ( $self->cancelled ) {
-			TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+			TRACE( __PACKAGE__ . 'task has been cancelled' ) if DEBUG;
 			$self->tell_status;
 			return 1;
 
@@ -110,7 +109,7 @@ sub run {
 
 			# Abort the task if we've been cancelled
 			if ( $self->cancelled ) {
-				TRACE('Padre::Wx::Directory::Search task has been cancelled') if DEBUG;
+				TRACE( __PACKAGE__ . 'task has been cancelled' ) if DEBUG;
 				$self->tell_status;
 				return 1;
 			}
@@ -164,7 +163,8 @@ sub run {
 					text => $buffer,
 				);
 				unless ( defined $type and $type eq $self->{mime} ) {
-					TRACE("Skipped $fullname: Not a $self->{mime} (got " . ($type || 'undef') . ")") if DEBUG;
+
+					# TRACE("Skipped $fullname: Not a $self->{mime} (got " . ($type || 'undef') . ")") if DEBUG;
 					next;
 				}
 			}
@@ -174,15 +174,15 @@ sub run {
 				$buffer,
 				$self->{search}->search_regex,
 			);
-			TRACE( "Found " . scalar(@lines) . " matches in " . $fullname ) if DEBUG;
 			next unless @lines;
+			TRACE( "Found " . scalar(@lines) . " matches in " . $fullname ) if DEBUG;
 
 			# Found results, inform our owner
 			$self->tell_owner( $object, @lines );
 
 			# If the task wants manual output capture as well,
 			# then save the result as well.
-			if ( $output ) {
+			if ($output) {
 				push @$output, [ $object, @lines ];
 			}
 		}

@@ -5,13 +5,14 @@ use strict;
 use warnings;
 use utf8;
 use Config;
+use PPI                     ();
 use Padre::Wx               ();
 use Wx::Perl::ProcessStream ();
 use Padre::Util             ();
-use PPI                     ();
+use Padre::Locale::Format   ();
 use Padre::Wx::FBP::About   ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::FBP::About
 };
@@ -23,16 +24,17 @@ use constant {
 sub run {
 	my $class = shift;
 	my $self  = $class->SUPER::new(@_);
-	
+
 	# Always show the first tab regardless of which one
 	# was selected in wxFormBuilder.
 	$self->notebook->ChangeSelection(0);
 
 	# Load the platform-adaptive splash image
 	$self->{splash}->SetBitmap( Wx::Bitmap->new( Padre::Util::splash, Wx::BITMAP_TYPE_PNG ) );
+
 	# $self->creator->SetLabel("G\x{e1}bor Szab\x{f3}"); # don't work
 	$self->creator->SetLabel('Created by Gábor Szabó'); # works
-	
+
 	# Set the system information
 	$self->{output}->ChangeValue( $self->_information );
 
@@ -40,7 +42,7 @@ sub run {
 	$self->_translation;
 
 	$self->CenterOnParent;
-	
+
 	# Show the dialog
 	$self->ShowModal;
 
@@ -104,10 +106,10 @@ sub _information {
 	$output .= $self->_wx_info;
 	$output .= "Other...\n";
 	$output .= sprintf "%*s %s\n", OFFSET, 'PPI',   $PPI::VERSION;
-	
+
 	require Debug::Client;
 	$output .= sprintf "%*s %s\n", OFFSET, 'Debug::Client', $Debug::Client::VERSION;
-	
+
 	$output .= sprintf "%*s %s\n", OFFSET, Wx::gettext('Config'), Padre::Constant::CONFIG_DIR;
 	return $output;
 }
@@ -146,7 +148,11 @@ sub _core_info {
 
 	# Calculate the current memory in use across all threads
 	my $ram = Padre::Util::process_memory();
-	$ram = $ram ? Padre::Util::humanbytes($ram) : Wx::gettext('(unsupported)');
+	if ($ram) {
+		$ram = Padre::Locale::Format::bytes($ram);
+	} else {
+		$ram = Wx::gettext('(unsupported)');
+	}
 	$output .= sprintf "%*s %s\n", OFFSET, Wx::gettext("RAM"), $ram;
 
 	return $output;

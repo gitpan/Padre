@@ -15,7 +15,7 @@ use Padre::Wx::Role::Main ();
 use Padre::Wx::TreeCtrl ();
 use File::ShareDir ();
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -124,15 +124,7 @@ sub new {
 		-1,
 		Wx::DefaultPosition,
 		Wx::DefaultSize,
-		Wx::TR_FULL_ROW_HIGHLIGHT | Wx::TR_HAS_BUTTONS | Wx::TR_HIDE_ROOT | Wx::TR_SINGLE,
-	);
-
-	Wx::Event::EVT_TREE_ITEM_ACTIVATED(
-		$self,
-		$self->{tree},
-		sub {
-			shift->item_clicked(@_);
-		},
+		Wx::TR_FULL_ROW_HIGHLIGHT | Wx::TR_HAS_BUTTONS | Wx::TR_HIDE_ROOT | Wx::TR_SINGLE | Wx::NO_BORDER,
 	);
 
 	my $top_sizer = Wx::BoxSizer->new(Wx::HORIZONTAL);
@@ -167,10 +159,6 @@ sub collapse_all_clicked {
 
 sub stop_clicked {
 	$_[0]->main->error('Handler method stop_clicked for event stop.OnButtonClick not implemented');
-}
-
-sub item_clicked {
-	$_[0]->main->error('Handler method item_clicked for event tree.OnTreeItemActivated not implemented');
 }
 
 1;

@@ -17,7 +17,7 @@ BEGIN {
 		exit 0;
 	}
 
-	plan tests => 16;
+	plan tests => 15;
 }
 
 use Padre::Logger;
@@ -28,6 +28,7 @@ use Padre::TaskManager        ();
 use Padre::Task::Addition     ();
 use t::lib::Padre::NullWindow ();
 
+use constant TIMER_POSTINIT   => Wx::NewId();
 use constant TIMER_LASTRESORT => Wx::NewId();
 
 use_ok('Test::NoWarnings');
@@ -46,12 +47,15 @@ isa_ok( $wxapp, 'Padre::Wx::App' );
 my $window = t::lib::Padre::NullWindow->new;
 isa_ok( $window, 't::lib::Padre::NullWindow' );
 
-my $manager = Padre::TaskManager->new( conduit => $window );
+my $manager = Padre::TaskManager->new(
+	threads => 0,
+	conduit => $window,
+);
 isa_ok( $manager, 'Padre::TaskManager' );
 
 # Schedule the startup timer
-Wx::Event::EVT_TIMER( $wxapp, Padre::Wx::Main::TIMER_POSTINIT, \&startup );
-my $timer1 = Wx::Timer->new( $wxapp, Padre::Wx::Main::TIMER_POSTINIT );
+Wx::Event::EVT_TIMER( $wxapp, TIMER_POSTINIT, \&startup );
+my $timer1 = Wx::Timer->new( $wxapp, TIMER_POSTINIT );
 
 # Schedule the failure timeout
 Wx::Event::EVT_TIMER( $wxapp, TIMER_LASTRESORT, \&timeout );
@@ -90,7 +94,7 @@ sub startup {
 	# Run the startup process
 	ok( $manager->start, '->start ok' );
 	Time::HiRes::sleep(1);
-	is( scalar( threads->list ), 1, 'Three threads exists' );
+	is( scalar( threads->list ), 0, 'Three threads exists' );
 
 	# Create the sample task
 	my $addition = Padre::Task::Addition->new(
@@ -111,8 +115,8 @@ sub timeout {
 	# Run the shutdown process
 	$timer1 = undef;
 	$timer2 = undef;
-	ok( $manager->stop,     '->stop ok' );
-	ok( $manager->waitjoin, '->waitjoin ok' );
+	ok( $manager->stop, '->stop ok' );
+	sleep(1);
 
 	# $window->Show(0) if $window;
 	$wxapp->ExitMainLoop;

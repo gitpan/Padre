@@ -19,7 +19,7 @@ use Padre::Wx::Action ();
 use Padre::Locale::T;
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 
 
@@ -150,7 +150,7 @@ sub init {
 		comment    => _T('Open a document with a skeleton Perl 5 script'),
 		menu_event => sub {
 			require Padre::Document::Perl::Starter;
-			Padre::Document::Perl::Starter->new($_[0])->create_script;
+			Padre::Document::Perl::Starter->new( $_[0] )->create_script;
 		},
 	);
 
@@ -160,7 +160,7 @@ sub init {
 		comment    => _T('Open a document with a skeleton Perl 5 module'),
 		menu_event => sub {
 			require Padre::Document::Perl::Starter;
-			Padre::Document::Perl::Starter->new($_[0])->create_module;
+			Padre::Document::Perl::Starter->new( $_[0] )->create_module;
 		},
 	);
 
@@ -170,7 +170,7 @@ sub init {
 		comment    => _T('Open a document with a skeleton Perl 5 test script'),
 		menu_event => sub {
 			require Padre::Document::Perl::Starter;
-			Padre::Document::Perl::Starter->new($_[0])->create_test;
+			Padre::Document::Perl::Starter->new( $_[0] )->create_test;
 		},
 	);
 
@@ -533,7 +533,7 @@ sub init {
 		comment    => _T('Remove the entries from the recent files list'),
 		menu_event => sub {
 			my $lock = Padre::Current->main->lock( 'UPDATE', 'DB', 'refresh_recent' );
-			Padre::DB::History->delete( 'where type = ?', 'files' );
+			Padre::DB::History->delete_where( 'type = ?', 'files' );
 		},
 	);
 
@@ -547,7 +547,16 @@ sub init {
 		toolbar     => 'actions/document-properties',
 		menu_event  => sub {
 			require Padre::Wx::Dialog::Document;
-			Padre::Wx::Dialog::Document->run($_[0]);
+			Padre::Wx::Dialog::Document->run( $_[0] );
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name       => 'file.sloccount',
+		label      => _T('&Project Statistics'),
+		menu_event => sub {
+			require Padre::Wx::Dialog::SLOC;
+			Padre::Wx::Dialog::SLOC->run( $_[0] );
 		},
 	);
 
@@ -1355,7 +1364,7 @@ sub init {
 
 	Padre::Wx::Action->new(
 		name        => 'view.functions',
-		label       => _T('Show &Functions'),
+		label       => _T('Show &Function List'),
 		comment     => _T('Show a window listing all the functions in the current document'),
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
@@ -1394,12 +1403,12 @@ sub init {
 	) if Padre::Feature::DIFF_WINDOW;
 
 	Padre::Wx::Action->new(
-		name        => 'view.todo',
-		label       => _T('Show &To-do List'),
-		comment     => _T('Show a window listing all todo items in the current document'),
+		name        => 'view.tasks',
+		label       => _T('Show &Task List'),
+		comment     => _T('Show a window listing all task items in the current document'),
 		menu_method => 'AppendCheckItem',
 		menu_event  => sub {
-			$_[0]->show_todo( $_[0]->menu->view->{todo}->IsChecked );
+			$_[0]->show_tasks( $_[0]->menu->view->{tasks}->IsChecked );
 		},
 	);
 
@@ -2035,7 +2044,21 @@ sub init {
 	if (Padre::Feature::DEBUGGER) {
 
 		Padre::Wx::Action->new(
-			name        => 'debug.breakpoints',
+			name => 'debug.breakpoints',
+			need => sub {
+				eval { Padre::Current->document->filename };
+				if ($@) {
+					return 0;
+				}
+				if ( !defined( Padre::Current->document->filename ) ) {
+					return 0;
+				}
+				if ( Padre::Current->document->mimetype =~ m/perl/ ) {
+					return 1;
+				} else {
+					return 0;
+				}
+			},
 			label       => _T('Show Debug Breakpoints'),
 			comment     => _T('Turn on debug breakpoints panel'),
 			menu_method => 'AppendCheckItem',
@@ -2045,7 +2068,6 @@ sub init {
 					$_[0]->{breakpoints}->on_refresh_click();
 				}
 			},
-
 		);
 
 		Padre::Wx::Action->new(
@@ -2074,7 +2096,11 @@ sub init {
 				eval { Padre::Current->document->filename };
 				if ($@) {
 					return 0;
-				} elsif ( Padre::Current->document->mimetype =~ m/perl/ ) {
+				}
+				if ( !defined( Padre::Current->document->filename ) ) {
+					return 0;
+				}
+				if ( Padre::Current->document->mimetype =~ m/perl/ ) {
 					return 1;
 				} else {
 					return 0;
@@ -2103,6 +2129,9 @@ sub init {
 				if ($@) {
 					return 0;
 				}
+				if ( !defined( Padre::Current->document->filename ) ) {
+					return 0;
+				}
 				if ( Padre::Current->document->mimetype =~ m/perl/ ) {
 					return 1;
 				} else {
@@ -2119,6 +2148,7 @@ sub init {
 				} else {
 					require Padre::Breakpoints;
 					Padre::Breakpoints->set_breakpoints_clicked();
+					Padre::Breakpoints->show_breakpoints();
 				}
 				return;
 			},
@@ -2129,9 +2159,9 @@ sub init {
 			need => sub {
 				$main->{debugger};
 			},
-			toolbar => 'actions/red_cross',
-			label   => _T('Quit Debugger (&q)'),
-			comment => _T('Quit the process being debugged'),
+			toolbar    => 'actions/red_cross',
+			label      => _T('Quit Debugger (&q)'),
+			comment    => _T('Quit the process being debugged'),
 			menu_event => sub {
 				if ( $_[0]->{debugger} ) {
 					$_[0]->{debugger}->on_quit_debugger_clicked;
@@ -2204,7 +2234,7 @@ sub init {
 		comment    => _T('Show the Padre plug-in manager to enable or disable plug-ins'),
 		menu_event => sub {
 			require Padre::Wx::Dialog::PluginManager;
-			Padre::Wx::Dialog::PluginManager->run($_[0]);
+			Padre::Wx::Dialog::PluginManager->run( $_[0] );
 		},
 	);
 
@@ -2375,19 +2405,6 @@ sub init {
 			$_[0]->refresh_functions( $_[0]->current );
 			$_[0]->show_functions(1);
 			$_[0]->functions->focus_on_search;
-		},
-	);
-
-	Padre::Wx::Action->new(
-		name    => 'window.goto_todo_window',
-		label   => _T('Go to &Todo Window'),
-		comment => _T('Set the focus to the "Todo" window'),
-
-		#shortcut   => 'Alt-T', # conflicts with the Tools menu
-		menu_event => sub {
-			$_[0]->refresh_todo( $_[0]->current );
-			$_[0]->show_todo(1);
-			$_[0]->todo->focus_on_search;
 		},
 	);
 
@@ -2576,7 +2593,7 @@ sub init {
 		comment    => _T('Show information about Padre'),
 		menu_event => sub {
 			require Padre::Wx::Dialog::About;
-			Padre::Wx::Dialog::About->run($_[0]);
+			Padre::Wx::Dialog::About->run( $_[0] );
 		},
 	);
 	return 1;

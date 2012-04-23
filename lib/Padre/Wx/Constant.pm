@@ -4,7 +4,7 @@ use 5.008;
 use strict;
 use warnings;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 
 use constant WANT => qw{
 	wxCLRP_SHOW_LABEL
@@ -320,6 +320,7 @@ sub load {
 		X11     => Wx::wxX11,
 	);
 	foreach ( keys %constants ) {
+
 		# Prevent duplicates on 2nd or later runs
 		delete $constants{$_} if defined $seen{$_};
 	}

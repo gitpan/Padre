@@ -5,16 +5,18 @@ use strict;
 use warnings;
 use Cwd                   ();
 use Padre::DB             ();
+use Padre::MIME           ();
+use Padre::Role::Task     ();
 use Padre::Wx             ();
 use Padre::Wx::Icon       ();
+use Padre::Wx::Role::Idle ();
 use Padre::Wx::Role::Main ();
-use Padre::MIME      ();
-use Padre::Role::Task     ();
 use Padre::Logger;
 
-our $VERSION = '0.94';
+our $VERSION = '0.96';
 our @ISA     = qw{
 	Padre::Role::Task
+	Padre::Wx::Role::Idle
 	Padre::Wx::Role::Main
 	Wx::Dialog
 };
@@ -85,23 +87,23 @@ sub init_search {
 sub ok_button {
 	my $self = shift;
 	my $main = $self->main;
-
 	$self->Hide;
 
-	#Open the selected resources here if the user pressed OK
-	my @selections = $self->{matches_list}->GetSelections;
-	foreach my $selection (@selections) {
-		my $filename = $self->{matches_list}->GetClientData($selection);
+	# Open the selected resources here if the user pressed OK
+	my $lock = $main->lock('DB');
+	my $list = $self->{matches_list};
+	foreach my $selection ( $list->GetSelections ) {
+		my $filename = $list->GetClientData($selection);
 
 		# Fetch the recently used files from the database
 		require Padre::DB::RecentlyUsed;
-		my $recently_used = Padre::DB::RecentlyUsed->select(
+		my $recent = Padre::DB::RecentlyUsed->select(
 			"where type = ? and value = ?",
 			'RESOURCE',
 			$filename,
 		) || [];
 
-		my $found = scalar @$recently_used > 0;
+		my $found = scalar @$recent > 0;
 
 		eval {
 
@@ -114,7 +116,7 @@ sub ok_button {
 			}
 		};
 		if ($@) {
-			$main->error(sprintf( Wx::gettext('Error while trying to perform Padre action: %s'), $@ ));
+			$main->error( sprintf( Wx::gettext('Error while trying to perform Padre action: %s'), $@ ) );
 			TRACE("Error while trying to perform Padre action: $@") if DEBUG;
 		} else {
 
@@ -426,7 +428,7 @@ sub _setup_events {
 		}
 	);
 
-	$self->_show_recent_while_idle;
+	$self->idle_method('show_recent');
 }
 
 #
@@ -463,30 +465,18 @@ sub show {
 			$self->{search_text}->ChangeValue('');
 		}
 
-		$self->_show_recent_while_idle;
+		$self->idle_method('show_recent');
 
 		$self->Show(1);
 	}
 }
 
-#
-# Shows recently opened stuff while idle
-#
-sub _show_recent_while_idle {
+# Show recently opened resources
+sub show_recent {
 	my $self = shift;
-
-	Wx::Event::EVT_IDLE(
-		$self,
-		sub {
-			$self->_show_recently_opened_resources;
-
-			# focus on the search text box
-			$self->{search_text}->SetFocus;
-
-			# unregister from idle event
-			Wx::Event::EVT_IDLE( $self, undef );
-		}
-	);
+	$self->_show_recently_opened_resources;
+	$self->{search_text}->SetFocus;
+	return;
 }
 
 #
@@ -577,7 +567,7 @@ sub render {
 		if ( $filename =~ /^$search_expr/i ) {
 
 			# display package name if it is a Perl file
-			my $pkg = '';
+			my $pkg       = '';
 			my $mime_type = Padre::MIME->detect(
 				file  => $file,
 				perl6 => $self->config->lang_perl6_auto_detection,
@@ -609,7 +599,7 @@ sub render {
 
 				# display package name if it is a Perl file
 				my $mime_type = Padre::MIME->detect(
-					file => $file,
+					file  => $file,
 					perl6 => $self->config->lang_perl6_auto_detection,
 				);
 				if ( $mime_type eq 'application/x-perl' or $mime_type eq 'application/x-perl6' ) {
@@ -618,7 +608,7 @@ sub render {
 						$pkg_name = "  ($1)";
 					}
 				} else {
-					next if $is_perl_package_expr;        # do nothing if input contains : or ::
+					next if $is_perl_package_expr; # do nothing if input contains : or ::
 				}
 			}
 
