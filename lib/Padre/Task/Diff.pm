@@ -1,20 +1,21 @@
 package Padre::Task::Diff;
 
-use 5.008005;
+use 5.010;
 use strict;
 use warnings;
-use Padre::Task     ();
-use Padre::Util     ();
-use Algorithm::Diff ();
-use Encode          ();
-use File::Basename  ();
-use File::Spec      ();
-use File::Which     ();
-use File::Temp      ();
-use Params::Util    ();
+use Padre::Task      ();
+use Padre::Util      ();
+use Padre::Util::SVN ();
+use Algorithm::Diff  ();
+use Encode           ();
+use File::Basename   ();
+use File::Spec       ();
+use File::Which      ();
+use File::Temp       ();
+use Params::Util     ();
 use Padre::Logger qw(TRACE);
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = 'Padre::Task';
 
 ######################################################################
@@ -39,7 +40,9 @@ sub new {
 	$self->{filename} = $file ? $file->filename : undef;
 
 	# Obtain project's Version Control System (VCS)
-	$self->{vcs} = $document->project->vcs;
+	if ( $document->project ) {
+		$self->{vcs} = $document->project->vcs;
+	}
 
 	# Obtain document text
 	$self->{text} = $document->text_get;
@@ -52,8 +55,6 @@ sub new {
 
 	return $self;
 }
-
-
 
 
 
@@ -116,13 +117,21 @@ sub _find_vcs_diff {
 sub _find_svn_diff {
 	my ( $self, $filename, $text, $encoding ) = @_;
 
-	my $local_cheat = File::Spec->catfile(
-		File::Basename::dirname($filename),
-		'.svn', 'text-base',
-		File::Basename::basename($filename) . '.svn-base'
-	);
-	my $origin = _slurp( $local_cheat, $encoding );
-	return $origin ? $self->_find_diffs( $$origin, $text ) : undef;
+	# Find the svn command line
+	my $svn = File::Which::which('svn') or return;
+
+	# Handle spaces in svn executable path under win32
+	$svn = qq{"$svn"} if Padre::Constant::WIN32;
+
+	my ( $file, $dir, $suffix ) = File::Basename::fileparse($filename);
+	TRACE("dir: $dir") if DEBUG;
+	my $svn_client_info_ref =
+		Padre::Util::run_in_directory_two( cmd => $svn . ' cat ' . $filename, dir => $dir, option => '0' );
+	my $svn_output = $svn_client_info_ref->{output};
+
+	TRACE("svn output: $svn_output") if DEBUG;
+	return $self->_find_diffs( $svn_output, $text );
+
 }
 
 # Reads the contents of a file, and decode it using document encoding scheme
@@ -170,6 +179,7 @@ sub _find_git_diff {
 		'1>' . $out->filename,
 		'2>' . $err->filename,
 	);
+	TRACE("git command: @cmd") if DEBUG;
 
 	# We need shell redirection (list context does not give that)
 	# Run command in directory
@@ -180,6 +190,7 @@ sub _find_git_diff {
 	my $stderr = _slurp( $err->filename, $encoding );
 
 	if ( defined($stderr) and ( $$stderr eq '' ) and defined($stdout) ) {
+		TRACE("git stdout: $$stdout") if DEBUG;
 		return $self->_find_diffs( $$stdout, $text );
 	}
 
@@ -198,7 +209,7 @@ sub _find_diffs {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

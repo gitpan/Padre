@@ -4,7 +4,7 @@ use 5.008005;
 use strict;
 use warnings;
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.93';
 
 1;
@@ -88,7 +88,7 @@ any timers, cancel tasks or do pre-destruction teardown.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl 5 itself.

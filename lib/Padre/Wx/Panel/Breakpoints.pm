@@ -1,16 +1,17 @@
 package Padre::Wx::Panel::Breakpoints;
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 use Padre::Util                 ();
+use Padre::Breakpoints          ();
 use Padre::Wx                   ();
 use Padre::Wx::Util             ();
 use Padre::Wx::Icon             ();
 use Padre::Wx::Role::View       ();
 use Padre::Wx::FBP::Breakpoints ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::FBP::Breakpoints
@@ -195,49 +196,15 @@ sub on_set_breakpoints_clicked {
 	my $self     = shift;
 	my $current  = $self->current;
 	my $document = $current->document;
-	my $editor   = $current->editor;
-	my %bp_action;
 
 	if ( $document->mimetype !~ m/perl/ ) {
 		return;
 	}
 
-	$self->_setup_db;
-	$self->{current_file} = $document->filename;
-	$self->{current_line} = $editor->GetCurrentLine + 1;
-	$bp_action{line}      = $self->{current_line};
-
-	if ($#{ $self->{debug_breakpoints}
-				->select( "WHERE filename = ? AND line_number = ?", $self->{current_file}, $self->{current_line} )
-		} >= 0
-		)
-	{
-
-		# say 'delete me';
-		$editor->MarkerDelete(
-			$self->{current_line} - 1,
-			Padre::Constant::MARKER_BREAKPOINT()
-		);
-		$editor->MarkerDelete(
-			$self->{current_line} - 1,
-			Padre::Constant::MARKER_NOT_BREAKABLE()
-		);
-		$self->_delete_bp_db;
-		$bp_action{action} = 'delete';
-
-	} else {
-
-		# say 'create me';
-		$self->{bp_active} = 1;
-		$editor->MarkerAdd(
-			$self->{current_line} - 1,
-			Padre::Constant::MARKER_BREAKPOINT()
-		);
-		$self->_add_bp_db;
-		$bp_action{action} = 'add';
-	}
-	$self->on_refresh_click;
-	return \%bp_action;
+	#add / remove the breakpoint on the current line
+	my $bp_action = Padre::Breakpoints->set_breakpoints_clicked;
+	
+	return $bp_action;
 }
 
 #######
@@ -290,6 +257,38 @@ sub on_delete_project_bp_clicked {
 	}
 
 	$self->on_refresh_click;
+	return;
+}
+
+#######
+# Event Handler _on_list_item_selected
+# equivalent to p|x the varaible
+#######
+sub _on_list_item_selected {
+	my $self          = shift;
+	my $event         = shift;
+	my $current       = $self->current;
+	my $editor        = $current->editor or return;
+	my $main          = $self->main;
+	my $index         = $event->GetIndex;          # zero based
+	my $variable_name = $event->GetText;
+
+	my $file = $self->{project_dir} . $variable_name or return;
+	my $row  = $self->{line_numbers}[$index]         or return;
+
+	# Open the file if needed
+	if ( $editor->{Document}->filename ne $file ) {
+		$main->setup_editor($file);
+		$editor = $main->current->editor;
+		if ( $self->main->{breakpoints} ) {
+			$self->main->{breakpoints}->on_refresh_click;
+		}
+	}
+
+	$editor->goto_line_centerize( $row - 1 );
+
+	$self->_update_list;
+
 	return;
 }
 
@@ -349,8 +348,11 @@ sub _update_list {
 	# Clear ListCtrl items
 	$self->{list}->DeleteAllItems;
 
-	my $sql_select = 'ORDER BY filename DESC, line_number DESC';
+	# my $sql_select = 'ORDER BY filename DESC, line_number DESC';
+	my $sql_select = 'ORDER BY filename ASC, line_number ASC';
 	my @tuples     = $self->{debug_breakpoints}->select($sql_select);
+
+	$self->{line_numbers} = [];
 
 	my $index = 0;
 	my $item  = Wx::ListItem->new;
@@ -376,9 +378,11 @@ sub _update_list {
 				$self->{list}->SetItem( $index, 1, ( $tuples[$_][2] ) );
 				$tuples[$_][1] =~ s/^ $self->{project_dir} //sxm;
 				$self->{list}->SetItem( $index, 0, ( $tuples[$_][1] ) );
+				$self->{line_numbers}[$index] = $tuples[$_][2];
 
 				#Do not remove comment, just on show for now, do not remove
 				# $self->{list}->SetItem( $index++, 2, ( $tuples[$_][3] ) );
+				$index++;
 
 			}
 
@@ -397,12 +401,14 @@ sub _update_list {
 					$self->{list}->SetItem( $index, 1, ( $tuples[$_][2] ) );
 					$tuples[$_][1] =~ s/^ $self->{project_dir} //sxm;
 					$self->{list}->SetItem( $index, 0, ( $tuples[$_][1] ) );
+					$self->{line_numbers}[$index] = $tuples[$_][2];
 
 					#Do not remove comment, just on show for now, do not remove
 					# $self->{list}->SetItem( $index++, 2, ( $tuples[$_][3] ) );
-
+					$index++;
 				}
 			}
+
 		}
 
 		Padre::Wx::Util::tidy_list( $self->{list} );
@@ -413,7 +419,7 @@ sub _update_list {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

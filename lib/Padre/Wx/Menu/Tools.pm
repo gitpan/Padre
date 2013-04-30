@@ -13,7 +13,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -61,29 +61,30 @@ sub new {
 	);
 
 	# Create the module tools submenu
-	my $modules = Wx::Menu->new;
-	$self->Append(
-		-1,
-		Wx::gettext('&Module Tools'),
-		$modules,
-	);
+	#ToDo Commeted out as per #1433, redundent code needs to be removed
+	# my $modules = Wx::Menu->new;
+	# $self->Append(
+		# -1,
+		# Wx::gettext('&Module Tools'),
+		# $modules,
+	# );
 
-	$self->add_menu_action(
-		$modules,
-		'plugins.install_local',
-	);
+	# $self->add_menu_action(
+		# $modules,
+		# 'plugins.install_local',
+	# );
 
-	$self->add_menu_action(
-		$modules,
-		'plugins.install_remote',
-	);
+	# $self->add_menu_action(
+		# $modules,
+		# 'plugins.install_remote',
+	# );
 
-	$modules->AppendSeparator;
+	# $modules->AppendSeparator;
 
-	$self->add_menu_action(
-		$modules,
-		'plugins.cpan_config',
-	);
+	# $self->add_menu_action(
+		# $modules,
+		# 'plugins.cpan_config',
+	# );
 
 	$self->AppendSeparator;
 
@@ -210,7 +211,7 @@ sub refresh {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

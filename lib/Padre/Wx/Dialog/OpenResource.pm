@@ -13,7 +13,7 @@ use Padre::Wx::Role::Idle ();
 use Padre::Wx::Role::Main ();
 use Padre::Logger;
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Idle
@@ -678,14 +678,14 @@ Ahmad M. Zawawi E<lt>ahmad.zawawi at gmail.comE<gt>
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

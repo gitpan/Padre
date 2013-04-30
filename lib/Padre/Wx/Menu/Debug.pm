@@ -9,7 +9,7 @@ use Padre::Wx       ();
 use Padre::Wx::Menu ();
 use Padre::Current  ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -47,6 +47,10 @@ sub new {
 		'debug.launch',
 	);
 
+	$self->{launch_options} = $self->add_menu_action(
+		'debug.launch_options',
+	);
+
 	$self->{set_breakpoint} = $self->add_menu_action(
 		'debug.set_breakpoint',
 	);
@@ -81,6 +85,7 @@ sub refresh {
 	$self->{debugger}->Check( $config->main_debugger );
 
 	$self->{launch}->Enable(1);
+	$self->{launch_options}->Enable(1);
 	$self->{set_breakpoint}->Enable(1);
 	$self->{quit}->Enable(1);
 
@@ -91,7 +96,7 @@ sub refresh {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

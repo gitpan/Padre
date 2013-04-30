@@ -2,14 +2,14 @@ package Padre::Project;
 
 # Base project functionality for Padre
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 use Padre::Current  ();
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.93';
 
 
@@ -164,6 +164,11 @@ sub _vcs {
 	if ( -d File::Spec->catdir( $root, '.svn' ) ) {
 		return Padre::Constant::SUBVERSION;
 	}
+
+	#Hack for svn 1.7 esp Padre trunk to re-enable VCS feature.
+	elsif ( -d File::Spec->catdir( $root, '..', '.svn' ) ) {
+			return Padre::Constant::SUBVERSION;
+		}
 	if ( -d File::Spec->catdir( $root, '.git' ) ) {
 		return Padre::Constant::GIT;
 	}
@@ -374,7 +379,7 @@ sub DESTROY {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

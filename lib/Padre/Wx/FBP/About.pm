@@ -13,7 +13,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Dialog
@@ -84,7 +84,7 @@ sub new {
 	$self->{m_staticText34} = Wx::StaticText->new(
 		$self->{padre},
 		-1,
-		Wx::gettext("Copyright 2008–2012 The Padre Development Team Padre is free software; \nyou can redistribute it and/or modify it under the same terms as Perl 5."),
+		Wx::gettext("Copyright 2008–2013 The Padre Development Team Padre is free software; \nyou can redistribute it and/or modify it under the same terms as Perl 5."),
 	);
 
 	$self->{m_staticText67} = Wx::StaticText->new(
@@ -312,6 +312,12 @@ sub new {
 		$self->{development},
 		-1,
 		Wx::gettext("code4pay"),
+	);
+
+	$self->{m_staticText541} = Wx::StaticText->new(
+		$self->{development},
+		-1,
+		Wx::gettext("Sven Dowideit"),
 	);
 
 	$self->{translation} = Wx::Panel->new(
@@ -568,6 +574,12 @@ sub new {
 		Wx::gettext("Cezary Morga"),
 	);
 
+	$self->{marek_roszkowski} = Wx::StaticText->new(
+		$self->{translation},
+		-1,
+		Wx::gettext("Marek Roszkowski"),
+	);
+
 	$self->{m_staticText472212} = Wx::StaticText->new(
 		$self->{translation},
 		-1,
@@ -719,6 +731,7 @@ sub new {
 	$gSizer3->Add( $self->{m_staticText56}, 0, Wx::ALL, 5 );
 	$gSizer3->Add( $self->{m_staticText7}, 0, Wx::ALL, 5 );
 	$gSizer3->Add( $self->{m_staticText54}, 0, Wx::ALL, 5 );
+	$gSizer3->Add( $self->{m_staticText541}, 0, Wx::ALL, 5 );
 
 	my $bSizer3 = Wx::BoxSizer->new(Wx::VERTICAL);
 	$bSizer3->Add( $gSizer3, 0, Wx::EXPAND, 5 );
@@ -787,6 +800,7 @@ sub new {
 	my $bSizer62211 = Wx::BoxSizer->new(Wx::VERTICAL);
 	$bSizer62211->Add( $self->{m_staticText472211}, 0, Wx::ALL, 4 );
 	$bSizer62211->Add( $self->{cezary_morga}, 0, Wx::ALL, 2 );
+	$bSizer62211->Add( $self->{marek_roszkowski}, 0, Wx::ALL, 2 );
 
 	my $bSizer62212 = Wx::BoxSizer->new(Wx::VERTICAL);
 	$bSizer62212->Add( $self->{m_staticText472212}, 0, Wx::ALL, 4 );
@@ -945,6 +959,10 @@ sub cezary_morga {
 	$_[0]->{cezary_morga};
 }
 
+sub marek_roszkowski {
+	$_[0]->{marek_roszkowski};
+}
+
 sub breno_g_de_oliveira {
 	$_[0]->{breno_g_de_oliveira};
 }
@@ -975,7 +993,7 @@ sub output {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

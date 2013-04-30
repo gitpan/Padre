@@ -7,7 +7,7 @@ use Carp                ();
 use Scalar::Util        ();
 use Padre::Browser::POD ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 use Class::XSAccessor {
 	getters => {
@@ -157,12 +157,19 @@ sub new {
 	return $self;
 }
 
+# Load a class, safely and efficiently
+sub _load_class {
+	my $class = shift;
+	( my $source = "$class.pm" ) =~ s{::}{/}g;
+	eval { require $source };
+}
+
 sub load_provider {
 	my ( $self, $class ) = @_;
 
 	unless ( $class->VERSION ) {
-		eval "require $class;";
-		die("Failed to load $class: $@") if $@;
+		_load_class($class)
+			or die "Failed to load $class: $@";
 	}
 	if ( $class->can('provider_for') ) {
 		$self->register_providers( $_ => $class ) for $class->provider_for;
@@ -182,8 +189,8 @@ sub load_provider {
 sub load_viewer {
 	my ( $self, $class ) = @_;
 	unless ( $class->VERSION ) {
-		eval "require $class;";
-		die("Failed to load $class: $@") if $@;
+		_load_class($class)
+			or die("Failed to load $class: $@");
 	}
 	if ( $class->can('viewer_for') ) {
 		$self->register_viewers( $_ => $class ) for $class->viewer_for;
@@ -209,8 +216,8 @@ sub register_viewers {
 	while ( my ( $type, $class ) = each %viewers ) {
 		$self->get_viewers->{$type} = $class;
 		unless ( $class->VERSION ) {
-			eval "require $class;";
-			die("Failed to load $class: $@") if $@;
+			_load_class($class)
+				or die("Failed to load $class: $@");
 		}
 	}
 	$self;
@@ -228,8 +235,7 @@ sub provider_for {
 	my ( $self, $type ) = @_;
 	my $p;
 	eval {
-		if ( exists $self->get_providers->{$type} )
-		{
+		if ( exists $self->get_providers->{$type} ) {
 			$p = $self->get_providers->{$type}->new;
 		}
 	};
@@ -249,8 +255,7 @@ sub viewer_for {
 	my ( $self, $type ) = @_;
 	my $v;
 	eval {
-		if ( exists $self->get_viewers->{$type} )
-		{
+		if ( exists $self->get_viewers->{$type} ) {
 			$v = $self->get_viewers->{$type}->new;
 		}
 	};
@@ -305,7 +310,7 @@ sub browse {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

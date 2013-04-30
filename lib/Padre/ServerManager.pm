@@ -6,15 +6,31 @@ package Padre::ServerManager;
 use 5.008;
 use strict;
 use warnings;
-use Carp              ();
-use File::Spec        ();
-use Padre::Constant   ();
-use Padre::Role::Task ();
+use Carp                ();
+use File::Spec          ();
+use JSON::XS            ();
+use Padre::Constant     ();
+use Padre::Role::Task   ();
+use Padre::Role::PubSub ();
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.95';
-our @ISA        = 'Padre::Role::Task';
+our @ISA        = qw{
+	Padre::Role::Task
+	Padre::Role::PubSub
+};
 
+# Subscribable Events
+use constant {
+	SERVER_VERSION => 'server_version',
+	SERVER_ERROR   => 'server_error',
+	LOGIN_SUCCESS  => 'login_success',
+	LOGIN_FAILURE  => 'login_failure',
+	PUSH_SUCCESS   => 'push_success',
+	PUSH_FAILURE   => 'push_failure',
+	PULL_SUCCESS   => 'pull_success',
+	PULL_FAILURE   => 'pull_failure',
+};
 
 
 
@@ -26,22 +42,24 @@ sub new {
 	my $class = shift;
 	my $self  = bless {
 		@_,
-		state   => 'LOGOUT',
 		version => undef,
+		user    => undef,
 	}, $class;
 
 	# Check and default params
 	unless ( $self->{ide} ) {
 		Carp::croak("Did not provide ide param to Padre::ServerManager");
 	}
-	unless ( $self->{cookie_file} ) {
-		$self->{cookie_file} = File::Spec->catfile(
-			Padre::Constant::CONFIG_DIR,
-			'lwp_cookies.dat',
-		);
-	}
 
 	return $self;
+}
+
+sub server {
+	$_[0]->{server};
+}
+
+sub user {
+	$_[0]->{user};
 }
 
 
@@ -53,28 +71,25 @@ sub new {
 
 sub version {
 	my $self = shift;
-	unless ( $self->{state} eq 'LOGOUT' ) {
-
-		# Not sure what to do with this...
-		return undef;
-	}
 
 	# Reset task state and send the request
 	$self->task_reset;
 	$self->task_get(
-		url       => 'version',
 		on_finish => 'version_finish',
+		url       => 'version',
 	);
 }
 
 sub version_finish {
-	my $self = shift;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
+	unless ( $json ) {
+		return $self->publish( SERVER_ERROR, $response );
+	}
 
-	#my $response = shift->response or return;
-
-	# TODO: To be completed
-
-	return 1;
+	$self->{server} = $json->{server};
+	$self->publish( SERVER_VERSION );
 }
 
 
@@ -87,29 +102,37 @@ sub version_finish {
 sub login {
 	my $self = shift;
 
-	unless ( $self->{state} eq 'LOGOUT' ) {
-
-		# Not sure what to do with this...
-		return undef;
-	}
+	# Do we have the things we need
+	my $config   = $self->config;
+	my $email    = $config->identity_email       or return undef;
+	my $password = $config->config_sync_password or return undef;
 
 	# Reset task state and send the request
 	$self->task_reset;
 	$self->task_post(
-		url       => 'login',
-		query     => {},            # TODO: stuff
 		on_finish => 'login_finish',
+		url       => 'login',
+		query     => {
+			email    => $email,
+			password => $password,
+		},
 	);
 }
 
 sub login_finish {
-	my $self = shift;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
 
-	#my $response = shift->response or return;
+	# Handle the positive case first, it is simpler
+	if ( $json ) {
+		$self->{user} = $json->{user};
+		$self->publish( LOGIN_SUCCESS );
+		return 1;
+	}
 
-	# TODO: To be completed
-
-	return 1;
+	# Handle the failed login case
+	$self->publish( LOGIN_FAILURE );
 }
 
 
@@ -122,23 +145,31 @@ sub login_finish {
 sub register {
 	my $self = shift;
 
+	# Do we have the things we need
+	my $config   = $self->config;
+	my $email    = $config->identity_email       or return undef;
+	my $password = $config->config_sync_password or return undef;
+
 	# Reset task state and send the request
 	$self->task_reset;
 	$self->task_post(
-		url       => 'register',
-		query     => {},               # TODO: stuff
 		on_finish => 'register_finish',
+		url       => 'register',
+		query     => {
+			email    => $email,
+			password => $password,
+		},
 	);
 }
 
 sub register_finish {
-	my $self = shift;
-
-	#my $response = shift->response or return;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
 
 	# TODO: To be completed
 
-	return 1;
+	$self->publish("on_register", $response);
 }
 
 
@@ -149,26 +180,50 @@ sub register_finish {
 # Configuration Pull Task
 
 sub pull {
-	my $self = shift;
+	my $self     = shift;
+	my $config   = $self->config;
+	my $email    = $config->identity_email       or return undef;
+	my $password = $config->config_sync_password or return undef;
 
 	# Fetch the server configuration
 	$self->task_reset;
 	$self->task_get(
-		url       => 'config',
 		on_finish => 'pull_finish',
+		url       => 'config',
+		query     => {
+			email    => $email,
+			password => $password,
+		},
 	);
 
 	return 1;
-}
+} 
 
 sub pull_finish {
-	my $self = shift;
+	my $self     = shift;
+	my $config   = $self->config;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
+	unless ( $json ) {
+		return $self->publish( PULL_FAILURE );
+	}
 
-	#my $response = shift->response or return;
+	# Apply the server settings to the current instance
+	my $server = $json->{config}->{data};
+	if (Params::Util::_HASH0($server)) {
+		foreach my $name ( $config->settings ) {
+			my $meta = $config->meta($name);
+			if ($meta->store == Padre::Constant::HUMAN) {
+				if (exists $server->{$name}) {
+					$config->apply($name, $server->{$name});
+				} else {
+					$config->apply($name, $config->default($name));
+				}
+			}
+		}
+	}
 
-	# TODO: To be completed
-
-	return 1;
+	return $self->publish( PULL_SUCCESS, $json->{config} );
 }
 
 
@@ -181,24 +236,35 @@ sub pull_finish {
 sub push {
 	my $self = shift;
 
+	# Do we have the things we need
+	my $config   = $self->config;
+	my $email    = $config->identity_email       or return undef;
+	my $password = $config->config_sync_password or return undef;
+
 	# Send configuration to the server
 	$self->task_reset;
-	$self->task_put(
-		url       => 'config',
+	$self->task_post(
 		on_finish => 'push_finish',
+		url       => 'config',
+		query     => {
+			email    => $email,
+			password => $password,
+			data     => $self->encode( $self->config->human->as_hash ),
+		},
 	);
 
 	return 1;
 }
 
 sub push_finish {
-	my $self = shift;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
+	unless ( $json ) {
+		return $self->publish( PUSH_FAILURE );
+	}
 
-	#my $response = shift->response or return;
-
-	# TODO: To be completed
-
-	return 1;
+	return $self->publish( PUSH_SUCCESS, $json->{config} );
 }
 
 
@@ -214,21 +280,21 @@ sub delete {
 	# Delete configuration from the server
 	$self->task_reset;
 	$self->task_delete(
-		url       => 'config',
 		on_finish => 'delete_finish',
+		url       => 'config',
 	);
 
 	return 1;
 }
 
 sub delete_finish {
-	my $self = shift;
-
-	#my $response = shift->response or return;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
 
 	# TODO: To be completed
 
-	return 1;
+	$self->publish("on_delete", $response);
 }
 
 
@@ -244,21 +310,21 @@ sub logout {
 	# Allow a logout action no matter what state we are in
 	$self->task_reset;
 	$self->task_get(
-		url       => 'logout',
 		on_finish => 'logout_finish',
+		url       => 'logout',
 	);
 
 	return 1;
 }
 
 sub logout_finish {
-	my $self = shift;
-
-	#my $response = shift->response or return;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
 
 	# TODO: To be completed
 
-	return 1;
+	$self->publish("on_logout", $response);
 }
 
 
@@ -273,19 +339,19 @@ sub telemetry {
 
 	# Don't reset, telemetry occurs in parallel
 	$self->task_post(
-		url       => 'telemetry',
 		on_finish => 'telemetry_finish',
+		url       => 'telemetry',
 	);
 }
 
 sub telemetry_finish {
-	my $self = shift;
-
-	#my $response = $self->response or return;
+	my $self     = shift;
+	my $response = shift->response;
+	my $json     = $self->decode($response);
 
 	# TODO: To be completed
 
-	return 1;
+	$self->publish("on_telemetry", $response);
 }
 
 
@@ -302,15 +368,6 @@ sub task_get {
 	);
 }
 
-sub task_put {
-	shift->task_request(
-		method => 'GET',
-		@_,
-
-		# TODO: Document content here
-	);
-}
-
 sub task_delete {
 	shift->task_request(
 		method => 'DELETE',
@@ -321,30 +378,29 @@ sub task_delete {
 sub task_post {
 	my $self  = shift;
 	my %param = @_;
-	my $query = delete $param{query};
-	$query = $self->encode($query) if $query;
+	if ( $param{query} and $param{content_type} and $param{content_type} eq 'text/json' ) {
+		$param{query} = $self->encode($param{query});
+	}
 
 	$self->task_request(
 		method => 'POST',
-		query  => $query,
-		@_,
+		%param,
 	);
 }
 
 sub task_request {
 	my $self   = shift;
-	my $server = $self->server or return;
+	my $server = $self->baseurl or return;
 	my %param  = @_;
-	my $url    = join( '/', $server, delete $param{url} );
+	my $url    = join( '/', $server, delete $param{url} ) . '.json';
 	$self->SUPER::task_request(
 		%param,
-		task        => 'Padre::Task::LWP',
-		url         => $url,
-		cookie_file => $self->{cookie_file},
+		task => 'Padre::Task::LWP',
+		url  => $url,
 	);
 }
 
-sub server {
+sub baseurl {
 	my $self   = shift;
 	my $server = $self->config->config_sync_server;
 	$server =~ s/\/$// if $server;
@@ -361,13 +417,26 @@ sub encode {
 }
 
 sub decode {
-	require JSON::XS;
-	JSON::XS->new->decode( $_[1] );
+	my $self     = shift;
+	my $response = shift or return undef;
+
+	require HTTP::Response;
+	$response->is_success or return undef;
+
+	local $@;
+	my $json = eval {
+		require JSON::XS;
+		JSON::XS->new->decode( $response->decoded_content );
+	};
+	if ( $@ or not $json ) {
+		return undef;
+	}
+	return $json;
 }
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

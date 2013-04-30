@@ -5,7 +5,7 @@
 use 5.010000;
 use strict;
 use lib 'privinc';
-use inc::Module::Install 1.04;
+use inc::Module::Install 1.06;
 use POSIX qw(locale_h);
 
 # Workaround for the fact that Module::Install loads the modules
@@ -47,7 +47,7 @@ configure_requires 'ExtUtils::Embed' => '1.250601';
 #}
 
 # This makes sure that we didn't compile Alien::wxWidgets with the wrong options.
-configure_requires 'Alien::wxWidgets' => '0.46';
+configure_requires 'Alien::wxWidgets' => '0.62';
 
 my $wxw = eval { use Alien::wxWidgets; 1; };
 if ( $@ or not $wxw ) {
@@ -88,7 +88,7 @@ requires 'Cwd'                      => '3.2701';
 requires 'Data::Dumper'             => '2.101';
 requires 'DBD::SQLite'              => '1.35';
 requires 'DBI'                      => '1.58';
-requires 'Debug::Client'            => '0.20';
+requires 'Debug::Client'            => '0.24';
 requires 'Devel::Dumpvar'           => '0.04';
 requires 'Devel::Refactor'          => '0.05';
 requires 'Encode'                   => '2.26';
@@ -125,7 +125,8 @@ requires 'LWP::UserAgent'           => '5.815';
 requires 'Module::Build'            => '0.3603';
 requires 'Module::CoreList'         => '2.22';
 requires 'Module::Manifest'         => '0.07';
-requires 'ORLite'                   => '1.96';
+requires 'Module::Starter'          => '1.60';
+requires 'ORLite'                   => '1.98';
 requires 'ORLite::Migrate'          => '1.10';
 requires 'Params::Util'             => '0.33';
 requires 'Parse::ErrorString::Perl' => '0.14';
@@ -138,8 +139,8 @@ requires 'Pod::Abstract'            => '0.16';
 requires 'Pod::Perldoc'             => '3.15';
 requires 'POD2::Base'               => '0.043';
 requires 'POSIX'                    => 0;
-requires 'PPI'                      => '1.213';
-requires 'PPIx::EditorTools'        => '0.13';
+requires 'PPI'                      => '1.215';
+requires 'PPIx::EditorTools'        => '0.18';
 requires 'PPIx::Regexp'             => '0.011';
 requires 'Probe::Perl'              => '0.01';
 requires 'Storable'                 => '2.16';
@@ -158,18 +159,18 @@ requires 'version'                  => '0.80';
 requires 'Win32'              => '0.31' if win32;
 requires 'Win32::Shortcut'    => '0.07' if win32;
 requires 'Win32::TieRegistry' => '0.26' if win32;
-requires 'Wx'                 => '0.9901';
-requires 'Wx::Perl::ProcessStream' => '0.29';
-requires 'Wx::Scintilla'           => '0.34';
+requires 'Wx'                 => '0.9916';
+requires 'Wx::Perl::ProcessStream' => '0.32';
+requires 'Wx::Scintilla'           => '0.39';
 requires 'YAML::Tiny'              => '1.32';
-test_requires 'Test::More'         => '0.88';
+test_requires 'Test::More'         => '0.98';
 
 # Ticket #1419: Padre and the soon to be Perl 5.16
 test_requires 'Test::Warn'       => '0.24';
 test_requires 'Test::MockObject' => '1.09';
 test_requires 'Test::Script'     => '1.07';
 test_requires 'Test::Exception'  => '0.27';
-test_requires 'Test::NoWarnings' => '0.084';
+test_requires 'Test::NoWarnings' => '1.04';
 
 # Special dependencies
 
@@ -187,7 +188,14 @@ my $locale = setlocale(LC_CTYPE);
 print "Found locale    $locale\n";
 
 # What tests should we run?
-my @TESTS = 't/*.t';
+my @TESTS = (
+	't/*.t',
+	't/perl/*.t',
+	't/python/*.t',
+	't/ruby/*.t',
+	't/java/*.t',
+	't/csharp/*.t',
+);
 if ( win32 and $locale =~ /^English/ ) {
 	if ( author_context or $ENV{RELEASE_TESTING} ) {
 		push @TESTS, 't/win32/*.t';
@@ -202,6 +210,55 @@ no_index 'directory' => qw{ t xt eg share inc privinc };
 homepage 'http://padre.perlide.org/';
 bugtracker 'http://padre.perlide.org/trac/';
 repository 'http://svn.perlide.org/padre/trunk/Padre/';
+
+Meta->add_metadata(
+    x_contributors => [
+        'Aaron Trevena (TEEJAY)',
+        'Adam Kennedy (ADAMK) <adamk@cpan.org>',
+        'Ahmad Zawawi أحمد محمد زواوي (AZAWAWI)',
+        'Andrew Shitov',
+        'Alexandr Ciornii (CHORNY)',
+        'Amir E. Aharoni - אמיר א. אהרוני',
+        'Blake Willmarth (BLAKEW)',
+        'BlueT - Matthew Lien - 練喆明 (BLUET) <bluet@cpan.org>',
+        'Breno G. de Oliveira (GARU)',
+        'Brian Cassidy (BRICAS)',
+        'Burak Gürsoy (BURAK) <burak@cpan.org>',
+        'Cezary Morga (THEREK) <cm@therek.net>',
+        'Chris Dolan (CHRISDOLAN)',
+        'Claudio Ramirez (NXADM) <nxadm@cpan.org>',
+        'Dirk De Nijs (ddn123456)',
+        'Enrique Nell (ENELL)',
+        'Fayland Lam (FAYLAND) <fayland@gmail.com>',
+        'Gabriel Vieira (GABRIELMAD)',
+        'Gábor Szabó - גאבור סבו (SZABGAB) <szabgab@cpan.org>',
+        'György Pásztor (GYU)',
+        'Heiko Jansen (HJANSEN) <heiko_jansen@web.de>',
+        'Jérôme Quelin (JQUELIN) <jquelin@cpan.org>',
+        'Kaare Rasmussen (KAARE) <kaare@cpan.org>',
+        'Keedi Kim - 김도형 (KEEDI)',
+        'Kenichi Ishigaki - 石垣憲一 (ISHIGAKI) <ishigaki@cpan.org>',
+        'Kevin Dawson (BOWTIE) <bowtie@cpan.org>',
+        'Kjetil Skotheim (KJETIL)',
+        'Marcela Mašláňová (mmaslano)',
+        'Marek Roszkowski (EviL) <evil@evil.devil.is-my.name>',
+        'Mark Grimes <mgrimes@cpan.org>',
+        'Max Maischein (CORION)',
+        'Olivier MenguE<eacute> (DOLMEN)',
+        'Omer Zak  - עומר זק',
+        'Paco Alguacil (PacoLinux)',
+        'Patrick Donelan (PDONELAN) <pat@patspam.com>',
+        'Paweł Murias (PMURIAS)',
+        'Petar Shangov (PSHANGOV)',
+        'Ryan Niebur (RSN) <rsn@cpan.org>',
+        'Sebastian Willing (SEWI)',
+        'Shlomi Fish  - שלומי פיש (SHLOMIF)',
+        'Simone Blandino (SBLANDIN)',
+        'Steffen Müller (TSEE) <smueller@cpan.org>',
+        'Zeno Gantner (ZENOG)',
+        'Chuanren Wu',
+    ],
+);
 
 keywords(
 	"auto-completion",

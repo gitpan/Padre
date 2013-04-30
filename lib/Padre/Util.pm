@@ -21,7 +21,7 @@ moved, removed or changed at any time without notice.
 
 =cut
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 use Carp            ();
@@ -36,16 +36,13 @@ use Padre::Constant (); ### NO other Padre:: dependencies
 use vars qw{ $VERSION $COMPATIBLE };
 
 BEGIN {
-	$VERSION    = '0.96';
-	$COMPATIBLE = '0.93';
+	$VERSION    = '0.98';
+	$COMPATIBLE = '0.97';
 }
 
 our @ISA       = 'Exporter';
 our @EXPORT_OK = '_T';
 our $DISTRO    = undef;
-
-
-
 
 
 #####################################################################
@@ -362,27 +359,6 @@ sub splash {
 	return -f $original ? $original : Padre::Util::sharefile('padre-splash.png');
 }
 
-sub find_perldiag_translations {
-	my %languages;
-	foreach my $path (@INC) {
-		my $dir = File::Spec->catdir( $path, 'POD2' );
-		next if not -e $dir;
-		if ( opendir my $dh, $dir ) {
-			my @files = readdir $dh;
-			close $dh;
-			foreach my $lang (@files) {
-				next if $lang eq '.';
-				next if $lang eq '..';
-				if ( -e File::Spec->catfile( $dir, $lang, 'perldiag.pod' ) ) {
-					$languages{$lang} = 1;
-				}
-			}
-		}
-	}
-	my @tr = sort keys %languages;
-	return @tr;
-}
-
 
 
 
@@ -446,19 +422,19 @@ sub run_in_directory {
 Plugin replacment for perl command qx{...} to avoid black lines in non *inux os
 
 	qx{...};
-	run_in_directory_two('...');
+	run_in_directory_two( cmd => '...');
 
 optional parameters are dir and return type
 
-	run_in_directory_two('...', $dir);
-	run_in_directory_two('...', $dir, type);
+	run_in_directory_two(cmd => '...', dir => $dir);
+	run_in_directory_two(cmd => '...', dir => $dir, option => type);
 
 also
 
-	run_in_directory_two('...', type);
+	run_in_directory_two(cmd => '...', option => type);
 
 return type 1 default, returns a string
-
+return type 2 error only for testing
 nb you might need to chomp result but thats for you.
 
 return type 0 hash_ref
@@ -467,14 +443,14 @@ return type 0 hash_ref
 
 =item example 1,
 
-	Padre::Util::run_in_directory_two('svn --version --quiet');
+	Padre::Util::run_in_directory_two(cmd => 'svn --version --quiet');
 
 	"1.6.12
 	"
 
 =item example 2,
 
-	Padre::Util::run_in_directory_two('svn --version --quiet', 0);
+	Padre::Util::run_in_directory_two(cmd => 'svn --version --quiet', option => '0');
 
 	\ {
 		error    "",
@@ -491,28 +467,19 @@ return type 0 hash_ref
 # function Padre::Util::run_in_directory_two
 #######
 sub run_in_directory_two {
-	my $cmd_line      = shift;
-	my $location      = shift;
-	my $return_option = shift;
+	my %args = @_;
 
-	if ( defined $location ) {
-		if ( $location =~ /\d/ ) {
-			$return_option = $location;
-			$location      = undef;
-		}
-
-	}
-
+	#create return hash ioe (input output error)
 	my %ret_ioe;
-	$ret_ioe{input} = $cmd_line;
+	$ret_ioe{input} = $args{cmd};
 
-	$cmd_line =~ m/((?:\w+)\s)/;
+	$args{cmd} =~ m/((?:\w+)\s)/;
 	my $cmd_app = $1;
 
-	if ( defined $return_option ) {
-		$return_option = ( $return_option =~ m/[0|1|2]/ ) ? $return_option : 1;
+	if ( defined $args{option} ) {
+		$args{option} = ( $args{option} =~ m/[0|1|2]/ ) ? $args{option} : '1';
 	} else {
-		$return_option = 1;
+		$args{option} = 1;
 	}
 
 	# Create a temporary file for standard output redirection
@@ -523,16 +490,10 @@ sub run_in_directory_two {
 	my $std_err = File::Temp->new( UNLINK => 1 );
 
 	my $temp_dir = File::Temp->newdir();
-
-	my $directory;
-	if ( defined $location ) {
-		$directory = ($location) ? $location : $temp_dir;
-	} else {
-		$directory = $temp_dir;
-	}
+	my $directory = $args{dir} // $temp_dir;
 
 	my @cmd = (
-		$cmd_line,
+		$args{cmd},
 		'1>' . $std_out->filename,
 		'2>' . $std_err->filename,
 	);
@@ -542,20 +503,21 @@ sub run_in_directory_two {
 	Padre::Util::run_in_directory( "@cmd", $directory );
 
 	# Slurp command standard input and output
-	$ret_ioe{output} = slurp( $std_out->filename );
+	$ret_ioe{output} = ${ slurp( $std_out->filename ) };
+	chomp $ret_ioe{output};
 
-	# chomp $ret_ioe{output};
 
 	# Slurp command standard error
-	$ret_ioe{error} = slurp( $std_err->filename );
+	$ret_ioe{error} = ${ slurp( $std_err->filename ) };
+	chomp $ret_ioe{error};
+	$ret_ioe{error} = $ret_ioe{error} ne "" ? $ret_ioe{error} : undef;
 
-	# chomp $ret_ioe{error};
-	if ( $ret_ioe{error} && ( $return_option eq 1 ) ) {
-		$return_option = 2;
+	if ( $ret_ioe{error} && ( $args{option} eq '1' ) ) {
+		$args{option} = '2';
 	}
 
-	return $ret_ioe{output} if ( $return_option eq 1 );
-	return $ret_ioe{error}  if ( $return_option eq 2 );
+	return $ret_ioe{output} if ( $args{option} eq '1' );
+	return $ret_ioe{error}  if ( $args{option} eq '2' );
 	return \%ret_ioe;
 
 }
@@ -568,7 +530,7 @@ __END__
 
 =head1 COPYRIGHT
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -578,7 +540,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

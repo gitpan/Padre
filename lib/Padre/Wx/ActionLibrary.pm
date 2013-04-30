@@ -7,19 +7,20 @@ package Padre::Wx::ActionLibrary;
 use 5.008005;
 use strict;
 use warnings;
-use File::Spec        ();
-use Params::Util      ();
-use Padre::Feature    ();
-use Padre::Current    ();
-use Padre::Constant   ();
-use Padre::MIME       ();
-use Padre::Wx         ();
-use Padre::Wx::Menu   ();
-use Padre::Wx::Action ();
+use File::Spec         ();
+use Params::Util       ();
+use Padre::Feature     ();
+use Padre::Current     ();
+use Padre::Constant    ();
+use Padre::MIME        ();
+use Padre::Breakpoints ();
+use Padre::Wx          ();
+use Padre::Wx::Menu    ();
+use Padre::Wx::Action  ();
 use Padre::Locale::T;
 use Padre::Logger;
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 
 
@@ -173,6 +174,19 @@ sub init {
 			Padre::Document::Perl::Starter->new( $_[0] )->create_test;
 		},
 	);
+
+	# Split projects from files
+
+	Padre::Wx::Action->new(
+		name       => 'file.p5_modulestarter',
+		label      => _T('Perl Distribution...'),
+		comment    => _T('Setup a skeleton Perl distribution'),
+		menu_event => sub {
+			require Padre::Wx::Dialog::ModuleStarter;
+			Padre::Wx::Dialog::ModuleStarter->run( $_[0] );
+		},
+	);
+
 
 	# Split by language
 
@@ -2123,6 +2137,30 @@ sub init {
 		);
 
 		Padre::Wx::Action->new(
+			name => 'debug.launch_options',
+			need => sub {
+				$main->{debugger};
+			},
+
+			#toolbar    => 'actions/breakpoints',
+			label      => _T('Debug Launch Options'),
+			comment    => _T('Launch debugger with options'),
+			menu_event => sub {
+
+				#TODO: need to hide the breakpoints and debugger panels if thats what the user started with - don't make a mess of my tiny screen - you have missed the point think eclipse
+				$_[0]->show_breakpoints(1);
+				if ( $_[0]->{breakpoints} ) {
+					$_[0]->{breakpoints}->on_refresh_click();
+				}
+
+				$_[0]->show_debugger(1);
+				if ( $_[0]->{debugger} ) {
+					$_[0]->{debugger}->on_launch_options();
+				}
+			},
+		);
+
+		Padre::Wx::Action->new(
 			name => 'debug.set_breakpoint',
 			need => sub {
 				eval { Padre::Current->document->filename };
@@ -2143,13 +2181,7 @@ sub init {
 			comment => _T('Set a breakpoint to the current location of the cursor with a condition'),
 
 			menu_event => sub {
-				if ( $_[0]->{breakpoints} ) {
-					$_[0]->{breakpoints}->on_set_breakpoints_clicked();
-				} else {
-					require Padre::Breakpoints;
-					Padre::Breakpoints->set_breakpoints_clicked();
-					Padre::Breakpoints->show_breakpoints();
-				}
+				Padre::Breakpoints->set_breakpoints_clicked();
 				return;
 			},
 		);
@@ -2200,7 +2232,7 @@ sub init {
 			comment    => _T('Share your preferences between multiple computers'),
 			menu_event => sub {
 				require Padre::Wx::Dialog::Sync;
-				Padre::Wx::Dialog::Sync->new( $_[0] )->ShowModal;
+				Padre::Wx::Dialog::Sync->run( $_[0] );
 			},
 		);
 	}
@@ -2523,14 +2555,26 @@ sub init {
 	);
 
 	Padre::Wx::Action->new(
-		name    => 'help.perl_help',
-		label   => _T('P&erl Help'),
+		name    => 'help.perl_en',
+		label   => _T('P&erl Help (English)'),
 		comment => _T(
 			      'Open the Perl live support chat in your web browser '
 				. 'and talk to others who may help you with your problem'
 		),
 		menu_event => sub {
 			Padre::Wx::launch_irc('general');
+		},
+	);
+
+	Padre::Wx::Action->new(
+		name    => 'help.perl_jp',
+		label   => _T('Perl Help (Japanese)'),
+		comment => _T(
+			      'Open the Perl live support chat in your web browser '
+				. 'and talk to others who may help you with your problem'
+		),
+		menu_event => sub {
+			Padre::Wx::launch_irc('locale_jp');
 		},
 	);
 
@@ -2601,7 +2645,7 @@ sub init {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

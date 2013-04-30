@@ -135,7 +135,7 @@ use Padre::MIME             ();
 use Padre::File             ();
 use Padre::Logger;
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.91';
 
 
@@ -308,8 +308,9 @@ sub rebless {
 	TRACE("Reblessing to mimetype class: '$class'") if DEBUG;
 	if ($class) {
 		unless ( $class->VERSION ) {
-			eval "require $class;";
-			die "Failed to load $class: $@" if $@;
+			(my $source = $class.".pm") =~ s{::}{/}g;
+			eval { require $source }
+				or die "Failed to load $class: $@";
 		}
 		bless $self, $class;
 	}
@@ -1184,6 +1185,22 @@ Returns nothing.
 #####################################################################
 # Project Integration Methods
 
+=pod
+
+=head2 project
+
+  my $project = $document->project;
+
+The C<project> method is used to discover which project a document is part
+of. It uses a variety of methods to discover, scanning the file system if
+needed to "intuit" the location and type of project.
+
+Returns a L<Padre::Project> object for the project, or C<undef> if the
+document is unsaved, anonymous, or not part of any type of project for
+some other reason.
+
+=cut
+
 sub project {
 	my $self    = shift;
 	my $manager = $self->current->ide->project_manager;
@@ -1209,6 +1226,20 @@ sub project {
 
 	return $project;
 }
+
+=pod
+
+=head2 project_dir
+
+  my $path = $document->project_dir;
+
+The C<project_dir> method behaves similarly to C<project>, but instead it
+returns a path to the root directory of the project for this document.
+
+Returns a directory as a string, or C<''> if the document is unsaved,
+anonymous, or not part of any type of project for some other reason.
+
+=cut
 
 sub project_dir {
 	my $self = shift;
@@ -1537,7 +1568,7 @@ sub _commafy {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

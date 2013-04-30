@@ -20,7 +20,7 @@ use YAML::Tiny    ();
 use DBI           ();
 use DBD::SQLite   ();
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.95';
 
 # Since everything is used OO-style, we will be require'ing
@@ -160,10 +160,10 @@ sub new {
 		conduit => $wx->conduit,
 	);
 
-	# Create the sync manager
+	# Create the server manager
 	# require Padre::ServerManager;
-	# $self->{sync_manager} = Padre::ServerManager->new(
-	# ide => $self,
+	# $self->{server_manager} = Padre::ServerManager->new(
+		# ide => $self,
 	# );
 
 	# Startup completed, let go of the database
@@ -635,7 +635,7 @@ See also L<http://padre.perlide.org/contact.html>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 L<http://padre.perlide.org/>
 
 =head1 LICENSE
@@ -804,6 +804,8 @@ Andrew Shitov
 
 Cezary Morga (THEREK)
 
+Marek Roszkowski (EviL) E<lt>evil@evil.devil.is-my.nameE<gt>
+
 =head3 Portuguese (Brazilian)
 
 Breno G. de Oliveira (GARU)
@@ -817,6 +819,8 @@ Enrique Nell (ENELL)
 =head3 Czech
 
 Marcela Mašláňová (mmaslano)
+
+Marek Roszkowski (EviL) E<lt>evil@evil.devil.is-my.nameE<gt> 
 
 =head3 Norwegian
 
@@ -839,7 +843,7 @@ Tatsuhiko Miyagawa for consulting on our I18N and L10N support.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

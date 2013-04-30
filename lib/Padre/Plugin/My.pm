@@ -1,33 +1,39 @@
 package Padre::Plugin::My;
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 use utf8;
-use Padre::Constant ();
 use Padre::Plugin   ();
-use Padre::Wx       ();
 
-our $VERSION = '0.96';
-our @ISA     = 'Padre::Plugin';
-
+our $VERSION = '0.98';
+use parent qw(Padre::Plugin);
 
 
 
-
-#####################################################################
-# Padre::Plugin Methods
-
+#######
+# Define Padre Interfaces required
+#######
 sub padre_interfaces {
 	return (
-		'Padre::Plugin'   => 0.66,
-		'Padre::Constant' => 0.66,
+		'Padre::Plugin'   => 0.94,
+		'Padre::Constant' => 0.94,
+		'Padre::Unload'   => 0.94,
 	);
 }
 
+# Child modules we need to unload when disabled
+use constant CHILDREN => qw{
+	Padre::Plugin::My
+};
+
+#######
+# Called by padre to know the plugin name
+#######
 sub plugin_name {
-	'My Plugin';
+	return Wx::gettext('My Plugin');
 }
+
 
 sub menu_plugins_simple {
 	my $self = shift;
@@ -41,9 +47,11 @@ sub menu_plugins_simple {
 	];
 }
 
-
-
-
+# Core plugins may reuse the page icon
+sub plugin_icon {
+	require Padre::Wx::Icon;
+	Padre::Wx::Icon::find('logo');
+}
 
 #####################################################################
 # Custom Methods
@@ -100,6 +108,26 @@ sub other_method {
 	return;
 }
 
+########
+# plugin_disable
+########
+sub plugin_disable {
+	my $self = shift;
+
+	# Close the dialog if it is hanging around
+	# $self->clean_dialog;
+
+	# Unload all our child classes
+	for my $package (CHILDREN) {
+		require Padre::Unload;
+		Padre::Unload->unload($package);
+	}
+
+	$self->SUPER::plugin_disable(@_);
+
+	return 1;
+}
+
 1;
 
 __END__
@@ -117,13 +145,13 @@ does interesting stuff, please consider sharing it on C<CPAN>!
 
 =head1 COPYRIGHT & LICENSE
 
-Currently it's copyrighted © 2008-2010 by The Padre development team as
-listed in Padre.pm... But update it and it will become copyrighted © You
+Currently it's copyrighted (c) 2008-2010 by The Padre development team as
+listed in Padre.pm... But update it and it will become copyrighted (c) You
 C<< <you@example.com> >>! How exciting! :-)
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

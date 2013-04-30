@@ -22,7 +22,7 @@ use Wx::Event  (':everything');
 use Wx::AUI    ();
 use Wx::Socket ();
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.43';
 
 BEGIN {
@@ -193,11 +193,12 @@ sub launch_file {
 # Wx::Event Convenience Functions
 
 # FIXME Find out why EVT_CONTEXT_MENU doesn't work on Ubuntu
-if (Padre::Constant::UNIX) {
-	*Wx::Event::EVT_CONTEXT = *Wx::Event::EVT_RIGHT_DOWN;
-} else {
+# commeted out as workas against Ubuntu 12.10, this is cool for lot's of Methods only
+# if (Padre::Constant::UNIX) {
+	# *Wx::Event::EVT_CONTEXT = *Wx::Event::EVT_RIGHT_DOWN;
+# } else {
 	*Wx::Event::EVT_CONTEXT = *Wx::Event::EVT_CONTEXT_MENU;
-}
+# }
 
 1;
 
@@ -219,7 +220,7 @@ use them without braces.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

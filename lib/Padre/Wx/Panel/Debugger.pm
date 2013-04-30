@@ -1,6 +1,6 @@
 package Padre::Wx::Panel::Debugger;
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 
@@ -12,10 +12,11 @@ use Padre::Wx::Util          ();
 use Padre::Wx::Icon          ();
 use Padre::Wx::Role::View    ();
 use Padre::Wx::FBP::Debugger ();
+use Padre::Breakpoints       ();
 use Padre::Logger;
 use Debug::Client 0.20 ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::FBP::Debugger
@@ -81,13 +82,16 @@ sub set_up {
 	my $self = shift;
 	my $main = $self->main;
 
+	$self->{debug_client_version} = $Debug::Client::VERSION;
+	$self->{debug_client_version} =~ s/^(\d.\d{2}).*/$1/;
+
 	$self->{client}           = undef;
 	$self->{file}             = undef;
 	$self->{save}             = {};
 	$self->{trace_status}     = 'Trace = off';
 	$self->{var_val}          = {};
-	$self->{auto_var_val}     = {};
-	$self->{auto_x_var}       = {};
+	$self->{local_values}     = {};
+	$self->{global_values}    = {};
 	$self->{set_bp}           = 0;
 	$self->{fudge}            = 0;
 	$self->{local_variables}  = 0;
@@ -95,7 +99,7 @@ sub set_up {
 
 	#turn off unless in project
 	$self->{show_global_variables}->Disable;
-	$self->{show_local_variables}->Enable;
+	$self->{show_local_variables}->Disable;
 
 	# $self->{show_local_variables}->SetValue(1);
 	# $self->{local_variables} = 1;
@@ -180,11 +184,11 @@ sub set_up {
 # display any relation db
 #######
 sub update_variables {
-	my $self             = shift;
-	my $var_val_ref      = shift;
-	my $auto_var_val_ref = shift;
-	my $auto_x_var_ref   = shift;
-	my $editor           = $self->current->editor;
+	my $self              = shift;
+	my $var_val_ref       = shift;
+	my $local_values_ref  = shift;
+	my $global_values_ref = shift;
+	my $editor            = $self->current->editor;
 
 	# clear ListCtrl items
 	$self->{variables}->DeleteAllItems;
@@ -202,25 +206,25 @@ sub update_variables {
 	}
 
 	if ( $self->{local_variables} == 1 ) {
-		foreach my $var ( keys %{$auto_var_val_ref} ) {
+		foreach my $var ( keys %{$local_values_ref} ) {
 
 			$item->SetId($index);
 			$self->{variables}->InsertItem($item);
 			$self->{variables}->SetItemTextColour( $index, BLUE );
 
 			$self->{variables}->SetItem( $index,   0, $var );
-			$self->{variables}->SetItem( $index++, 1, $auto_var_val_ref->{$var} );
+			$self->{variables}->SetItem( $index++, 1, $local_values_ref->{$var} );
 		}
 	}
 	if ( $self->{global_variables} == 1 ) {
-		foreach my $var ( keys %{$auto_x_var_ref} ) {
+		foreach my $var ( keys %{$global_values_ref} ) {
 
 			$item->SetId($index);
 			$self->{variables}->InsertItem($item);
 			$self->{variables}->SetItemTextColour( $index, DARK_GRAY );
 
 			$self->{variables}->SetItem( $index,   0, $var );
-			$self->{variables}->SetItem( $index++, 1, $auto_x_var_ref->{$var} );
+			$self->{variables}->SetItem( $index++, 1, $global_values_ref->{$var} );
 		}
 	}
 
@@ -235,14 +239,16 @@ sub update_variables {
 # sub debug_perl
 #######
 sub debug_perl {
-	my $self     = shift;
+	my $self = shift;
+	my $arg_ref = shift || { debug => 1 };
+
 	my $main     = $self->main;
 	my $current  = $self->current;
 	my $document = $current->document;
 	my $editor   = $current->editor;
 
 	# test for valid perl document
-	if ( $document->mimetype !~ m/perl/ ) {
+	if ( !$document || $document->mimetype !~ m/perl/ ) {
 		return;
 	}
 
@@ -292,7 +298,13 @@ sub debug_perl {
 	my $port = 24642 + int rand(1000); # TODO make this configurable?
 	SCOPE: {
 		local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
-		$main->run_command( $document->get_command( { debug => 1 } ) );
+		my ( $cmd, $ref ) = $document->get_command($arg_ref);
+
+		#TODO: consider pushing the chdir into run_command (as there is a hidden 'cd' in it)
+		my $dir = Cwd::cwd;
+		chdir $arg_ref->{run_directory} if ( exists( $arg_ref->{run_directory} ) );
+		$main->run_command($cmd);
+		chdir $dir;
 	}
 
 	# Bootstrap the debugger
@@ -301,20 +313,26 @@ sub debug_perl {
 		host => $host,
 		port => $port,
 	);
-	$self->{client}->listener;
 
+	#ToDo remove when Debug::Client 0.22 is released.
+	if ( $self->{debug_client_version} eq '0.20' ) {
+		$self->{client}->listener;
+	}
 	$self->{file} = $filename;
 
 	#Now we ask where are we
-	$self->{client}->get;
+	#ToDo remove when Debug::Client 0.22 is released.
+	if ( $self->{debug_client_version} eq '0.20' ) {
+		$self->{client}->get;
+	}
 	$self->{client}->get_lineinfo;
 
 	my $save = ( $self->{save}->{$filename} ||= {} );
 
 	if ( $self->{set_bp} == 0 ) {
 
-		# get bp's from db
-		$self->_get_bp_db();
+		# get bp's from db and set b|B (remember it's a toggle) hence we do this only once
+		$self->_get_bp_db;
 		$self->{set_bp} = 1;
 	}
 
@@ -346,13 +364,13 @@ sub _set_debugger {
 			$self->main->{breakpoints}->on_refresh_click;
 		}
 
-		# we only want to do this if we are loading other packages of ours
-		# $self->_bp_autoload();
+		# we only want to do this if we are loading other files in this packages of ours
+		$self->_bp_autoload();
 	}
 
 	$editor->goto_line_centerize( $row - 1 );
 
-	#### TODO this was taken from the Padre::Wx::Syntax::start() and  changed a bit.
+	#### TODO this was taken from the Padre::Wx::Syntax::start() and changed a bit.
 	# They should be reunited soon !!!! (or not)
 
 	$editor->MarkerDeleteAll(Padre::Constant::MARKER_LOCATION);
@@ -422,10 +440,13 @@ sub debug_quit {
 	$self->{run_till}->Hide;
 	$self->{display_value}->Hide;
 
-	$self->{var_val}      = {};
-	$self->{auto_var_val} = {};
-	$self->{auto_x_var}   = {};
-	$self->update_variables( $self->{var_val}, $self->{auto_var_val}, $self->{auto_x_var} );
+	$self->{show_global_variables}->Disable;
+	$self->{show_local_variables}->Disable;
+
+	$self->{var_val}       = {};
+	$self->{local_values}  = {};
+	$self->{global_values} = {};
+	$self->update_variables( $self->{var_val}, $self->{local_values}, $self->{global_values} );
 
 	$self->{debug}->Show;
 
@@ -434,16 +455,11 @@ sub debug_quit {
 	return;
 }
 
-#######
-# Method debug_step_in
-#######
-sub debug_step_in {
+sub update_debug_user_interface {
 	my $self = shift;
+	my $output = shift;
 	my $main = $self->main;
 
-	#ToDo list request ouch
-	my @list_request;
-	eval { @list_request = $self->{client}->step_in(); };
 	my $module = $self->{client}->module;
 	$self->{client}->get_lineinfo;
 
@@ -455,8 +471,27 @@ sub debug_step_in {
 		return;
 	}
 
-	$main->{debugoutput}->debug_output( $self->{client}->buffer );
+	if ( ! $output ) {
+		#ToDo remove when Debug::Client 0.22 is released.
+		if ( $self->{debug_client_version} eq '0.20' ) {
+			$output = $self->{client}->buffer;
+		} else {
+			 $output = $self->{client}->get_buffer;
+		}
+	}
+	$main->{debugoutput}->debug_output( $output );
 	$self->_set_debugger;
+}
+
+#######
+# Method debug_step_in
+#######
+sub debug_step_in {
+	my $self = shift;
+
+	my @list_request;
+	eval { @list_request = $self->{client}->step_in(); };
+	$self->update_debug_user_interface;
 
 	return;
 }
@@ -468,23 +503,9 @@ sub debug_step_over {
 	my $self = shift;
 	my $main = $self->main;
 
-	#ToDo list request ouch
 	my @list_request;
 	eval { @list_request = $self->{client}->step_over(); };
-	my $module = $self->{client}->module;
-	$self->{client}->get_lineinfo;
-
-	if ( $module eq '<TERMINATED>' ) {
-		TRACE('TERMINATED') if DEBUG;
-		$self->{trace_status} = 'Trace = off';
-		$main->{debugoutput}->debug_status( $self->{trace_status} );
-
-		$self->debug_quit;
-		return;
-	}
-
-	$main->{debugoutput}->debug_output( $self->{client}->buffer );
-	$self->_set_debugger;
+	$self->update_debug_user_interface;
 
 	return;
 }
@@ -496,23 +517,9 @@ sub debug_step_out {
 	my $self = shift;
 	my $main = $self->main;
 
-	#ToDo list request ouch
 	my @list_request;
 	eval { @list_request = $self->{client}->step_out(); };
-	my $module = $self->{client}->module;
-	$self->{client}->get_lineinfo;
-
-	if ( $module eq '<TERMINATED>' ) {
-		TRACE('TERMINATED') if DEBUG;
-		$self->{trace_status} = 'Trace = off';
-		$main->{debugoutput}->debug_status( $self->{trace_status} );
-
-		$self->debug_quit;
-		return;
-	}
-
-	$main->{debugoutput}->debug_output( $self->{client}->buffer );
-	$self->_set_debugger;
+	$self->update_debug_user_interface;
 
 	return;
 }
@@ -527,20 +534,7 @@ sub debug_run_till {
 
 	my @list_request;
 	eval { @list_request = $self->{client}->run($param); };
-
-	my $temp_buffer = $self->{client}->buffer;
-	my $module      = $self->{client}->module;
-	$self->{client}->get_lineinfo;
-	if ( $module eq '<TERMINATED>' ) {
-		TRACE('TERMINATED') if DEBUG;
-		$self->{trace_status} = 'Trace = off';
-		$main->{debugoutput}->debug_status( $self->{trace_status} );
-		$self->debug_quit;
-		return;
-	}
-
-	$main->{debugoutput}->debug_output($temp_buffer);
-	$self->_set_debugger;
+	$self->update_debug_user_interface;
 
 	return;
 }
@@ -679,9 +673,8 @@ sub _output_variables {
 
 	# only get local variables if required
 	if ( $self->{local_variables} == 1 ) {
-		$self->get_local_variables();
+		$self->get_local_variables;
 	}
-
 
 	# Only enable global variables if we are debuging in a project
 	# why dose $self->{project_dir} contain the root when no magic file present
@@ -699,17 +692,17 @@ sub _output_variables {
 		$self->{show_global_variables}->Enable;
 
 		if ( $self->{current_file} =~ m/pm$/ ) {
-			$self->get_global_variables();
+			$self->get_global_variables;
 
 		} else {
 			$self->{show_global_variables}->Disable;
 
 			# get ride of stale values
-			$self->{auto_x_var} = {};
+			$self->{global_values} = {};
 		}
 	}
 
-	$self->update_variables( $self->{var_val}, $self->{auto_var_val}, $self->{auto_x_var} );
+	$self->update_variables( $self->{var_val}, $self->{local_values}, $self->{global_values} );
 
 	return;
 }
@@ -730,7 +723,7 @@ sub get_local_variables {
 	shift @auto;
 
 	# This is better I think, it's quicker
-	$self->{auto_var_val} = {};
+	$self->{local_values} = {};
 
 	foreach (@auto) {
 
@@ -738,9 +731,9 @@ sub get_local_variables {
 
 		if ( defined $1 ) {
 			if ( defined $2 ) {
-				$self->{auto_var_val}->{$1} = $2;
+				$self->{local_values}->{$1} = $2;
 			} else {
-				$self->{auto_var_val}->{$1} = BLANK;
+				$self->{local_values}->{$1} = BLANK;
 			}
 		}
 	}
@@ -765,7 +758,7 @@ sub get_global_variables {
 	shift @auto;
 
 	# This is better I think, it's quicker
-	$self->{auto_x_var} = {};
+	$self->{global_values} = {};
 
 	foreach (@auto) {
 
@@ -773,9 +766,9 @@ sub get_global_variables {
 
 		if ( defined $1 ) {
 			if ( defined $2 ) {
-				$self->{auto_x_var}->{$1} = $2;
+				$self->{global_values}->{$1} = $2;
 			} else {
-				$self->{auto_x_var}->{$1} = BLANK;
+				$self->{global_values}->{$1} = BLANK;
 			}
 		}
 	}
@@ -818,7 +811,8 @@ sub _get_bp_db {
 
 		# if ( $tuples[$_][1] =~ m/^$self->{current_file}$/ ) {
 		if ( $tuples[$_][1] eq $self->{current_file} ) {
-			if ( $self->{client}->set_breakpoint( $tuples[$_][1], $tuples[$_][2] ) ) {
+
+			if ( $self->{client}->set_breakpoint( $tuples[$_][1], $tuples[$_][2] ) == 1 ) {
 				$editor->MarkerAdd( $tuples[$_][2] - 1, Padre::Constant::MARKER_BREAKPOINT() );
 			} else {
 				$editor->MarkerAdd( $tuples[$_][2] - 1, Padre::Constant::MARKER_NOT_BREAKABLE() );
@@ -837,9 +831,7 @@ sub _get_bp_db {
 
 		if ( $tuples[$_][1] =~ m/^$self->{project_dir}/ ) {
 			if ( $tuples[$_][1] ne $self->{current_file} ) {
-
 				if ( $self->{client}->__send("f $tuples[$_][1]") !~ m/^No file matching/ ) {
-
 					unless ( $self->{client}->set_breakpoint( $tuples[$_][1], $tuples[$_][2] ) ) {
 						Padre::DB->do( 'update debug_breakpoints SET active = ? WHERE id = ?', {}, 0, $tuples[$_][0], );
 					}
@@ -870,11 +862,7 @@ sub _bp_autoload {
 
 	#TODO is there a better way
 	$self->{current_file} = $document->filename;
-
-	# my $sql_select = "WHERE filename = \"$self->{current_file}\"";
 	my $sql_select = "WHERE filename = ?";
-
-	# my @tuples = $self->{debug_breakpoints}->select($sql_select);
 	my @tuples = $self->{debug_breakpoints}->select( $sql_select, $self->{current_file} );
 
 	for ( 0 .. $#tuples ) {
@@ -882,7 +870,7 @@ sub _bp_autoload {
 		TRACE("show breakpoints autoload: self->{client}->set_breakpoint: $tuples[$_][1] => $tuples[$_][2]") if DEBUG;
 
 		# autoload of breakpoints and mark file
-		if ( $self->{client}->set_breakpoint( $tuples[$_][1], $tuples[$_][2] ) ) {
+		if ( $self->{client}->set_breakpoint( $tuples[$_][1], $tuples[$_][2] ) == 1 ) {
 			$editor->MarkerAdd( $tuples[$_][2] - 1, Padre::Constant::MARKER_BREAKPOINT() );
 		} else {
 			$editor->MarkerAdd( $tuples[$_][2] - 1, Padre::Constant::MARKER_NOT_BREAKABLE() );
@@ -910,24 +898,32 @@ sub _on_list_item_selected {
 	my $index         = $event->GetIndex + 1;
 	my $variable_name = $event->GetText;
 
-	#ToDo inspired by task_manager, I think the next step is playing with DB::
-	my $variable_value = $self->{client}->__send_np( "x \\" . $variable_name );
-	my $black_size     = keys %{ $self->{var_val} };
-	my $blue_size      = keys %{ $self->{auto_var_val} };
+	#ToDo Changed to use current internal hashes instead of asking perl5db for value, this also gets around a bug with 'File::HomeDir has tied variables' clobbering x @rray giving an empty array
+	my $variable_value;
+	my $black_size = keys %{ $self->{var_val} };
+	my $blue_size  = keys %{ $self->{local_values} };
 
-	# my $gray_size = keys $self->{auto_x_var};
-	# print "blach = $black_size, blue = $blue_size, gray = $gray_size \n";
-
-	if ( $index <= $black_size ) {
-		$main->{debugoutput}->debug_output_black( $variable_name . " = " . $variable_value );
-	} elsif ( $index <= ( $black_size + $blue_size ) ) {
-		$main->{debugoutput}->debug_output_blue( $variable_name . " = " . $variable_value );
-	} else {
-		$main->{debugoutput}->debug_output_dark_gray( $variable_name . " = " . $variable_value );
+	given ($index) {
+		when ( $_ <= $black_size ) {
+			$variable_value = $self->{var_val}->{$variable_name};
+			chomp $variable_value;
+			$main->{debugoutput}->debug_output_black( $variable_name . ' = ' . $variable_value );
+		}
+		when ( $_ <= ( $black_size + $blue_size ) ) {
+			$variable_value = $self->{local_values}->{$variable_name};
+			chomp $variable_value;
+			$main->{debugoutput}->debug_output_blue( $variable_name . ' = ' . $variable_value );
+		}
+		default {
+			$variable_value = $self->{global_values}->{$variable_name};
+			chomp $variable_value;
+			$main->{debugoutput}->debug_output_dark_gray( $variable_name . ' = ' . $variable_value );
+		}
 	}
 
 	return;
 }
+
 
 ###############################################
 # event handler top row
@@ -936,14 +932,20 @@ sub _on_list_item_selected {
 #######
 sub on_debug_clicked {
 	my $self = shift;
-	my $main = $self->main;
-
-	# test for valid perl document
-	if ( $main->current->document->mimetype !~ m/perl/ ) {
-		return;
-	}
 
 	$self->debug_perl;
+	$self->update_debugger_buttons_on;
+}
+
+#######
+# sub update_debugger_buttons_on
+#######
+sub update_debugger_buttons_on {
+	my $self    = shift;
+	my $arg_ref = shift;
+
+	my $main = $self->main;
+
 	return unless $self->{client};
 
 	$self->{quit_debugger}->Enable;
@@ -955,6 +957,8 @@ sub on_debug_clicked {
 	$self->{step_out}->Show;
 	$self->{run_till}->Show;
 	$self->{display_value}->Show;
+
+	$self->{show_local_variables}->Enable;
 
 	$self->{trace}->Enable;
 	$self->{evaluate_expression}->Enable;
@@ -980,6 +984,9 @@ sub on_debug_clicked {
 	$main->aui->Update;
 	if ( $main->{debugoutput} ) {
 		$main->{debugoutput}->debug_output( $self->{client}->get_h_var('h') );
+		if ($arg_ref) {
+			$main->{debugoutput}->debug_launch_options('To see all Debug Launch Parameters see menu');
+		}
 	}
 
 	#let's reload our breakpoints
@@ -1072,7 +1079,7 @@ sub on_show_local_variables_checked {
 	} else {
 		$self->{local_variables} = 0;
 	}
-
+	$self->_output_variables;
 	return;
 }
 #######
@@ -1086,7 +1093,7 @@ sub on_show_global_variables_checked {
 	} else {
 		$self->{global_variables} = 0;
 	}
-
+	$self->_output_variables;
 	return;
 }
 
@@ -1115,6 +1122,9 @@ sub on_dot_clicked {
 	my $main = $self->main;
 
 	$main->{debugoutput}->debug_output( $self->{client}->show_line() );
+
+	#reset editor to dot location
+	$self->_set_debugger;
 
 	return;
 }
@@ -1145,44 +1155,42 @@ sub on_list_action_clicked {
 # Event handler on_running_bp_set_clicked b|B
 #######
 sub on_running_bp_clicked {
+	my $bp_action_ref = Padre::Breakpoints->set_breakpoints_clicked;
+
+	return;
+}
+sub update_debugger_breakpoint {
 	my $self     = shift;
+	my $bp_action_ref = shift;
 	my $main     = $self->main;
 	my $editor   = $self->current->editor;
 	my $document = $self->current->document;
 	$self->{current_file} = $document->filename;
+	
+	if ( $self->{client} ) {
+		if ( $bp_action_ref->{action} eq 'add' ) {
+			my $result = $self->{client}->set_breakpoint( $self->{current_file}, $bp_action_ref->{line} );
+			if ( $result == 0 ) {
 
-	my $bp_action_ref;
-	if ( $self->main->{breakpoints} ) {
-		$bp_action_ref = $self->main->{breakpoints}->on_set_breakpoints_clicked();
-	} else {
-		require Padre::Breakpoints;
-		$bp_action_ref = Padre::Breakpoints->set_breakpoints_clicked();
-	}
+				# print "not breakable\n";
+				$editor->MarkerAdd( $bp_action_ref->{line} - 1, Padre::Constant::MARKER_NOT_BREAKABLE() );
+				$self->_setup_db;
+				Padre::DB->do(
+					'update debug_breakpoints SET active = ? WHERE filename = ? AND line_number = ?', {}, 0,
+					$self->{current_file}, $bp_action_ref->{line},
+				);
+				if ( $self->main->{breakpoints} ) {
+					$self->main->{breakpoints}->on_refresh_click();
+				}
 
-	my %bp_action = %{$bp_action_ref};
-
-	if ( $bp_action{action} eq 'add' ) {
-		my $result = $self->{client}->set_breakpoint( $self->{current_file}, $bp_action{line} );
-		if ( $result == 0 ) {
-
-			# print "not breakable\n";
-			$editor->MarkerAdd( $bp_action{line} - 1, Padre::Constant::MARKER_NOT_BREAKABLE() );
-			$self->_setup_db;
-			Padre::DB->do(
-				'update debug_breakpoints SET active = ? WHERE filename = ? AND line_number = ?', {}, 0,
-				$self->{current_file}, $bp_action{line},
-			);
-			if ( $self->main->{breakpoints} ) {
-				$self->main->{breakpoints}->on_refresh_click();
 			}
-
 		}
-	}
-	if ( $bp_action{action} eq 'delete' ) {
-		$self->{client}->remove_breakpoint( $self->{current_file}, $bp_action{line} );
+		if ( $bp_action_ref->{action} eq 'delete' ) {
+			$self->{client}->remove_breakpoint( $self->{current_file}, $bp_action_ref->{line} );
+		}
+		$main->{debugoutput}->debug_output( $self->{client}->__send('L b') );
 	}
 
-	$main->{debugoutput}->debug_output( $self->{client}->__send('L b') );
 	return;
 }
 #######
@@ -1203,7 +1211,7 @@ sub on_stacktrace_clicked {
 	my $self = shift;
 	my $main = $self->main;
 
-	$main->{debugoutput}->debug_output( $self->{client}->get_stack_trace() );
+	$main->{debugoutput}->debug_output( $self->{client}->get_stack_trace );
 
 	return;
 }
@@ -1225,7 +1233,7 @@ sub on_display_options_clicked {
 	my $self = shift;
 	my $main = $self->main;
 
-	$main->{debugoutput}->debug_output( $self->{client}->get_options() );
+	$main->{debugoutput}->debug_output( $self->{client}->get_options );
 
 	return;
 }
@@ -1238,11 +1246,17 @@ sub on_evaluate_expression_clicked {
 	my $self = shift;
 	my $main = $self->main;
 
+	if ( $self->{client}->get_stack_trace =~ /ANON/ ) {
+		$main->{debugoutput}->debug_output(
+			' You appear to be inside an __ANON__, suggest you use "Show Local Variables" to view contents');
+		return;
+	}
+
 	if ( $self->{expression}->GetValue() eq "" ) {
-		$main->{debugoutput}->debug_output( '$_ = ' . $self->{client}->get_value() );
+		$main->{debugoutput}->debug_output( '$_ = ' . $self->{client}->get_value );
 	} else {
 		$main->{debugoutput}->debug_output(
-			$self->{expression}->GetValue() . " = " . $self->{client}->get_value( $self->{expression}->GetValue() ) );
+			$self->{expression}->GetValue . " = " . $self->{client}->get_value( $self->{expression}->GetValue ) );
 	}
 
 	return;
@@ -1254,7 +1268,7 @@ sub on_sub_names_clicked {
 	my $self = shift;
 	my $main = $self->main;
 
-	$main->{debugoutput}->debug_output( $self->{client}->list_subroutine_names( $self->{expression}->GetValue() ) );
+	$main->{debugoutput}->debug_output( $self->{client}->list_subroutine_names( $self->{expression}->GetValue ) );
 
 	return;
 }
@@ -1265,18 +1279,18 @@ sub on_watchpoints_clicked {
 	my $self = shift;
 	my $main = $self->main;
 
-	if ( $self->{expression}->GetValue() ne "" ) {
-		if ( $self->{expression}->GetValue() eq "*" ) {
-			$main->{debugoutput}->debug_output( $self->{client}->__send( 'W ' . $self->{expression}->GetValue() ) );
+	if ( $self->{expression}->GetValue ne "" ) {
+		if ( $self->{expression}->GetValue eq "*" ) {
+			$main->{debugoutput}->debug_output( $self->{client}->__send( 'W ' . $self->{expression}->GetValue ) );
 
 			return;
 		}
 
 		# this is nasty, there must be a better way
-		my $exp = "\\" . $self->{expression}->GetValue();
+		my $exp = "\\" . $self->{expression}->GetValue;
 
 		if ( $self->{client}->__send('L w') =~ m/$exp/gm ) {
-			my $del_watch = $self->{client}->__send( 'W ' . $self->{expression}->GetValue() );
+			my $del_watch = $self->{client}->__send( 'W ' . $self->{expression}->GetValue );
 			if ($del_watch) {
 				$main->{debugoutput}->debug_output($del_watch);
 			} else {
@@ -1286,7 +1300,7 @@ sub on_watchpoints_clicked {
 			return;
 		} else {
 
-			$self->{client}->__send( 'w ' . $self->{expression}->GetValue() );
+			$self->{client}->__send( 'w ' . $self->{expression}->GetValue );
 			$main->{debugoutput}->debug_output( $self->{client}->__send('L w') );
 
 			return;
@@ -1305,12 +1319,14 @@ sub on_raw_clicked {
 	my $self = shift;
 	my $main = $self->main;
 
-	if ( $self->{expression}->GetValue() =~ m/^h.?(\w*)/s ) {
-		$main->{debugoutput}->debug_output( $self->{client}->get_h_var($1) );
+	my $output;
+	if ( $self->{expression}->GetValue =~ m/^h.?(\w*)/s ) {
+		$output = $self->{client}->get_h_var($1) ;
 	} else {
 
-		$main->{debugoutput}->debug_output( $self->{client}->__send_np( $self->{expression}->GetValue() ) );
+		$output = $self->{client}->__send_np( $self->{expression}->GetValue );
 	}
+	$self->update_debug_user_interface($output);
 
 	return;
 }
@@ -1367,6 +1383,88 @@ sub on_raw_clicked {
 # return;
 # }
 
+#######
+# Event handler on_launch_options - launch the debugger over-riding its auto-choices
+#######
+sub on_launch_options {
+	my $self     = shift;
+	my $main     = $self->main;
+	my $current  = $self->current;
+	my $document = $current->document;
+	my $editor   = $current->editor;
+
+	my $filename;
+	if ( defined $document->{file} ) {
+		$filename = $document->{file}->filename;
+	}
+
+	# TODO: improve the message displayed to the user
+	# If the document is not saved, simply return for now
+	return unless $filename;
+
+	my ( $cmd, $arg_ref ) = $document->get_command( { debug => 1 } );
+
+	require Padre::Wx::Dialog::DebugOptions;
+	my $dialog = Padre::Wx::Dialog::DebugOptions->new(
+		$main,
+	);
+
+	$dialog->perl_interpreter->SetValue( $arg_ref->{perl} );
+	$dialog->perl_args->SetValue( $arg_ref->{perl_args} );
+	$dialog->find_script->SetValue( $arg_ref->{script} );
+	$dialog->run_directory->SetValue( $arg_ref->{run_directory} );
+	$dialog->script_options->SetValue( $arg_ref->{script_args} );
+
+	$dialog->find_script->SetFocus;
+
+	if ( $dialog->ShowModal == Wx::ID_CANCEL ) {
+		return;
+	}
+	$arg_ref->{perl}          = $dialog->perl_interpreter->GetValue();
+	$arg_ref->{perl_args}     = $dialog->perl_args->GetValue();
+	$arg_ref->{script}        = $dialog->find_script->GetValue();
+	$arg_ref->{run_directory} = $dialog->run_directory->GetValue();
+	$arg_ref->{script_args}   = $dialog->script_options->GetValue();
+	$dialog->Destroy;
+
+	#save history for next time (when we might just hit run!
+	{
+		my $history = $main->lock( 'DB', 'refresh_recent' );
+
+		#save which script the user selected to run for this document
+		Padre::DB::History->create(
+			type => "run_script_" . File::Basename::fileparse($filename),
+			name => $arg_ref->{script},
+		);
+		my $script_base = File::Basename::fileparse( $arg_ref->{script} );
+
+		Padre::DB::History->create(
+			type => 'run_directory_' . $script_base,
+			name => $arg_ref->{run_directory},
+		);
+		Padre::DB::History->create(
+			type => "run_script_args_" . $script_base,
+			name => $arg_ref->{script_args},
+		);
+		Padre::DB::History->create(
+			type => "run_perl_" . $script_base,
+			name => $arg_ref->{perl},
+		);
+		Padre::DB::History->create(
+			type => "run_perl_args_" . $script_base,
+			name => $arg_ref->{perl_args},
+		);
+	}
+
+	#now run the debugger with the new command
+	$self->debug_perl($arg_ref);
+
+	# p $arg_ref;
+	$self->update_debugger_buttons_on($arg_ref);
+
+	return;
+}
+
 
 1;
 
@@ -1402,7 +1500,7 @@ Returns true if debugger successfully started.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

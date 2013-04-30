@@ -12,7 +12,7 @@ use Padre::Current  ();
 use Padre::Feature  ();
 use Padre::Logger;
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = 'Padre::Wx::Menu';
 
 
@@ -71,6 +71,16 @@ sub new {
 	);
 
 	### NOTE: Add support for plugins here
+
+	# Split projects from files
+	$file_new->AppendSeparator;
+
+
+	#ToDo Not yet finished
+	$self->add_menu_action(
+		$file_new,
+		'file.p5_modulestarter',
+	);
 
 	# Open things
 
@@ -235,11 +245,11 @@ sub new {
 	$self->AppendSeparator;
 
 	# Print files
-	# $self->{print} = $self->add_menu_action(
-	# 'file.print',
-	# );
+	$self->{print} = $self->add_menu_action(
+		'file.print',
+	);
 
-	# $self->AppendSeparator;
+	$self->AppendSeparator;
 
 	# Recent things
 	$self->{recentfiles} = Wx::Menu->new;
@@ -400,7 +410,7 @@ sub on_recent {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

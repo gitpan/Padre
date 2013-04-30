@@ -8,7 +8,7 @@ use Padre::Config   ();
 use Padre::Constant ();
 use Padre::Wx       ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 # Generate faster accessors
 use Class::XSAccessor {
@@ -94,7 +94,7 @@ sub new {
 	# Validate the shortcut
 	if ($shortcut) {
 		my $shortcuts = $ide->shortcuts;
-		if ( exists $shortcuts->{$shortcut} ) {
+		if ( exists $shortcuts->{$shortcut} and $shortcuts->{$shortcut}->name ne $name ) {
 			warn "Found a duplicate shortcut '$shortcut' with " . $shortcuts->{$shortcut}->name . " for '$name'\n";
 		} else {
 			$shortcuts->{$shortcut} = $self;
@@ -201,7 +201,7 @@ sub _event {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
@@ -351,7 +351,7 @@ A default constructor for action objects.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.

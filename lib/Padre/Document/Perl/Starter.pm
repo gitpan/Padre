@@ -15,12 +15,14 @@ documents and projects of various types.
 
 =cut
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
-use Padre::Template ();
+use Params::Util                          ();
+use Padre::Template                       ();
+use Padre::Document::Perl::Starter::Style ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 
 
@@ -43,8 +45,23 @@ window object as a parameter.
 sub new {
 	my $class = shift;
 	return bless {
-		main => shift,
+		main  => shift,
+		style => Padre::Document::Perl::Starter::Style->new(@_),
 	}, $class;
+}
+
+=pod
+
+=head2 style
+
+The C<style> accessor returns the default code style for modules as a
+L<Padre::Document::Perl::Starter::Style> object. Any style values provided
+to a specific create method will override these defaults.
+
+=cut
+
+sub style {
+	$_[0]->{style};
 }
 
 =pod
@@ -91,11 +108,11 @@ possible.
 =cut
 
 sub create_script {
-	my $self = shift;
-	my $code = Padre::Template->render('perl5/script_pl.tt');
-	$self->main->new_document_from_string(
-		$code => 'application/x-perl',
-	);
+	shift->create('perl5/script_pl.tt', @_);
+}
+
+sub generate_script {
+	shift->generate('perl5/script_pl.tt', @_);
 }
 
 =pod
@@ -117,28 +134,29 @@ sub create_module {
 	my $module = $param{module};
 
 	# Ask for a module name if one is not provided
-	unless ( defined Params::Util::_STRING($module) ) {
-		$module = $self->main->prompt(
+	unless ( defined Params::Util::_STRING($param{module}) ) {
+		$param{module} = $self->main->prompt(
 			Wx::gettext('Module Name:'),
 			Wx::gettext('New Module'),
 		);
+		unless ( defined Params::Util::_STRING($param{module}) ) {
+			return;
+		}
 	}
 
-	# If we still don't have a module name abort
-	unless ( defined Params::Util::_STRING($module) ) {
+	$self->create('perl5/module_pm.tt', %param);
+}
+
+sub generate_module {
+	my $self  = shift;
+	my %param = @_;
+
+	# Abort if we don't have a module name
+	unless ( defined Params::Util::_STRING($param{module}) ) {
 		return;
 	}
 
-	# Generate the code from the module template
-	my $code = Padre::Template->render(
-		'perl5/module_pm.tt',
-		module => $module,
-	);
-
-	# Show the new file in a new editor window
-	$self->main->new_document_from_string(
-		$code => 'application/x-perl',
-	);
+	$self->generate('perl5/module_pm.tt', %param);
 }
 
 =pod
@@ -153,11 +171,121 @@ possible.
 =cut
 
 sub create_test {
+	shift->create('perl5/test_t.tt', @_);
+}
+
+sub generate_test {
+	shift->generate('perl5/test_t.tt', @_);
+}
+
+=pod
+
+=head2 create_test_compile
+
+    $starter->create_text_compile;
+
+Create a new empty Perl 5 test for compilation testing of all the code in your
+project, so that further tests can use your modules as normal without doing any
+load testing of their own.
+
+=cut
+
+sub create_text_compile {
 	my $self = shift;
-	my $code = Padre::Template->render('perl5/test_t.tt');
-	$self->main->new_document_from_string(
-		$code => 'application/x-perl',
-	);
+	my $code = $self->generate_test_compile(@_) or return undef;
+
+	$self->new_document($code);
+}
+
+sub generate_test_compile {
+	my $self  = shift;
+	my %param = @_;
+
+	# Get the style and module name from the current project
+	if ( Params::Util::_INSTANCE($param{project}, 'Padre::Project::Perl') ) {
+		$param{style}  ||= $param{project};
+		$param{module} ||= $param{project}->module or return undef;	
+	}
+
+	# We must have a module name
+	unless ( Params::Util::_CLASS($param{module}) ) {
+		return undef;
+	}
+
+	$self->generate( 'perl5/01_compile_t.tt', %param );
+}
+
+
+
+
+
+######################################################################
+# Support Methods
+
+sub create {
+	my $self = shift;
+	my $code = $self->generate(@_) or return undef;
+
+	$self->new_document($code);
+}
+
+sub generate {
+	my $self = shift;
+	my $name  = shift;
+	my %param = $self->params(@_);
+	my $code  = Padre::Template->render($name, %param);
+
+	$self->tidy($code);
+}
+
+sub params {
+	my $self  = shift;
+	my %param = @_;
+
+	# Inheriting from a project means inheriting from the headline file
+	if ( Params::Util::_INSTANCE($param{style}, 'Padre::Project::Perl') ) {
+		$param{style} = $param{style}->headline_path;
+	}
+
+	# Inherit style from an existing document
+	if ( Params::Util::_INSTANCE($param{style}, 'Padre::Document::Perl') ) {
+		$param{style} = Padre::Document::Perl::Starter::Style->from_document(
+			$param{style},
+			$self->{style},
+		);
+	}
+
+	# Inherit style from a file on disk
+	if ( Params::Util::_STRING($param{style}) ) {
+		$param{style} = Padre::Document::Perl::Starter::Style->from_file(
+			$param{style},
+			$self->{style},
+		);
+	}
+
+	# Apply default style if we have nothing more specific
+	unless ( Params::Util::_INSTANCE($param{style}, 'Padre::Document::Perl::Starter::Style') ) {
+		$param{style} = $self->{style};
+	}
+
+	return %param;
+}
+
+sub tidy {
+	my $self = shift;
+	my $code = shift;
+
+	# Remove multiple blank lines
+	$code =~ s/\n{3,}/\n\n/sg;
+
+	# Remove spaces between successive use statements to create use blocks
+	$code =~ s/(?<=\n)(use\b\N+)\n+(?=use\b)/$1\n/g;
+
+	return $code;
+}
+
+sub new_document {
+	$_[0]->main->new_document_from_string( $_[1] => 'application/x-perl' );
 }
 
 1;
@@ -166,7 +294,7 @@ sub create_test {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -176,7 +304,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -33,7 +33,7 @@ use warnings;
 use File::Spec      ();
 use Padre::Constant ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 my $SPLASH = undef;
 
@@ -177,7 +177,7 @@ sub startup {
 	$SPLASH = Wx::SplashScreen->new(
 		Wx::Bitmap->new(
 			$splash,
-			Wx::wxBITMAP_TYPE_BMP()
+			Wx::wxBITMAP_TYPE_PNG()
 		),
 		Wx::wxSPLASH_CENTRE_ON_SCREEN() | Wx::wxSPLASH_TIMEOUT(),
 		3500, undef, -1
@@ -204,7 +204,7 @@ sub destroy_splash {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

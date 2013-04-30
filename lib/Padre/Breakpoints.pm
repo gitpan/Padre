@@ -2,23 +2,25 @@ package Padre::Breakpoints;
 
 #ToDo Q is this package wrong in the wronge location
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 #######
 # function set_breakpoints_clicked
 # this is a toggle function based on current status
 #######
 sub set_breakpoints_clicked {
+	my $bp_line = $_[1];
 
 	my $debug_breakpoints = ('Padre::DB::DebugBreakpoints');
 
 	my $editor       = Padre::Current->editor;
 	my $current_file = $editor->{Document}->filename;
-	my $bp_line      = $editor->GetCurrentLine + 1;
+	$bp_line      = $editor->GetCurrentLine unless defined $bp_line;
+	$bp_line++;
 	my %bp_action;
 	$bp_action{line} = $bp_line;
 
@@ -41,6 +43,14 @@ sub set_breakpoints_clicked {
 		);
 		$bp_action{action} = 'add';
 	}
+	#update the breakpoint panel
+        if ( $editor->main->{breakpoints} ) {
+                $editor->main->{breakpoints}->on_refresh_click();
+        }
+	#update the debugger client - if we're currently debugging
+        if ( $editor->main->{debugger} ) {
+            $editor->main->{debugger}->update_debugger_breakpoint(\%bp_action);
+        }
 
 	return \%bp_action;
 }
@@ -61,7 +71,6 @@ sub show_breakpoints {
 	}
 
 	for ( 0 .. $#tuples ) {
-
 		if ( $tuples[$_][3] == 1 ) {
 			$editor->MarkerAdd( $tuples[$_][2] - 1, Padre::Constant::MARKER_BREAKPOINT() );
 		} else {
@@ -74,7 +83,7 @@ sub show_breakpoints {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

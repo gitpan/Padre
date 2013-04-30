@@ -8,8 +8,9 @@ use Padre::Util ();
 use File::Temp  ();
 use File::Spec  ();
 use Padre::Logger;
+use Try::Tiny;
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = 'Padre::Task';
 
 use constant {
@@ -20,6 +21,7 @@ use constant {
 	VCS_REVERT => 'revert',
 	VCS_COMMIT => 'commit',
 };
+
 
 ######################################################################
 # Constructor
@@ -49,8 +51,6 @@ sub new {
 
 	return $self;
 }
-
-
 
 
 
@@ -95,42 +95,21 @@ sub _find_svn_status {
 
 	my @model = ();
 
-	# Create a temporary file for standard output redirection
-	my $out = File::Temp->new( UNLINK => 1 );
-	$out->close;
-
-	# Create a temporary file for standard error redirection
-	my $err = File::Temp->new( UNLINK => 1 );
-	$err->close;
-
 	# Find the svn command line
 	my $svn = File::Which::which('svn') or return \@model;
 
 	# Handle spaces in executable path under win32
 	$svn = qq{"$svn"} if Padre::Constant::WIN32;
 
-	# run 'svn --no-ignore --verbose status' command
-	my @cmd = (
-		$svn,
-		'--no-ignore',
-		'--verbose',
-		'status',
-		'1>' . $out->filename,
-		'2>' . $err->filename,
+	#Now uses run in dir
+	my $svn_info_ref = Padre::Util::run_in_directory_two(
+		cmd    => "$svn --no-ignore --verbose status", dir => $project_dir,
+		option => '0'
 	);
+	my %svn_info = %{$svn_info_ref};
 
-	# We need shell redirection (list context does not give that)
-	# Run command in directory
-	Padre::Util::run_in_directory( join( ' ', @cmd ), $project_dir );
-
-	# Slurp command standard input and output
-	my $stdout = Padre::Util::slurp $out->filename;
-
-	#TODO parse Standard error?
-	#my $stderr = Padre::Util::slurp $err->filename;
-
-	if ($stdout) {
-		for my $line ( split /^/, $$stdout ) {
+	if ( $svn_info{output} ) {
+		for my $line ( split /^/, $svn_info{output} ) {
 
 			# Remove newlines and an extra CR (carriage return)
 			chomp($line);
@@ -174,38 +153,21 @@ sub _find_git_status {
 
 	my @model = ();
 
-	# Create a temporary file for standard output redirection
-	my $out = File::Temp->new( UNLINK => 1 );
-	$out->close;
-
-	# Create a temporary file for standard error redirection
-	my $err = File::Temp->new( UNLINK => 1 );
-	$err->close;
-
 	# Find the git command line
 	my $git = File::Which::which('git') or return \@model;
 
 	# Handle spaces in executable path under win32
 	$git = qq{"$git"} if Padre::Constant::WIN32;
 
-	# run 'git status --short' command
-	my @cmd = (
-		$git,
-		'status',
-		'--short',
-		'1>' . $out->filename,
-		'2>' . $err->filename,
+	#Now uses run in dir
+	my $git_info_ref = Padre::Util::run_in_directory_two(
+		cmd    => "$git status --short", dir => $project_dir,
+		option => '0'
 	);
+	my %git_info = %{$git_info_ref};
 
-	# We need shell redirection (list context does not give that)
-	# Run command in directory
-	Padre::Util::run_in_directory( join( ' ', @cmd ), $project_dir );
-
-	# Slurp command standard input and output
-	my $stdout = Padre::Util::slurp $out->filename;
-
-	if ($stdout) {
-		for my $line ( split /^/, $$stdout ) {
+	if ( $git_info{output} ) {
+		for my $line ( split /^/, $git_info{output} ) {
 			chomp($line);
 			if ( $line =~ /^(..)\s+(.+?)(?:\s\->\s(.+?))?$/ ) {
 
@@ -237,7 +199,7 @@ sub _find_git_status {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

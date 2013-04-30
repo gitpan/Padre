@@ -12,7 +12,7 @@ use Padre::Util             ();
 use Padre::Locale::Format   ();
 use Padre::Wx::FBP::About   ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Wx::FBP::About
 };
@@ -86,6 +86,7 @@ sub _translation {
 
 	# $self->kjetil_skotheim->SetLabel('');
 	# $self->cezary_morga->SetLabel('');
+	# $self->marek_roszkowski->SetLabel('');
 	# $self->breno_g_de_oliveira->SetLabel('');
 	# $self->gabriel_vieira->SetLabel('');
 
@@ -102,13 +103,18 @@ sub _information {
 	my $self   = shift;
 	my $output = "\n";
 	$output .= sprintf "%*s %s\n", OFFSET, 'Padre', $VERSION;
+
 	$output .= $self->_core_info;
 	$output .= $self->_wx_info;
+
 	$output .= "Other...\n";
 	$output .= sprintf "%*s %s\n", OFFSET, 'PPI',   $PPI::VERSION;
 
 	require Debug::Client;
 	$output .= sprintf "%*s %s\n", OFFSET, 'Debug::Client', $Debug::Client::VERSION;
+
+	require PPIx::EditorTools;
+	$output .= sprintf "%*s %s\n", OFFSET, 'PPIx::EditorTools', $PPIx::EditorTools::VERSION;
 
 	$output .= sprintf "%*s %s\n", OFFSET, Wx::gettext('Config'), Padre::Constant::CONFIG_DIR;
 	return $output;
@@ -125,6 +131,7 @@ sub _core_info {
 
 	if ( $Config{osname} eq 'linux' ) {
 
+		# qx{...} ok here as linux
 		my $distro = qx{cat /etc/issue};
 		chomp($distro);
 		$distro =~ s/\\n \\l//g;
@@ -183,7 +190,7 @@ sub _wx_info {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

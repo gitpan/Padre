@@ -22,7 +22,9 @@ the available methods that can be applied to it besides the added ones
 
 =cut
 
-use 5.008005;
+use v5.10;
+
+# use 5.008005;
 use strict;
 use warnings;
 use Cwd                       ();
@@ -58,8 +60,7 @@ use Padre::Wx::Role::Timer    ();
 use Padre::Wx::Role::Idle     ();
 use Padre::Locale::T;
 use Padre::Logger;
-
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.91';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
@@ -1565,7 +1566,7 @@ sub refresh_title {
 	require Padre::Util::SVN;
 	my $revision = Padre::Util::SVN::padre_revision();
 	if ( defined $revision ) {
-		$title .= " SVN \@$revision (\$VERSION = $Padre::VERSION)";
+		$title .= "  svn: r$revision (\$VERSION = $Padre::VERSION)";
 	}
 
 	unless ( $self->GetTitle eq $title ) {
@@ -2945,9 +2946,15 @@ sub run_command {
 					system qq(xterm -sb -e "$cmd; sleep 1000" &);
 				}
 			}
-		} elsif (Padre::Constant::UNIX) {
+		} elsif (Padre::Constant::MAC) {
 
 			# tome
+			my $pwd = $self->current->document->project_dir();
+			$cmd =~ s/"/\\"/g;
+
+			# Applescript can throw spurious errors on STDERR: http://helpx.adobe.com/photoshop/kb/unit-type-conversion-error-applescript.html
+			system qq(osascript -e 'tell app "Terminal"\n\tdo script "cd $pwd; clear; $cmd;"\nend tell'\n);
+
 		} else {
 			system qq(xterm -sb -e "$cmd; sleep 1000" &);
 		}
@@ -2963,6 +2970,7 @@ sub run_command {
 
 	# ticket #205, reset output style to neutral
 	$self->output->style_neutral;
+	$self->output->AppendText("Running: $cmd\n");
 
 	# If this is the first time a command has been run,
 	# set up the ProcessStream bindings.
@@ -4246,6 +4254,18 @@ sub on_open_selection {
 			Wx::gettext("Nothing selected. Enter what should be opened:"),
 			Wx::gettext("Open selection"), ''
 		);
+
+		#help the user by loading whats on the current line
+		my $pos   = $editor->GetCurrentPos;
+		my $line  = $editor->LineFromPosition($pos);
+		my $first = $editor->PositionFromLine($line);
+		my $last  = $editor->PositionFromLine( $line + 1 );
+		$text = $editor->GetTextRange( $first, $last );
+		if ($text) {
+			$text =~ s/^[\s\n]*(.*?)[\s\n]*$/$1/;
+			$dialog->SetValue($text);
+		}
+
 		return if $dialog->ShowModal == Wx::ID_CANCEL;
 
 		$text = $dialog->GetValue;
@@ -4281,9 +4301,16 @@ sub on_open_selection {
 	unless (@files) {
 		my $document = $current->document;
 		push @files, $document->guess_filename_to_open($text);
+		unless (@files) {
+			my $text_shortened = $text;
+			$text_shortened =~ s{::[^\:]+$}{};
+			push @files, $document->guess_filename_to_open($text_shortened);
+		}
 	}
 
 	unless (@files) {
+
+		#replace this with the original chooser dialog - so the user can refine it
 		$self->message(
 			sprintf( Wx::gettext("Could not find file '%s'"), $text ),
 			Wx::gettext("Open Selection")
@@ -4578,7 +4605,15 @@ sub reload_editor {
 	my $self     = shift;
 	my $editor   = shift || $self->current->editor or return 0;
 	my $document = $editor->document or return 0;
-	my $lock     = $editor->lock_update;
+
+	# If file doesn't exist close the tab
+	unless ( -e $document->{filename} ) {
+		my $id = $self->editor_of_file( $document->{filename} );
+		$self->delete($id);
+		return 1;
+	}
+
+	my $lock = $editor->lock_update;
 
 	# Capture where we are in the document
 	my $line = $editor->LineFromPosition( $editor->GetCurrentPos );
@@ -4593,6 +4628,7 @@ sub reload_editor {
 		);
 		return 0;
 	}
+
 	$editor->set_document($document);
 
 	# Restore the line position
@@ -4606,8 +4642,8 @@ sub reload_editor {
 		foreach my $editor ( $self->editors ) {
 			$editor->SetMarginWidth( 1, 16 );
 		}
-		return;
 	}
+
 
 	# Refresh the editor title to remove any unsaved marker
 	$editor->refresh_notebook;
@@ -4646,7 +4682,7 @@ sub reload_editors {
 	my $notebook = $self->notebook;
 	foreach my $i ( 0 .. $#editors ) {
 		$progress->update( $i, ( $i + 1 ) . "/$total" );
-		$self->reload_editor( $editors[$i] ) or return 0;
+		$self->reload_editor( $editors[$i] );
 	}
 
 	# Notify the plugin manager of the changed files
@@ -5114,7 +5150,11 @@ sub close {
 			$self,
 		);
 		if ( $ret == Wx::YES ) {
-			$self->on_save($document);
+
+			# see #1447
+			if ( -e $document->{filename} ) {
+				$self->on_save($document);
+			}
 		} elsif ( $ret == Wx::NO ) {
 
 			# just close it
@@ -5386,6 +5426,9 @@ sub delete {
 			Wx::gettext("Do you really want to close and delete %s from disk?"),
 			$filename
 		),
+
+		# see #1447
+		Wx::gettext("Warning"),
 		Wx::YES_NO | Wx::CANCEL | Wx::CENTRE,
 		$self,
 	);
@@ -6054,6 +6097,9 @@ sub editor_of_file {
 		my $document = $editor->{Document}     or return;
 		defined( $document->{file} ) or next;
 		my $doc_filename = $document->{file}->{filename} or next;
+
+		#below fix for -> stop dumping the following on console 'Use of uninitialized value in string eq'
+		defined( $file->{filename} ) or next;
 		return $id if $doc_filename eq $file->{filename};
 	}
 	return;
@@ -6872,7 +6918,7 @@ sub backup {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -6882,7 +6928,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -13,7 +13,7 @@ use warnings;
 use Padre::Wx ();
 use Padre::Wx::Role::Main ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Wx::Role::Main
 	Wx::Panel
@@ -99,6 +99,14 @@ sub new {
 		Wx::LC_REPORT | Wx::LC_SINGLE_SEL,
 	);
 
+	Wx::Event::EVT_LIST_ITEM_SELECTED(
+		$self,
+		$self->{list},
+		sub {
+			shift->_on_list_item_selected(@_);
+		},
+	);
+
 	$self->{show_project} = Wx::CheckBox->new(
 		$self,
 		-1,
@@ -179,6 +187,10 @@ sub on_set_breakpoints_clicked {
 	$_[0]->main->error('Handler method on_set_breakpoints_clicked for event set_breakpoints.OnButtonClick not implemented');
 }
 
+sub _on_list_item_selected {
+	$_[0]->main->error('Handler method _on_list_item_selected for event list.OnListItemSelected not implemented');
+}
+
 sub on_show_project_click {
 	$_[0]->main->error('Handler method on_show_project_click for event show_project.OnCheckBox not implemented');
 }
@@ -189,7 +201,7 @@ sub on_delete_project_bp_clicked {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

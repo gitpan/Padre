@@ -1,6 +1,6 @@
 package Padre::Wx::Panel::DebugOutput;
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 
@@ -8,7 +8,7 @@ use utf8;
 use Padre::Wx::Role::View;
 use Padre::Wx::FBP::DebugOutput ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 our @ISA = qw{
 	Padre::Wx::Role::View
@@ -131,6 +131,7 @@ sub debug_output_dark_gray {
 
 	return;
 }
+
 ########
 # debug_status
 ########
@@ -141,9 +142,19 @@ sub debug_status {
 	return;
 }
 
+########
+# debug launch options
+########
+sub debug_launch_options {
+	my $self   = shift;
+	my $options = shift || 'none';
+	$self->{dl_options}->SetLabel($options);
+	return;
+}
+
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

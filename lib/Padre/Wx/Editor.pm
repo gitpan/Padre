@@ -27,13 +27,14 @@ use Padre::Config             ();
 use Padre::Feature            ();
 use Padre::Util               ();
 use Padre::DB                 ();
+use Padre::Breakpoints        ();
 use Padre::Wx                 ();
 use Padre::Wx::FileDropTarget ();
 use Padre::Wx::Role::Main     ();
 use Padre::Wx::Role::Timer    ();
 use Padre::Logger;
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.91';
 our @ISA        = (
 	'Padre::Wx::Role::Main',
@@ -309,6 +310,27 @@ sub new {
 			shift->on_left_double(@_);
 		},
 	);
+	
+	Wx::Event::EVT_STC_MARGINCLICK(
+	$self, -1,
+	sub {
+		my ( $editor, $event ) = @_;
+		my $main    = $self->main;
+
+		my $line_clicked  = $editor->LineFromPosition( $event->GetPosition );
+		#my $level_clicked = $editor->GetFoldLevel($line_clicked);
+
+		if ( $event->GetMargin == 2 ) {
+			# TO DO check this (cf. ~/contrib/samples/stc/edit.cpp from wxWidgets)
+			#if ( $level_clicked && Wx::Scintilla::FOLDLEVELHEADERFLAG) > 0) {
+			$editor->ToggleFold($line_clicked);
+
+			#}
+		} elsif ( $event->GetMargin == 1 ) {
+			Padre::Breakpoints->set_breakpoints_clicked($line_clicked);
+		}
+	}
+);
 
 	# Capture change events that result in an actual change to the text
 	# of the document, so we can refire content-dependent editor tools.
@@ -550,11 +572,11 @@ sub on_left_up {
 	if ( Wx::GTK and defined $text and $text ne '' ) {
 
 		# Only on X11 based platforms
-		if ( $config->mid_button_paste ) {
-			$self->put_text_to_clipboard( $text, 1 );
-		} else {
-			$self->put_text_to_clipboard($text);
-		}
+		# if ( $config->mid_button_paste ) {
+		# $self->put_text_to_clipboard( $text, 1 );
+		# } else {
+		# $self->put_text_to_clipboard($text);
+		# }
 	}
 
 	my $doc = $self->document;
@@ -2009,8 +2031,9 @@ sub put_text_to_clipboard {
 	#         if $self->{Clipboard_Old} ne $self->get_text_from_clipboard;
 
 	Wx::TheClipboard->Open;
-	Wx::TheClipboard->UsePrimarySelection($clipboard)
-		if $config->mid_button_paste;
+
+	# Wx::TheClipboard->UsePrimarySelection($clipboard)
+	# if $config->mid_button_paste;
 	Wx::TheClipboard->SetData( Wx::TextDataObject->new($text) );
 	Wx::TheClipboard->Close;
 
@@ -2161,7 +2184,8 @@ BEGIN {
 			my $b = Wx::Colour->new("black");
 			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEREND, Wx::Scintilla::SC_MARK_BOXPLUSCONNECTED, $w, $b );
 			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDEROPENMID, Wx::Scintilla::SC_MARK_BOXMINUSCONNECTED, $w,
-				$b );
+				$b
+			);
 			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERMIDTAIL, Wx::Scintilla::SC_MARK_TCORNER,  $w, $b );
 			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERTAIL,    Wx::Scintilla::SC_MARK_LCORNER,  $w, $b );
 			$self->MarkerDefine( Wx::Scintilla::SC_MARKNUM_FOLDERSUB,     Wx::Scintilla::SC_MARK_VLINE,    $w, $b );
@@ -2171,22 +2195,6 @@ BEGIN {
 			# Activate
 			$self->SetProperty( 'fold' => 1 );
 
-			Wx::Event::EVT_STC_MARGINCLICK(
-				$self, -1,
-				sub {
-					my ( $editor, $event ) = @_;
-					if ( $event->GetMargin == 2 ) {
-						my $line_clicked  = $editor->LineFromPosition( $event->GetPosition );
-						my $level_clicked = $editor->GetFoldLevel($line_clicked);
-
-						# TO DO check this (cf. ~/contrib/samples/stc/edit.cpp from wxWidgets)
-						#if ( $level_clicked && Wx::Scintilla::FOLDLEVELHEADERFLAG) > 0) {
-						$editor->ToggleFold($line_clicked);
-
-						#}
-					}
-				}
-			);
 		} else {
 			$self->SetMarginSensitive(
 				Padre::Constant::MARGIN_FOLD,
@@ -2339,7 +2347,7 @@ BEGIN {
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute
 it and/or modify it under the same terms as Perl itself.
@@ -2349,7 +2357,7 @@ LICENSE file included with this module.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -3,21 +3,21 @@ abstract: 'Perl Application Development and Refactoring Environment'
 author:
   - 'Gabor Szabo'
 build_requires:
-  ExtUtils::MakeMaker: 6.62
+  ExtUtils::MakeMaker: 6.59
   Locale::Msgfmt: 0.15
   Test::Exception: 0.27
   Test::MockObject: 1.09
-  Test::More: 0.88
-  Test::NoWarnings: 0.084
+  Test::More: 0.98
+  Test::NoWarnings: 1.04
   Test::Script: 1.07
   Test::Warn: 0.24
 configure_requires:
-  Alien::wxWidgets: 0.46
+  Alien::wxWidgets: 0.62
   ExtUtils::Embed: 1.250601
-  ExtUtils::MakeMaker: 6.62
+  ExtUtils::MakeMaker: 6.59
 distribution_type: module
 dynamic_config: 1
-generated_by: 'Module::Install version 1.04'
+generated_by: 'Module::Install version 1.06'
 keywords:
   - auto-completion
   - code
@@ -76,7 +76,7 @@ requires:
   DBD::SQLite: 1.35
   DBI: 1.58
   Data::Dumper: 2.101
-  Debug::Client: 0.20
+  Debug::Client: 0.24
   Devel::Dumpvar: 0.04
   Devel::Refactor: 0.05
   Encode: 2.26
@@ -113,12 +113,13 @@ requires:
   Module::Build: 0.3603
   Module::CoreList: 2.22
   Module::Manifest: 0.07
-  ORLite: 1.96
+  Module::Starter: 1.60
+  ORLite: 1.98
   ORLite::Migrate: 1.10
   POD2::Base: 0.043
   POSIX: 0
-  PPI: 1.213
-  PPIx::EditorTools: 0.13
+  PPI: 1.215
+  PPIx::EditorTools: 0.18
   PPIx::Regexp: 0.011
   Params::Util: 0.33
   Parse::ErrorString::Perl: 0.14
@@ -140,9 +141,9 @@ requires:
   Text::Patch: 1.8
   Time::HiRes: 1.9718
   URI: 0
-  Wx: 0.9901
-  Wx::Perl::ProcessStream: 0.29
-  Wx::Scintilla: 0.34
+  Wx: 0.9916
+  Wx::Perl::ProcessStream: 0.32
+  Wx::Scintilla: 0.39
   YAML::Tiny: 1.32
   perl: 5.010000
   threads: 1.71
@@ -153,4 +154,49 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.96
+version: 0.98
+x_contributors:
+  - 'Aaron Trevena (TEEJAY)'
+  - 'Adam Kennedy (ADAMK) <adamk@cpan.org>'
+  - 'Ahmad Zawawi أحمد محمد زواوي (AZAWAWI)'
+  - 'Andrew Shitov'
+  - 'Alexandr Ciornii (CHORNY)'
+  - 'Amir E. Aharoni - אמיר א. אהרוני'
+  - 'Blake Willmarth (BLAKEW)'
+  - 'BlueT - Matthew Lien - 練喆明 (BLUET) <bluet@cpan.org>'
+  - 'Breno G. de Oliveira (GARU)'
+  - 'Brian Cassidy (BRICAS)'
+  - 'Burak Gürsoy (BURAK) <burak@cpan.org>'
+  - 'Cezary Morga (THEREK) <cm@therek.net>'
+  - 'Chris Dolan (CHRISDOLAN)'
+  - 'Claudio Ramirez (NXADM) <nxadm@cpan.org>'
+  - 'Dirk De Nijs (ddn123456)'
+  - 'Enrique Nell (ENELL)'
+  - 'Fayland Lam (FAYLAND) <fayland@gmail.com>'
+  - 'Gabriel Vieira (GABRIELMAD)'
+  - 'Gábor Szabó - גאבור סבו (SZABGAB) <szabgab@cpan.org>'
+  - 'György Pásztor (GYU)'
+  - 'Heiko Jansen (HJANSEN) <heiko_jansen@web.de>'
+  - 'Jérôme Quelin (JQUELIN) <jquelin@cpan.org>'
+  - 'Kaare Rasmussen (KAARE) <kaare@cpan.org>'
+  - 'Keedi Kim - 김도형 (KEEDI)'
+  - 'Kenichi Ishigaki - 石垣憲一 (ISHIGAKI) <ishigaki@cpan.org>'
+  - 'Kevin Dawson (BOWTIE) <bowtie@cpan.org>'
+  - 'Kjetil Skotheim (KJETIL)'
+  - 'Marcela Mašláňová (mmaslano)'
+  - 'Marek Roszkowski (EviL) <evil@evil.devil.is-my.name>'
+  - 'Mark Grimes <mgrimes@cpan.org>'
+  - 'Max Maischein (CORION)'
+  - 'Olivier MenguE<eacute> (DOLMEN)'
+  - 'Omer Zak  - עומר זק'
+  - 'Paco Alguacil (PacoLinux)'
+  - 'Patrick Donelan (PDONELAN) <pat@patspam.com>'
+  - 'Paweł Murias (PMURIAS)'
+  - 'Petar Shangov (PSHANGOV)'
+  - 'Ryan Niebur (RSN) <rsn@cpan.org>'
+  - 'Sebastian Willing (SEWI)'
+  - 'Shlomi Fish  - שלומי פיש (SHLOMIF)'
+  - 'Simone Blandino (SBLANDIN)'
+  - 'Steffen Müller (TSEE) <smueller@cpan.org>'
+  - 'Zeno Gantner (ZENOG)'
+  - 'Chuanren Wu'

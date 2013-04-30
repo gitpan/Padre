@@ -1,4 +1,3 @@
-.gitignore
 Artistic
 Changes
 COPYING
@@ -103,6 +102,7 @@ lib/Padre/Document/Perl/QuickFix.pm
 lib/Padre/Document/Perl/QuickFix/IncludeModule.pm
 lib/Padre/Document/Perl/QuickFix/StrictWarnings.pm
 lib/Padre/Document/Perl/Starter.pm
+lib/Padre/Document/Perl/Starter/Style.pm
 lib/Padre/Document/Perl/Syntax.pm
 lib/Padre/Document/Python.pm
 lib/Padre/Document/Python/FunctionList.pm
@@ -149,6 +149,7 @@ lib/Padre/Project/Perl/Temp.pm
 lib/Padre/Project/Temp.pm
 lib/Padre/ProjectManager.pm
 lib/Padre/QuickFix.pm
+lib/Padre/Role/PubSub.pm
 lib/Padre/Role/Task.pm
 lib/Padre/Search.pm
 lib/Padre/ServerManager.pm
@@ -195,7 +196,6 @@ lib/Padre/Util.pm
 lib/Padre/Util/CommandLine.pm
 lib/Padre/Util/FileBrowser.pm
 lib/Padre/Util/SVN.pm
-lib/Padre/Util/Template.pm
 lib/Padre/Util/Win32.pm
 lib/Padre/Wx.pm
 lib/Padre/Wx/Action.pm
@@ -216,6 +216,7 @@ lib/Padre/Wx/CPAN/Listview.pm
 lib/Padre/Wx/Dialog/About.pm
 lib/Padre/Wx/Dialog/Advanced.pm
 lib/Padre/Wx/Dialog/Bookmarks.pm
+lib/Padre/Wx/Dialog/DebugOptions.pm
 lib/Padre/Wx/Dialog/Diff.pm
 lib/Padre/Wx/Dialog/Document.pm
 lib/Padre/Wx/Dialog/Expression.pm
@@ -225,6 +226,7 @@ lib/Padre/Wx/Dialog/FindInFiles.pm
 lib/Padre/Wx/Dialog/Form.pm
 lib/Padre/Wx/Dialog/Goto.pm
 lib/Padre/Wx/Dialog/HelpSearch.pm
+lib/Padre/Wx/Dialog/ModuleStarter.pm
 lib/Padre/Wx/Dialog/OpenResource.pm
 lib/Padre/Wx/Dialog/OpenURL.pm
 lib/Padre/Wx/Dialog/Patch.pm
@@ -265,6 +267,7 @@ lib/Padre/Wx/FBP/Bookmarks.pm
 lib/Padre/Wx/FBP/Breakpoints.pm
 lib/Padre/Wx/FBP/CPAN.pm
 lib/Padre/Wx/FBP/Debugger.pm
+lib/Padre/Wx/FBP/DebugOptions.pm
 lib/Padre/Wx/FBP/DebugOutput.pm
 lib/Padre/Wx/FBP/Diff.pm
 lib/Padre/Wx/FBP/Document.pm
@@ -273,6 +276,7 @@ lib/Padre/Wx/FBP/Find.pm
 lib/Padre/Wx/FBP/FindFast.pm
 lib/Padre/Wx/FBP/FindInFiles.pm
 lib/Padre/Wx/FBP/FoundInFiles.pm
+lib/Padre/Wx/FBP/ModuleStarter.pm
 lib/Padre/Wx/FBP/Outline.pm
 lib/Padre/Wx/FBP/Patch.pm
 lib/Padre/Wx/FBP/PluginManager.pm
@@ -443,6 +447,7 @@ share/icons/padre/16x16/actions/77-w.png
 share/icons/padre/16x16/actions/breakpoints.png
 share/icons/padre/16x16/actions/bub.png
 share/icons/padre/16x16/actions/dot.png
+share/icons/padre/16x16/actions/metared.png
 share/icons/padre/16x16/actions/morpho.png
 share/icons/padre/16x16/actions/morpho2.png
 share/icons/padre/16x16/actions/morpho3.png
@@ -623,6 +628,7 @@ t/perl/functionlist.t
 t/perl/general.t
 t/perl/project.t
 t/perl/project_temp.t
+t/perl/starter.t
 t/perl/syntax.t
 t/perl/zerolengthperl
 t/python/functionlist.t

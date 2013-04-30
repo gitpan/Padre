@@ -8,7 +8,7 @@ use File::Spec      ();
 use Padre::Constant ();
 use Padre::File     ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = 'Padre::File';
 
 sub _reformat_filename {
@@ -205,7 +205,9 @@ sub splitall {
 
 sub readonly {
 	my $self = shift;
-	return 1 if ( !-w $self->{filename} );
+	# see #1447
+	# return 1 if ( !-w $self->{filename} );
+	return 1 if ( -e $self->{filename} && !-w $self->{filename} );
 }
 
 sub browse_url_join {
@@ -228,7 +230,7 @@ sub delete {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

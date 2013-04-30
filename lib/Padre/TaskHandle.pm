@@ -11,7 +11,7 @@ use Storable                 ();
 use Padre::Wx::Role::Conduit ();
 use Padre::Logger;
 
-our $VERSION  = '0.96';
+our $VERSION  = '0.98';
 our $SEQUENCE = 0;
 
 
@@ -131,8 +131,8 @@ sub from_array {
 
 	# Load the task class first so we can deserialize
 	TRACE("Loading $array->[1]") if DEBUG;
-	eval "require $array->[1];";
-	die $@ if $@;
+	(my $source = $array->[1].".pm") =~ s{::}{/}g;
+	require $source;
 
 	return bless {
 		hid  => $array->[0] + 0,
@@ -468,7 +468,7 @@ sub tell_status {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

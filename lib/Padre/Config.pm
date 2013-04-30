@@ -1,11 +1,85 @@
 package Padre::Config;
 
-# Configuration subsystem for Padre
+=pod
 
-# To help force the break from the first-generation HASH based configuration
-# over to the second-generation method based configuration, initially we
-# will use an ARRAY-based object, so that all existing code is forcefully
-# broken.
+=head1 NAME
+
+Padre::Config - Configuration subsystem for Padre
+
+=head1 SYNOPSIS
+
+    use Padre::Config;
+    [...]
+    if ( Padre::Config->main_statusbar ) { [...] }
+
+=head1 DESCRIPTION
+
+This module not only stores the complete Padre configuration, it also holds
+the functions for loading and saving the configuration.
+
+The Padre configuration lives in two places:
+
+=over
+
+=item a user-editable text file usually called F<config.yml>
+
+=item an SQLite database which shouldn't be edited by the user
+
+=back
+
+=head2 Generic usage
+
+Every setting is accessed by a mutator named after it as follows:
+
+  # Get the identity of the current user
+  my $name = $config->identity_name;
+  
+  # Set the identity of the current user
+  my $changed = $config->identity_name("John Smith");
+
+=head2 Different types of settings
+
+Padre needs to store different types of settings, storing them in different
+places depending on their impact, with C<Padre::Config> allows access to access
+them with a unified API (a mutator).
+
+Here are the various types of settings that C<Padre::Config> can manage:
+
+=over 4
+
+=item * User settings
+
+Those settings are general settings that relates to user preferences. They range
+from general user interface I<look & feel> (whether to show the line numbers, etc.)
+to editor preferences (tab width, etc.) and other personal settings.
+
+Those settings are stored in a YAML file in your configuration directory (which you
+can see in the About dialog)
+
+=item * Host settings
+
+Those preferences are related to the host on which Padre is run. The principal
+example of those settings is the locatio of the main window appearance, and other
+values which could be different between different operating systems and machines.
+
+Those settings are stored in a SQLite file.
+
+=item * Project settings
+
+Those preferences are related to the project of the file you are currently
+editing and allow, in principle, projects to set policies on certain values.
+
+Examples of those settings are whether to use tabs or spaces, etc.
+
+=back
+
+=head1 METHODS
+
+While the vast majority of the methods for this class are mutator front ends,
+a number of methods exist which allow you to interact with the config system
+more directly.
+
+=cut
 
 use 5.008;
 use strict;
@@ -23,7 +97,7 @@ use Padre::Config::Host    ();
 use Padre::Locale::T;
 use Padre::Logger;
 
-our $VERSION    = '0.96';
+our $VERSION    = '0.98';
 our $COMPATIBLE = '0.93';
 
 our ( %SETTING, %DEFAULT, %STARTUP, $REVISION, $SINGLETON );
@@ -52,6 +126,9 @@ use Class::XSAccessor::Array {
 		host    => Padre::Constant::HOST,
 		human   => Padre::Constant::HUMAN,
 		project => Padre::Constant::PROJECT,
+	},
+	accessors => {
+		restart => Padre::Constant::RESTART,
 	}
 };
 
@@ -71,8 +148,19 @@ my $PANEL_OPTIONS = {
 # This section identifies the set of all named configuration entries,
 # and where the configuration system should resolve them to.
 
+=pod
+
+=head2 settings
+
+  my @names = Padre::Config->settings;
+
+Returns the names of all registered settings as a sorted list.
+
+=cut
+
 sub settings {
-	sort keys %SETTING;
+	my @names = keys %SETTING;
+	return wantarray ? sort @names : scalar @names;
 }
 
 #
@@ -126,7 +214,7 @@ sub new {
 	}
 
 	# Create the basic object with the two required elements
-	my $self = bless [ $host, $human, undef ], $class;
+	my $self = bless [ $host, $human, undef, 0 ], $class;
 
 	# Add the optional third element
 	if (@_) {
@@ -139,6 +227,21 @@ sub new {
 
 	return $self;
 }
+
+=pod
+
+=head2 read
+
+  my $config = Padre::Config->read;
+
+The C<read> method reads and loads the config singleton for the current instance of Padre
+from the various places it is stored, or returns the singleton again if it has already
+been loaded.
+
+Returns a B<Padre::Config> object, or throws an exception if loaded of the configuration
+fails.
+
+=cut
 
 sub read {
 	my $class = shift;
@@ -209,9 +312,38 @@ sub clone {
 ######################################################################
 # Main Methods
 
+=pod
+
+=head2 meta
+
+  my $setting = Padre::Config->meta("identity_name");
+
+The C<meta> method finds the configuration metadata for a named
+setting.
+
+Returns a L<Padre::Config::Setting> object, or throws an exception if the
+named setting does not exist.
+
+=cut
+
 sub meta {
 	$SETTING{ $_[1] } or die("Missing or invalid setting name '$_[1]'");
 }
+
+=pod
+
+=head2 default
+
+  my $value = Padre::Config->default("main_directory_panel");
+
+The C<default> method reports the default value for the setting in the
+context of the currently running instance of Padre (some settings may have
+different default on different operating systems, for example)
+
+Returns a value that is legal for the setting type, or throws an exception if
+the named setting does not exist.
+
+=cut
 
 sub default {
 	my $self = shift;
@@ -225,6 +357,22 @@ sub default {
 	return $DEFAULT{$name};
 }
 
+=pod
+
+=head2 changed
+
+  my $same = ! $config->changed( "identity_name", "John Smith" );
+
+The C<changed> method takes a named setting and a value for that setting,
+and determines if setting that value on the config would result in the
+configuration being changed.
+
+Returns true if the value provided is different to the current setting, or
+false if the value provided is the same (or effectively the same) as the
+current setting.
+
+=cut
+
 sub changed {
 	my $self = shift;
 	my $name = shift;
@@ -237,6 +385,23 @@ sub changed {
 		return $new != $old;
 	}
 }
+
+=pod
+
+=head2 set
+
+  my $changed = $config->set("identity_name", "John Smith");
+
+The C<set> method takes a named setting and a value and modifies the
+configuration object to have that value.
+
+Changes made to the configuration in this manner will not be reflected in
+the running instance, for that you should use the C<apply> method.
+
+Returns true, or throws an exception on errors such as a non-existant setting
+name or an illegal value for that setting type.
+
+=cut
 
 sub set {
 	TRACE( $_[1] ) if DEBUG;
@@ -307,8 +472,31 @@ sub set {
 	return 1;
 }
 
-# Set a value in the configuration and apply the preference change
-# to the application.
+=pod
+
+=head2 apply
+
+  my $changed = $config->apply("main_directory_panel", "right");
+
+The C<apply> method is a higher order version of the C<set> which will set
+the configuration value, and then immediately update the running instance of
+Padre to reflect the change.
+
+For example, if the directory panel is open and on the left side of the
+display, running the sample code above will change the location preference to
+the right side and immediately move the directory panel to the other side of
+the IDE.
+
+See L<Padre::Config::Apply> for more information on Padre's on-the-fly
+configuration change support.
+
+Returns true if the configuration was changed, false if the value was the
+same as the existing configuration value and did not need to be modified,
+or throws an exception on errors such as a non-existant setting name or
+an illegal value for that setting type.
+
+=cut
+
 sub apply {
 	TRACE( $_[0] ) if DEBUG;
 	my $self = shift;
@@ -321,21 +509,26 @@ sub apply {
 		Carp::croak("The configuration setting '$name' does not exist");
 	}
 
+	# Shortcut if the value has not changed
+	my $changed = $self->changed($name, $new);
+	return $changed unless $changed;
+
+	# Set the config value
 	my $old = $self->$name();
-	if ( $old ne $new ) {
+	$self->set( $name => $new );
 
-		# Set the config value
-		$self->set( $name => $new );
-
-		# Does this setting have an apply hook
-		my $code = do {
-			require Padre::Config::Apply;
-			Padre::Config::Apply->can($name);
-		};
-		if ($code) {
-			my $current = Padre::Current::_CURRENT(@_);
-			$code->( $current->main, $new, $old );
-		}
+	# Does this setting have an apply hook
+	my $code = do {
+		require Padre::Config::Apply;
+		Padre::Config::Apply->can($name);
+	};
+	if ( $code ) {
+		# Hand off control to the apply hook
+		my $current = Padre::Current::_CURRENT(@_);
+		$code->( $current->main, $new, $old );
+	} elsif ( $setting->restart ) {
+		# Change requires a restart of Padre
+		$self->restart(1);
 	}
 
 	return 1;
@@ -1202,12 +1395,6 @@ setting(
 	store   => Padre::Constant::HUMAN,
 	default => '',
 );
-setting(
-	name    => 'locale_perldiag',
-	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
-	default => '',
-);
 
 # Colour Data
 # Since it's in local files, it has to be a host-specific setting.
@@ -1291,6 +1478,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 );
 
 # Disable convenience font-size changes.
@@ -1301,6 +1489,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 );
 
 # Disable code folding.
@@ -1310,6 +1499,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 );
 
 # Disable session support.
@@ -1319,6 +1509,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 );
 
 # Disable remembering cursor position.
@@ -1328,6 +1519,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 );
 
 # Disable GUI debugger.
@@ -1338,6 +1530,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 );
 
 # Enable experimental quick fix system.
@@ -1346,6 +1539,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 );
 
 # Enable experimental preference sync support.
@@ -1354,6 +1548,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 );
 
 # Enable experimental expanded style support
@@ -1362,6 +1557,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 );
 
 # Enable experimental Run with Devel::EndStats support.
@@ -1370,6 +1566,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 	help    => _T('Enable or disable the Run with Devel::EndStats if it is installed. ')
 		. _T('This requires an installed Devel::EndStats and a Padre restart'),
 );
@@ -1389,6 +1586,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 	help    => _T('Enable or disable the Run with Devel::TraceUse if it is installed. ')
 		. _T('This requires an installed Devel::TraceUse and a Padre restart'),
 );
@@ -1408,6 +1606,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 	help    => _T('Enable syntax checker annotations in the editor')
 );
 
@@ -1417,6 +1616,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 	help    => _T('Enable document differences feature')
 );
 
@@ -1426,6 +1626,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 	help    => _T('Enable version control system support')
 );
 
@@ -1435,6 +1636,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 1,
+	restart => 1,
 	help    => _T('Enable the CPAN Explorer, powered by MetaCPAN'),
 );
 
@@ -1444,6 +1646,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 	help    => _T('Toggle Diff window feature that compares two buffers graphically'),
 );
 
@@ -1453,6 +1656,7 @@ setting(
 	type    => Padre::Constant::BOOLEAN,
 	store   => Padre::Constant::HUMAN,
 	default => 0,
+	restart => 1,
 	help    => _T('Enable the experimental command line interface'),
 );
 
@@ -1650,21 +1854,21 @@ setting(
 setting(
 	name    => 'config_sync_server',
 	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
+	store   => Padre::Constant::HOST,
 	default => 'http://sync.perlide.org/',
 );
 
 setting(
 	name    => 'config_sync_username',
 	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
+	store   => Padre::Constant::HOST,
 	default => '',
 );
 
 setting(
 	name    => 'config_sync_password',
 	type    => Padre::Constant::ASCII,
-	store   => Padre::Constant::HUMAN,
+	store   => Padre::Constant::HOST,
 	default => '',
 );
 
@@ -1690,77 +1894,58 @@ setting(
 	default => '',
 );
 
+
+# Support for Module::Starter
+setting(
+	name    => 'module_starter_directory',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => '',
+);
+setting(
+	name    => 'module_starter_builder',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'Module::Install',
+	options => {
+		'ExtUtils::MakeMaker' => 'ExtUtils::MakeMaker',
+		'Module::Build'       => 'Module::Build',
+		'Module::Install'     => 'Module::Install',
+	},
+);
+setting(
+	name    => 'module_starter_license',
+	type    => Padre::Constant::ASCII,
+	store   => Padre::Constant::HUMAN,
+	default => 'perl',
+
+	# licenses list taken from
+	# http://search.cpan.org/dist/Module-Build/lib/Module/Build/API.pod
+	# even though it should be in http://module-build.sourceforge.net/META-spec.html
+	# and we should fetch it from Module::Start or maybe Software::License.
+	# (but don't load them in this module, it adds bloat)
+	options => {
+		'apache'       => _T('Apache License'),
+		#'artistic'     => _T('Artistic License 1.0'),
+		#'artistic_2'   => _T('Artistic License 2.0'),
+		'bsd'          => _T('Revised BSD License'),
+		'gpl'          => _T('GPL 2 or later'),
+		'lgpl'         => _T('LGPL 2.1 or later'),
+		'mit'          => _T('MIT License'),
+		#'mozilla'      => _T('Mozilla Public License'),
+		#'open_source'  => _T('Other Open Source'),
+		'perl'         => _T('The same as Perl itself'),
+		#'unrestricted' => _T('Other Unrestricted'),
+		#'restrictive'  => _T('Proprietary/Restrictive'),
+	},
+);
+
+
 1;
 
 __END__
 
 =pod
-
-=head1 NAME
-
-Padre::Config - Configuration subsystem for Padre
-
-=head1 SYNOPSIS
-
-    use Padre::Config;
-    [...]
-    if ( Padre::Config->main_statusbar ) { [...] }
-
-=head1 DESCRIPTION
-
-This module not only stores the complete Padre configuration, it also holds
-the functions for loading and saving the configuration.
-
-The Padre configuration lives in two places:
-
-=over
-
-=item a user-editable text file usually called F<config.yml>
-
-=item an SQLite database which shouldn't be edited by the user
-
-=back
-
-=head2 Generic usage
-
-Every setting is accessed by a mutator named after it,
-i.e. it can be used both as a getter and a setter depending on the number
-of arguments passed to it.
-
-=head2 Different types of settings
-
-Padre needs to store different settings. Those preferences are stored in
-different places depending on their impact. But C<Padre::Config> allows to
-access them with a unified API (a mutator). Only their declaration differs
-in the module.
-
-Here are the various types of settings that C<Padre::Config> can manage:
-
-=over 4
-
-=item * User settings
-
-Those settings are general settings that relates to user preferences. They range
-from general user interface I<look & feel> (whether to show the line numbers, etc.)
-to editor preferences (tab width, etc.) and other personal settings.
-
-Those settings are stored in a YAML file, and accessed with C<Padre::Config::Human>.
-
-=item * Host settings
-
-Those preferences are related to the host on which Padre is run. The principal
-example of those settings are window appearance.
-
-Those settings are stored in a DB file, and accessed with C<Padre::Config::Host>.
-
-=item * Project settings
-
-Those preferences are related to the project of the file you are currently
-editing. Examples of those settings are whether to use tabs or spaces, etc.
-
-Those settings are accessed with C<Padre::Config::Project>.
-
-=back
 
 =head1 ADDING CONFIGURATION OPTIONS
 
@@ -1773,14 +1958,14 @@ a own value.
 
 =head1 COPYRIGHT & LICENSE
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 This program is free software; you can redistribute it and/or modify it under the
 same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -1,6 +1,6 @@
 package Padre::Wx::Outline;
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 use Scalar::Util             ();
@@ -15,7 +15,7 @@ use Padre::Wx::Role::Context ();
 use Padre::Wx::FBP::Outline  ();
 use Padre::Logger;
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 our @ISA     = qw{
 	Padre::Role::Task
 	Padre::Wx::Role::Idle
@@ -24,9 +24,6 @@ our @ISA     = qw{
 	Padre::Wx::Role::Context
 	Padre::Wx::FBP::Outline
 };
-
-
-
 
 
 ######################################################################
@@ -120,9 +117,6 @@ sub new {
 }
 
 
-
-
-
 #####################################################################
 # Event Handlers
 
@@ -174,9 +168,6 @@ sub on_tree_item_right_click {
 }
 
 
-
-
-
 ######################################################################
 # Padre::Wx::Role::Context Methods
 
@@ -185,9 +176,6 @@ sub context_menu {
 	my $menu = shift;
 	$self->context_append_options( $menu => 'main_outline_panel' );
 }
-
-
-
 
 
 ######################################################################
@@ -208,9 +196,6 @@ sub view_close {
 sub view_stop {
 	$_[0]->task_reset;
 }
-
-
-
 
 
 ######################################################################
@@ -286,9 +271,6 @@ sub render {
 
 	return;
 }
-
-
-
 
 
 ######################################################################
@@ -425,6 +407,10 @@ sub add_subtree {
 
 		foreach my $item (@sorted_entries) {
 			my $name = $item->{name};
+
+			#ToDo hack to remove double spacing caused by a stray has with no value, works with PPIx 0.15_02 but overwites
+			$name =~ s/\n//;
+
 			next if $name !~ /$term/;
 			my $item = $tree->AppendItem(
 				$type_elem,
@@ -437,7 +423,6 @@ sub add_subtree {
 				)
 			);
 			$tree->SetItemImage( $item, $images->{file} );
-
 		}
 	}
 	if ( defined $type_elem ) {
@@ -445,6 +430,8 @@ sub add_subtree {
 			$tree->Expand($type_elem);
 		} else {
 			if ( $type eq 'methods' ) {
+				$tree->Expand($type_elem);
+			} elsif ( $type eq 'attributes' ) {
 				$tree->Expand($type_elem);
 			} else {
 				if ( $tree->IsExpanded($type_elem) ) {
@@ -473,7 +460,7 @@ sub select_line_in_editor {
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -1,7 +1,15 @@
-#!/usr/bin/perl
+#![% style.bin_perl %]
 
-use 5.010;
+[% IF style.use_perl %]
+[% style.use_perl %]
+[% END %]
+[% IF style.use_strict %]
 use strict;
+[% END %]
+[% IF style.use_warnings %]
 use warnings;
+[% END %]
+[% IF style.version_line %]
+[% style.version_line %]
+[% END %]
 
-say 'Hello World!';

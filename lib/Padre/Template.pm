@@ -8,7 +8,7 @@ use Padre::Util     ();
 use Padre::Constant ();
 use Padre::Current  ();
 
-our $VERSION = '0.96';
+our $VERSION = '0.98';
 
 use constant TEMPLATE_DIRECTORY => Padre::Util::sharedir('templates');
 
@@ -41,21 +41,14 @@ sub render {
 
 	# Hand off to Template::Tiny
 	require Template::Tiny;
-	require Padre::Util::Template;
 	my $output = '';
-	my $params = {
-		config => Padre::Current->config,
-		util   => Padre::Util::Template->new,
-		@_,
-	};
-	Template::Tiny->new->process( $input, $params, \$output );
-
+	Template::Tiny->new->process( $input, { @_ }, \$output );
 	return $output;
 }
 
 1;
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.

@@ -18,7 +18,7 @@ plug-ins, as well as providing part of the interface to plug-in writers.
 # API NOTES:
 # - This class uses english-style verb_noun method naming
 
-use 5.008;
+use 5.010;
 use strict;
 use warnings;
 use Carp                   ();
@@ -37,9 +37,7 @@ use Padre::Wx              ();
 use Padre::Wx::Menu::Tools ();
 use Padre::Locale::T;
 
-our $VERSION = '0.96';
-
-
+our $VERSION = '0.98';
 
 
 
@@ -150,6 +148,7 @@ sub main {
 # so cache the result.
 sub plugin_order {
 	my $self = shift;
+
 	unless ( $self->{plugin_order} ) {
 
 		# Schwartzian transform that sorts the plugins by their
@@ -157,12 +156,13 @@ sub plugin_order {
 		$self->{plugin_order} = [
 			map { $_->[0] } sort {
 				( $b->[0] eq 'Padre::Plugin::My' ) <=> ( $a->[0] eq 'Padre::Plugin::My' )
-					or $a->[1] cmp $b->[1]
+					or $a->[0] cmp $b->[0]
 				} map {
 				[ $_->class, $_->plugin_name ]
 				} values %{ $self->{plugins} }
 		];
 	}
+
 	return @{ $self->{plugin_order} };
 }
 
@@ -695,7 +695,8 @@ is passed in as first argument.
 
 sub reload_plugin {
 	my $self   = shift;
-	my $handle = self->handle(shift) or return;
+	my $handle = shift or return;
+
 	my $lock   = $self->main->lock( 'UPDATE', 'DB', 'refresh_menu_plugins' );
 	$self->_unload_plugin($handle);
 	$self->_load_plugin($handle)   or return;
@@ -939,9 +940,10 @@ sub on_context_menu {
 
 	foreach my $handle ( $self->handles ) {
 		next unless $handle->can_context;
-		foreach my $handle ( $self->handles ) {
+		# commeted out, as it kills padre, only used in p-p-Git, see #1448 & #1449
+		# foreach my $handle ( $self->handles ) {
 			$handle->plugin->event_on_context_menu(@_);
-		}
+		# }
 	}
 
 	return ();
@@ -1059,7 +1061,7 @@ L<Padre>, L<Padre::Config>
 
 =head1 COPYRIGHT
 
-Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 
 =head1 LICENSE
 
@@ -1068,7 +1070,7 @@ modify it under the same terms as Perl 5 itself.
 
 =cut
 
-# Copyright 2008-2012 The Padre development team as listed in Padre.pm.
+# Copyright 2008-2013 The Padre development team as listed in Padre.pm.
 # LICENSE
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl 5 itself.
