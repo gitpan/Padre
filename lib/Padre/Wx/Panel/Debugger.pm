@@ -3,6 +3,7 @@ package Padre::Wx::Panel::Debugger;
 use 5.010;
 use strict;
 use warnings;
+no if $] > 5.017010, warnings => 'experimental::smartmatch';
 
 use utf8;
 use Padre::Util              ();
@@ -16,7 +17,7 @@ use Padre::Breakpoints       ();
 use Padre::Logger;
 use Debug::Client 0.20 ();
 
-our $VERSION = '0.98';
+our $VERSION = '1.00';
 our @ISA     = qw{
 	Padre::Wx::Role::View
 	Padre::Wx::FBP::Debugger
@@ -294,7 +295,7 @@ sub debug_perl {
 	#TODO how do we add debug options at startup such as threaded mode
 
 	# Set up the debugger
-	my $host = 'localhost';
+	my $host = '127.0.0.1';
 	my $port = 24642 + int rand(1000); # TODO make this configurable?
 	SCOPE: {
 		local $ENV{PERLDB_OPTS} = "RemotePort=$host:$port";
@@ -460,7 +461,7 @@ sub update_debug_user_interface {
 	my $output = shift;
 	my $main = $self->main;
 
-	my $module = $self->{client}->module;
+	my $module = $self->{client}->module || BLANK;
 	$self->{client}->get_lineinfo;
 
 	if ( $module eq '<TERMINATED>' ) {

@@ -3,13 +3,15 @@ package Padre::Wx::Dialog::PluginManager;
 use 5.010;
 use strict;
 use warnings;
+no if $] > 5.017010, warnings => 'experimental::smartmatch';
+
 use Padre::Wx::Util               ();
 use Padre::Wx::Icon               ();
 use Padre::Wx::FBP::PluginManager ();
 use Padre::Locale::T;
 use Try::Tiny;
 
-our $VERSION = '0.98';
+our $VERSION = '1.00';
 our @ISA     = 'Padre::Wx::FBP::PluginManager';
 
 

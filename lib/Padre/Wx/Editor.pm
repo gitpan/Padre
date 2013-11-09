@@ -34,7 +34,7 @@ use Padre::Wx::Role::Main     ();
 use Padre::Wx::Role::Timer    ();
 use Padre::Logger;
 
-our $VERSION    = '0.98';
+our $VERSION    = '1.00';
 our $COMPATIBLE = '0.91';
 our @ISA        = (
 	'Padre::Wx::Role::Main',
@@ -1462,8 +1462,22 @@ sub convert_eols {
 	return 1;
 }
 
+# hack for cut n paste - start
+sub Cut {
+	my $self = shift;
+	$self->{internal_copy} = $self->GetSelectedText;
+	return $self->SUPER::Cut(@_);
+}
+
+sub Copy {
+	my $self = shift;
+	$self->{internal_copy} = $self->GetSelectedText;
+	return $self->SUPER::Copy(@_);
+}
+
 sub CanPaste {
 	my $self = shift;
+	return 1 if $self->{internal_copy};
 	return 0 unless $self->SUPER::CanPaste;
 	return 0 unless $self->clipboard_length;
 	return 1;
@@ -1483,10 +1497,13 @@ sub Paste {
 		# Please see ticket:589, "Pasting in a UNIX document in win32
 		# corrupts it to MIXEd"
 		$self->ReplaceSelection( $self->_convert_paste_eols($text) );
+	} else {
+		$self->ReplaceSelection( $self->_convert_paste_eols( $self->{internal_copy} ) );
 	}
 
 	return 1;
 }
+# hack for cut n past - end 
 
 #
 # This method converts line ending based on current document EOL mode

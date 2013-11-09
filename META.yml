@@ -76,7 +76,7 @@ requires:
   DBD::SQLite: 1.35
   DBI: 1.58
   Data::Dumper: 2.101
-  Debug::Client: 0.24
+  Debug::Client: 0.29
   Devel::Dumpvar: 0.04
   Devel::Refactor: 0.05
   Encode: 2.26
@@ -122,7 +122,7 @@ requires:
   PPIx::EditorTools: 0.18
   PPIx::Regexp: 0.011
   Params::Util: 0.33
-  Parse::ErrorString::Perl: 0.14
+  Parse::ErrorString::Perl: 0.18
   Parse::ExuberantCTags: 1.00
   Pod::Abstract: 0.16
   Pod::Functions: 0
@@ -145,7 +145,7 @@ requires:
   Wx::Perl::ProcessStream: 0.32
   Wx::Scintilla: 0.39
   YAML::Tiny: 1.32
-  perl: 5.010000
+  perl: 5.011000
   threads: 1.71
   threads::shared: 1.33
   version: 0.80
@@ -154,7 +154,7 @@ resources:
   homepage: http://padre.perlide.org/
   license: http://dev.perl.org/licenses/
   repository: http://svn.perlide.org/padre/trunk/Padre/
-version: 0.98
+version: 1.00
 x_contributors:
   - 'Aaron Trevena (TEEJAY)'
   - 'Adam Kennedy (ADAMK) <adamk@cpan.org>'
@@ -193,6 +193,7 @@ x_contributors:
   - 'Patrick Donelan (PDONELAN) <pat@patspam.com>'
   - 'Paweł Murias (PMURIAS)'
   - 'Petar Shangov (PSHANGOV)'
+  - 'Peter Lavender (PLAVEN)'
   - 'Ryan Niebur (RSN) <rsn@cpan.org>'
   - 'Sebastian Willing (SEWI)'
   - 'Shlomi Fish  - שלומי פיש (SHLOMIF)'

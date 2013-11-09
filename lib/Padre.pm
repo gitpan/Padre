@@ -20,7 +20,7 @@ use YAML::Tiny    ();
 use DBI           ();
 use DBD::SQLite   ();
 
-our $VERSION    = '0.98';
+our $VERSION    = '1.00';
 our $COMPATIBLE = '0.95';
 
 # Since everything is used OO-style, we will be require'ing
@@ -725,6 +725,8 @@ Patrick Donelan (PDONELAN) E<lt>pat@patspam.comE<gt>
 Paweł Murias (PMURIAS)
 
 Petar Shangov (PSHANGOV)
+
+Peter Lavender (PLAVEN)
 
 Ryan Niebur (RSN) E<lt>rsn@cpan.orgE<gt>
 

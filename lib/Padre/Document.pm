@@ -98,7 +98,7 @@ implements the features of that MIME type. By default Padre
 supports the built-in syntax highlighting of Scintilla.
 Perl 5 currently has two L<PPI> based syntax highlighter,
 Perl 6 can use the STD.pm or Rakudo/PGE for syntax highlighting but
-there are two plug-ins – Parrot and Kate – that can provide syntax
+there are two plug-ins - Parrot and Kate - that can provide syntax
 highlighting to a wide range of MIME types.
 
 C<provided_highlighters()> returns a list of arrays like this:
@@ -135,7 +135,7 @@ use Padre::MIME             ();
 use Padre::File             ();
 use Padre::Logger;
 
-our $VERSION    = '0.98';
+our $VERSION    = '1.00';
 our $COMPATIBLE = '0.91';
 
 

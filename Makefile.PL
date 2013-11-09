@@ -73,7 +73,7 @@ name 'Padre';
 license 'perl';
 author 'Gabor Szabo';
 all_from 'lib/Padre.pm';
-requires 'perl' => '5.010000';
+requires 'perl' => '5.011000';
 
 # General dependencies
 requires 'Algorithm::Diff'          => '1.19';
@@ -88,7 +88,7 @@ requires 'Cwd'                      => '3.2701';
 requires 'Data::Dumper'             => '2.101';
 requires 'DBD::SQLite'              => '1.35';
 requires 'DBI'                      => '1.58';
-requires 'Debug::Client'            => '0.24';
+requires 'Debug::Client'            => '0.29';
 requires 'Devel::Dumpvar'           => '0.04';
 requires 'Devel::Refactor'          => '0.05';
 requires 'Encode'                   => '2.26';
@@ -129,7 +129,7 @@ requires 'Module::Starter'          => '1.60';
 requires 'ORLite'                   => '1.98';
 requires 'ORLite::Migrate'          => '1.10';
 requires 'Params::Util'             => '0.33';
-requires 'Parse::ErrorString::Perl' => '0.14';
+requires 'Parse::ErrorString::Perl' => '0.18';
 requires 'Parse::ExuberantCTags'    => '1.00';
 requires 'Pod::Functions'           => 0;
 requires 'Pod::POM'                 => '0.17';
@@ -250,6 +250,7 @@ Meta->add_metadata(
         'Patrick Donelan (PDONELAN) <pat@patspam.com>',
         'Paweł Murias (PMURIAS)',
         'Petar Shangov (PSHANGOV)',
+	'Peter Lavender (PLAVEN)',
         'Ryan Niebur (RSN) <rsn@cpan.org>',
         'Sebastian Willing (SEWI)',
         'Shlomi Fish  - שלומי פיש (SHLOMIF)',

@@ -60,7 +60,7 @@ use Padre::Wx::Role::Timer    ();
 use Padre::Wx::Role::Idle     ();
 use Padre::Locale::T;
 use Padre::Logger;
-our $VERSION    = '0.98';
+our $VERSION    = '1.00';
 our $COMPATIBLE = '0.91';
 our @ISA        = qw{
 	Padre::Wx::Role::Conduit
@@ -1512,6 +1512,7 @@ sub refresh {
 		# $self->aui->GetPane('notebook')->PaneBorder(1);
 	}
 
+	$self->refresh_breakpoint_panel($current);
 	return;
 }
 
@@ -1996,6 +1997,23 @@ sub refresh_diff {
 	return unless Padre::Feature::DIFF_DOCUMENT;
 	return if $self->locked('REFRESH');
 	$self->diff->refresh( $_[0] or $self->current );
+	return;
+}
+
+=pod
+
+=head3 C<refresh_breakpoint_panel>
+
+    $main->refresh_breakpoint_panel;
+
+Refresh of the Breakpoints panel if open, required as we load and switch tabs.
+
+=cut
+sub refresh_breakpoint_panel {
+	my $self = shift;
+	return unless $self->current->main->{breakpoints};
+	return if $self->locked('REFRESH');
+	$self->current->main->{breakpoints}->on_refresh_click();
 	return;
 }
 
@@ -5898,6 +5916,7 @@ sub editor_focus {
 	my $self   = shift;
 	my $editor = $self->current->editor;
 	$editor->SetFocus if $editor;
+	
 	return;
 }
 

@@ -26,7 +26,7 @@ use List::Util   ();
 use Params::Util ();
 use Padre::MIME  ();
 
-our $VERSION    = '0.98';
+our $VERSION    = '1.00';
 our $COMPATIBLE = '0.95';
 
 my %MIME = ();
@@ -290,6 +290,7 @@ Padre::Comment->register(
 	'application/x-pir'         => '#',
 	'text/x-perltt'             => '<!-- -->',
 	'application/x-php'         => '#',
+	'text/x-perlxs'             => '#',   # Define our own MIME type
 	'text/x-pod'                => '#',
 	'text/x-povray'             => '//',
 	'text/x-python'             => '#',
